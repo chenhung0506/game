@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Battle Prototype</title>
+<style>
+  body { margin: 0; background: #14161c; color: #e8e8ea; font: 14px system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; }
+  canvas { background: #2b3a2f; max-width: 100%; margin-top: 12px; border: 2px solid #3d4a40; }
+  #bar { padding: 10px 16px; text-align: center; line-height: 1.6; }
+  code { background: #262a33; padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<canvas id="c" width="800" height="500"></canvas>
+<div id="bar2" style="padding:8px 16px;opacity:.7">移動 WASD / 方向鍵　跳躍 空白鍵（落地壓人）　地震 J（打不到空中的人）</div>
+<script>
+// Arena and radii mirror game.go; keep them in sync.
+const SLAM_R = 70, QUAKE_R = 100;
+const COLORS = ['#f5c542', '#6aa5c9'];
+
+let room = new URLSearchParams(location.search).get('room');
+if (!room) { room = Math.random().toString(36).slice(2, 8); location.replace('?room=' + room); }
+
+const bar = document.getElementById('bar');
+const ctx = document.getElementById('c').getContext('2d');
+let you = -1, snap = null, waiting = true, status = '連線中…';
+const disp = [{ x: 200, y: 250, z: 0 }, { x: 600, y: 250, z: 0 }]; // smoothed positions
+let fx = [], shake = 0;
+
+const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room);
+ws.onmessage = (e) => {
+  const m = JSON.parse(e.data);
+  if (m.t === 'hi') you = m.you;
+  else if (m.t === 'wait') { waiting = true; snap = null; }
+  else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
+  else if (m.t === 's') {
+    waiting = false; snap = m;
+    for (const ev of m.e || []) { fx.push({ ...ev, age: 0 }); if (ev.t === 'slam') shake = 8; }
+  }
+};
+ws.onclose = () => { status = '連線中斷，重新整理頁面再試'; waiting = false; snap = null; };
+
+// ---- input: send only when the held-key state changes ----
+const keys = new Set();
+let last = '';
+function sendInput() {
+  const k = (n) => keys.has(n);
+  const msg = JSON.stringify({
+    dx: (k('d') || k('arrowright') ? 1 : 0) - (k('a') || k('arrowleft') ? 1 : 0),
+    dy: (k('s') || k('arrowdown') ? 1 : 0) - (k('w') || k('arrowup') ? 1 : 0),
+    jump: k(' '), atk: k('j'),
+  });
+  if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
+}
+addEventListener('keydown', (e) => { if (e.key === ' ') e.preventDefault(); keys.add(e.key.toLowerCase()); sendInput(); });
+addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); sendInput(); });
+addEventListener('blur', () => { keys.clear(); sendInput(); }); // no stuck keys after alt-tab
+
+// ---- render ----
+function drawPlayer(i, p) {
+  const d = disp[i];
+  // Snapshots arrive at 30/s; ease toward them so 60fps motion looks smooth.
+  d.x += (p.x - d.x) * 0.4; d.y += (p.y - d.y) * 0.4; d.z += (p.z - d.z) * 0.5;
+  const lift = Math.min(d.z, 200) / 200;
+  // Shadow stays on the ground and shrinks/fades as the player rises.
+  ctx.fillStyle = `rgba(0,0,0,${0.35 - 0.2 * lift})`;
+  ctx.beginPath(); ctx.ellipse(d.x, d.y + 14, 18 * (1 - 0.4 * lift), 7 * (1 - 0.4 * lift), 0, 0, 7); ctx.fill();
+  // Body is drawn at y - z.
+  ctx.fillStyle = COLORS[i];
+  ctx.fillRect(d.x - 16, d.y - d.z - 16, 32, 32);
+  if (i === you) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(d.x - 16, d.y - d.z - 16, 32, 32); }
+  // HP bar follows the body.
+  ctx.fillStyle = '#000a'; ctx.fillRect(d.x - 20, d.y - d.z - 30, 40, 6);
+  ctx.fillStyle = p.hp > 30 ? '#6fd36f' : '#e55'; ctx.fillRect(d.x - 20, d.y - d.z - 30, 40 * p.hp / 100, 6);
+}
+
+function frame() {
+  ctx.save();
+  ctx.clearRect(0, 0, 800, 500);
+  if (shake > 0) { ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake); shake *= 0.85; if (shake < .5) shake = 0; }
+
+  if (snap) {
+    // Draw lower players first so the one nearer the camera overlaps correctly.
+    [0, 1].sort((a, b) => snap.p[a].y - snap.p[b].y).forEach((i) => drawPlayer(i, snap.p[i]));
+    fx = fx.filter((f) => (f.age += 1 / 60) < 0.35);
+    for (const f of fx) {
+      const r = f.t === 'slam' ? SLAM_R : QUAKE_R, k = f.age / 0.35;
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = `rgba(${f.t === 'slam' ? '255,170,60' : '200,160,100'},${1 - k})`;
+      ctx.beginPath(); ctx.ellipse(f.x, f.y + 14, r * k, r * k * 0.4, 0, 0, 7); ctx.stroke();
+    }
+    if (snap.w >= 0) {
+      ctx.fillStyle = '#000a'; ctx.fillRect(0, 200, 800, 100);
+      ctx.fillStyle = '#fff'; ctx.font = '40px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(snap.w === you ? '你贏了！' : '你輸了', 400, 262);
+    }
+  }
+  ctx.restore();
+
+  const link = location.origin + location.pathname + '?room=' + room;
+  bar.innerHTML = waiting ? `等待對手加入… 把這個連結傳給對方：<br><code>${link}</code>` : status === '連線中…' ? '' : status;
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>
