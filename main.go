@@ -223,7 +223,7 @@ func newMux() *http.ServeMux {
 
 func main() {
 	addr := ":" + envOr("PORT", "8080")
-	log.Printf("battle listening on %s", addr)
+	log.Printf("game listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, newMux()))
 }
 
