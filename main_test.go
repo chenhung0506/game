@@ -47,6 +47,12 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if hi["you"] != float64(0) {
 		t.Fatalf("first player index = %v, want 0", hi["you"])
 	}
+	if th, ok := hi["thunder"].(map[string]any); !ok || th["radius"] != float64(60) || th["delay"] != float64(1) || th["interval"] != float64(0.5) || th["strikes"] != float64(3) {
+		t.Fatalf("hi.thunder = %v, want the configured radius/delay/interval/strikes", hi["thunder"])
+	}
+	if arena, ok := hi["arena"].(map[string]any); !ok || arena["w"] != float64(1600) || arena["h"] != float64(1000) {
+		t.Fatalf("hi.arena = %v, want 1600x1000", hi["arena"])
+	}
 	// The client draws the beam's warning line from these, not from hard-coded numbers.
 	if beam, ok := hi["beam"].(map[string]any); !ok || beam["len"] != float64(450) || beam["w"] != float64(50) || beam["charge"] != float64(0.6) || beam["angle"] != float64(30) {
 		t.Fatalf("hi.beam = %v, want the configured length/width/charge", hi["beam"])
@@ -74,15 +80,15 @@ func TestInputMovesPlayerAndLeaveSendsWait(t *testing.T) {
 
 	a, b := dial(t, srv, "mv"), dial(t, srv, "mv")
 	next(t, a, "s")
+	x0 := next(t, b, "s")["p"].([]any)[0].(map[string]any)["x"].(float64) // the real spawn point
 
 	a.WriteMessage(websocket.TextMessage, []byte(`{"dx":1,"dy":0}`))
-	var x float64
-	for i := 0; i < 30 && x <= 200; i++ {
-		p := next(t, b, "s")["p"].([]any)[0].(map[string]any)
-		x = p["x"].(float64)
+	x := x0
+	for i := 0; i < 30 && x <= x0+10; i++ {
+		x = next(t, b, "s")["p"].([]any)[0].(map[string]any)["x"].(float64)
 	}
-	if x <= 200 {
-		t.Fatalf("player 0 x = %v, want > 200 after holding right", x)
+	if x <= x0+10 {
+		t.Fatalf("player 0 x = %v (started at %v), want it to move right when holding right", x, x0)
 	}
 
 	a.Close()

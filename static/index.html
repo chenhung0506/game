@@ -6,41 +6,47 @@
 <title>Battle Prototype</title>
 <style>
   body { margin: 0; background: #14161c; color: #e8e8ea; font: 14px system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; }
-  canvas { background: #2b3a2f; max-width: 100%; margin-top: 12px; border: 2px solid #3d4a40; }
+  canvas { background: #2b3a2f; max-width: 100%; max-height: calc(100vh - 120px); margin-top: 12px; border: 2px solid #3d4a40; }
   #bar { padding: 10px 16px; text-align: center; line-height: 1.6; }
   code { background: #262a33; padding: 2px 6px; border-radius: 4px; }
 </style>
 </head>
 <body>
 <div id="bar"></div>
-<canvas id="c" width="800" height="500"></canvas>
+<canvas id="c" width="1600" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
 <script>
 // Arena and radii mirror game.go; keep them in sync.
 const SLAM_R = 70, QUAKE_R = 100;
 // Slot 0 is always Pikachu, slot 1 Snorlax (fixed by the server).
 const HELP = [
-  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震（打不到空中的人）',
-  '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人）　J＝地震　K＝破壞死光（朝面向方向扇形掃射，蓄力與掃射時定身，之後硬直）',
+  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震　L＝打雷（敵人頭上出現陰影，之後落雷，陰影會追著敵人）',
+  '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人）　J＝地震　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
 ];
 const ghosts = []; // dash afterimages
 const beamLook = { ang: null, tail: null }; // smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }; // replaced by the server's values in 'hi'
+let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewise
+const shadow = { x: null, y: null }; // smoothed thunder shadow position
+const smoke = []; // puffs rising off Snorlax while it recharges
+let smokeAcc = 0;
 
 let room = new URLSearchParams(location.search).get('room');
 if (!room) { room = Math.random().toString(36).slice(2, 8); location.replace('?room=' + room); }
 
 const bar = document.getElementById('bar');
-const ctx = document.getElementById('c').getContext('2d');
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let arena = { w: 1600, h: 1000 }; // replaced by the server's values in 'hi'
 let you = -1, snap = null, waiting = true, status = '連線中…';
-const disp = [{ x: 200, y: 250, z: 0 }, { x: 600, y: 250, z: 0 }]; // smoothed positions
+const disp = [{ x: null, y: 0, z: 0 }, { x: null, y: 0, z: 0 }]; // smoothed positions; set from the first snapshot
 let fx = [], shake = 0;
 
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room);
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; document.getElementById('bar2').textContent = HELP[you]; }
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; arena = m.arena; cv.width = tele.width = arena.w; cv.height = tele.height = arena.h; document.getElementById('bar2').textContent = HELP[you]; }
   else if (m.t === 'wait') { waiting = true; snap = null; }
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
@@ -52,6 +58,7 @@ ws.onmessage = (e) => {
     for (const ev of m.e || []) {
       fx.push({ ...ev, age: 0 });
       if (ev.t === 'slam') shake = 8;
+      if (ev.t === 'thunder') shake = 10;
     }
   }
 };
@@ -65,7 +72,7 @@ function sendInput() {
   const msg = JSON.stringify({
     dx: (k('d') || k('arrowright') ? 1 : 0) - (k('a') || k('arrowleft') ? 1 : 0),
     dy: (k('s') || k('arrowdown') ? 1 : 0) - (k('w') || k('arrowup') ? 1 : 0),
-    skill: k(' '), atk: k('j'), beam: k('k'),
+    skill: k(' '), atk: k('j'), beam: k('k'), thunder: k('l'),
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
@@ -96,14 +103,14 @@ function drawBody(i, x, y, alpha) {
 // it turns from +angle to -angle, i.e. the fan plus half a beam-width along both
 // edges. That is drawn once in a single opaque colour on an offscreen canvas and
 // blended in, so the overlaps do not get darker than the rest.
-const tele = document.createElement('canvas'); tele.width = 800; tele.height = 500;
+const tele = document.createElement('canvas'); tele.width = arena.w; tele.height = arena.h;
 const teleCtx = tele.getContext('2d');
 function drawTelegraph() {
   const p = snap.p[1];
   if (!(p.bt > 0)) return;
   const d = disp[1], k = 1 - p.bt / beamCfg.charge; // 0 -> 1 as the charge fills
   const base = Math.atan2(p.by, p.bx), A = beamCfg.angle * Math.PI / 180;
-  teleCtx.clearRect(0, 0, 800, 500);
+  teleCtx.clearRect(0, 0, tele.width, tele.height);
   teleCtx.fillStyle = teleCtx.strokeStyle = '#ff4628';
   teleCtx.lineCap = 'round'; teleCtx.lineWidth = beamCfg.w;
   teleCtx.beginPath(); teleCtx.moveTo(d.x, d.y); teleCtx.arc(d.x, d.y, beamCfg.len, base - A, base + A); teleCtx.closePath(); teleCtx.fill();
@@ -148,8 +155,60 @@ function drawBeams() {
   }
 }
 
+// Thunder: a dark circle the size of the strike area sits where the bolt will land.
+// It darkens and a ring closes in on it as the bolt gets near.
+function drawShadow() {
+  const p = snap.p[0];
+  if (!(p.tn > 0)) { shadow.x = null; return; }
+  if (shadow.x === null) { shadow.x = p.sx; shadow.y = p.sy; }
+  shadow.x += (p.sx - shadow.x) * 0.4; shadow.y += (p.sy - shadow.y) * 0.4;
+  const period = p.tn === thunderCfg.strikes ? thunderCfg.delay : thunderCfg.interval; // time the current wait started from
+  const k = period > 0 ? Math.min(Math.max(1 - p.ti / period, 0), 1) : 1;               // 0 -> 1 as the bolt nears
+  ctx.save();
+  ctx.fillStyle = `rgba(10,10,40,${0.18 + 0.4 * k})`;
+  ctx.beginPath(); ctx.arc(shadow.x, shadow.y, thunderCfg.radius, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,235,90,${0.4 + 0.6 * k})`; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(shadow.x, shadow.y, thunderCfg.radius * (1 - 0.7 * k), 0, 7); ctx.stroke();
+  ctx.restore();
+}
+
+// A jagged bolt from the top of the screen to the strike point, plus a flash on the ground.
+function drawBolt(f) {
+  const k = f.age / 0.35, a = 1 - k;
+  ctx.save();
+  ctx.fillStyle = `rgba(255,245,170,${0.55 * a})`;
+  ctx.beginPath(); ctx.arc(f.x, f.y, thunderCfg.radius, 0, 7); ctx.fill();
+  const pts = [[f.x + (Math.random() - 0.5) * 24, -10]];
+  for (let y = 30; y < f.y; y += 38) pts.push([f.x + (Math.random() - 0.5) * 36, y]);
+  pts.push([f.x, f.y]);
+  ctx.lineJoin = 'round';
+  for (const [wd, col] of [[14, `rgba(255,225,70,${0.5 * a})`], [5, `rgba(255,255,255,${a})`]]) {
+    ctx.strokeStyle = col; ctx.lineWidth = wd;
+    ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Smoke over Snorlax's head while it cannot move (recharging after Hyper Beam).
+function drawSmoke() {
+  const p = snap.p[1], d = disp[1];
+  if (p.rt > 0) {
+    for (smokeAcc += 1 / 60; smokeAcc > 0.06; smokeAcc -= 0.06) {
+      smoke.push({ x: d.x + (Math.random() - 0.5) * 18, y: d.y - d.z - 30, vx: (Math.random() - 0.5) * 12, vy: -(26 + Math.random() * 16), age: 0, life: 0.9 + Math.random() * 0.5 });
+    }
+  }
+  for (const s of smoke) {
+    const k = s.age / s.life;
+    s.x += s.vx / 60; s.y += s.vy / 60; s.age += 1 / 60;
+    ctx.fillStyle = `rgba(200,200,205,${0.55 * (1 - k)})`;
+    ctx.beginPath(); ctx.arc(s.x, s.y, 5 + 11 * k, 0, 7); ctx.fill();
+  }
+  while (smoke.length && smoke[0].age >= smoke[0].life) smoke.shift();
+}
+
 function drawPlayer(i, p) {
   const d = disp[i];
+  if (d.x === null) { d.x = p.x; d.y = p.y; d.z = p.z; }
   const px = d.x, py = d.y;
   // Snapshots arrive at 30/s; ease toward them so 60fps motion looks smooth.
   d.x += (p.x - d.x) * 0.4; d.y += (p.y - d.y) * 0.4; d.z += (p.z - d.z) * 0.5;
@@ -187,27 +246,30 @@ function drawPlayer(i, p) {
 
 function frame() {
   ctx.save();
-  ctx.clearRect(0, 0, 800, 500);
+  ctx.clearRect(0, 0, arena.w, arena.h);
   if (shake > 0) { ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake); shake *= 0.85; if (shake < .5) shake = 0; }
 
   if (snap) {
     for (const g of ghosts) { drawBody(g.i, g.x, g.y, Math.max(g.a, 0)); g.a -= 0.04; }
     while (ghosts.length && ghosts[0].a <= 0) ghosts.shift();
     drawTelegraph();
+    drawShadow();
     drawBeams();
+    drawSmoke(); // under the players, so the labels and HP bars stay readable
     // Draw lower players first so the one nearer the camera overlaps correctly.
     [0, 1].sort((a, b) => snap.p[a].y - snap.p[b].y).forEach((i) => drawPlayer(i, snap.p[i]));
     fx = fx.filter((f) => (f.age += 1 / 60) < 0.35);
     for (const f of fx) {
+      if (f.t === 'thunder') { drawBolt(f); continue; }
       const r = f.t === 'slam' ? SLAM_R : QUAKE_R, k = f.age / 0.35;
       ctx.lineWidth = 4;
       ctx.strokeStyle = `rgba(${f.t === 'slam' ? '255,170,60' : '200,160,100'},${1 - k})`;
       ctx.beginPath(); ctx.ellipse(f.x, f.y + 14, r * k, r * k * 0.4, 0, 0, 7); ctx.stroke();
     }
     if (snap.w >= 0) {
-      ctx.fillStyle = '#000a'; ctx.fillRect(0, 200, 800, 100);
+      ctx.fillStyle = '#000a'; ctx.fillRect(0, arena.h / 2 - 50, arena.w, 100);
       ctx.fillStyle = '#fff'; ctx.font = '40px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(snap.w === you ? '你贏了！' : '你輸了', 400, 262);
+      ctx.fillText(snap.w === you ? '你贏了！' : '你輸了', arena.w / 2, arena.h / 2 + 12);
     }
   }
   ctx.restore();

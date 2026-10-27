@@ -37,24 +37,34 @@ func TestPartialFileOverridesOnlyWhatItSets(t *testing.T) {
 
 func TestInvalidConfigIsRejected(t *testing.T) {
 	for name, body := range map[string]string{
-		"misspelt key":      `{"pikachu":{"dash_distence":300}}`,
-		"zero distance":     `{"pikachu":{"dash_distance":0}}`,
-		"negative duration": `{"pikachu":{"dash_duration":-0.1}}`,
-		"zero height":       `{"snorlax":{"jump_height":0}}`,
-		"zero jump time":    `{"snorlax":{"jump_duration":0}}`,
-		"negative cooldown": `{"pikachu":{"dash_cooldown":-1}}`,
-		"zero charge time":  `{"snorlax":{"hyper_beam":{"charge_duration":0}}}`,
-		"negative recharge": `{"snorlax":{"hyper_beam":{"recharge_duration":-1}}}`,
-		"zero beam damage":  `{"snorlax":{"hyper_beam":{"damage":0}}}`,
-		"zero beam length":  `{"snorlax":{"hyper_beam":{"length":0}}}`,
-		"zero beam width":   `{"snorlax":{"hyper_beam":{"width":0}}}`,
-		"misspelt beam key": `{"snorlax":{"hyper_beam":{"dammage":50}}}`,
-		"zero sweep time":   `{"snorlax":{"hyper_beam":{"sweep_duration":0}}}`,
-		"negative angle":    `{"snorlax":{"hyper_beam":{"sweep_angle":-1}}}`,
-		"angle over 180":    `{"snorlax":{"hyper_beam":{"sweep_angle":181}}}`,
-		"angle as text":     `{"snorlax":{"hyper_beam":{"sweep_angle":"30"}}}`,
-		"not json":          `dash_distance = 3`,
-		"wrong type":        `{"pikachu":{"dash_distance":"far"}}`,
+		"misspelt key":              `{"pikachu":{"dash_distence":300}}`,
+		"zero distance":             `{"pikachu":{"dash_distance":0}}`,
+		"negative duration":         `{"pikachu":{"dash_duration":-0.1}}`,
+		"zero height":               `{"snorlax":{"jump_height":0}}`,
+		"zero jump time":            `{"snorlax":{"jump_duration":0}}`,
+		"negative cooldown":         `{"pikachu":{"dash_cooldown":-1}}`,
+		"zero charge time":          `{"snorlax":{"hyper_beam":{"charge_duration":0}}}`,
+		"negative recharge":         `{"snorlax":{"hyper_beam":{"recharge_duration":-1}}}`,
+		"zero beam damage":          `{"snorlax":{"hyper_beam":{"damage":0}}}`,
+		"zero beam length":          `{"snorlax":{"hyper_beam":{"length":0}}}`,
+		"zero beam width":           `{"snorlax":{"hyper_beam":{"width":0}}}`,
+		"misspelt beam key":         `{"snorlax":{"hyper_beam":{"dammage":50}}}`,
+		"zero sweep time":           `{"snorlax":{"hyper_beam":{"sweep_duration":0}}}`,
+		"negative angle":            `{"snorlax":{"hyper_beam":{"sweep_angle":-1}}}`,
+		"angle over 180":            `{"snorlax":{"hyper_beam":{"sweep_angle":181}}}`,
+		"angle as text":             `{"snorlax":{"hyper_beam":{"sweep_angle":"30"}}}`,
+		"zero thunder delay":        `{"pikachu":{"thunder":{"delay":0}}}`,
+		"zero thunder radius":       `{"pikachu":{"thunder":{"radius":0}}}`,
+		"zero thunder damage":       `{"pikachu":{"thunder":{"damage":0}}}`,
+		"zero thunder strikes":      `{"pikachu":{"thunder":{"strikes":0}}}`,
+		"fractional strikes":        `{"pikachu":{"thunder":{"strikes":2.5}}}`,
+		"negative interval":         `{"pikachu":{"thunder":{"interval":-0.1}}}`,
+		"negative follow speed":     `{"pikachu":{"thunder":{"follow_speed":-1}}}`,
+		"negative thunder cooldown": `{"pikachu":{"thunder":{"cooldown":-1}}}`,
+		"negative beam cooldown":    `{"snorlax":{"hyper_beam":{"cooldown":-1}}}`,
+		"misspelt thunder key":      `{"pikachu":{"thunder":{"dealy":1}}}`,
+		"not json":                  `dash_distance = 3`,
+		"wrong type":                `{"pikachu":{"dash_distance":"far"}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := LoadConfig(writeConfig(t, body)); err == nil {
@@ -68,6 +78,10 @@ func TestZeroCooldownAndRechargeAreAllowed(t *testing.T) {
 	for _, body := range []string{
 		`{"pikachu":{"dash_cooldown":0}}`,
 		`{"snorlax":{"hyper_beam":{"recharge_duration":0}}}`,
+		`{"pikachu":{"thunder":{"cooldown":0}}}`,
+		`{"snorlax":{"hyper_beam":{"cooldown":0}}}`,
+		`{"pikachu":{"thunder":{"interval":0}}}`,         // all bolts at once
+		`{"pikachu":{"thunder":{"follow_speed":0}}}`,     // a shadow that stays put
 		`{"snorlax":{"hyper_beam":{"sweep_angle":0}}}`,   // a fixed beam
 		`{"snorlax":{"hyper_beam":{"sweep_angle":180}}}`, // a full circle
 	} {

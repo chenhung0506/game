@@ -159,10 +159,11 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	go c.writePump()
 
 	r.mu.Lock()
-	hb := r.g.cfg.Snorlax.HyperBeam // tunable, so the client takes it from here instead of hard-coding
+	hb, th := r.g.cfg.Snorlax.HyperBeam, r.g.cfg.Pikachu.Thunder // tunable, so the client takes them from here instead of hard-coding
 	hi, _ := json.Marshal(map[string]any{
-		"t": "hi", "you": idx,
-		"beam": map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},
+		"t": "hi", "you": idx, "arena": map[string]float64{"w": arenaW, "h": arenaH},
+		"beam":    map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},
+		"thunder": map[string]float64{"radius": th.Radius, "delay": th.Delay, "interval": th.Interval, "strikes": float64(th.Strikes)},
 	})
 	c.send <- hi
 	if r.c[1-idx] == nil {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"testing"
 )
@@ -282,6 +283,22 @@ func hitTick(g *Game) int {
 	return 0
 }
 
+// hitTickAt fires one beam while Pikachu stands dead ahead (so the aim locks
+// straight left), then moves Pikachu to bearing b, distance r from that aim.
+// It returns the tick on which Pikachu first lost HP, or 0.
+func hitTickAt(cfg Config, b, r float64) int {
+	g := beamGame(cfg)
+	stepBeam(g) // tick 1: the aim locks on Pikachu at (300, 250)
+	g.P[pikachu].X, g.P[pikachu].Y = at(b, r)
+	for tick := 2; tick <= 6*tickRate; tick++ {
+		g.Step(dt)
+		if g.P[pikachu].HP < maxHP {
+			return tick
+		}
+	}
+	return 0
+}
+
 func TestBeamRunsChargeThenSweepThenRecharge(t *testing.T) {
 	cfg := DefaultConfig()
 	hb := cfg.Snorlax.HyperBeam
@@ -313,12 +330,7 @@ func TestBeamRunsChargeThenSweepThenRecharge(t *testing.T) {
 // Facing 0 degrees, the beam goes from +30 to -30: a target on the +30 side is
 // hit before one on the -30 side.
 func TestSweepGoesFromPlusAngleToMinusAngle(t *testing.T) {
-	plus := beamGame(DefaultConfig())
-	plus.P[pikachu].X, plus.P[pikachu].Y = at(20, 300)
-	minus := beamGame(DefaultConfig())
-	minus.P[pikachu].X, minus.P[pikachu].Y = at(-20, 300)
-
-	tp, tm := hitTick(plus), hitTick(minus)
+	tp, tm := hitTickAt(DefaultConfig(), 20, 300), hitTickAt(DefaultConfig(), -20, 300)
 	if tp == 0 || tm == 0 {
 		t.Fatalf("both targets are inside the fan: hit ticks +20=%d -20=%d", tp, tm)
 	}
@@ -351,9 +363,7 @@ func TestSweepCoversExactlyTheFan(t *testing.T) { // defaults: +-30 degrees, len
 		{"standing on Snorlax", 0, 10, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			g := beamGame(DefaultConfig())
-			g.P[pikachu].X, g.P[pikachu].Y = at(tc.b, tc.r)
-			if got := hitTick(g) != 0; got != tc.hit {
+			if got := hitTickAt(DefaultConfig(), tc.b, tc.r) != 0; got != tc.hit {
 				t.Fatalf("hit = %v, want %v (bearing %v, distance %v)", got, tc.hit, tc.b, tc.r)
 			}
 		})
@@ -376,9 +386,9 @@ func TestOneSweepHitsATargetOnlyOnce(t *testing.T) {
 func TestSweepCanBeDodgedBeforeItArrives(t *testing.T) {
 	cfg := DefaultConfig()
 	g := beamGame(cfg)
+	stepBeam(g)                                   // the aim locks straight left
 	g.P[pikachu].X, g.P[pikachu].Y = at(-25, 300) // near the end of the sweep
-	stepBeam(g)
-	for i := 1; i < chargeTicks(cfg)+5; i++ { // charge done, a third of the sweep gone
+	for i := 1; i < chargeTicks(cfg)+5; i++ {     // charge done, a third of the sweep gone
 		g.Step(dt)
 	}
 	if g.P[pikachu].HP != maxHP {
@@ -393,31 +403,120 @@ func TestSweepCanBeDodgedBeforeItArrives(t *testing.T) {
 	}
 }
 
-func TestFanFollowsTheFacingAndItIsLockedDuringCharge(t *testing.T) {
+// The beam is aimed at wherever the opponent stands when it is used, at any angle,
+// whatever Snorlax faces and whichever keys are held.
+func TestBeamAimsStraightAtTheOpponent(t *testing.T) {
 	for _, tc := range []struct {
-		name      string
-		in        Input
-		target    [2]float64 // Pikachu position
-		wantHit   bool
-		steerWith Input // keys held during the charge: must not re-aim the beam
+		name   string
+		target [2]float64 // Pikachu; Snorlax stands at (800, 500)
+		hit    bool
 	}{
-		{"facing right", Input{DX: 1, Beam: true}, [2]float64{650, 250}, true, Input{DY: -1}},
-		{"facing up", Input{DY: -1, Beam: true}, [2]float64{400, 100}, true, Input{DX: 1}},
-		{"facing up-left", Input{DX: -1, DY: -1, Beam: true}, [2]float64{190, 40}, true, Input{DX: 1}},
-		{"facing right, target on the left", Input{DX: 1, Beam: true}, [2]float64{150, 250}, false, Input{}},
+		{"to the right", [2]float64{1100, 500}, true},
+		{"straight up", [2]float64{800, 200}, true},
+		{"an odd angle (17 degrees)", [2]float64{1230, 625}, true},
+		{"an odd angle (123 degrees)", [2]float64{650, 745}, true},
+		{"up-left", [2]float64{560, 260}, true},
+		{"out of reach: aimed, but too far", [2]float64{1500, 500}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewGame(DefaultConfig())
-			g.P[snorlax].X, g.P[snorlax].Y = 400, 250
+			g.P[snorlax].X, g.P[snorlax].Y = 800, 500
 			g.P[pikachu].X, g.P[pikachu].Y = tc.target[0], tc.target[1]
-			g.P[snorlax].In = tc.in
+			g.P[snorlax].In = Input{DX: -1, DY: 1, Beam: true} // walking away from it, facing the other way
 			g.Step(dt)
-			g.P[snorlax].In = tc.steerWith
+
+			dx, dy := tc.target[0]-800, tc.target[1]-500
+			n := math.Hypot(dx, dy)
+			if bx, by := g.P[snorlax].BeamX, g.P[snorlax].BeamY; math.Abs(bx-dx/n) > 1e-9 || math.Abs(by-dy/n) > 1e-9 {
+				t.Fatalf("aim = (%.4f, %.4f), want (%.4f, %.4f)", bx, by, dx/n, dy/n)
+			}
+			g.P[snorlax].In = Input{}
 			for i := 0; i < 2*tickRate; i++ {
 				g.Step(dt)
 			}
-			if got := g.P[pikachu].HP < maxHP; got != tc.wantHit {
-				t.Fatalf("hit = %v, want %v", got, tc.wantHit)
+			if got := g.P[pikachu].HP < maxHP; got != tc.hit {
+				t.Fatalf("hit = %v, want %v", got, tc.hit)
+			}
+		})
+	}
+}
+
+// The aim is taken when the beam is used. Running to the other side afterwards
+// does not drag the beam along, and steering keys do not re-aim it.
+func TestBeamAimIsLockedWhenUsed(t *testing.T) {
+	g := beamGame(DefaultConfig())
+	stepBeam(g)                               // aims straight left, at Pikachu (300, 250)
+	g.P[pikachu].X, g.P[pikachu].Y = 900, 250 // runs to the far side of Snorlax
+	g.P[snorlax].In = Input{DX: 1}            // and Snorlax tries to turn toward it
+	for i := 0; i < 2*tickRate; i++ {
+		g.Step(dt)
+	}
+	if g.P[snorlax].BeamX != -1 || g.P[snorlax].BeamY != 0 {
+		t.Fatalf("aim = (%v, %v), want it still locked straight left", g.P[snorlax].BeamX, g.P[snorlax].BeamY)
+	}
+	if g.P[pikachu].HP != maxHP {
+		t.Fatalf("HP = %d: the beam went where Pikachu had been, so it must miss", g.P[pikachu].HP)
+	}
+}
+
+// With no distance to the opponent there is no direction to aim; the facing is used, never NaN.
+func TestBeamOnTopOfTheOpponentFallsBackToTheFacing(t *testing.T) {
+	g := beamGame(DefaultConfig())
+	g.P[pikachu].X, g.P[pikachu].Y = 600, 250 // exactly on Snorlax
+	stepBeam(g)
+	bx, by := g.P[snorlax].BeamX, g.P[snorlax].BeamY
+	if bx != -1 || by != 0 || math.IsNaN(bx) || math.IsNaN(by) {
+		t.Fatalf("aim = (%v, %v), want the facing (-1, 0)", bx, by)
+	}
+}
+
+// ---- cooldowns count from the moment a skill is used ----
+
+func TestBeamCooldownCountsFromTheMomentItIsUsed(t *testing.T) {
+	cfg := DefaultConfig() // cooldown 5s: longer than the beam's own 2.6s cycle
+	hb := cfg.Snorlax.HyperBeam
+	if hb.Cooldown != 5 {
+		t.Fatalf("setup: default cooldown = %v, want 5", hb.Cooldown)
+	}
+	g := beamGame(cfg)
+	g.P[snorlax].In = Input{Beam: true} // key held the whole time
+	var starts []int
+	prev := false
+	for tick := 1; tick <= 8*tickRate; tick++ {
+		g.Step(dt)
+		if charging := g.P[snorlax].BeamT > 0; charging && !prev {
+			starts = append(starts, tick)
+		} else {
+			prev = charging
+			continue
+		}
+		prev = true
+	}
+	// Used on tick 1; the 5s cooldown (150 ticks) is over on tick 151.
+	if len(starts) != 2 || starts[0] != 1 || starts[1] != 151 {
+		t.Fatalf("beams started on ticks %v, want [1 151]", starts)
+	}
+}
+
+func TestThunderCooldownCountsFromTheMomentTheCastStarts(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		cooldown float64
+		until    int // how many ticks to watch
+		want     []int
+	}{
+		// First cast: bolts on 30, 45, 60. The next cast starts when the cooldown is over.
+		{"cooldown 4s: the next cast starts on tick 121", 4, 185, []int{30, 45, 60, 150, 165, 180}},
+		{"no cooldown: the next cast starts as soon as the first ends (tick 61)", 0, 125, []int{30, 45, 60, 90, 105, 120}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Pikachu.Thunder.Cooldown = tc.cooldown
+			g := thunderGame(cfg)
+			g.P[pikachu].In = Input{Thunder: true} // key held the whole time
+			ticks := boltTicks(g, 1, tc.until)
+			if fmt.Sprint(ticks) != fmt.Sprint(tc.want) {
+				t.Fatalf("bolts at ticks %v, want %v", ticks, tc.want)
 			}
 		})
 	}
@@ -427,8 +526,8 @@ func TestSnorlaxIsRootedThroughChargeSweepAndRecharge(t *testing.T) {
 	cfg := DefaultConfig()
 	hb := cfg.Snorlax.HyperBeam
 	g := beamGame(cfg)
+	stepBeam(g)                               // the aim locks straight left
 	g.P[pikachu].X, g.P[pikachu].Y = 580, 330 // inside quake range (82 away) but 76 degrees off the fan
-	stepBeam(g)
 	n := chargeTicks(cfg) + sweepTicks(cfg) + int(math.Ceil(hb.RechargeDuration/dt)) - 2
 	for i := 0; i < n; i++ { // every key held for the whole sequence
 		g.P[snorlax].In = Input{DX: 1, Skill: true, Attack: true}
@@ -450,7 +549,9 @@ func TestSnorlaxIsRootedThroughChargeSweepAndRecharge(t *testing.T) {
 }
 
 func TestHoldingBeamKeyCannotSkipTheSweepOrRecharge(t *testing.T) {
-	g := beamGame(DefaultConfig()) // charge 0.6 + sweep 0.5 + recharge 1.5 = 2.6s per beam
+	cfg := DefaultConfig()
+	cfg.Snorlax.HyperBeam.Cooldown = 0 // so only the beam's own phases are in the way
+	g := beamGame(cfg)                 // charge 0.6 + sweep 0.5 + recharge 1.5 = 2.6s per beam
 	g.P[snorlax].In = Input{Beam: true}
 	starts, prev := 0, false
 	for i := 0; i < 6*tickRate; i++ { // 6s
@@ -469,12 +570,10 @@ func TestHoldingBeamKeyCannotSkipTheSweepOrRecharge(t *testing.T) {
 func TestSweepAngleZeroIsAFixedBeam(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Snorlax.HyperBeam.SweepAngle = 0
-	ahead, aside := beamGame(cfg), beamGame(cfg)
-	aside.P[pikachu].X, aside.P[pikachu].Y = at(10, 300) // asin(25/300) = 4.8 degrees of reach
-	if hitTick(ahead) == 0 {
+	if hitTick(beamGame(cfg)) == 0 {
 		t.Fatal("a fixed beam must hit what is dead ahead")
 	}
-	if hitTick(aside) != 0 {
+	if hitTickAt(cfg, 10, 300) != 0 { // asin(25/300) = 4.8 degrees of reach
 		t.Fatal("a fixed beam must not reach 10 degrees off its line")
 	}
 }
@@ -484,16 +583,12 @@ func TestVeryFastSweepStillCoversTheWholeFan(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Snorlax.HyperBeam.SweepDuration = 0.001 // far shorter than a tick
 	for _, b := range []float64{-28, -10, 0, 10, 28} {
-		g := beamGame(cfg)
-		g.P[pikachu].X, g.P[pikachu].Y = at(b, 350)
-		if hitTick(g) == 0 {
+		if hitTickAt(cfg, b, 350) == 0 {
 			t.Errorf("target at %v degrees was skipped by a one-tick sweep", b)
 		}
 	}
 	cfg.Snorlax.HyperBeam.SweepAngle = 180 // a full circle
-	g := beamGame(cfg)
-	g.P[pikachu].X, g.P[pikachu].Y = at(180, 300) // right behind Snorlax
-	if hitTick(g) == 0 {
+	if hitTickAt(cfg, 180, 300) == 0 {     // right behind Snorlax
 		t.Error("a 180 degree sweep must reach the target behind Snorlax")
 	}
 }
@@ -565,10 +660,255 @@ func TestPlayerSnapshotCarriesBeamState(t *testing.T) {
 	}
 	var m map[string]any
 	json.Unmarshal(b, &m)
-	for _, k := range []string{"x", "y", "z", "hp", "cd", "bt", "st", "rt", "bx", "by", "ba"} {
+	for _, k := range []string{"x", "y", "z", "hp", "cd", "bt", "st", "rt", "bx", "by", "ba", "tn", "ti", "sx", "sy"} {
 		if _, ok := m[k]; !ok {
 			t.Errorf("snapshot is missing %q: %s", k, b)
 		}
+	}
+}
+
+// ---- Pikachu: Thunder (a shadow chases the opponent, bolts hit wherever it is) ----
+
+// thunderGame has Pikachu at (200,250) and Snorlax at (600,250), well apart.
+func thunderGame(cfg Config) *Game { return NewGame(cfg) }
+
+// castThunder presses the thunder key for one tick (tick 1) and lets go.
+func castThunder(g *Game) []Event {
+	g.P[pikachu].In = Input{Thunder: true}
+	ev := g.Step(dt)
+	g.P[pikachu].In = Input{}
+	return ev
+}
+
+func thunderEvents(ev []Event) (n int, last Event) {
+	for _, e := range ev {
+		if e.T == "thunder" {
+			n, last = n+1, e
+		}
+	}
+	return
+}
+
+// boltTicks steps from tick `from` to `to` (the cast press is tick 1) and returns
+// the ticks on which a bolt struck.
+func boltTicks(g *Game, from, to int) []int {
+	var ticks []int
+	for tick := from; tick <= to; tick++ {
+		if n, _ := thunderEvents(g.Step(dt)); n > 0 {
+			ticks = append(ticks, tick)
+		}
+	}
+	return ticks
+}
+
+func TestThunderShadowAppearsOnTheOpponentThenBoltsFollowTheSchedule(t *testing.T) {
+	cfg := DefaultConfig() // delay 1.0s, interval 0.5s, 3 strikes
+	g := thunderGame(cfg)
+	g.P[snorlax].X, g.P[snorlax].Y = 640, 310
+	if n, _ := thunderEvents(castThunder(g)); n != 0 {
+		t.Fatal("a bolt must not strike on the tick of the cast")
+	}
+	p := &g.P[pikachu]
+	if p.ThunderLeft != cfg.Pikachu.Thunder.Strikes || p.ShadowX != 640 || p.ShadowY != 310 {
+		t.Fatalf("after the cast: left=%d shadow=(%v,%v), want %d bolts and the shadow on the opponent (640,310)",
+			p.ThunderLeft, p.ShadowX, p.ShadowY, cfg.Pikachu.Thunder.Strikes)
+	}
+
+	ticks := boltTicks(g, 2, 4*tickRate)
+	// delay 1.0s = tick 30, then every 0.5s = 15 ticks.
+	if want := []int{30, 45, 60}; len(ticks) != 3 || ticks[0] != want[0] || ticks[1] != want[1] || ticks[2] != want[2] {
+		t.Fatalf("bolts at ticks %v, want %v", ticks, want)
+	}
+	if p.ThunderLeft != 0 {
+		t.Fatalf("ThunderLeft = %d after the last bolt, want the shadow gone", p.ThunderLeft)
+	}
+}
+
+func TestThunderEveryBoltDoesItsDamageToAStandingTarget(t *testing.T) {
+	cfg := DefaultConfig()
+	g := thunderGame(cfg)
+	castThunder(g)
+	for i := 0; i < 4*tickRate; i++ {
+		g.Step(dt)
+	}
+	th := cfg.Pikachu.Thunder
+	if want := maxHP - th.Damage*th.Strikes; g.P[snorlax].HP != want {
+		t.Fatalf("HP = %d, want %d (%d bolts x %d)", g.P[snorlax].HP, want, th.Strikes, th.Damage)
+	}
+}
+
+// Snorlax walks at 180 u/s. A shadow slower than that falls behind and the bolt misses;
+// one that is at least as fast stays on top of it.
+func TestThunderShadowFollowSpeedDecidesWhetherYouCanOutrunIt(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		speed float64
+		hit   bool
+	}{
+		{"slower shadow is outrun (lag 80 > radius 60)", 100, false},
+		{"just fast enough to keep up", 200, true},
+		{"shadow that never moves", 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Pikachu.Thunder.FollowSpeed = tc.speed
+			cfg.Pikachu.Thunder.Strikes = 1
+			g := thunderGame(cfg)
+			castThunder(g)
+			for i := 0; i < 36; i++ { // past the bolt at tick 30, and short of the wall (y = 250 + 180 * 1.2)
+				g.P[snorlax].In = Input{DY: 1} // keep walking down the whole time
+				g.Step(dt)
+			}
+			if got := g.P[snorlax].HP < maxHP; got != tc.hit {
+				t.Fatalf("hit = %v, want %v", got, tc.hit)
+			}
+		})
+	}
+}
+
+func TestThunderShadowChasesWithoutOvershooting(t *testing.T) {
+	cfg := DefaultConfig()
+	g := thunderGame(cfg)
+	g.P[snorlax].X, g.P[snorlax].Y = 600, 250
+	castThunder(g)
+	g.P[snorlax].X, g.P[snorlax].Y = 620, 250 // 20 away; one tick of chasing covers 120*dt = 4
+	g.Step(dt)
+	if got := g.P[pikachu].ShadowX; math.Abs(got-(600+cfg.Pikachu.Thunder.FollowSpeed*dt)) > 1e-9 {
+		t.Fatalf("shadow x = %v, want one tick of chasing", got)
+	}
+	g.P[snorlax].X = g.P[pikachu].ShadowX + 1 // closer than one step: it must land exactly, not overshoot
+	g.Step(dt)
+	if g.P[pikachu].ShadowX != g.P[snorlax].X {
+		t.Fatalf("shadow x = %v, want it exactly on the target at %v", g.P[pikachu].ShadowX, g.P[snorlax].X)
+	}
+}
+
+func TestThunderHitAreaIsTheConfiguredRadius(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		off  float64 // how far the target stands from where the shadow ends up
+		hit  bool
+	}{{"inside", 55, true}, {"on the edge", 60, true}, {"just outside", 65, false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Pikachu.Thunder.FollowSpeed = 0 // the shadow stays where it appeared
+			cfg.Pikachu.Thunder.Strikes = 1
+			g := thunderGame(cfg)
+			castThunder(g)
+			g.P[snorlax].X += tc.off
+			for i := 0; i < 2*tickRate; i++ {
+				g.Step(dt)
+			}
+			if got := g.P[snorlax].HP < maxHP; got != tc.hit {
+				t.Fatalf("hit = %v, want %v", got, tc.hit)
+			}
+		})
+	}
+}
+
+// Lightning comes from the sky, unlike the ground attacks: jumping does not dodge it.
+func TestThunderHitsAnAirborneTarget(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.Thunder.Strikes = 1
+	g := thunderGame(cfg)
+	castThunder(g)
+	g.P[snorlax].Z = 1000 // still falling when the bolt arrives
+	for i := 0; i < 2*tickRate; i++ {
+		g.Step(dt)
+	}
+	if g.P[snorlax].HP != maxHP-cfg.Pikachu.Thunder.Damage {
+		t.Fatalf("HP = %d, an airborne target must still be hit", g.P[snorlax].HP)
+	}
+}
+
+func TestThunderDoesNotRootPikachuAndCannotBeStacked(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.Thunder.Cooldown = 0 // so only the "one cast at a time" rule is in the way
+	g := thunderGame(cfg)
+	castThunder(g)
+	x := g.P[pikachu].X
+	for i := 0; i < 10; i++ {
+		g.P[pikachu].In = Input{DX: -1, Thunder: true} // walking, and mashing the thunder key
+		g.Step(dt)
+	}
+	if g.P[pikachu].X >= x {
+		t.Fatal("Pikachu must be free to move while the bolts are coming")
+	}
+	if g.P[pikachu].ThunderLeft != cfg.Pikachu.Thunder.Strikes {
+		t.Fatalf("ThunderLeft = %d, want an unchanged %d: pressing again must not restart or add bolts",
+			g.P[pikachu].ThunderLeft, cfg.Pikachu.Thunder.Strikes)
+	}
+
+	// Once the cast is over, the next one is allowed.
+	g.P[pikachu].In = Input{}
+	for i := 0; i < 3*tickRate; i++ {
+		g.Step(dt)
+	}
+	if g.P[pikachu].ThunderLeft != 0 {
+		t.Fatal("setup: the cast should have finished")
+	}
+	castThunder(g)
+	if g.P[pikachu].ThunderLeft != cfg.Pikachu.Thunder.Strikes {
+		t.Fatal("a finished cast must allow a new one")
+	}
+}
+
+func TestOnlyPikachuCanCastThunder(t *testing.T) {
+	g := thunderGame(DefaultConfig())
+	g.P[snorlax].In = Input{Thunder: true}
+	for i := 0; i < 2*tickRate; i++ {
+		g.Step(dt)
+	}
+	if g.P[snorlax].ThunderLeft != 0 || g.P[pikachu].HP != maxHP {
+		t.Fatal("Snorlax cast thunder")
+	}
+}
+
+func TestThunderIntervalZeroDropsAllBoltsOnTheSameTick(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.Thunder.Interval = 0
+	g := thunderGame(cfg)
+	castThunder(g)
+	var perTick []int
+	for i := 0; i < 2*tickRate; i++ {
+		if n, _ := thunderEvents(g.Step(dt)); n > 0 {
+			perTick = append(perTick, n)
+		}
+	}
+	if len(perTick) != 1 || perTick[0] != cfg.Pikachu.Thunder.Strikes {
+		t.Fatalf("bolts per striking tick = %v, want a single tick with all %d", perTick, cfg.Pikachu.Thunder.Strikes)
+	}
+}
+
+// Holding the key must not push the first bolt back: a restart would reset the delay every tick.
+func TestThunderHoldingTheKeyDoesNotRestartTheCast(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.Thunder.Cooldown = 0 // so only the "one cast at a time" rule is in the way
+	g := thunderGame(cfg)
+	g.P[pikachu].In = Input{Thunder: true} // held from tick 1 onward
+	var ticks []int
+	for tick := 1; tick <= 89; tick++ { // the cast ends on tick 60; the held key starts the next one on tick 61
+		if n, _ := thunderEvents(g.Step(dt)); n > 0 {
+			ticks = append(ticks, tick)
+		}
+	}
+	if want := []int{30, 45, 60}; len(ticks) != 3 || ticks[0] != want[0] || ticks[1] != want[1] || ticks[2] != want[2] {
+		t.Fatalf("bolts at ticks %v, want %v", ticks, want)
+	}
+}
+
+func TestThunderFollowsConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	th := &cfg.Pikachu.Thunder
+	th.Delay, th.Interval, th.Strikes, th.Damage = 2.0, 1.0, 2, 33
+	g := thunderGame(cfg)
+	castThunder(g)
+	ticks := boltTicks(g, 2, 5*tickRate)
+	if len(ticks) != 2 || ticks[0] != 2*tickRate || ticks[1] != 3*tickRate {
+		t.Fatalf("bolts at ticks %v, want [60 90] for delay 2s, interval 1s, 2 strikes", ticks)
+	}
+	if g.P[snorlax].HP != maxHP-66 {
+		t.Fatalf("HP = %d, want %d", g.P[snorlax].HP, maxHP-66)
 	}
 }
 
@@ -618,6 +958,20 @@ func TestDiagonalMoveIsNotFaster(t *testing.T) {
 	d := dist(&Player{X: x0, Y: y0}, &g.P[pikachu])
 	if d < speed-0.001 || d > speed+0.001 {
 		t.Fatalf("diagonal distance = %v, want %v", d, speed)
+	}
+}
+
+func TestPlayersSpawnCentredInTheArenaFourHundredApart(t *testing.T) {
+	g := newTestGame()
+	a, b := g.P[pikachu], g.P[snorlax]
+	if a.Y != arenaH/2 || b.Y != arenaH/2 {
+		t.Fatalf("spawn rows = %v and %v, want the middle row %v", a.Y, b.Y, arenaH/2)
+	}
+	if mid := (a.X + b.X) / 2; mid != arenaW/2 || b.X-a.X != 400 {
+		t.Fatalf("spawn x = %v and %v, want them 400 apart around the middle %v", a.X, b.X, arenaW/2)
+	}
+	if arenaW != 1600 || arenaH != 1000 {
+		t.Fatalf("arena = %vx%v, want 1600x1000 (twice the original 800x500)", arenaW, arenaH)
 	}
 }
 

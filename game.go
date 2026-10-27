@@ -4,8 +4,8 @@ import "math"
 
 // Game units: arena is 800x500, time in seconds.
 const (
-	arenaW        = 800.0
-	arenaH        = 500.0
+	arenaW        = 1600.0
+	arenaH        = 1000.0
 	speed         = 180.0
 	groundZ       = 12.0 // a target above this height counts as airborne
 	slamRadius    = 70.0
@@ -25,11 +25,12 @@ const (
 // Input is the only thing a client controls: which keys are held. Skill is the
 // space bar; what it does depends on the character (dash or jump).
 type Input struct {
-	DX     int  `json:"dx"`
-	DY     int  `json:"dy"`
-	Skill  bool `json:"skill"`
-	Attack bool `json:"atk"`
-	Beam   bool `json:"beam"` // Snorlax only: Hyper Beam
+	DX      int  `json:"dx"`
+	DY      int  `json:"dy"`
+	Skill   bool `json:"skill"`
+	Attack  bool `json:"atk"`
+	Beam    bool `json:"beam"`    // Snorlax only: Hyper Beam
+	Thunder bool `json:"thunder"` // Pikachu only: Thunder
 }
 
 type Player struct {
@@ -51,10 +52,19 @@ type Player struct {
 	BeamT     float64 `json:"bt"` // seconds of charge left
 	SweepT    float64 `json:"st"` // seconds of sweep left
 	RechargeT float64 `json:"rt"` // seconds of recovery left
-	BeamX     float64 `json:"bx"` // facing (unit vector), locked when the charge starts
+	BeamX     float64 `json:"bx"` // aim (unit vector toward the opponent), locked when the beam is used
 	BeamY     float64 `json:"by"`
 	BeamA     float64 `json:"ba"` // beam angle from the facing in degrees, counter-clockwise on screen is positive
 	SweptHit  bool    `json:"-"`  // a sweep hits a target at most once
+	BeamCD    float64 `json:"-"`  // counted from the moment the beam is used
+
+	// Thunder: a shadow chases the opponent, then bolts hit wherever it is.
+	// ThunderLeft is the number of bolts still to come (0 = no cast running).
+	ThunderLeft int     `json:"tn"`
+	ThunderIn   float64 `json:"ti"` // seconds until the next bolt
+	ShadowX     float64 `json:"sx"`
+	ShadowY     float64 `json:"sy"`
+	ThunderCD   float64 `json:"-"` // counted from the moment the cast starts
 }
 
 // Event is a one-shot effect the client plays (ring, screen shake).
@@ -76,8 +86,9 @@ func NewGame(cfg Config) *Game {
 }
 
 func (g *Game) Reset() {
-	g.P[pikachu] = Player{X: 200, Y: 250, HP: maxHP, FX: 1}
-	g.P[snorlax] = Player{X: 600, Y: 250, HP: maxHP, FX: -1}
+	// 400 apart, centred in the arena.
+	g.P[pikachu] = Player{X: arenaW/2 - 200, Y: arenaH / 2, HP: maxHP, FX: 1}
+	g.P[snorlax] = Player{X: arenaW/2 + 200, Y: arenaH / 2, HP: maxHP, FX: -1}
 }
 
 // Winner returns the index of the surviving player, or -1 while both are alive.
@@ -150,7 +161,7 @@ func (g *Game) Step(dt float64) []Event {
 		}
 
 		// Snorlax's Hyper Beam: charge -> sweep -> recharge. It is rooted through all
-		// three, and the facing is locked when the charge starts.
+		// three. The aim is locked on the opponent's position when the beam is used.
 		busy := false
 		if i == snorlax {
 			hb := g.cfg.Snorlax.HyperBeam
@@ -159,14 +170,21 @@ func (g *Game) Step(dt float64) []Event {
 					p.RechargeT = 0
 				}
 			}
-			if p.BeamT == 0 && p.SweepT == 0 && p.RechargeT == 0 && p.In.Beam && p.Z == 0 {
-				dx, dy := float64(p.In.DX), float64(p.In.DY)
-				if dx == 0 && dy == 0 {
-					dx, dy = float64(p.FX), float64(p.FY)
+			if p.BeamCD > 0 {
+				if p.BeamCD -= dt; p.BeamCD < 1e-9 {
+					p.BeamCD = 0
 				}
+			}
+			if p.BeamT == 0 && p.SweepT == 0 && p.RechargeT == 0 && p.BeamCD == 0 && p.In.Beam && p.Z == 0 {
+				dx, dy := other.X-p.X, other.Y-p.Y
 				n := math.Hypot(dx, dy)
+				if n < 1e-9 { // standing on the opponent: there is no direction, so use the facing
+					dx, dy = float64(p.FX), float64(p.FY)
+					n = math.Hypot(dx, dy)
+				}
 				p.BeamX, p.BeamY = dx/n, dy/n
 				p.BeamT = hb.ChargeDuration
+				p.BeamCD = hb.Cooldown
 			}
 			if p.BeamT > 0 {
 				if p.BeamT -= dt; p.BeamT < 1e-9 { // charged: the beam starts at +angle
@@ -191,6 +209,39 @@ func (g *Game) Step(dt float64) []Event {
 				}
 			}
 			busy = p.BeamT > 0 || p.SweepT > 0 || p.RechargeT > 0
+		}
+
+		// Pikachu's Thunder. It does not root Pikachu, and a new cast waits for the
+		// current one to finish. Bolts come from the sky, so height gives no cover.
+		if i == pikachu {
+			th := g.cfg.Pikachu.Thunder
+			if p.ThunderCD > 0 {
+				if p.ThunderCD -= dt; p.ThunderCD < 1e-9 {
+					p.ThunderCD = 0
+				}
+			}
+			if p.In.Thunder && p.ThunderLeft == 0 && p.ThunderCD == 0 {
+				p.ThunderLeft, p.ThunderIn = th.Strikes, th.Delay
+				p.ThunderCD = th.Cooldown
+				p.ShadowX, p.ShadowY = other.X, other.Y // appears right where the opponent stands
+			}
+			if p.ThunderLeft > 0 {
+				dx, dy := other.X-p.ShadowX, other.Y-p.ShadowY
+				if d := math.Hypot(dx, dy); d > 0 { // chase, without overshooting
+					step := math.Min(d, th.FollowSpeed*dt)
+					p.ShadowX += dx / d * step
+					p.ShadowY += dy / d * step
+				}
+				p.ThunderIn -= dt
+				for p.ThunderLeft > 0 && p.ThunderIn < 1e-9 { // a loop so a tiny interval cannot lose bolts
+					events = append(events, Event{T: "thunder", X: p.ShadowX, Y: p.ShadowY})
+					if math.Hypot(other.X-p.ShadowX, other.Y-p.ShadowY) <= th.Radius {
+						g.hit(other, th.Damage)
+					}
+					p.ThunderLeft--
+					p.ThunderIn += th.Interval
+				}
+			}
 		}
 
 		if p.DashT > 0 {
