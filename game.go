@@ -7,8 +7,6 @@ const (
 	arenaW        = 800.0
 	arenaH        = 500.0
 	speed         = 180.0
-	jumpV         = 360.0 // initial vertical velocity; air time = 2*jumpV/gravity = 0.8s
-	gravity       = 900.0
 	groundZ       = 12.0 // a target above this height counts as airborne
 	slamRadius    = 70.0
 	slamDamage    = 20
@@ -18,12 +16,20 @@ const (
 	maxHP         = 100
 )
 
-// Input is the only thing a client controls: which keys are held.
+// Player slots are fixed characters: the first to join is Pikachu.
+const (
+	pikachu = 0
+	snorlax = 1
+)
+
+// Input is the only thing a client controls: which keys are held. Skill is the
+// space bar; what it does depends on the character (dash or jump).
 type Input struct {
 	DX     int  `json:"dx"`
 	DY     int  `json:"dy"`
-	Jump   bool `json:"jump"`
+	Skill  bool `json:"skill"`
 	Attack bool `json:"atk"`
+	Beam   bool `json:"beam"` // Snorlax only: Hyper Beam
 }
 
 type Player struct {
@@ -34,6 +40,21 @@ type Player struct {
 	HP int     `json:"hp"`
 	CD float64 `json:"cd"`
 	In Input   `json:"-"`
+
+	FX, FY       int     `json:"-"` // last non-zero direction held; a dash with no keys goes this way
+	DashT        float64 `json:"-"` // seconds of dash left
+	DashX, DashY float64 `json:"-"` // unit dash direction
+	DashCD       float64 `json:"-"`
+
+	// Hyper Beam: charge (BeamT) -> sweep (SweepT) -> recharge (RechargeT).
+	// The client draws the warning fan, the rotating beam and "must recharge" from these.
+	BeamT     float64 `json:"bt"` // seconds of charge left
+	SweepT    float64 `json:"st"` // seconds of sweep left
+	RechargeT float64 `json:"rt"` // seconds of recovery left
+	BeamX     float64 `json:"bx"` // facing (unit vector), locked when the charge starts
+	BeamY     float64 `json:"by"`
+	BeamA     float64 `json:"ba"` // beam angle from the facing in degrees, counter-clockwise on screen is positive
+	SweptHit  bool    `json:"-"`  // a sweep hits a target at most once
 }
 
 // Event is a one-shot effect the client plays (ring, screen shake).
@@ -44,18 +65,19 @@ type Event struct {
 }
 
 type Game struct {
-	P [2]Player
+	cfg Config
+	P   [2]Player
 }
 
-func NewGame() *Game {
-	g := &Game{}
+func NewGame(cfg Config) *Game {
+	g := &Game{cfg: cfg}
 	g.Reset()
 	return g
 }
 
 func (g *Game) Reset() {
-	g.P[0] = Player{X: 200, Y: 250, HP: maxHP}
-	g.P[1] = Player{X: 600, Y: 250, HP: maxHP}
+	g.P[pikachu] = Player{X: 200, Y: 250, HP: maxHP, FX: 1}
+	g.P[snorlax] = Player{X: 600, Y: 250, HP: maxHP, FX: -1}
 }
 
 // Winner returns the index of the surviving player, or -1 while both are alive.
@@ -73,6 +95,28 @@ func (g *Game) Winner() int {
 
 func dist(a, b *Player) float64 { return math.Hypot(a.X-b.X, a.Y-b.Y) }
 
+// sweepHits reports whether a beam fired from src toward the facing (fx, fy)
+// touched the target while it rotated from angle a0 down to a1 (degrees from
+// the facing; counter-clockwise on screen is positive, so a0 >= a1).
+//
+// It tests the whole angular interval of the tick instead of the beam's final
+// position, so a fast sweep cannot jump over a target between two ticks. The
+// beam has width, so it reaches half-width/r degrees past its centre line.
+func sweepHits(src, target *Player, fx, fy, a0, a1, length, width float64) bool {
+	dx, dy := target.X-src.X, target.Y-src.Y
+	r := math.Hypot(dx, dy)
+	if r <= width/2 {
+		return true // standing on the muzzle
+	}
+	if r > length {
+		return false
+	}
+	// Screen y points down, so negate it to get counter-clockwise angles.
+	bearing := math.Remainder(math.Atan2(-dy, dx)-math.Atan2(-fy, fx), 2*math.Pi) * 180 / math.Pi
+	half := math.Asin(math.Min(1, width/2/r)) * 180 / math.Pi
+	return bearing >= a1-half && bearing <= a0+half
+}
+
 func (g *Game) hit(victim *Player, dmg int) {
 	victim.HP -= dmg
 	if victim.HP < 0 {
@@ -86,23 +130,96 @@ func (g *Game) Step(dt float64) []Event {
 	for i := range g.P {
 		p, other := &g.P[i], &g.P[1-i]
 
-		// Horizontal movement; normalise diagonals so they are not faster.
-		dx, dy := float64(p.In.DX), float64(p.In.DY)
-		if n := math.Hypot(dx, dy); n > 0 {
-			p.X += dx / n * speed * dt
-			p.Y += dy / n * speed * dt
+		if p.In.DX != 0 || p.In.DY != 0 {
+			p.FX, p.FY = p.In.DX, p.In.DY
+		}
+		if p.DashCD > 0 {
+			p.DashCD = math.Max(0, p.DashCD-dt)
+		}
+
+		// Pikachu's skill: dash toward the held direction (or where it faces).
+		if i == pikachu && p.In.Skill && p.DashT == 0 && p.DashCD == 0 {
+			dx, dy := float64(p.In.DX), float64(p.In.DY)
+			if dx == 0 && dy == 0 {
+				dx, dy = float64(p.FX), float64(p.FY)
+			}
+			n := math.Hypot(dx, dy)
+			p.DashX, p.DashY = dx/n, dy/n
+			p.DashT = g.cfg.Pikachu.DashDuration
+			p.DashCD = g.cfg.Pikachu.DashCooldown // counted from the start of the dash
+		}
+
+		// Snorlax's Hyper Beam: charge -> sweep -> recharge. It is rooted through all
+		// three, and the facing is locked when the charge starts.
+		busy := false
+		if i == snorlax {
+			hb := g.cfg.Snorlax.HyperBeam
+			if p.RechargeT > 0 {
+				if p.RechargeT -= dt; p.RechargeT < 1e-9 {
+					p.RechargeT = 0
+				}
+			}
+			if p.BeamT == 0 && p.SweepT == 0 && p.RechargeT == 0 && p.In.Beam && p.Z == 0 {
+				dx, dy := float64(p.In.DX), float64(p.In.DY)
+				if dx == 0 && dy == 0 {
+					dx, dy = float64(p.FX), float64(p.FY)
+				}
+				n := math.Hypot(dx, dy)
+				p.BeamX, p.BeamY = dx/n, dy/n
+				p.BeamT = hb.ChargeDuration
+			}
+			if p.BeamT > 0 {
+				if p.BeamT -= dt; p.BeamT < 1e-9 { // charged: the beam starts at +angle
+					p.BeamT = 0
+					p.SweepT = hb.SweepDuration
+					p.BeamA = hb.SweepAngle
+					p.SweptHit = false
+				}
+			} else if p.SweepT > 0 {
+				prev := p.BeamA
+				if p.SweepT -= dt; p.SweepT < 1e-9 {
+					p.SweepT = 0
+				}
+				p.BeamA = hb.SweepAngle * (2*p.SweepT/hb.SweepDuration - 1) // +angle -> -angle
+				// Like the quake, the beam travels along the ground and misses airborne targets.
+				if !p.SweptHit && other.Z < groundZ && sweepHits(p, other, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length, hb.Width) {
+					g.hit(other, hb.Damage)
+					p.SweptHit = true
+				}
+				if p.SweepT == 0 {
+					p.RechargeT = hb.RechargeDuration
+				}
+			}
+			busy = p.BeamT > 0 || p.SweepT > 0 || p.RechargeT > 0
+		}
+
+		if p.DashT > 0 {
+			// Steering is locked while dashing. The last step is clipped so the
+			// total distance is exact whatever the tick length.
+			step := math.Min(dt, p.DashT)
+			v := g.cfg.Pikachu.DashDistance / g.cfg.Pikachu.DashDuration
+			p.X += p.DashX * v * step
+			p.Y += p.DashY * v * step
+			if p.DashT -= step; p.DashT < 1e-9 {
+				p.DashT = 0
+			}
+		} else if n := math.Hypot(float64(p.In.DX), float64(p.In.DY)); !busy && n > 0 {
+			// Normalise diagonals so they are not faster.
+			p.X += float64(p.In.DX) / n * speed * dt
+			p.Y += float64(p.In.DY) / n * speed * dt
 		}
 		p.X = math.Min(math.Max(p.X, 0), arenaW)
 		p.Y = math.Min(math.Max(p.Y, 0), arenaH)
 
-		// Vertical: jump, gravity, landing.
-		if p.In.Jump && p.Z == 0 {
-			p.VZ = jumpV
+		// Snorlax's skill: jump. Exact parabola so height and air time match the config.
+		if i == snorlax && p.In.Skill && p.Z == 0 && !busy {
+			p.VZ = g.cfg.jumpV()
 		}
 		landed := false
 		if p.Z > 0 || p.VZ > 0 {
-			p.VZ -= gravity * dt
-			p.Z += p.VZ * dt
+			gr := g.cfg.gravity()
+			p.Z += p.VZ*dt - 0.5*gr*dt*dt
+			p.VZ -= gr * dt
 			if p.Z <= 0 {
 				p.Z, p.VZ, landed = 0, 0, true
 			}
@@ -110,7 +227,7 @@ func (g *Game) Step(dt float64) []Event {
 
 		// The slam resolves on the landing frame, not while falling.
 		if landed {
-			events = append(events, Event{"slam", p.X, p.Y})
+			events = append(events, Event{T: "slam", X: p.X, Y: p.Y})
 			if dist(p, other) < slamRadius && other.Z < groundZ {
 				g.hit(other, slamDamage)
 			}
@@ -120,9 +237,9 @@ func (g *Game) Step(dt float64) []Event {
 		if p.CD > 0 {
 			p.CD = math.Max(0, p.CD-dt)
 		}
-		if p.In.Attack && p.CD == 0 && p.Z == 0 {
+		if p.In.Attack && p.CD == 0 && p.Z == 0 && !busy {
 			p.CD = quakeCooldown
-			events = append(events, Event{"quake", p.X, p.Y})
+			events = append(events, Event{T: "quake", X: p.X, Y: p.Y})
 			if dist(p, other) < quakeRadius && other.Z < groundZ {
 				g.hit(other, quakeDamage)
 			}

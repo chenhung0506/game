@@ -14,11 +14,19 @@
 <body>
 <div id="bar"></div>
 <canvas id="c" width="800" height="500"></canvas>
-<div id="bar2" style="padding:8px 16px;opacity:.7">移動 WASD / 方向鍵　跳躍 空白鍵（落地壓人）　地震 J（打不到空中的人）</div>
+<div id="bar2" style="padding:8px 16px;opacity:.7"></div>
 <script>
 // Arena and radii mirror game.go; keep them in sync.
 const SLAM_R = 70, QUAKE_R = 100;
-const COLORS = ['#f5c542', '#6aa5c9'];
+// Slot 0 is always Pikachu, slot 1 Snorlax (fixed by the server).
+const HELP = [
+  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震（打不到空中的人）',
+  '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人）　J＝地震　K＝破壞死光（朝面向方向扇形掃射，蓄力與掃射時定身，之後硬直）',
+];
+const ghosts = []; // dash afterimages
+const beamLook = { ang: null, tail: null }; // smoothed beam angle, and the fading afterimage when a sweep ends
+const TAIL = 0.2; // seconds
+let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }; // replaced by the server's values in 'hi'
 
 let room = new URLSearchParams(location.search).get('room');
 if (!room) { room = Math.random().toString(36).slice(2, 8); location.replace('?room=' + room); }
@@ -32,12 +40,19 @@ let fx = [], shake = 0;
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room);
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') you = m.you;
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; document.getElementById('bar2').textContent = HELP[you]; }
   else if (m.t === 'wait') { waiting = true; snap = null; }
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
+    const prevSt = snap ? snap.p[1].st : 0;
     waiting = false; snap = m;
-    for (const ev of m.e || []) { fx.push({ ...ev, age: 0 }); if (ev.t === 'slam') shake = 8; }
+    const st = m.p[1].st;
+    if (st > 0 && !(prevSt > 0)) shake = 14; // the sweep begins
+    if (!(st > 0) && prevSt > 0 && beamLook.ang !== null) beamLook.tail = { x: disp[1].x, y: disp[1].y - 6, ang: beamLook.ang, age: 0 };
+    for (const ev of m.e || []) {
+      fx.push({ ...ev, age: 0 });
+      if (ev.t === 'slam') shake = 8;
+    }
   }
 };
 ws.onclose = () => { status = '連線中斷，重新整理頁面再試'; waiting = false; snap = null; };
@@ -50,7 +65,7 @@ function sendInput() {
   const msg = JSON.stringify({
     dx: (k('d') || k('arrowright') ? 1 : 0) - (k('a') || k('arrowleft') ? 1 : 0),
     dy: (k('s') || k('arrowdown') ? 1 : 0) - (k('w') || k('arrowup') ? 1 : 0),
-    jump: k(' '), atk: k('j'),
+    skill: k(' '), atk: k('j'), beam: k('k'),
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
@@ -59,21 +74,115 @@ addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); sendInput()
 addEventListener('blur', () => { keys.clear(); sendInput(); }); // no stuck keys after alt-tab
 
 // ---- render ----
+// Placeholder art drawn with shapes; (x, y) is the centre of the body.
+function drawBody(i, x, y, alpha) {
+  ctx.globalAlpha = alpha;
+  if (i === 0) { // Pikachu
+    ctx.fillStyle = '#f5c542'; ctx.fillRect(x - 14, y - 14, 28, 28);
+    ctx.fillRect(x - 12, y - 26, 6, 12); ctx.fillRect(x + 6, y - 26, 6, 12);
+    ctx.fillStyle = '#222'; ctx.fillRect(x - 12, y - 26, 6, 4); ctx.fillRect(x + 6, y - 26, 6, 4);
+    ctx.fillRect(x - 8, y - 6, 4, 4); ctx.fillRect(x + 4, y - 6, 4, 4);
+    ctx.fillStyle = '#e34'; ctx.fillRect(x - 13, y + 2, 5, 5); ctx.fillRect(x + 8, y + 2, 5, 5);
+  } else { // Snorlax
+    ctx.fillStyle = '#3f6f86'; ctx.fillRect(x - 22, y - 18, 44, 36);
+    ctx.fillRect(x - 18, y - 26, 8, 8); ctx.fillRect(x + 10, y - 26, 8, 8);
+    ctx.fillStyle = '#e8dcc0'; ctx.beginPath(); ctx.ellipse(x, y + 5, 15, 11, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#222'; ctx.fillRect(x - 10, y - 8, 7, 2); ctx.fillRect(x + 3, y - 8, 7, 2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Warning fan while Snorlax charges. The server hits whatever the beam touches as
+// it turns from +angle to -angle, i.e. the fan plus half a beam-width along both
+// edges. That is drawn once in a single opaque colour on an offscreen canvas and
+// blended in, so the overlaps do not get darker than the rest.
+const tele = document.createElement('canvas'); tele.width = 800; tele.height = 500;
+const teleCtx = tele.getContext('2d');
+function drawTelegraph() {
+  const p = snap.p[1];
+  if (!(p.bt > 0)) return;
+  const d = disp[1], k = 1 - p.bt / beamCfg.charge; // 0 -> 1 as the charge fills
+  const base = Math.atan2(p.by, p.bx), A = beamCfg.angle * Math.PI / 180;
+  teleCtx.clearRect(0, 0, 800, 500);
+  teleCtx.fillStyle = teleCtx.strokeStyle = '#ff4628';
+  teleCtx.lineCap = 'round'; teleCtx.lineWidth = beamCfg.w;
+  teleCtx.beginPath(); teleCtx.moveTo(d.x, d.y); teleCtx.arc(d.x, d.y, beamCfg.len, base - A, base + A); teleCtx.closePath(); teleCtx.fill();
+  for (const edge of [base - A, base + A]) {
+    teleCtx.beginPath(); teleCtx.moveTo(d.x, d.y);
+    teleCtx.lineTo(d.x + Math.cos(edge) * beamCfg.len, d.y + Math.sin(edge) * beamCfg.len); teleCtx.stroke();
+  }
+  ctx.save(); ctx.globalAlpha = 0.12 + 0.3 * k; ctx.drawImage(tele, 0, 0); ctx.restore();
+}
+
+// One beam at canvas angle ang (radians): red glow, orange body, white-hot core, rings running outward.
+function drawBeamLine(x0, y0, ang, a) {
+  const dx = Math.cos(ang), dy = Math.sin(ang), x1 = x0 + dx * beamCfg.len, y1 = y0 + dy * beamCfg.len;
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const [wd, col] of [[beamCfg.w, `rgba(255,90,30,${0.35 * a})`], [beamCfg.w * 0.65, `rgba(255,170,50,${0.75 * a})`], [beamCfg.w * 0.3, `rgba(255,255,230,${a})`]]) {
+    ctx.strokeStyle = col; ctx.lineWidth = wd;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  }
+  ctx.strokeStyle = `rgba(255,255,255,${0.8 * a})`; ctx.lineWidth = 2;
+  for (let s = (performance.now() * 0.9) % 70; s < beamCfg.len; s += 70) {
+    ctx.beginPath(); ctx.ellipse(x0 + dx * s, y0 + dy * s, beamCfg.w * 0.22, beamCfg.w * 0.55, ang, 0, 7); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// The beam is drawn from the snapshot, so it turns as the server turns it. The
+// server's angle is counter-clockwise positive, which is a smaller canvas angle.
+function drawBeams() {
+  const p = snap.p[1], d = disp[1];
+  if (p.st > 0) {
+    const target = Math.atan2(p.by, p.bx) - p.ba * Math.PI / 180;
+    beamLook.ang = beamLook.ang === null ? target : beamLook.ang + (target - beamLook.ang) * 0.5; // 30 snapshots/s -> smooth at 60fps
+    drawBeamLine(d.x, d.y - 6, beamLook.ang, 1);
+  } else {
+    beamLook.ang = null;
+  }
+  const t = beamLook.tail;
+  if (t) {
+    drawBeamLine(t.x, t.y, t.ang, 1 - t.age / TAIL);
+    if ((t.age += 1 / 60) >= TAIL) beamLook.tail = null;
+  }
+}
+
 function drawPlayer(i, p) {
   const d = disp[i];
+  const px = d.x, py = d.y;
   // Snapshots arrive at 30/s; ease toward them so 60fps motion looks smooth.
   d.x += (p.x - d.x) * 0.4; d.y += (p.y - d.y) * 0.4; d.z += (p.z - d.z) * 0.5;
+  // Only a dash moves this fast along the ground (walking is ~3px/frame): leave an afterimage.
+  if (Math.hypot(d.x - px, d.y - py) > 8) ghosts.push({ i, x: d.x, y: d.y - d.z, a: 0.5 });
   const lift = Math.min(d.z, 200) / 200;
   // Shadow stays on the ground and shrinks/fades as the player rises.
   ctx.fillStyle = `rgba(0,0,0,${0.35 - 0.2 * lift})`;
   ctx.beginPath(); ctx.ellipse(d.x, d.y + 14, 18 * (1 - 0.4 * lift), 7 * (1 - 0.4 * lift), 0, 0, 7); ctx.fill();
   // Body is drawn at y - z.
-  ctx.fillStyle = COLORS[i];
-  ctx.fillRect(d.x - 16, d.y - d.z - 16, 32, 32);
-  if (i === you) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(d.x - 16, d.y - d.z - 16, 32, 32); }
+  drawBody(i, d.x, d.y - d.z, 1);
+  if (i === 1 && p.bt > 0) { // glowing orb with radiating lines, growing as the charge fills
+    const k = 1 - p.bt / beamCfg.charge, ox = d.x + p.bx * 26, oy = d.y - d.z - 4 + p.by * 26, r = 4 + 12 * k;
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5;
+    for (let a = 0; a < 6.28; a += 0.5236) {
+      ctx.beginPath();
+      ctx.moveTo(ox + Math.cos(a) * (r + 4), oy + Math.sin(a) * (r + 4));
+      ctx.lineTo(ox + Math.cos(a) * (r + 10 + 14 * k), oy + Math.sin(a) * (r + 10 + 14 * k));
+      ctx.stroke();
+    }
+    const gr = ctx.createRadialGradient(ox, oy, 0, ox, oy, r * 1.8);
+    gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#ffb040'); gr.addColorStop(1, 'rgba(255,90,30,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(ox, oy, r * 1.8, 0, 7); ctx.fill();
+  }
+  if (i === 1 && (p.bt > 0 || p.st > 0 || p.rt > 0)) {
+    ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
+    ctx.fillStyle = p.rt > 0 ? '#ff8a5c' : '#ffd27a';
+    ctx.fillText(p.rt > 0 ? 'MUST RECHARGE' : '破壞死光！', d.x, d.y - d.z - 54);
+  }
+  if (i === you) { ctx.fillStyle = '#fff'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 你', d.x, d.y - d.z - 40); }
   // HP bar follows the body.
-  ctx.fillStyle = '#000a'; ctx.fillRect(d.x - 20, d.y - d.z - 30, 40, 6);
-  ctx.fillStyle = p.hp > 30 ? '#6fd36f' : '#e55'; ctx.fillRect(d.x - 20, d.y - d.z - 30, 40 * p.hp / 100, 6);
+  ctx.fillStyle = '#000a'; ctx.fillRect(d.x - 20, d.y - d.z - 36, 40, 6);
+  ctx.fillStyle = p.hp > 30 ? '#6fd36f' : '#e55'; ctx.fillRect(d.x - 20, d.y - d.z - 36, 40 * p.hp / 100, 6);
 }
 
 function frame() {
@@ -82,6 +191,10 @@ function frame() {
   if (shake > 0) { ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake); shake *= 0.85; if (shake < .5) shake = 0; }
 
   if (snap) {
+    for (const g of ghosts) { drawBody(g.i, g.x, g.y, Math.max(g.a, 0)); g.a -= 0.04; }
+    while (ghosts.length && ghosts[0].a <= 0) ghosts.shift();
+    drawTelegraph();
+    drawBeams();
     // Draw lower players first so the one nearer the camera overlaps correctly.
     [0, 1].sort((a, b) => snap.p[a].y - snap.p[b].y).forEach((i) => drawPlayer(i, snap.p[i]));
     fx = fx.filter((f) => (f.age += 1 / 60) < 0.35);

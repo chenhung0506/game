@@ -1,0 +1,20 @@
+{
+  "pikachu": {
+    "dash_distance": 220,
+    "dash_duration": 0.2,
+    "dash_cooldown": 0.6
+  },
+  "snorlax": {
+    "jump_height": 72,
+    "jump_duration": 0.8,
+    "hyper_beam": {
+      "charge_duration": 0.6,
+      "sweep_angle": 30,
+      "sweep_duration": 0.5,
+      "recharge_duration": 1.5,
+      "damage": 40,
+      "length": 450,
+      "width": 50
+    }
+  }
+}

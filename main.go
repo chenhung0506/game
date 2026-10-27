@@ -42,9 +42,10 @@ type room struct {
 type hub struct {
 	mu    sync.Mutex
 	rooms map[string]*room
+	cfg   Config
 }
 
-func newHub() *hub { return &hub{rooms: map[string]*room{}} }
+func newHub(cfg Config) *hub { return &hub{rooms: map[string]*room{}, cfg: cfg} }
 
 // join claims a slot in the room. Lock order is always hub.mu -> room.mu.
 func (h *hub) join(id string, c *client) (r *room, idx int, ok bool) {
@@ -55,7 +56,7 @@ func (h *hub) join(id string, c *client) (r *room, idx int, ok bool) {
 		if len(h.rooms) >= maxRooms {
 			return nil, 0, false
 		}
-		r = &room{g: NewGame(), winner: -1}
+		r = &room{g: NewGame(h.cfg), winner: -1}
 		h.rooms[id] = r
 	}
 	r.mu.Lock()
@@ -158,7 +159,11 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	go c.writePump()
 
 	r.mu.Lock()
-	hi, _ := json.Marshal(map[string]any{"t": "hi", "you": idx})
+	hb := r.g.cfg.Snorlax.HyperBeam // tunable, so the client takes it from here instead of hard-coding
+	hi, _ := json.Marshal(map[string]any{
+		"t": "hi", "you": idx,
+		"beam": map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},
+	})
 	c.send <- hi
 	if r.c[1-idx] == nil {
 		c.send <- []byte(`{"t":"wait"}`)
@@ -212,8 +217,8 @@ func (c *client) writePump() {
 	}
 }
 
-func newMux() *http.ServeMux {
-	h := newHub()
+func newMux(cfg Config) *http.ServeMux {
+	h := newHub(cfg)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", h.serveWS)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
@@ -222,9 +227,16 @@ func newMux() *http.ServeMux {
 }
 
 func main() {
+	cfgPath := envOr("CONFIG", "config.json")
+	cfg, err := LoadConfig(cfgPath)
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+	log.Printf("config %s: %+v", cfgPath, cfg)
+
 	addr := ":" + envOr("PORT", "8080")
 	log.Printf("game listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, newMux()))
+	log.Fatal(http.ListenAndServe(addr, newMux(cfg)))
 }
 
 func envOr(k, def string) string {

@@ -39,12 +39,17 @@ func next(t *testing.T, c *websocket.Conn, want string) map[string]any {
 }
 
 func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
-	srv := httptest.NewServer(newMux())
+	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
 
 	a := dial(t, srv, "abc")
-	if got := next(t, a, "hi")["you"]; got != float64(0) {
-		t.Fatalf("first player index = %v, want 0", got)
+	hi := next(t, a, "hi")
+	if hi["you"] != float64(0) {
+		t.Fatalf("first player index = %v, want 0", hi["you"])
+	}
+	// The client draws the beam's warning line from these, not from hard-coded numbers.
+	if beam, ok := hi["beam"].(map[string]any); !ok || beam["len"] != float64(450) || beam["w"] != float64(50) || beam["charge"] != float64(0.6) || beam["angle"] != float64(30) {
+		t.Fatalf("hi.beam = %v, want the configured length/width/charge", hi["beam"])
 	}
 	next(t, a, "wait")
 
@@ -64,7 +69,7 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 }
 
 func TestInputMovesPlayerAndLeaveSendsWait(t *testing.T) {
-	srv := httptest.NewServer(newMux())
+	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
 
 	a, b := dial(t, srv, "mv"), dial(t, srv, "mv")
@@ -85,7 +90,7 @@ func TestInputMovesPlayerAndLeaveSendsWait(t *testing.T) {
 }
 
 func TestBadRoomIDRejected(t *testing.T) {
-	srv := httptest.NewServer(newMux())
+	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
 	url := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws?room=Bad%20Room"
 	if _, resp, err := websocket.DefaultDialer.Dial(url, nil); err == nil || resp == nil || resp.StatusCode != 400 {
