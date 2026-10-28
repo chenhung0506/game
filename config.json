@@ -5,18 +5,19 @@
     "dash_cooldown": 1.2,
     "thunder": {
       "delay": 1.2,
-      "radius": 90,
+      "radius": 100,
       "damage": 15,
       "strikes": 3,
-      "interval": 0.5,
-      "follow_speed": 120,
+      "interval": 0.7,
+      "follow_speed": 90,
       "cooldown": 4
     }
   },
   "snorlax": {
     "jump_height": 100,
-    "jump_duration": 1.5,
+    "jump_duration": 1.7,
     "jump_cooldown": 2,
+    "slam_radius": 100,
     "air_speed_first_half": 320,
     "air_speed_second_half": 120,
     "hyper_beam": {
