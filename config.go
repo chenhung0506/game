@@ -52,6 +52,7 @@ type Config struct {
 			ExplosionDamage int     `json:"explosion_damage"`
 			Knockback       float64 `json:"knockback"` // the blast pushes the target this far straight away from its centre
 			Cooldown        float64 `json:"cooldown"`  // before the next ball; counted from the start of the charge
+			Mass            float64 `json:"mass"`      // see hyper_beam.mass: a heavier beam pushes the ball back by the difference
 		} `json:"electro_ball"`
 	} `json:"pikachu"`
 	Snorlax struct {
@@ -77,6 +78,7 @@ type Config struct {
 			Damage           int     `json:"damage"`            // per hit
 			Knockback        float64 `json:"knockback"`         // each hit pushes the target this far straight away from Snorlax; 0 = none
 			HitInterval      float64 `json:"hit_interval"`      // a target still in the beam is hit again this often; 0 = a sweep hits only once
+			Mass             float64 `json:"mass"`              // against an Electro Ball: each hit pushes it mass - electro_ball.mass away (nothing if lighter)
 			Length           float64 `json:"length"`            // reach (radius of the fan)
 			Width            float64 `json:"width"`
 		} `json:"hyper_beam"`
@@ -205,6 +207,8 @@ func (c Config) validate() error {
 		{"pikachu.thunder.follow_speed", c.Pikachu.Thunder.FollowSpeed},
 		{"pikachu.electro_ball.knockback", c.Pikachu.ElectroBall.Knockback},
 		{"pikachu.electro_ball.cooldown", c.Pikachu.ElectroBall.Cooldown},
+		{"pikachu.electro_ball.mass", c.Pikachu.ElectroBall.Mass},
+		{"snorlax.hyper_beam.mass", c.Snorlax.HyperBeam.Mass},
 		{"snorlax.jump.cooldown", c.Snorlax.Jump.Cooldown},
 		{"snorlax.jump.air_speed_first_half", c.Snorlax.Jump.AirSpeedFirstHalf},
 		{"snorlax.jump.air_speed_second_half", c.Snorlax.Jump.AirSpeedSecondHalf},

@@ -1840,3 +1840,135 @@ func TestBallSnapshotKeys(t *testing.T) {
 		}
 	}
 }
+
+// ---- Hyper Beam against an Electro Ball: repeated hits, pushed back by the difference in mass ----
+
+// beamVsBall: Snorlax (600,250) fires a fixed beam at Pikachu (300,250); the ball hangs on the line.
+func beamVsBall(seconds, interval, beamMass, ballMass, ballSpeed float64, ball Ball) *Game {
+	cfg := DefaultConfig()
+	hb := &cfg.Snorlax.HyperBeam
+	hb.SweepAngle, hb.SweepDuration, hb.HitInterval, hb.Mass = 0, seconds, interval, beamMass
+	hb.Damage, hb.Length = 10, 550
+	cfg.Pikachu.ElectroBall.Mass, cfg.Pikachu.ElectroBall.Speed = ballMass, ballSpeed
+	g := beamGame(cfg)
+	if ball.HP == 0 {
+		ball.HP = 100000
+	}
+	g.Balls = []Ball{ball}
+	return g
+}
+
+func TestBeamPushesABallBackByTheDifferenceInMass(t *testing.T) {
+	g := beamVsBall(0.5, 0, 130, 100, 0, Ball{X: 450, Y: 250})
+	stepBeam(g)
+	for i := 0; i < 3*tickRate && g.Balls[0].HP == 100000; i++ {
+		g.Step(dt)
+	}
+	if b := g.Balls[0]; b.HP != 100000-10 || b.X != 420 || b.Y != 250 {
+		t.Fatalf("ball %+v, want HP %d and pushed 130-100 = 30 away from Snorlax to (420,250)", b, 100000-10)
+	}
+}
+
+func TestBeamPushesTheBallAgainEveryHitInterval(t *testing.T) {
+	g := beamVsBall(2.0, 0.5, 130, 100, 0, Ball{X: 450, Y: 250}) // 60 ticks of beam: a hit every 15
+	stepBeam(g)
+	var pushedOn []int
+	prev := g.Balls[0].X
+	for tick := 2; tick <= 4*tickRate; tick++ {
+		g.Step(dt)
+		if g.Balls[0].X != prev {
+			pushedOn = append(pushedOn, tick)
+		}
+		prev = g.Balls[0].X
+	}
+	if len(pushedOn) != 4 {
+		t.Fatalf("pushed on ticks %v, want 4 (every 0.5s of a 2s beam)", pushedOn)
+	}
+	for i := 1; i < len(pushedOn); i++ {
+		if pushedOn[i]-pushedOn[i-1] != 15 {
+			t.Fatalf("pushed on ticks %v, want them 15 ticks (0.5s) apart", pushedOn)
+		}
+	}
+	if x := g.Balls[0].X; x != 450-4*30 {
+		t.Fatalf("ball x = %v, want 4 pushes of 30 from 450", x)
+	}
+	if hp := g.Balls[0].HP; hp != 100000-40 {
+		t.Fatalf("ball HP = %d, want one 10 damage per hit", hp)
+	}
+}
+
+// The point of the design: each hit throws the ball back a little, but it still flies on, so while
+// the push per hit (here 10) stays under what it flies between hits (150 * 0.2 = 30) it gets ahead.
+func TestBallKeepsAdvancingThroughTheBeamWhileBeingPushedBack(t *testing.T) {
+	g := beamVsBall(3.0, 0.2, 110, 100, 150, Ball{X: 100, Y: 250, DX: 1})
+	stepBeam(g)
+	const ticks = 54 // 18 of charge, then 1.2s of beam
+	for i := 1; i < ticks; i++ {
+		g.Step(dt)
+	}
+	b := g.Balls[0]
+	hits := (100000 - b.HP) / 10
+	if hits < 5 {
+		t.Fatalf("hits = %d, want the beam to have hit the ball every 0.2s", hits)
+	}
+	if want := 100 + 150*dt*ticks - 10*float64(hits); math.Abs(b.X-want) > 1e-6 {
+		t.Fatalf("ball x = %v, want %v: flight minus %d pushes of 10", b.X, want, hits)
+	}
+	if b.X <= 100 {
+		t.Fatalf("ball x = %v: it must still have moved forward overall", b.X)
+	}
+}
+
+func TestBeamDoesNotPushABallThatIsAsHeavyOrHeavier(t *testing.T) {
+	for _, tc := range []struct{ beam, ball float64 }{{100, 150}, {100, 100}, {0, 0}} {
+		g := beamVsBall(0.5, 0, tc.beam, tc.ball, 0, Ball{X: 450, Y: 250})
+		stepBeam(g)
+		for i := 0; i < 2*tickRate; i++ {
+			g.Step(dt)
+		}
+		if b := g.Balls[0]; b.X != 450 || b.HP != 100000-10 {
+			t.Fatalf("beam %v ball %v: ball %+v, want it hit (HP -10) but not moved", tc.beam, tc.ball, b)
+		}
+	}
+}
+
+func TestBallIntervalZeroIsOneHitAndOnePushPerSweep(t *testing.T) {
+	g := beamVsBall(2.0, 0, 130, 100, 0, Ball{X: 450, Y: 250})
+	stepBeam(g)
+	for i := 0; i < 4*tickRate; i++ {
+		g.Step(dt)
+	}
+	if b := g.Balls[0]; b.HP != 100000-10 || b.X != 420 {
+		t.Fatalf("ball %+v, want a single hit and a single push for a lingering ball", b)
+	}
+}
+
+func TestBallPushedIntoTheWallBlowsUp(t *testing.T) {
+	g := beamVsBall(0.5, 0, 130, 100, 0, Ball{X: 20, Y: 250})
+	g.cfg.Snorlax.HyperBeam.Length = 700 // reach the far end of the court
+	stepBeam(g)
+	var boom Event
+	var n int
+	for i := 0; i < 2*tickRate && n == 0; i++ {
+		n, boom = explodeEvents(g.Step(dt))
+	}
+	if n != 1 || boom.X != 0 || len(g.Balls) != 0 {
+		t.Fatalf("explosions = %d at x=%v, balls left %d: pushed against the wall it should explode there", n, boom.X, len(g.Balls))
+	}
+}
+
+// A new sweep hits at once: the previous sweep's interval must not hold the first hit back.
+func TestBallIntervalDoesNotCarryOverToTheNextSweep(t *testing.T) {
+	g := beamVsBall(0.1, 5, 130, 100, 0, Ball{X: 450, Y: 250})
+	hb := &g.cfg.Snorlax.HyperBeam
+	hb.Cooldown, hb.RechargeDuration = 0, 0
+	for sweep := 1; sweep <= 2; sweep++ {
+		stepBeam(g)
+		for i := 0; i < 2*tickRate; i++ {
+			g.Step(dt)
+		}
+		if want := 100000 - 10*sweep; g.Balls[0].HP != want {
+			t.Fatalf("after sweep %d the ball has %d HP, want %d: each sweep hits it once, despite the 5s interval", sweep, g.Balls[0].HP, want)
+		}
+	}
+}

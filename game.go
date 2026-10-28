@@ -85,7 +85,8 @@ type Ball struct {
 	Y         float64 `json:"y"`
 	DX, DY    float64 `json:"-"` // unit direction
 	HP        int     `json:"hp"`
-	LastSweep int     `json:"-"` // the Hyper Beam sweep that last hit it, so one sweep hits it once
+	LastSweep int     `json:"-"` // the Hyper Beam sweep that last hit it
+	HitCD     float64 `json:"-"` // until the beam may hit it again (hyper_beam.hit_interval)
 }
 
 // Event is a one-shot effect the client plays (ring, screen shake).
@@ -149,13 +150,17 @@ func (g *Game) radius(i int) float64 {
 // knockBack pushes target d units straight away from (sx, sy), stopping at the walls. Standing exactly
 // on it there is no "away", so it goes along (fx, fy).
 func (g *Game) knockBack(sx, sy float64, target *Player, d, fx, fy float64) {
-	dx, dy := target.X-sx, target.Y-sy
+	target.X, target.Y = g.pushedAway(target.X, target.Y, sx, sy, d, fx, fy)
+}
+
+// pushedAway is where a point at (x, y) ends up pushed d units away from (sx, sy), inside the court.
+func (g *Game) pushedAway(x, y, sx, sy, d, fx, fy float64) (float64, float64) {
+	dx, dy := x-sx, y-sy
 	n := math.Hypot(dx, dy)
 	if n < 1e-9 {
 		dx, dy, n = fx, fy, math.Hypot(fx, fy)
 	}
-	target.X = math.Min(math.Max(target.X+dx/n*d, 0), g.court.Length)
-	target.Y = math.Min(math.Max(target.Y+dy/n*d, 0), g.court.Width)
+	return math.Min(math.Max(x+dx/n*d, 0), g.court.Length), math.Min(math.Max(y+dy/n*d, 0), g.court.Width)
 }
 
 func dist(a, b *Player) float64 { return math.Hypot(a.X-b.X, a.Y-b.Y) }
@@ -253,6 +258,9 @@ func (g *Game) Step(dt float64) []Event {
 					p.BeamA = hb.SweepAngle
 					p.SweptHit, p.BeamHitCD = false, 0
 					p.SweepID++
+					for j := range g.Balls {
+						g.Balls[j].HitCD = 0 // a new sweep hits at once
+					}
 				}
 			} else if p.SweepT > 0 {
 				prev := p.BeamA
@@ -274,11 +282,22 @@ func (g *Game) Step(dt float64) []Event {
 					g.knockBack(p.X, p.Y, other, hb.Knockback, p.BeamX, p.BeamY)
 				}
 				br := g.cfg.Pikachu.ElectroBall.Radius
-				for j := range g.Balls { // the beam hits a ball once per sweep
+				// A ball is hit like a player: at once, then every hit_interval while it stays in the beam
+				// (0 = once per sweep). Each hit also pushes it away from Snorlax by the beam's mass minus
+				// the ball's, so a heavy beam can hold a light ball back while the ball keeps flying forward.
+				push := math.Max(0, hb.Mass-g.cfg.Pikachu.ElectroBall.Mass)
+				for j := range g.Balls {
 					b := &g.Balls[j]
-					if b.LastSweep != p.SweepID && sweepHits(p, &Player{X: b.X, Y: b.Y}, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+br, hb.Width+2*br) {
+					if b.HitCD > 0 {
+						if b.HitCD -= dt; b.HitCD < 1e-9 {
+							b.HitCD = 0
+						}
+					}
+					ready := b.HitCD == 0 && (hb.HitInterval > 0 || b.LastSweep != p.SweepID)
+					if ready && sweepHits(p, &Player{X: b.X, Y: b.Y}, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+br, hb.Width+2*br) {
 						b.HP -= hb.Damage
-						b.LastSweep = p.SweepID
+						b.LastSweep, b.HitCD = p.SweepID, hb.HitInterval
+						b.X, b.Y = g.pushedAway(b.X, b.Y, p.X, p.Y, push, p.BeamX, p.BeamY)
 					}
 				}
 				if p.SweepT == 0 {

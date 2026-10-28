@@ -70,6 +70,8 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 		"negative ball knockback":    `{"pikachu":{"electro_ball":{"knockback":-1}}}`,
 		"negative ball cooldown":     `{"pikachu":{"electro_ball":{"cooldown":-1}}}`,
 		"misspelt ball key":          `{"pikachu":{"electro_ball":{"explosion_radious":5}}}`,
+		"negative beam mass":         `{"snorlax":{"hyper_beam":{"mass":-1}}}`,
+		"negative ball mass":         `{"pikachu":{"electro_ball":{"mass":-1}}}`,
 		"negative knockback":         `{"snorlax":{"hyper_beam":{"knockback":-1}}}`,
 		"negative hit interval":      `{"snorlax":{"hyper_beam":{"hit_interval":-0.1}}}`,
 		"negative beam cooldown":     `{"snorlax":{"hyper_beam":{"cooldown":-1}}}`,
@@ -115,6 +117,8 @@ func TestZeroCooldownAndRechargeAreAllowed(t *testing.T) {
 		`{"snorlax":{"jump":{"air_speed_first_half":0}}}`,  // no steering while rising
 		`{"snorlax":{"jump":{"air_speed_second_half":0}}}`, // no steering while falling
 		`{"snorlax":{"hyper_beam":{"cooldown":0}}}`,
+		`{"snorlax":{"hyper_beam":{"mass":0}}}`, // weightless: never pushes a ball
+		`{"pikachu":{"electro_ball":{"mass":0}}}`,
 		`{"pikachu":{"electro_ball":{"knockback":0}}}`, // a blast that does not push
 		`{"pikachu":{"electro_ball":{"cooldown":0}}}`,
 		`{"snorlax":{"hyper_beam":{"knockback":0}}}`,     // no push
