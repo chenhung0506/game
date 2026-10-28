@@ -16,6 +16,9 @@
   "snorlax": {
     "jump_height": 72,
     "jump_duration": 0.8,
+    "jump_cooldown": 1.5,
+    "air_speed": 180,
+    "quake_radius": 100,
     "hyper_beam": {
       "charge_duration": 0.6,
       "sweep_angle": 35,

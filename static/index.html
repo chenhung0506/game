@@ -17,7 +17,7 @@
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
 <script>
 // Arena and radii mirror game.go; keep them in sync.
-const SLAM_R = 70, QUAKE_R = 100;
+const SLAM_R = 70, QUAKE_R = 100, QUAKE_LIFE = 0.75; // seconds the earthquake effect stays on screen
 // Slot 0 is always Pikachu, slot 1 Snorlax (fixed by the server).
 const HELP = [
   '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震　L＝打雷（敵人頭上出現陰影，之後落雷，陰影會追著敵人）',
@@ -59,6 +59,7 @@ ws.onmessage = (e) => {
       fx.push({ ...ev, age: 0 });
       if (ev.t === 'slam') shake = 8;
       if (ev.t === 'thunder') shake = 10;
+      if (ev.t === 'quake') shake = 16;
     }
   }
 };
@@ -172,6 +173,48 @@ function drawShadow() {
   ctx.restore();
 }
 
+// Earthquake. It shows the real reach (f.r, sent by the server) in a bright disc the moment it
+// goes off, then a pair of shockwaves, cracks in the ground and flying dust. All circles are true
+// circles because the hit test is a distance in the ground plane.
+function drawQuake(f) {
+  const R = f.r || QUAKE_R, k = f.age / QUAKE_LIFE, a = 1 - k;
+  ctx.save();
+  // the area that was hit
+  const disc = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
+  disc.addColorStop(0, `rgba(255,170,40,${0.2 * a})`);
+  disc.addColorStop(1, `rgba(255,110,20,${0.6 * a})`);
+  ctx.fillStyle = disc; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,225,100,${a})`; ctx.lineWidth = 7; ctx.stroke();
+  // cracks racing out from the centre
+  ctx.strokeStyle = `rgba(45,25,10,${0.9 * a})`; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const grow = Math.min(1, k * 5);
+  for (let i = 0; i < 10; i++) {
+    const ang = i * 0.6283 + (i % 3) * 0.12, len = R * (0.55 + 0.4 * (((i * 37) % 10) / 10)) * grow;
+    const dx = Math.cos(ang), dy = Math.sin(ang), j1 = (((i * 53) % 11) - 5) * 2.2, j2 = (((i * 29) % 11) - 5) * 2.2;
+    ctx.beginPath(); ctx.moveTo(f.x, f.y);
+    ctx.lineTo(f.x + dx * len * 0.35 - dy * j1, f.y + dy * len * 0.35 + dx * j1);
+    ctx.lineTo(f.x + dx * len * 0.7 - dy * j2, f.y + dy * len * 0.7 + dx * j2);
+    ctx.lineTo(f.x + dx * len, f.y + dy * len);
+    ctx.stroke();
+  }
+  // two shockwaves, the second one a beat behind
+  for (const [delay, w] of [[0, 14], [0.12, 8]]) {
+    const kk = (k - delay) / 0.5;
+    if (kk > 0 && kk < 1) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.95 * (1 - kk)})`; ctx.lineWidth = w * (1 - kk) + 1;
+      ctx.beginPath(); ctx.arc(f.x, f.y, R * kk, 0, 7); ctx.stroke();
+    }
+  }
+  // dust thrown outwards
+  const out = 1 - (1 - k) * (1 - k);
+  ctx.fillStyle = `rgba(165,135,100,${0.6 * a})`;
+  for (let i = 0; i < 18; i++) {
+    const ang = i * 0.349 + 0.2, dist = R * (0.45 + 0.5 * (((i * 17) % 10) / 10)) * out;
+    ctx.beginPath(); ctx.arc(f.x + Math.cos(ang) * dist, f.y + Math.sin(ang) * dist - 10 * k * 6, 6 + 9 * k, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+
 // A jagged bolt from the top of the screen to the strike point, plus a flash on the ground.
 function drawBolt(f) {
   const k = f.age / 0.35, a = 1 - k;
@@ -258,9 +301,10 @@ function frame() {
     drawSmoke(); // under the players, so the labels and HP bars stay readable
     // Draw lower players first so the one nearer the camera overlaps correctly.
     [0, 1].sort((a, b) => snap.p[a].y - snap.p[b].y).forEach((i) => drawPlayer(i, snap.p[i]));
-    fx = fx.filter((f) => (f.age += 1 / 60) < 0.35);
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'quake' ? QUAKE_LIFE : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') { drawBolt(f); continue; }
+      if (f.t === 'quake') { drawQuake(f); continue; }
       const r = f.t === 'slam' ? SLAM_R : QUAKE_R, k = f.age / 0.35;
       ctx.lineWidth = 4;
       ctx.strokeStyle = `rgba(${f.t === 'slam' ? '255,170,60' : '200,160,100'},${1 - k})`;

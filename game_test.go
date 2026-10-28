@@ -82,6 +82,181 @@ func TestJumpHeightAndDurationFollowConfig(t *testing.T) {
 	}
 }
 
+// ---- Snorlax: air speed, jump cooldown, earthquake reach ----
+
+// While Snorlax is above the ground it steers at air_speed; the moment it lands, at the walking speed.
+func TestSnorlaxSteersInTheAirAtAirSpeed(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		air  float64
+	}{{"slower than walking", 60}, {"as fast as walking", speed}, {"no steering at all", 0}} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Snorlax.AirSpeed = tc.air
+			g := NewGame(cfg)
+			g.P[snorlax].X = 1000
+			g.P[snorlax].In = Input{Skill: true}
+			g.Step(dt) // take-off; no horizontal key yet
+			g.P[snorlax].In = Input{DX: 1}
+
+			airTicks, moved := 0, 0.0
+			for g.P[snorlax].Z > 0 && airTicks < 100 {
+				before := g.P[snorlax].X
+				g.Step(dt)
+				airTicks, moved = airTicks+1, moved+g.P[snorlax].X-before
+			}
+			if airTicks < 15 {
+				t.Fatalf("setup: only %d airborne ticks, the jump should last ~24", airTicks)
+			}
+			if want := tc.air * dt * float64(airTicks); math.Abs(moved-want) > 1e-6 {
+				t.Fatalf("moved %.3f in the air, want %.3f (%v u/s for %d ticks)", moved, want, tc.air, airTicks)
+			}
+
+			x := g.P[snorlax].X // landed: walking speed again
+			g.Step(dt)
+			if got := g.P[snorlax].X - x; math.Abs(got-speed*dt) > 1e-9 {
+				t.Fatalf("moved %.4f on the ground, want %.4f", got, speed*dt)
+			}
+		})
+	}
+}
+
+func TestAirSpeedOnlyAffectsSnorlax(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Snorlax.AirSpeed = 0
+	g := NewGame(cfg)
+	x := g.P[pikachu].X
+	g.P[pikachu].In = Input{DX: 1}
+	g.Step(dt)
+	if got := g.P[pikachu].X - x; math.Abs(got-speed*dt) > 1e-9 {
+		t.Fatalf("Pikachu moved %.4f, want its normal %.4f", got, speed*dt)
+	}
+}
+
+// When the configured duration is a whole number of ticks, the landing must happen on
+// that very tick. Float rounding used to leave the height at +3e-15 and cost one extra tick.
+func TestJumpLandsOnTheTickTheConfiguredDurationEnds(t *testing.T) {
+	for _, duration := range []float64{0.5, 0.8, 1.0, 1.2} {
+		cfg := DefaultConfig()
+		cfg.Snorlax.JumpDuration = duration
+		g := NewGame(cfg)
+		g.P[snorlax].In = Input{Skill: true}
+		g.Step(dt) // tick 1: take-off
+		g.P[snorlax].In = Input{}
+		landed := 0
+		for tick := 2; tick <= 100 && landed == 0; tick++ {
+			g.Step(dt)
+			if g.P[snorlax].Z == 0 {
+				landed = tick
+			}
+		}
+		if want := int(math.Round(duration * tickRate)); landed != want {
+			t.Errorf("duration %vs: landed on tick %d, want %d", duration, landed, want)
+		}
+	}
+}
+
+// takeoffs holds the jump key down and returns the ticks on which Snorlax leaves the ground.
+func takeoffs(cfg Config, ticks int) []int {
+	g := NewGame(cfg)
+	g.P[snorlax].In = Input{Skill: true}
+	var out []int
+	for tick := 1; tick <= ticks; tick++ {
+		was := g.P[snorlax].Z
+		g.Step(dt)
+		if was == 0 && g.P[snorlax].Z > 0 {
+			out = append(out, tick)
+		}
+	}
+	return out
+}
+
+func TestJumpCooldownCountsFromTakeoff(t *testing.T) {
+	// A jump lasts 0.8s = 24 ticks, so Snorlax is back on the ground on tick 24.
+	for _, tc := range []struct {
+		name     string
+		cooldown float64
+		want     []int
+	}{
+		{"1.5s: the next jump is allowed 45 ticks after take-off", 1.5, []int{1, 46, 91}},
+		{"no cooldown: jumps again the tick after landing", 0, []int{1, 25, 49, 73, 97}},
+		{"shorter than the jump: the landing is what is waited for", 0.5, []int{1, 25, 49, 73, 97}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Snorlax.JumpCooldown = tc.cooldown
+			if got := takeoffs(cfg, 100); fmt.Sprint(got) != fmt.Sprint(tc.want) {
+				t.Fatalf("take-offs on ticks %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSnorlaxQuakeReachFollowsConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		radius float64
+		gap    float64 // distance to Pikachu
+		hit    bool
+	}{
+		{"default 100: 90 away is hit", 100, 90, true},
+		{"default 100: 150 away is not", 100, 150, false},
+		{"widened to 200: 190 away is hit", 200, 190, true},
+		{"widened to 200: 210 away is not", 200, 210, false},
+		{"shrunk to 40: 90 away is not", 40, 90, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Snorlax.QuakeRadius = tc.radius
+			g := NewGame(cfg)
+			g.P[snorlax].X, g.P[snorlax].Y = 800, 500
+			g.P[pikachu].X, g.P[pikachu].Y = 800-tc.gap, 500
+			g.P[snorlax].In = Input{Attack: true}
+			events := g.Step(dt)
+			if got := g.P[pikachu].HP < maxHP; got != tc.hit {
+				t.Fatalf("hit = %v, want %v", got, tc.hit)
+			}
+			var r float64
+			for _, e := range events {
+				if e.T == "quake" {
+					r = e.R
+				}
+			}
+			if r != tc.radius {
+				t.Fatalf("the quake event carries reach %v, want %v so the effect can match it", r, tc.radius)
+			}
+		})
+	}
+}
+
+// The configurable reach is Snorlax's; Pikachu's own earthquake keeps its fixed one.
+func TestPikachuQuakeReachIsNotAffectedBySnorlaxConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Snorlax.QuakeRadius = 300
+	g := NewGame(cfg)
+	g.P[pikachu].X, g.P[pikachu].Y = 800, 500
+	g.P[snorlax].X, g.P[snorlax].Y = 800+150, 500 // inside 300, outside Pikachu's 100
+	g.P[pikachu].In = Input{Attack: true}
+	events := g.Step(dt)
+	if g.P[snorlax].HP != maxHP {
+		t.Fatal("Pikachu's earthquake must not use Snorlax's widened reach")
+	}
+	for _, e := range events {
+		if e.T == "quake" && e.R != quakeRadius {
+			t.Fatalf("Pikachu's quake event carries reach %v, want %v", e.R, quakeRadius)
+		}
+	}
+}
+
+func TestQuakeEventCarriesItsReachToTheClient(t *testing.T) {
+	b, _ := json.Marshal(Event{T: "quake", X: 1, Y: 2, R: 100})
+	var m map[string]any
+	json.Unmarshal(b, &m)
+	if m["r"] != float64(100) {
+		t.Fatalf("event JSON = %s, want an \"r\" key", b)
+	}
+}
+
 // ---- Pikachu: dash ----
 
 func TestDashCoversConfiguredDistanceInConfiguredTime(t *testing.T) {

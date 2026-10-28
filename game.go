@@ -57,6 +57,7 @@ type Player struct {
 	BeamA     float64 `json:"ba"` // beam angle from the facing in degrees, counter-clockwise on screen is positive
 	SweptHit  bool    `json:"-"`  // a sweep hits a target at most once
 	BeamCD    float64 `json:"-"`  // counted from the moment the beam is used
+	JumpCD    float64 `json:"-"`  // counted from the moment of take-off
 
 	// Thunder: a shadow chases the opponent, then bolts hit wherever it is.
 	// ThunderLeft is the number of bolts still to come (0 = no cast running).
@@ -69,9 +70,10 @@ type Player struct {
 
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
-	T string  `json:"t"` // "slam" | "quake"
+	T string  `json:"t"` // "slam" | "quake" | "thunder"
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
+	R float64 `json:"r,omitempty"` // quake reach, so the effect can match it
 }
 
 type Game struct {
@@ -165,6 +167,11 @@ func (g *Game) Step(dt float64) []Event {
 		busy := false
 		if i == snorlax {
 			hb := g.cfg.Snorlax.HyperBeam
+			if p.JumpCD > 0 {
+				if p.JumpCD -= dt; p.JumpCD < 1e-9 {
+					p.JumpCD = 0
+				}
+			}
 			if p.RechargeT > 0 {
 				if p.RechargeT -= dt; p.RechargeT < 1e-9 {
 					p.RechargeT = 0
@@ -255,23 +262,28 @@ func (g *Game) Step(dt float64) []Event {
 				p.DashT = 0
 			}
 		} else if n := math.Hypot(float64(p.In.DX), float64(p.In.DY)); !busy && n > 0 {
-			// Normalise diagonals so they are not faster.
-			p.X += float64(p.In.DX) / n * speed * dt
-			p.Y += float64(p.In.DY) / n * speed * dt
+			// Normalise diagonals so they are not faster. Snorlax steers more slowly in the air.
+			v := speed
+			if i == snorlax && p.Z > 0 {
+				v = g.cfg.Snorlax.AirSpeed
+			}
+			p.X += float64(p.In.DX) / n * v * dt
+			p.Y += float64(p.In.DY) / n * v * dt
 		}
 		p.X = math.Min(math.Max(p.X, 0), arenaW)
 		p.Y = math.Min(math.Max(p.Y, 0), arenaH)
 
 		// Snorlax's skill: jump. Exact parabola so height and air time match the config.
-		if i == snorlax && p.In.Skill && p.Z == 0 && !busy {
+		if i == snorlax && p.In.Skill && p.Z == 0 && !busy && p.JumpCD == 0 {
 			p.VZ = g.cfg.jumpV()
+			p.JumpCD = g.cfg.Snorlax.JumpCooldown // counted from the moment of take-off
 		}
 		landed := false
 		if p.Z > 0 || p.VZ > 0 {
 			gr := g.cfg.gravity()
 			p.Z += p.VZ*dt - 0.5*gr*dt*dt
 			p.VZ -= gr * dt
-			if p.Z <= 0 {
+			if p.Z <= 1e-9 { // not 0: the parabola ends at 0 on the tick, but rounding can leave +3e-15
 				p.Z, p.VZ, landed = 0, 0, true
 			}
 		}
@@ -290,8 +302,12 @@ func (g *Game) Step(dt float64) []Event {
 		}
 		if p.In.Attack && p.CD == 0 && p.Z == 0 && !busy {
 			p.CD = quakeCooldown
-			events = append(events, Event{T: "quake", X: p.X, Y: p.Y})
-			if dist(p, other) < quakeRadius && other.Z < groundZ {
+			qr := quakeRadius
+			if i == snorlax {
+				qr = g.cfg.Snorlax.QuakeRadius // Pikachu keeps the fixed radius
+			}
+			events = append(events, Event{T: "quake", X: p.X, Y: p.Y, R: qr}) // the client draws the real reach
+			if dist(p, other) < qr && other.Z < groundZ {
 				g.hit(other, quakeDamage)
 			}
 		}

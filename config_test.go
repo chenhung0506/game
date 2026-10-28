@@ -62,6 +62,10 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 		"negative follow speed":     `{"pikachu":{"thunder":{"follow_speed":-1}}}`,
 		"negative thunder cooldown": `{"pikachu":{"thunder":{"cooldown":-1}}}`,
 		"negative beam cooldown":    `{"snorlax":{"hyper_beam":{"cooldown":-1}}}`,
+		"zero quake radius":         `{"snorlax":{"quake_radius":0}}`,
+		"negative air speed":        `{"snorlax":{"air_speed":-1}}`,
+		"negative jump cooldown":    `{"snorlax":{"jump_cooldown":-1}}`,
+		"misspelt snorlax key":      `{"snorlax":{"air_spead":10}}`,
 		"misspelt thunder key":      `{"pikachu":{"thunder":{"dealy":1}}}`,
 		"not json":                  `dash_distance = 3`,
 		"wrong type":                `{"pikachu":{"dash_distance":"far"}}`,
@@ -79,6 +83,8 @@ func TestZeroCooldownAndRechargeAreAllowed(t *testing.T) {
 		`{"pikachu":{"dash_cooldown":0}}`,
 		`{"snorlax":{"hyper_beam":{"recharge_duration":0}}}`,
 		`{"pikachu":{"thunder":{"cooldown":0}}}`,
+		`{"snorlax":{"jump_cooldown":0}}`,
+		`{"snorlax":{"air_speed":0}}`, // no steering in the air
 		`{"snorlax":{"hyper_beam":{"cooldown":0}}}`,
 		`{"pikachu":{"thunder":{"interval":0}}}`,         // all bolts at once
 		`{"pikachu":{"thunder":{"follow_speed":0}}}`,     // a shadow that stays put
