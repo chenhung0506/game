@@ -35,6 +35,7 @@ type Input struct {
 	Beam    bool `json:"beam"`    // Snorlax only: Hyper Beam
 	Thunder bool `json:"thunder"` // Pikachu only: Thunder
 	Ball    bool `json:"ball"`    // Pikachu only: Electro Ball
+	Punch   bool `json:"punch"`   // Snorlax only: Ice Punch
 }
 
 type Player struct {
@@ -74,6 +75,17 @@ type Player struct {
 	ShadowY     float64 `json:"sy"`
 	ThunderCD   float64 `json:"tcd"` // counted from the moment the cast starts
 
+	// Ice Punch (Snorlax): charge time left, dash distance left (> 0 while dashing), recovery time left.
+	PunchT       float64 `json:"ut"`
+	PunchLeft    float64 `json:"ud"`
+	PunchRecover float64 `json:"ur"`
+	PunchDX      float64 `json:"udx"` // unit direction of the dash
+	PunchDY      float64 `json:"udy"`
+	PunchCD      float64 `json:"pcd"` // counted from the moment the charge starts
+	PunchID      int     `json:"-"`   // counts the punches, so one punch hits a ball once
+	PunchHit     bool    `json:"-"`
+	FrozenT      float64 `json:"fz"` // seconds left frozen: no moving, no skills
+
 	// Electro Ball: BallT is the charge time left (0 = not charging).
 	BallT  float64 `json:"kt"`
 	BallCD float64 `json:"ecd"` // counted from the moment the charge starts
@@ -87,11 +99,12 @@ type Ball struct {
 	HP        int     `json:"hp"`
 	LastSweep int     `json:"-"` // the Hyper Beam sweep that last hit it
 	HitCD     float64 `json:"-"` // until the beam may hit it again (hyper_beam.hit_interval)
+	LastPunch int     `json:"-"` // the Ice Punch that last hit it
 }
 
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
-	T string  `json:"t"` // "slam" | "quake" | "thunder" | "skybolt" | "explode"
+	T string  `json:"t"` // "slam" | "quake" | "thunder" | "skybolt" | "explode" | "freeze"
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 	R float64 `json:"r,omitempty"` // quake reach, so the effect can match it
@@ -215,16 +228,25 @@ func (g *Game) Step(dt float64) []Event {
 	for i := range g.P {
 		p, other := &g.P[i], &g.P[1-i]
 
-		if p.In.DX != 0 || p.In.DY != 0 {
-			p.FX, p.FY = p.In.DX, p.In.DY
+		// A frozen player is deaf to its keys until it thaws: the held keys take effect again afterwards.
+		in := p.In
+		if p.FrozenT > 0 {
+			if p.FrozenT -= dt; p.FrozenT < 1e-9 {
+				p.FrozenT = 0
+			}
+			in = Input{}
+			p.DashT, p.BallT = 0, 0 // a dash or a charge in progress is cut short
+		}
+		if in.DX != 0 || in.DY != 0 {
+			p.FX, p.FY = in.DX, in.DY
 		}
 		if p.DashCD > 0 {
 			p.DashCD = math.Max(0, p.DashCD-dt)
 		}
 
 		// Pikachu's skill: dash toward the held direction (or where it faces).
-		if i == pikachu && p.In.Skill && p.DashT == 0 && p.DashCD == 0 && p.ThunderLeft == 0 && p.BallT == 0 {
-			dx, dy := float64(p.In.DX), float64(p.In.DY)
+		if i == pikachu && in.Skill && p.DashT == 0 && p.DashCD == 0 && p.ThunderLeft == 0 && p.BallT == 0 {
+			dx, dy := float64(in.DX), float64(in.DY)
 			if dx == 0 && dy == 0 {
 				dx, dy = float64(p.FX), float64(p.FY)
 			}
@@ -255,7 +277,8 @@ func (g *Game) Step(dt float64) []Event {
 					p.BeamCD = 0
 				}
 			}
-			if p.BeamT == 0 && p.SweepT == 0 && p.RechargeT == 0 && p.BeamCD == 0 && p.In.Beam && p.Z == 0 {
+			punchBusy := p.PunchT > 0 || p.PunchLeft > 0 || p.PunchRecover > 0
+			if p.BeamT == 0 && p.SweepT == 0 && p.RechargeT == 0 && p.BeamCD == 0 && in.Beam && p.Z == 0 && !punchBusy {
 				dx, dy := other.X-p.X, other.Y-p.Y
 				n := math.Hypot(dx, dy)
 				if n < 1e-9 { // standing on the opponent: there is no direction, so use the facing
@@ -311,7 +334,8 @@ func (g *Game) Step(dt float64) []Event {
 					p.RechargeT = hb.RechargeDuration
 				}
 			}
-			busy = p.BeamT > 0 || p.SweepT > 0 || p.RechargeT > 0
+			events = append(events, g.stepIcePunch(i, in, dt)...)
+			busy = p.BeamT > 0 || p.SweepT > 0 || p.RechargeT > 0 || p.PunchT > 0 || p.PunchLeft > 0 || p.PunchRecover > 0
 		}
 
 		// Pikachu's Thunder. Pikachu cannot move until the last bolt has struck, and a
@@ -324,7 +348,7 @@ func (g *Game) Step(dt float64) []Event {
 					p.ThunderCD = 0
 				}
 			}
-			if p.In.Thunder && p.ThunderLeft == 0 && p.ThunderCD == 0 && p.BallT == 0 {
+			if in.Thunder && p.ThunderLeft == 0 && p.ThunderCD == 0 && p.BallT == 0 {
 				p.ThunderLeft, p.ThunderIn = th.Strikes, th.Delay
 				p.ThunderCD = th.Cooldown
 				p.DashT = 0                             // a dash in progress (or begun this tick) stops: casting roots Pikachu at once
@@ -359,7 +383,7 @@ func (g *Game) Step(dt float64) []Event {
 					p.BallCD = 0
 				}
 			}
-			if p.In.Ball && p.BallT == 0 && p.ThunderLeft == 0 && p.BallCD == 0 {
+			if in.Ball && p.BallT == 0 && p.ThunderLeft == 0 && p.BallCD == 0 {
 				p.BallT, p.BallCD = bc.ChargeTime, bc.Cooldown
 				p.DashT = 0 // charging roots Pikachu at once
 			}
@@ -385,7 +409,7 @@ func (g *Game) Step(dt float64) []Event {
 			if p.DashT -= step; p.DashT < 1e-9 {
 				p.DashT = 0
 			}
-		} else if n := math.Hypot(float64(p.In.DX), float64(p.In.DY)); !busy && !casting && n > 0 {
+		} else if n := math.Hypot(float64(in.DX), float64(in.DY)); !busy && !casting && n > 0 {
 			// Normalise diagonals so they are not faster. Snorlax steers at its own speeds in
 			// the air: rising is the first half of the jump, falling the second.
 			v := g.cfg.Pikachu.WalkSpeed
@@ -398,14 +422,14 @@ func (g *Game) Step(dt float64) []Event {
 					v = g.cfg.Snorlax.Jump.AirSpeedFirstHalf
 				}
 			}
-			p.X += float64(p.In.DX) / n * v * dt
-			p.Y += float64(p.In.DY) / n * v * dt
+			p.X += float64(in.DX) / n * v * dt
+			p.Y += float64(in.DY) / n * v * dt
 		}
 		p.X = math.Min(math.Max(p.X, 0), g.court.Length)
 		p.Y = math.Min(math.Max(p.Y, 0), g.court.Width)
 
 		// Snorlax's skill: jump. Exact parabola so height and air time match the config.
-		if i == snorlax && p.In.Skill && p.Z == 0 && !busy && p.JumpCD == 0 {
+		if i == snorlax && in.Skill && p.Z == 0 && !busy && p.JumpCD == 0 {
 			p.VZ = g.cfg.jumpV()
 			p.JumpCD = g.cfg.Snorlax.Jump.Cooldown // counted from the moment of take-off
 		}
@@ -438,7 +462,7 @@ func (g *Game) Step(dt float64) []Event {
 		if p.CD > 0 {
 			p.CD = math.Max(0, p.CD-dt)
 		}
-		if i == pikachu && p.In.Attack && p.CD == 0 && p.Z == 0 && !busy {
+		if i == pikachu && in.Attack && p.CD == 0 && p.Z == 0 && !busy {
 			p.CD = quakeCooldown
 			events = append(events, Event{T: "quake", X: p.X, Y: p.Y, R: quakeRadius}) // the client draws the real reach
 			if dist(p, other) < quakeRadius+g.radius(1-i) && other.Z < groundZ {
@@ -447,6 +471,65 @@ func (g *Game) Step(dt float64) []Event {
 		}
 	}
 	return append(events, g.stepBalls(dt)...)
+}
+
+// stepIcePunch runs Snorlax's Ice Punch: charge -> dash -> recharge, rooted through all three. The aim is
+// the direction held when the charge ends. The fist hits whatever it touches along the dash, once.
+func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
+	var events []Event
+	p, other := &g.P[i], &g.P[1-i]
+	ip := g.cfg.Snorlax.IcePunch
+	if p.PunchCD > 0 {
+		if p.PunchCD -= dt; p.PunchCD < 1e-9 {
+			p.PunchCD = 0
+		}
+	}
+	idle := p.PunchT == 0 && p.PunchLeft == 0 && p.PunchRecover == 0
+	if in.Punch && idle && p.BeamT == 0 && p.SweepT == 0 && p.RechargeT == 0 && p.Z == 0 && p.PunchCD == 0 {
+		p.PunchT, p.PunchCD = ip.ChargeDuration, ip.Cooldown
+	}
+	switch {
+	case p.PunchT > 0:
+		if p.PunchT -= dt; p.PunchT < 1e-9 { // charged: go
+			p.PunchT = 0
+			fx, fy := float64(p.FX), float64(p.FY)
+			n := math.Hypot(fx, fy)
+			p.PunchDX, p.PunchDY = fx/n, fy/n
+			p.PunchLeft, p.PunchHit = ip.Distance, false
+			p.PunchID++
+		}
+	case p.PunchLeft > 0:
+		step := math.Min(ip.Speed*dt, p.PunchLeft)
+		x0, y0 := p.X, p.Y
+		p.X = math.Min(math.Max(p.X+p.PunchDX*step, 0), g.court.Length)
+		p.Y = math.Min(math.Max(p.Y+p.PunchDY*step, 0), g.court.Width)
+		if p.PunchLeft -= step; p.PunchLeft < 1e-9 {
+			p.PunchLeft, p.PunchRecover = 0, ip.RechargeDuration
+		}
+		// Like the other ground attacks it misses an airborne opponent. Tested along the whole step so a
+		// fast fist cannot jump over a body between two ticks.
+		if !p.PunchHit && other.Z < groundZ && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.radius(1-i) {
+			p.PunchHit = true
+			g.hit(other, ip.Damage)
+			other.FrozenT = math.Max(other.FrozenT, ip.FreezeDuration)
+			events = append(events, Event{T: "freeze", X: other.X, Y: other.Y})
+		}
+		for j := range g.Balls {
+			b := &g.Balls[j]
+			if b.LastPunch != p.PunchID && segDist(b.X, b.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.cfg.Pikachu.ElectroBall.Radius {
+				b.LastPunch = p.PunchID
+				b.HP -= ip.Damage
+				// carried along the dash by the mass the punch has over the ball
+				push := math.Max(0, ip.Mass-g.cfg.Pikachu.ElectroBall.Mass)
+				b.X, b.Y = g.pushedAway(b.X, b.Y, b.X-p.PunchDX, b.Y-p.PunchDY, push, p.PunchDX, p.PunchDY)
+			}
+		}
+	case p.PunchRecover > 0:
+		if p.PunchRecover -= dt; p.PunchRecover < 1e-9 {
+			p.PunchRecover = 0
+		}
+	}
+	return events
 }
 
 // stepBalls flies the balls and blows up those that touched the opponent, reached a wall or ran out of HP.

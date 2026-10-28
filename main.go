@@ -172,12 +172,13 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
 		"radius":  []float64{r.g.cfg.Pikachu.Radius, r.g.cfg.Snorlax.Radius},
+		"punch":   map[string]float64{"charge": r.g.cfg.Snorlax.IcePunch.ChargeDuration, "radius": r.g.cfg.Snorlax.IcePunch.Radius, "freeze": r.g.cfg.Snorlax.IcePunch.FreezeDuration, "distance": r.g.cfg.Snorlax.IcePunch.Distance},
 		"ball":    map[string]float64{"radius": r.g.cfg.Pikachu.ElectroBall.Radius, "hp": float64(r.g.cfg.Pikachu.ElectroBall.HP), "charge": r.g.cfg.Pikachu.ElectroBall.ChargeTime},
 		"maxhp":   []int{r.g.cfg.Pikachu.MaxHP, r.g.cfg.Snorlax.MaxHP},
 		"beam":    map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},
 		"thunder": map[string]float64{"radius": th.Radius, "delay": th.Delay, "interval": th.Interval, "strikes": float64(th.Strikes)},
 		// full cooldowns, so the pad's buttons can show how much of each is left
-		"cooldown": map[string]float64{"dash": r.g.cfg.Pikachu.Dash.Cooldown, "thunder": th.Cooldown, "jump": r.g.cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown, "ball": r.g.cfg.Pikachu.ElectroBall.Cooldown},
+		"cooldown": map[string]float64{"dash": r.g.cfg.Pikachu.Dash.Cooldown, "thunder": th.Cooldown, "jump": r.g.cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown, "ball": r.g.cfg.Pikachu.ElectroBall.Cooldown, "punch": r.g.cfg.Snorlax.IcePunch.Cooldown},
 	})
 	c.send <- hi
 	if r.c[1-idx] == nil {

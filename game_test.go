@@ -889,7 +889,7 @@ func TestPlayerSnapshotCarriesBeamState(t *testing.T) {
 	}
 	var m map[string]any
 	json.Unmarshal(b, &m)
-	for _, k := range []string{"x", "y", "z", "hp", "cd", "bt", "st", "rt", "bx", "by", "ba", "tn", "ti", "sx", "sy", "dcd", "bcd", "jcd", "tcd", "kt", "ecd", "fx", "fy"} {
+	for _, k := range []string{"x", "y", "z", "hp", "cd", "bt", "st", "rt", "bx", "by", "ba", "tn", "ti", "sx", "sy", "dcd", "bcd", "jcd", "tcd", "kt", "ecd", "fx", "fy", "ut", "ud", "ur", "udx", "udy", "pcd", "fz"} {
 		if _, ok := m[k]; !ok {
 			t.Errorf("snapshot is missing %q: %s", k, b)
 		}
@@ -2009,5 +2009,286 @@ func TestHitIntervalBelowOneTickMeansOneHitPerTick(t *testing.T) {
 		if got[i]-got[i-1] != 1 {
 			t.Fatalf("hits on ticks %v, want every tick", got)
 		}
+	}
+}
+
+// ---- Snorlax: Ice Punch ----
+
+// punchGame has Snorlax at (1000,500) facing left and Pikachu at (800,500), 200 away.
+func punchGame(cfg Config) *Game {
+	g := NewGame(cfg)
+	g.P[snorlax].X, g.P[snorlax].Y = 1000, 500
+	g.P[pikachu].X, g.P[pikachu].Y = 800, 500
+	return g
+}
+
+// pressPunch holds the punch key for one tick with the given direction held, then lets go.
+func pressPunch(g *Game, dx, dy int) {
+	g.P[snorlax].In = Input{Punch: true, DX: dx, DY: dy}
+	g.Step(dt)
+	g.P[snorlax].In = Input{DX: dx, DY: dy}
+}
+
+func TestIcePunchChargesThenDashesTheConfiguredDistanceAtTheConfiguredSpeed(t *testing.T) {
+	cfg := DefaultConfig() // charge 0.4s (12 ticks), 250 at 900/s (30 a tick), recharge 0.6s
+	g := punchGame(cfg)
+	g.P[pikachu].X = 100 // out of the way
+	pressPunch(g, -1, 0) // tick 1
+	var moved []int
+	prev := g.P[snorlax].X
+	for tick := 2; tick <= 80; tick++ {
+		g.Step(dt)
+		if g.P[snorlax].X != prev {
+			moved = append(moved, tick)
+		}
+		prev = g.P[snorlax].X
+	}
+	// the charge runs ticks 1..12, so the dash covers ticks 13..21: eight steps of 30 and a last one of 10
+	// (the keys are still held when the recharge ends, which is why it walks again from tick 39)
+	if len(moved) < 9 || moved[0] != 13 || moved[8] != 21 || (len(moved) > 9 && moved[9] != 39) {
+		t.Fatalf("Snorlax moved on ticks %v, want the dash on 13..21 and nothing until the recharge ends", moved)
+	}
+	g2 := punchGame(DefaultConfig())
+	g2.P[pikachu].X = 100
+	pressPunch(g2, -1, 0)
+	g2.P[snorlax].In = Input{}
+	for tick := 2; tick <= 40; tick++ {
+		g2.Step(dt)
+	}
+	if x := g2.P[snorlax].X; math.Abs(x-750) > 1e-9 {
+		t.Fatalf("Snorlax ended at x=%v, want 750 (250 to the left)", x)
+	}
+}
+
+func TestIcePunchRootsSnorlaxUntilTheRechargeEnds(t *testing.T) {
+	g := punchGame(DefaultConfig())
+	g.P[pikachu].X = 100
+	g.P[snorlax].In = Input{Punch: true, DX: -1}
+	g.Step(dt)                                               // tick 1
+	g.P[snorlax].In = Input{DX: -1, Skill: true, Beam: true} // the same direction, so the aim does not change
+	// the dash covers ticks 13..21 and the recharge (18 ticks) ends on tick 39
+	for tick := 2; tick <= 38; tick++ {
+		x := g.P[snorlax].X
+		g.Step(dt)
+		if g.P[snorlax].Z != 0 || g.P[snorlax].BeamT != 0 || (tick > 21 && g.P[snorlax].X != x) || g.P[snorlax].Y != 500 {
+			t.Fatalf("tick %d: Snorlax z=%v beamT=%v x %v -> %v y=%v: it must not jump, fire or walk during the punch", tick, g.P[snorlax].Z, g.P[snorlax].BeamT, x, g.P[snorlax].X, g.P[snorlax].Y)
+		}
+	}
+	g.P[snorlax].In = Input{DX: 1}
+	x := g.P[snorlax].X
+	g.Step(dt) // tick 39
+	if g.P[snorlax].X <= x {
+		t.Fatal("Snorlax must walk again once the recharge is over")
+	}
+}
+
+func TestIcePunchGoesWhereTheKeysPointWhenTheChargeEnds(t *testing.T) {
+	g := punchGame(DefaultConfig())
+	g.P[pikachu].X, g.P[pikachu].Y = 100, 100
+	pressPunch(g, -1, 0)
+	g.P[snorlax].In = Input{DY: 1} // turn to face down while charging
+	for i := 0; i < 11; i++ {
+		g.Step(dt)
+	}
+	x0, y0 := g.P[snorlax].X, g.P[snorlax].Y
+	for i := 0; i < 12; i++ {
+		g.Step(dt)
+	}
+	if g.P[snorlax].X != x0 || math.Abs(g.P[snorlax].Y-(y0+250)) > 1e-9 {
+		t.Fatalf("Snorlax went (%v,%v) -> (%v,%v), want straight down 250", x0, y0, g.P[snorlax].X, g.P[snorlax].Y)
+	}
+}
+
+func TestIcePunchFreezesWhatItTouchesOnceAndHurtsIt(t *testing.T) {
+	cfg := DefaultConfig()
+	g := punchGame(cfg)
+	pressPunch(g, -1, 0)
+	var freezes int
+	for tick := 2; tick <= 40; tick++ {
+		for _, e := range g.Step(dt) {
+			if e.T == "freeze" {
+				freezes++
+			}
+		}
+	}
+	ip := cfg.Snorlax.IcePunch
+	if freezes != 1 {
+		t.Fatalf("freeze events = %d, want exactly one for one punch", freezes)
+	}
+	if g.P[pikachu].HP != maxHP-ip.Damage {
+		t.Fatalf("Pikachu HP = %d, want %d: one hit", g.P[pikachu].HP, maxHP-ip.Damage)
+	}
+	if g.P[pikachu].FrozenT <= 0 || g.P[pikachu].FrozenT > ip.FreezeDuration {
+		t.Fatalf("Pikachu frozen for %v more seconds, want some of the %v", g.P[pikachu].FrozenT, ip.FreezeDuration)
+	}
+}
+
+func TestFrozenPikachuCannotActAndMovesAgainOnTheTickItThaws(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Snorlax.IcePunch.FreezeDuration = 1.0 // 30 ticks
+	g := punchGame(cfg)
+	g.P[pikachu].X, g.P[pikachu].Y = 800, 500
+	pressPunch(g, -1, 0)
+	frozenAt := 0
+	for tick := 2; tick <= 80 && frozenAt == 0; tick++ {
+		g.Step(dt)
+		if g.P[pikachu].FrozenT > 0 {
+			frozenAt = tick
+		}
+	}
+	if frozenAt == 0 {
+		t.Fatal("setup: Pikachu was never frozen")
+	}
+	g.P[pikachu].In = Input{DX: -1, Skill: true, Thunder: true, Ball: true} // everything held down from now on
+	x := g.P[pikachu].X
+	for i := 0; i < 29; i++ { // the 30 frozen ticks, the first of them being the one that froze it
+		g.Step(dt)
+		if g.P[pikachu].X != x || g.P[pikachu].ThunderLeft != 0 || g.P[pikachu].BallT != 0 || g.P[pikachu].DashT != 0 {
+			t.Fatalf("frozen tick %d: Pikachu x=%v thunder=%d ball=%v dash=%v, want it unable to act", i+1, g.P[pikachu].X, g.P[pikachu].ThunderLeft, g.P[pikachu].BallT, g.P[pikachu].DashT)
+		}
+	}
+	g.Step(dt) // the 30th frozen tick
+	g.Step(dt) // the thaw: the keys still held take effect again without being pressed anew
+	if g.P[pikachu].ThunderLeft == 0 {
+		t.Fatal("Pikachu must start the Thunder it still holds the key for once it thaws")
+	}
+}
+
+func TestFreezeCutsAChargeAndADashShort(t *testing.T) {
+	g := punchGame(DefaultConfig())
+	g.P[pikachu].BallT, g.P[pikachu].DashT = 0.3, 0.1
+	g.P[pikachu].FrozenT = 1
+	g.Step(dt)
+	if g.P[pikachu].BallT != 0 || g.P[pikachu].DashT != 0 {
+		t.Fatalf("ball charge %v, dash %v: freezing must stop both", g.P[pikachu].BallT, g.P[pikachu].DashT)
+	}
+}
+
+func TestIcePunchReachIsItsRadiusPlusTheBodyAlongTheWholePath(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		x, y float64 // where Pikachu stands; the dash runs from (1000,500) to (750,500)
+		hit  bool
+	}{
+		{"on the path", 850, 500, true},
+		{"beside the path, inside radius 40 + body 16", 850, 500 + 55, true},
+		{"beside the path, just outside", 850, 500 + 57, false},
+		{"beyond the end of the dash, inside the reach", 750 - 55, 500, true},
+		{"beyond the end of the dash, outside", 750 - 57, 500, false},
+		{"behind Snorlax", 1100, 500, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := punchGame(DefaultConfig())
+			g.P[pikachu].X, g.P[pikachu].Y = tc.x, tc.y
+			pressPunch(g, -1, 0)
+			for i := 0; i < 40; i++ {
+				g.Step(dt)
+			}
+			if got := g.P[pikachu].FrozenT > 0 || g.P[pikachu].HP < maxHP; got != tc.hit {
+				t.Fatalf("hit = %v, want %v", got, tc.hit)
+			}
+		})
+	}
+}
+
+func TestFastFistCannotJumpOverABodyBetweenTwoTicks(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Snorlax.IcePunch.Speed, cfg.Snorlax.IcePunch.Distance = 30000, 400 // the whole dash in one tick
+	g := punchGame(cfg)
+	pressPunch(g, -1, 0)
+	for i := 0; i < 30; i++ {
+		g.Step(dt)
+	}
+	if g.P[pikachu].FrozenT <= 0 {
+		t.Fatal("a fist crossing Pikachu within a single tick must still freeze it")
+	}
+}
+
+func TestIcePunchMissesAnAirborneTarget(t *testing.T) {
+	g := punchGame(DefaultConfig())
+	pressPunch(g, -1, 0)
+	for i := 0; i < 40; i++ {
+		g.P[pikachu].Z = 100
+		g.Step(dt)
+	}
+	if g.P[pikachu].FrozenT > 0 || g.P[pikachu].HP != maxHP {
+		t.Fatal("the fist is a ground attack and must pass under an airborne target")
+	}
+}
+
+func TestIcePunchPushesABallAlongTheDashByTheMassDifference(t *testing.T) {
+	cfg := DefaultConfig() // punch mass 150, ball mass 0 by default: set it
+	cfg.Pikachu.ElectroBall.Mass, cfg.Pikachu.ElectroBall.Speed = 100, 0
+	g := punchGame(cfg)
+	g.P[pikachu].X, g.P[pikachu].Y = 100, 100
+	g.Balls = []Ball{{X: 900, Y: 545, HP: 30}} // beside the path: inside the fist's 40 + 14, outside Snorlax's own body 24 + 14
+	pressPunch(g, -1, 0)
+	for i := 0; i < 60; i++ {
+		g.Step(dt)
+	}
+	if len(g.Balls) != 1 {
+		t.Fatalf("balls = %d, want the ball hit once and left (HP 30 - 10) but still alive", len(g.Balls))
+	}
+	if b := g.Balls[0]; b.HP != 30-cfg.Snorlax.IcePunch.Damage || b.X != 850 || b.Y != 545 {
+		t.Fatalf("ball %+v, want HP %d and pushed 150-100 = 50 along the dash to (850,545)", b, 30-cfg.Snorlax.IcePunch.Damage)
+	}
+}
+
+func TestIcePunchCooldownCountsFromTheStartOfTheCharge(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Snorlax.IcePunch.Cooldown = 2 // 60 ticks
+	g := punchGame(cfg)
+	g.P[pikachu].X, g.P[pikachu].Y = 100, 100
+	g.P[snorlax].In = Input{Punch: true} // held the whole time
+	var started []int
+	prevID := 0
+	for tick := 1; tick <= 100; tick++ {
+		g.Step(dt)
+		if g.P[snorlax].PunchID > prevID {
+			started = append(started, tick)
+		}
+		prevID = g.P[snorlax].PunchID
+	}
+	// press on tick 1, the dash starts on tick 12 (the charge ends); the next press is allowed on tick 61, dash on tick 72
+	if len(started) != 2 || started[0] != 12 || started[1] != 72 {
+		t.Fatalf("dashes started on ticks %v, want 12 and 72", started)
+	}
+}
+
+func TestIcePunchAndHyperBeamAreOneAtATimeAndNotInTheAir(t *testing.T) {
+	g := punchGame(DefaultConfig())
+	g.P[snorlax].In = Input{Beam: true}
+	g.Step(dt)
+	g.P[snorlax].In = Input{Punch: true}
+	g.Step(dt)
+	if g.P[snorlax].PunchT != 0 {
+		t.Fatal("a punch started in the middle of a beam")
+	}
+
+	g = punchGame(DefaultConfig())
+	pressPunch(g, -1, 0)
+	g.P[snorlax].In = Input{Beam: true}
+	g.Step(dt)
+	if g.P[snorlax].BeamT != 0 {
+		t.Fatal("a beam started in the middle of a punch")
+	}
+
+	g = punchGame(DefaultConfig())
+	g.P[snorlax].Z, g.P[snorlax].VZ = 50, 0
+	g.P[snorlax].In = Input{Punch: true}
+	g.Step(dt)
+	if g.P[snorlax].PunchT != 0 {
+		t.Fatal("a punch started in the air")
+	}
+}
+
+func TestOnlySnorlaxThrowsIcePunches(t *testing.T) {
+	g := punchGame(DefaultConfig())
+	g.P[pikachu].In = Input{Punch: true}
+	for i := 0; i < 2*tickRate; i++ {
+		g.Step(dt)
+	}
+	if g.P[pikachu].PunchT != 0 || g.P[pikachu].PunchID != 0 {
+		t.Fatal("Pikachu threw an Ice Punch")
 	}
 }

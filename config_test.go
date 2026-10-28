@@ -72,6 +72,16 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 		"misspelt ball key":          `{"pikachu":{"electro_ball":{"explosion_radious":5}}}`,
 		"negative beam mass":         `{"snorlax":{"hyper_beam":{"mass":-1}}}`,
 		"negative ball mass":         `{"pikachu":{"electro_ball":{"mass":-1}}}`,
+		"zero punch charge":          `{"snorlax":{"ice_punch":{"charge_duration":0}}}`,
+		"zero punch speed":           `{"snorlax":{"ice_punch":{"speed":0}}}`,
+		"zero punch distance":        `{"snorlax":{"ice_punch":{"distance":0}}}`,
+		"zero punch radius":          `{"snorlax":{"ice_punch":{"radius":0}}}`,
+		"zero freeze duration":       `{"snorlax":{"ice_punch":{"freeze_duration":0}}}`,
+		"negative punch recharge":    `{"snorlax":{"ice_punch":{"recharge_duration":-1}}}`,
+		"negative punch cooldown":    `{"snorlax":{"ice_punch":{"cooldown":-1}}}`,
+		"negative punch damage":      `{"snorlax":{"ice_punch":{"damage":-1}}}`,
+		"negative punch mass":        `{"snorlax":{"ice_punch":{"mass":-1}}}`,
+		"misspelt punch key":         `{"snorlax":{"ice_punch":{"freeze_duraton":2}}}`,
 		"negative knockback":         `{"snorlax":{"hyper_beam":{"knockback":-1}}}`,
 		"negative hit interval":      `{"snorlax":{"hyper_beam":{"hit_interval":-0.1}}}`,
 		"negative beam cooldown":     `{"snorlax":{"hyper_beam":{"cooldown":-1}}}`,
@@ -121,6 +131,10 @@ func TestZeroCooldownAndRechargeAreAllowed(t *testing.T) {
 		`{"pikachu":{"electro_ball":{"mass":0}}}`,
 		`{"pikachu":{"electro_ball":{"knockback":0}}}`, // a blast that does not push
 		`{"pikachu":{"electro_ball":{"cooldown":0}}}`,
+		`{"snorlax":{"ice_punch":{"recharge_duration":0}}}`, // no recovery
+		`{"snorlax":{"ice_punch":{"cooldown":0}}}`,
+		`{"snorlax":{"ice_punch":{"damage":0}}}`, // a pure freeze
+		`{"snorlax":{"ice_punch":{"mass":0}}}`,
 		`{"snorlax":{"hyper_beam":{"knockback":0}}}`,     // no push
 		`{"snorlax":{"hyper_beam":{"hit_interval":0}}}`,  // one hit per sweep
 		`{"pikachu":{"thunder":{"interval":0}}}`,         // all bolts at once

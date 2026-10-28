@@ -42,7 +42,7 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Slot 0 is always Pikachu, slot 1 Snorlax (fixed by the server).
 const HELP = [
   '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震　K＝電球（續能後朝面向的方向丟出，續能時按方向鍵轉向，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
-  '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
+  '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　J＝急凍拳（蓄力時按方向鍵決定方向，朝該方向衝拳，打到的敵人被冰凍）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
 ];
 const ghosts = []; // dash afterimages
 const beamLook = { ang: null, tail: null }; // smoothed beam angle, and the fading afterimage when a sweep ends
@@ -55,7 +55,9 @@ let radius = [16, 24];
 const REF = [16, 24];
 let maxHp = [100, 100]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
-let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0 }; // full cooldowns, from 'hi'
+let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
+const iceTrail = []; // fading ice puffs the dash leaves behind
+let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
 const shadow = { x: null, y: null }; // smoothed thunder shadow position
 const smoke = []; // puffs rising off Snorlax while it recharges
@@ -77,7 +79,7 @@ let fx = [], shake = 0;
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // the first player's view picks the court
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); document.getElementById('bar2').textContent = HELP[you]; if (PORTRAIT) buildPad(); }
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); document.getElementById('bar2').textContent = HELP[you]; if (PORTRAIT) buildPad(); }
   else if (m.t === 'wait') { waiting = true; snap = null; }
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
@@ -92,6 +94,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'thunder') shake = 10;
       if (ev.t === 'quake') shake = 16;
       if (ev.t === 'explode') shake = 14;
+      if (ev.t === 'freeze') shake = 10;
     }
   }
 };
@@ -117,7 +120,7 @@ function upright(x, y, fn) { ctx.save(); ctx.translate(x, y); ctx.rotate(-ROT); 
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { skill: false, thunder: false, beam: false, ball: false }; // the pad's buttons
+const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let last = '';
 function sendInput() {
@@ -129,7 +132,7 @@ function sendInput() {
   const msg = JSON.stringify({
     dx: Math.round(sx * c + sy * s) || 0,
     dy: Math.round(-sx * s + sy * c) || 0,
-    skill: k(' ') || touch.skill, atk: k('j'), beam: k('k') || touch.beam, ball: k('k') || touch.ball, thunder: k('l') || touch.thunder,
+    skill: k(' ') || touch.skill, atk: k('j'), punch: k('j') || touch.punch, beam: k('k') || touch.beam, ball: k('k') || touch.ball, thunder: k('l') || touch.thunder,
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
@@ -171,7 +174,7 @@ if (PORTRAIT) {
 // A small slot that is null is reserved and not drawn.
 const PAD = [
   { main: ['衝刺', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball']] }, // Pikachu
-  { main: ['跳躍', 'skill'], small: [['死光', 'beam'], null] },    // Snorlax
+  { main: ['跳躍', 'skill'], small: [['死光', 'beam'], ['冰拳', 'punch']] }, // Snorlax
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
@@ -196,7 +199,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }];
   const hold = (b, label, name) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -358,6 +361,82 @@ function drawExplosion(f) {
   ctx.restore();
 }
 
+// Ice Punch: a white ice fist grows in front of Snorlax while it charges (with a dashed line along the aim),
+// then Snorlax is wrapped in an icy aura with the fist in front while it dashes, leaving fading ice puffs.
+function drawIcePunch() {
+  const p = snap.p[1], d = disp[1], R = punchCfg.radius;
+  const n = Math.hypot(p.fx, p.fy) || 1;
+  let ux = p.fx / n, uy = p.fy / n, k = 0, dashing = false;
+  if (p.ut > 0) k = 1 - p.ut / punchCfg.charge;
+  else if (p.ud > 0) { ux = p.udx; uy = p.udy; k = 1; dashing = true; }
+  else k = -1; // not punching
+  if (dashing) iceTrail.push({ x: d.x, y: d.y, age: 0 });
+  for (const t of iceTrail) {
+    const a = 1 - t.age / 0.45; t.age += 1 / 60;
+    if (a <= 0) continue;
+    ctx.fillStyle = `rgba(215,242,255,${0.5 * a})`;
+    ctx.beginPath(); ctx.arc(t.x, t.y, R * (0.55 + 0.35 * a), 0, 7); ctx.fill();
+  }
+  while (iceTrail.length && iceTrail[0].age >= 0.45) iceTrail.shift();
+  if (k < 0) return;
+  ctx.save();
+  if (!dashing) { // the aim, so the direction can be chosen while charging
+    ctx.strokeStyle = `rgba(200,235,255,${0.3 + 0.4 * k})`; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
+    ctx.beginPath(); ctx.moveTo(d.x + ux * R, d.y + uy * R); ctx.lineTo(d.x + ux * punchCfg.distance, d.y + uy * punchCfg.distance); ctx.stroke();
+    ctx.setLineDash([]);
+  } else { // the aura the dash hits with
+    const g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, R);
+    g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(150,215,255,0.25)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.fill();
+  }
+  const fr = R * (0.35 + 0.45 * k), fxp = d.x + ux * R * 0.85, fyp = d.y + uy * R * 0.85; // the fist
+  ctx.translate(fxp, fyp); ctx.rotate(Math.atan2(uy, ux));
+  ctx.fillStyle = '#f4fbff'; ctx.strokeStyle = '#7fd0f5'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.arc(0, 0, fr, 0, 7); ctx.fill(); ctx.stroke();
+  for (let s = -2; s <= 2; s++) { // ice crystals along the knuckles
+    const a = s * 0.45, bx = Math.cos(a) * fr, by = Math.sin(a) * fr;
+    ctx.beginPath(); ctx.moveTo(bx - Math.sin(a) * fr * 0.28, by + Math.cos(a) * fr * 0.28);
+    ctx.lineTo(Math.cos(a) * fr * 1.55, Math.sin(a) * fr * 1.55);
+    ctx.lineTo(bx + Math.sin(a) * fr * 0.28, by - Math.cos(a) * fr * 0.28); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// A frozen player sits inside an iceberg; in its last half second the ice flickers and cracks.
+function drawFrozen(p, i, d) {
+  if (!(p.fz > 0)) return;
+  const r = Math.max(radius[i] * 1.9, 30), melting = p.fz < 0.5;
+  const a = melting ? 0.45 + 0.35 * Math.abs(Math.sin(p.fz * 30)) : 0.8;
+  const pts = [[-1.1, 0.75], [-0.85, -0.15], [-0.5, 0.05], [-0.25, -1.0], [0.1, -0.35], [0.45, -0.85], [0.8, -0.05], [1.1, 0.75]];
+  upright(d.x, d.y, () => {
+    ctx.save(); ctx.translate(0, -d.z - r * 0.15); ctx.scale(r, r);
+    const g = ctx.createLinearGradient(0, -1, 0, 0.8);
+    g.addColorStop(0, `rgba(245,252,255,${a})`); g.addColorStop(1, `rgba(120,200,240,${a * 0.85})`);
+    ctx.fillStyle = g; ctx.strokeStyle = `rgba(255,255,255,${Math.min(1, a + 0.2)})`; ctx.lineWidth = 2.5 / r; ctx.lineJoin = 'round';
+    ctx.beginPath(); pts.forEach(([x, y], n) => (n ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${a * 0.8})`; ctx.lineWidth = 1.5 / r; // facets
+    ctx.beginPath(); ctx.moveTo(-0.25, -1.0); ctx.lineTo(-0.1, 0.1); ctx.lineTo(0.1, -0.35); ctx.moveTo(-0.1, 0.1); ctx.lineTo(0, 0.75); ctx.stroke();
+    if (melting) { ctx.strokeStyle = `rgba(60,110,150,${a})`; ctx.beginPath(); ctx.moveTo(-0.5, -0.1); ctx.lineTo(-0.2, 0.2); ctx.lineTo(-0.3, 0.5); ctx.moveTo(0.4, -0.3); ctx.lineTo(0.2, 0.1); ctx.stroke(); }
+    ctx.restore();
+  });
+}
+
+// The moment of freezing: a flash and shards of ice flying out.
+function drawFreezeBurst(f) {
+  const k = f.age / 0.6, a = 1 - k;
+  ctx.save();
+  ctx.fillStyle = `rgba(235,250,255,${0.7 * a * a})`;
+  ctx.beginPath(); ctx.arc(f.x, f.y, 30 + 50 * k, 0, 7); ctx.fill();
+  ctx.fillStyle = `rgba(190,232,255,${a})`; ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 1.5;
+  for (let s = 0; s < 12; s++) {
+    const ang = s * 0.5236 + (s % 3) * 0.1, dd = 15 + (50 + 25 * (s % 3)) * (1 - (1 - k) * (1 - k)), sz = 7 + (s % 4) * 2;
+    ctx.save(); ctx.translate(f.x + Math.cos(ang) * dd, f.y + Math.sin(ang) * dd); ctx.rotate(ang + k * 3);
+    ctx.beginPath(); ctx.moveTo(sz, 0); ctx.lineTo(0, sz * 0.4); ctx.lineTo(-sz * 0.7, 0); ctx.lineTo(0, -sz * 0.4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 // Thunder: a dark circle the size of the strike area sits where the bolt will land.
 // It darkens and a ring closes in on it as the bolt gets near.
 function drawShadow() {
@@ -486,6 +565,7 @@ function drawPlayer(i, p) {
     ctx.beginPath(); ctx.ellipse(0, 14 * bs, 18 * bs * (1 - 0.4 * lift), 7 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.fill();
   });
   drawBody(i, d.x, d.y, 1, d.z); // the body floats d.z above the ground
+  drawFrozen(p, i, d);
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.
   const top = -d.z;
   upright(d.x, d.y, () => {
@@ -537,15 +617,17 @@ function frame() {
     drawTelegraph();
     drawShadow();
     drawBalls();
+    drawIcePunch();
     drawBeams();
     drawSmoke(); // under the players, so the labels and HP bars stay readable
     // Draw lower players first so the one nearer the camera overlaps correctly.
     [0, 1].sort((a, b) => screenY(snap.p[a].x, snap.p[a].y) - screenY(snap.p[b].x, snap.p[b].y)).forEach((i) => drawPlayer(i, snap.p[i]));
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'quake' || f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'quake' || f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' ? 0.6 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
       else if (f.t === 'explode') drawExplosion(f);
+      else if (f.t === 'freeze') drawFreezeBurst(f);
       else drawQuake(f); // 'quake' and 'slam'
     }
     ctx.restore();

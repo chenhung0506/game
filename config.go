@@ -69,6 +69,19 @@ type Config struct {
 			AirSpeedFirstHalf  float64 `json:"air_speed_first_half"`
 			AirSpeedSecondHalf float64 `json:"air_speed_second_half"`
 		} `json:"jump"`
+		// Ice Punch: charge (rooted, the aim follows the direction held), dash `distance` at `speed`, then
+		// recharge (rooted). The opponent it touches is frozen solid for freeze_duration.
+		IcePunch struct {
+			ChargeDuration   float64 `json:"charge_duration"`
+			RechargeDuration float64 `json:"recharge_duration"`
+			Cooldown         float64 `json:"cooldown"`        // before the next punch; counted from the start of the charge
+			Speed            float64 `json:"speed"`           // of the dash
+			Distance         float64 `json:"distance"`        // how far the dash goes
+			Radius           float64 `json:"radius"`          // size of the fist: it touches a body when the two overlap along the dash
+			FreezeDuration   float64 `json:"freeze_duration"` // how long a hit opponent cannot move or act
+			Damage           int     `json:"damage"`          // on the opponent, and on an Electro Ball it hits
+			Mass             float64 `json:"mass"`            // against an Electro Ball: it is pushed mass - electro_ball.mass along the dash (nothing if lighter)
+		} `json:"ice_punch"`
 		HyperBeam struct {
 			ChargeDuration   float64 `json:"charge_duration"`   // rooted and aim locked on the opponent; the warning fan shows
 			SweepAngle       float64 `json:"sweep_angle"`       // degrees each side of the facing; the beam goes +angle -> -angle
@@ -119,6 +132,15 @@ func DefaultConfig() Config {
 	c.Snorlax.Jump.SlamRadius = slamRadius
 	c.Snorlax.Jump.AirSpeedFirstHalf = speed // the same as walking, i.e. no change until it is tuned
 	c.Snorlax.Jump.AirSpeedSecondHalf = speed
+	c.Snorlax.IcePunch.ChargeDuration = 0.4
+	c.Snorlax.IcePunch.RechargeDuration = 0.6
+	c.Snorlax.IcePunch.Cooldown = 5
+	c.Snorlax.IcePunch.Speed = 900
+	c.Snorlax.IcePunch.Distance = 250
+	c.Snorlax.IcePunch.Radius = 40
+	c.Snorlax.IcePunch.FreezeDuration = 1.5
+	c.Snorlax.IcePunch.Damage = 10
+	c.Snorlax.IcePunch.Mass = 150
 	c.Snorlax.HyperBeam.ChargeDuration = 0.6
 	c.Snorlax.HyperBeam.SweepAngle = 30
 	c.Snorlax.HyperBeam.SweepDuration = 0.5
@@ -182,6 +204,11 @@ func (c Config) validate() error {
 		{"snorlax.jump.height", c.Snorlax.Jump.Height, 0},
 		{"snorlax.jump.duration", c.Snorlax.Jump.Duration, 0},
 		{"snorlax.jump.slam_radius", c.Snorlax.Jump.SlamRadius, 0},
+		{"snorlax.ice_punch.charge_duration", c.Snorlax.IcePunch.ChargeDuration, 0},
+		{"snorlax.ice_punch.speed", c.Snorlax.IcePunch.Speed, 0},
+		{"snorlax.ice_punch.distance", c.Snorlax.IcePunch.Distance, 0},
+		{"snorlax.ice_punch.radius", c.Snorlax.IcePunch.Radius, 0},
+		{"snorlax.ice_punch.freeze_duration", c.Snorlax.IcePunch.FreezeDuration, 0},
 		{"snorlax.hyper_beam.charge_duration", c.Snorlax.HyperBeam.ChargeDuration, 0},
 		{"snorlax.hyper_beam.sweep_duration", c.Snorlax.HyperBeam.SweepDuration, 0},
 		{"snorlax.hyper_beam.damage", float64(c.Snorlax.HyperBeam.Damage), 0},
@@ -212,6 +239,10 @@ func (c Config) validate() error {
 		{"snorlax.jump.cooldown", c.Snorlax.Jump.Cooldown},
 		{"snorlax.jump.air_speed_first_half", c.Snorlax.Jump.AirSpeedFirstHalf},
 		{"snorlax.jump.air_speed_second_half", c.Snorlax.Jump.AirSpeedSecondHalf},
+		{"snorlax.ice_punch.recharge_duration", c.Snorlax.IcePunch.RechargeDuration},
+		{"snorlax.ice_punch.cooldown", c.Snorlax.IcePunch.Cooldown},
+		{"snorlax.ice_punch.damage", float64(c.Snorlax.IcePunch.Damage)},
+		{"snorlax.ice_punch.mass", c.Snorlax.IcePunch.Mass},
 		{"snorlax.hyper_beam.cooldown", c.Snorlax.HyperBeam.Cooldown},
 		{"snorlax.hyper_beam.knockback", c.Snorlax.HyperBeam.Knockback},
 		{"snorlax.hyper_beam.hit_interval", c.Snorlax.HyperBeam.HitInterval},

@@ -65,6 +65,12 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if rd, ok := hi["radius"].([]any); !ok || len(rd) != 2 || rd[0] != float64(16) || rd[1] != float64(24) {
 		t.Fatalf("hi.radius = %v, want [16 24]: the client draws each body at its size", hi["radius"])
 	}
+	if pu, ok := hi["punch"].(map[string]any); !ok || pu["charge"] != float64(0.4) || pu["radius"] != float64(40) || pu["freeze"] != float64(1.5) {
+		t.Fatalf("hi.punch = %v, want charge 0.4 / radius 40 / freeze 1.5", hi["punch"])
+	}
+	if cd, ok := hi["cooldown"].(map[string]any); !ok || cd["punch"] != float64(5) {
+		t.Fatalf("hi.cooldown.punch = %v, want 5", hi["cooldown"])
+	}
 	if mh, ok := hi["maxhp"].([]any); !ok || len(mh) != 2 || mh[0] != float64(100) || mh[1] != float64(100) {
 		t.Fatalf("hi.maxhp = %v, want [100 100]: the client scales the HP bars with it", hi["maxhp"])
 	}
