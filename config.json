@@ -30,7 +30,7 @@
       "explosion_damage": 25,
       "knockback": 120,
       "cooldown": 3,
-      "mass": 100
+      "mass": 50
     }
   },
   "snorlax": {
