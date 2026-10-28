@@ -29,7 +29,8 @@
       "explosion_radius": 180,
       "explosion_damage": 25,
       "knockback": 120,
-      "cooldown": 3
+      "cooldown": 3,
+      "mass": 100
     }
   },
   "snorlax": {
@@ -50,10 +51,11 @@
       "sweep_duration": 0.65,
       "recharge_duration": 1.5,
       "cooldown": 5,
-      "damage": 20,
+      "damage": 10,
       "knockback": 80,
-      "hit_interval": 0.12,
-      "length": 550,
+      "hit_interval": 0.08,
+      "mass": 130,
+      "length": 650,
       "width": 50
     }
   }
