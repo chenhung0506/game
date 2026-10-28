@@ -38,12 +38,12 @@
     "walk_speed": 140,
     "radius": 30,
     "ice_punch": {
-      "charge_duration": 0.4,
-      "recharge_duration": 0.6,
+      "charge_duration": 0.2,
+      "recharge_duration": 0.5,
       "cooldown": 5,
-      "speed": 900,
-      "distance": 250,
-      "radius": 40,
+      "speed": 1000,
+      "distance": 350,
+      "radius": 60,
       "freeze_duration": 1.5,
       "damage": 10,
       "mass": 150
