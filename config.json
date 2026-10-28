@@ -1,8 +1,17 @@
 {
+  "court": {
+    "mobile": { "width": 600, "length": 1200 },
+    "web": { "width": 900, "length": 1600 }
+  },
   "pikachu": {
-    "dash_distance": 200,
-    "dash_duration": 0.2,
-    "dash_cooldown": 1.2,
+    "max_hp": 100,
+    "walk_speed": 165,
+    "radius": 16,
+    "dash": {
+      "distance": 200,
+      "duration": 0.2,
+      "cooldown": 1.5
+    },
     "thunder": {
       "delay": 1.2,
       "radius": 100,
@@ -14,12 +23,17 @@
     }
   },
   "snorlax": {
-    "jump_height": 100,
-    "jump_duration": 1.7,
-    "jump_cooldown": 2,
-    "slam_radius": 100,
-    "air_speed_first_half": 320,
-    "air_speed_second_half": 120,
+    "max_hp": 100,
+    "walk_speed": 150,
+    "radius": 24,
+    "jump": {
+      "height": 100,
+      "duration": 1.7,
+      "cooldown": 2,
+      "slam_radius": 100,
+      "air_speed_first_half": 320,
+      "air_speed_second_half": 120
+    },
     "hyper_beam": {
       "charge_duration": 0.6,
       "sweep_angle": 35,
@@ -27,7 +41,7 @@
       "recharge_duration": 1.5,
       "cooldown": 5,
       "damage": 40,
-      "length": 450,
+      "length": 550,
       "width": 50
     }
   }

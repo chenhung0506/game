@@ -23,13 +23,13 @@ func TestMissingFileUsesDefaults(t *testing.T) {
 }
 
 func TestPartialFileOverridesOnlyWhatItSets(t *testing.T) {
-	p := writeConfig(t, `{"pikachu":{"dash_distance":300},"snorlax":{"jump_height":100}}`)
+	p := writeConfig(t, `{"pikachu":{"dash":{"distance":300}},"snorlax":{"jump":{"height":100}}}`)
 	cfg, err := LoadConfig(p)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := DefaultConfig()
-	want.Pikachu.DashDistance, want.Snorlax.JumpHeight = 300, 100
+	want.Pikachu.Dash.Distance, want.Snorlax.Jump.Height = 300, 100
 	if cfg != want {
 		t.Fatalf("cfg = %+v, want %+v", cfg, want)
 	}
@@ -37,12 +37,12 @@ func TestPartialFileOverridesOnlyWhatItSets(t *testing.T) {
 
 func TestInvalidConfigIsRejected(t *testing.T) {
 	for name, body := range map[string]string{
-		"misspelt key":               `{"pikachu":{"dash_distence":300}}`,
-		"zero distance":              `{"pikachu":{"dash_distance":0}}`,
-		"negative duration":          `{"pikachu":{"dash_duration":-0.1}}`,
-		"zero height":                `{"snorlax":{"jump_height":0}}`,
-		"zero jump time":             `{"snorlax":{"jump_duration":0}}`,
-		"negative cooldown":          `{"pikachu":{"dash_cooldown":-1}}`,
+		"misspelt key":               `{"pikachu":{"dash":{"distence":300}}}`,
+		"zero distance":              `{"pikachu":{"dash":{"distance":0}}}`,
+		"negative duration":          `{"pikachu":{"dash":{"duration":-0.1}}}`,
+		"zero height":                `{"snorlax":{"jump":{"height":0}}}`,
+		"zero jump time":             `{"snorlax":{"jump":{"duration":0}}}`,
+		"negative cooldown":          `{"pikachu":{"dash":{"cooldown":-1}}}`,
 		"zero charge time":           `{"snorlax":{"hyper_beam":{"charge_duration":0}}}`,
 		"negative recharge":          `{"snorlax":{"hyper_beam":{"recharge_duration":-1}}}`,
 		"zero beam damage":           `{"snorlax":{"hyper_beam":{"damage":0}}}`,
@@ -62,16 +62,30 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 		"negative follow speed":      `{"pikachu":{"thunder":{"follow_speed":-1}}}`,
 		"negative thunder cooldown":  `{"pikachu":{"thunder":{"cooldown":-1}}}`,
 		"negative beam cooldown":     `{"snorlax":{"hyper_beam":{"cooldown":-1}}}`,
-		"zero slam radius":           `{"snorlax":{"slam_radius":0}}`,
+		"zero slam radius":           `{"snorlax":{"jump":{"slam_radius":0}}}`,
 		"retired quake_radius key":   `{"snorlax":{"quake_radius":100}}`,
-		"negative air speed rising":  `{"snorlax":{"air_speed_first_half":-1}}`,
-		"negative air speed falling": `{"snorlax":{"air_speed_second_half":-1}}`,
+		"old flat dash key":          `{"pikachu":{"dash_distance":100}}`,
+		"old flat jump key":          `{"snorlax":{"jump_height":100}}`,
+		"zero mobile court width":    `{"court":{"mobile":{"width":0}}}`,
+		"zero web court width":       `{"court":{"web":{"width":0}}}`,
+		"mobile court too short":     `{"court":{"mobile":{"length":399}}}`,
+		"web court too short":        `{"court":{"web":{"length":399}}}`,
+		"old flat court key":         `{"court":{"width":600}}`,
+		"zero pikachu radius":        `{"pikachu":{"radius":0}}`,
+		"negative snorlax radius":    `{"snorlax":{"radius":-1}}`,
+		"zero pikachu hp":            `{"pikachu":{"max_hp":0}}`,
+		"zero snorlax hp":            `{"snorlax":{"max_hp":0}}`,
+		"zero pikachu speed":         `{"pikachu":{"walk_speed":0}}`,
+		"negative snorlax speed":     `{"snorlax":{"walk_speed":-5}}`,
+		"fractional hp":              `{"pikachu":{"max_hp":99.5}}`,
+		"negative air speed rising":  `{"snorlax":{"jump":{"air_speed_first_half":-1}}}`,
+		"negative air speed falling": `{"snorlax":{"jump":{"air_speed_second_half":-1}}}`,
 		"retired air_speed key":      `{"snorlax":{"air_speed":100}}`,
-		"negative jump cooldown":     `{"snorlax":{"jump_cooldown":-1}}`,
-		"misspelt snorlax key":       `{"snorlax":{"air_spead":10}}`,
+		"negative jump cooldown":     `{"snorlax":{"jump":{"cooldown":-1}}}`,
+		"misspelt snorlax key":       `{"snorlax":{"jump":{"air_spead":10}}}`,
 		"misspelt thunder key":       `{"pikachu":{"thunder":{"dealy":1}}}`,
 		"not json":                   `dash_distance = 3`,
-		"wrong type":                 `{"pikachu":{"dash_distance":"far"}}`,
+		"wrong type":                 `{"pikachu":{"dash":{"distance":"far"}}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := LoadConfig(writeConfig(t, body)); err == nil {
@@ -83,12 +97,12 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 
 func TestZeroCooldownAndRechargeAreAllowed(t *testing.T) {
 	for _, body := range []string{
-		`{"pikachu":{"dash_cooldown":0}}`,
+		`{"pikachu":{"dash":{"cooldown":0}}}`,
 		`{"snorlax":{"hyper_beam":{"recharge_duration":0}}}`,
 		`{"pikachu":{"thunder":{"cooldown":0}}}`,
-		`{"snorlax":{"jump_cooldown":0}}`,
-		`{"snorlax":{"air_speed_first_half":0}}`,  // no steering while rising
-		`{"snorlax":{"air_speed_second_half":0}}`, // no steering while falling
+		`{"snorlax":{"jump":{"cooldown":0}}}`,
+		`{"snorlax":{"jump":{"air_speed_first_half":0}}}`,  // no steering while rising
+		`{"snorlax":{"jump":{"air_speed_second_half":0}}}`, // no steering while falling
 		`{"snorlax":{"hyper_beam":{"cooldown":0}}}`,
 		`{"pikachu":{"thunder":{"interval":0}}}`,         // all bolts at once
 		`{"pikachu":{"thunder":{"follow_speed":0}}}`,     // a shadow that stays put

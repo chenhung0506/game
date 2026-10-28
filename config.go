@@ -9,14 +9,30 @@ import (
 	"os"
 )
 
-// Config holds the per-character tuning values. Distances are in game units
-// (the arena is 800x500) and times are in seconds.
+// CourtSize is the playing field in game units.
+type CourtSize struct {
+	Width  float64 `json:"width"`
+	Length float64 `json:"length"`
+}
+
+// Config holds the tuning values. Distances are in game units and times are in seconds.
 type Config struct {
+	// Length runs between the two players (left-right on the web page, up-down on a phone), width
+	// across. A room takes the court of the view its first player opened it in.
+	Court struct {
+		Mobile CourtSize `json:"mobile"`
+		Web    CourtSize `json:"web"`
+	} `json:"court"`
 	Pikachu struct {
-		DashDistance float64 `json:"dash_distance"`
-		DashDuration float64 `json:"dash_duration"`
-		DashCooldown float64 `json:"dash_cooldown"`
-		Thunder      struct {
+		MaxHP     int     `json:"max_hp"`
+		WalkSpeed float64 `json:"walk_speed"`
+		Radius    float64 `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
+		Dash      struct {
+			Distance float64 `json:"distance"`
+			Duration float64 `json:"duration"`
+			Cooldown float64 `json:"cooldown"`
+		} `json:"dash"`
+		Thunder struct {
 			Delay       float64 `json:"delay"`        // shadow appears -> first bolt
 			Radius      float64 `json:"radius"`       // strike area
 			Damage      int     `json:"damage"`       // per bolt
@@ -27,15 +43,20 @@ type Config struct {
 		} `json:"thunder"`
 	} `json:"pikachu"`
 	Snorlax struct {
-		JumpHeight   float64 `json:"jump_height"`
-		JumpDuration float64 `json:"jump_duration"`
-		JumpCooldown float64 `json:"jump_cooldown"` // before the next jump; counted from take-off
-		SlamRadius   float64 `json:"slam_radius"`   // reach of the landing shock; the earthquake effect is drawn at this size
-		// Steering speed in the air (walking is 180); 0 = no steering. The first half of the
-		// jump is the rise, the second half the fall.
-		AirSpeedFirstHalf  float64 `json:"air_speed_first_half"`
-		AirSpeedSecondHalf float64 `json:"air_speed_second_half"`
-		HyperBeam          struct {
+		MaxHP     int     `json:"max_hp"`
+		WalkSpeed float64 `json:"walk_speed"`
+		Radius    float64 `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
+		Jump      struct {
+			Height     float64 `json:"height"`
+			Duration   float64 `json:"duration"`
+			Cooldown   float64 `json:"cooldown"`    // before the next jump; counted from take-off
+			SlamRadius float64 `json:"slam_radius"` // reach of the landing shock; the earthquake effect is drawn at this size
+			// Steering speed in the air (walking is walk_speed); 0 = no steering. The first half of
+			// the jump is the rise, the second half the fall.
+			AirSpeedFirstHalf  float64 `json:"air_speed_first_half"`
+			AirSpeedSecondHalf float64 `json:"air_speed_second_half"`
+		} `json:"jump"`
+		HyperBeam struct {
 			ChargeDuration   float64 `json:"charge_duration"`   // rooted and aim locked on the opponent; the warning fan shows
 			SweepAngle       float64 `json:"sweep_angle"`       // degrees each side of the facing; the beam goes +angle -> -angle
 			SweepDuration    float64 `json:"sweep_duration"`    // seconds the beam takes to cross that arc
@@ -50,9 +71,14 @@ type Config struct {
 
 func DefaultConfig() Config {
 	var c Config
-	c.Pikachu.DashDistance = 220
-	c.Pikachu.DashDuration = 0.2
-	c.Pikachu.DashCooldown = 0.6
+	c.Court.Mobile = CourtSize{Width: arenaH, Length: arenaW}
+	c.Court.Web = c.Court.Mobile
+	c.Pikachu.MaxHP = maxHP
+	c.Pikachu.WalkSpeed = speed
+	c.Pikachu.Radius = pikachuRadius
+	c.Pikachu.Dash.Distance = 220
+	c.Pikachu.Dash.Duration = 0.2
+	c.Pikachu.Dash.Cooldown = 0.6
 	c.Pikachu.Thunder.Delay = 1.0
 	c.Pikachu.Thunder.Radius = 60
 	c.Pikachu.Thunder.Damage = 15
@@ -60,12 +86,15 @@ func DefaultConfig() Config {
 	c.Pikachu.Thunder.Interval = 0.5
 	c.Pikachu.Thunder.FollowSpeed = 120
 	c.Pikachu.Thunder.Cooldown = 4
-	c.Snorlax.JumpHeight = 72
-	c.Snorlax.JumpDuration = 0.8
-	c.Snorlax.JumpCooldown = 1.5
-	c.Snorlax.SlamRadius = slamRadius
-	c.Snorlax.AirSpeedFirstHalf = speed // the same as walking, i.e. no change until it is tuned
-	c.Snorlax.AirSpeedSecondHalf = speed
+	c.Snorlax.MaxHP = maxHP
+	c.Snorlax.WalkSpeed = speed
+	c.Snorlax.Radius = snorlaxRadius
+	c.Snorlax.Jump.Height = 72
+	c.Snorlax.Jump.Duration = 0.8
+	c.Snorlax.Jump.Cooldown = 1.5
+	c.Snorlax.Jump.SlamRadius = slamRadius
+	c.Snorlax.Jump.AirSpeedFirstHalf = speed // the same as walking, i.e. no change until it is tuned
+	c.Snorlax.Jump.AirSpeedSecondHalf = speed
 	c.Snorlax.HyperBeam.ChargeDuration = 0.6
 	c.Snorlax.HyperBeam.SweepAngle = 30
 	c.Snorlax.HyperBeam.SweepDuration = 0.5
@@ -106,15 +135,23 @@ func (c Config) validate() error {
 		v    float64
 		min  float64 // exclusive lower bound
 	}{
-		{"pikachu.dash_distance", c.Pikachu.DashDistance, 0},
-		{"pikachu.dash_duration", c.Pikachu.DashDuration, 0},
+		{"court.mobile.width", c.Court.Mobile.Width, 0},
+		{"court.web.width", c.Court.Web.Width, 0},
+		{"pikachu.radius", c.Pikachu.Radius, 0},
+		{"snorlax.radius", c.Snorlax.Radius, 0},
+		{"pikachu.max_hp", float64(c.Pikachu.MaxHP), 0},
+		{"pikachu.walk_speed", c.Pikachu.WalkSpeed, 0},
+		{"pikachu.dash.distance", c.Pikachu.Dash.Distance, 0},
+		{"pikachu.dash.duration", c.Pikachu.Dash.Duration, 0},
 		{"pikachu.thunder.delay", c.Pikachu.Thunder.Delay, 0},
 		{"pikachu.thunder.radius", c.Pikachu.Thunder.Radius, 0},
 		{"pikachu.thunder.damage", float64(c.Pikachu.Thunder.Damage), 0},
 		{"pikachu.thunder.strikes", float64(c.Pikachu.Thunder.Strikes), 0},
-		{"snorlax.jump_height", c.Snorlax.JumpHeight, 0},
-		{"snorlax.jump_duration", c.Snorlax.JumpDuration, 0},
-		{"snorlax.slam_radius", c.Snorlax.SlamRadius, 0},
+		{"snorlax.max_hp", float64(c.Snorlax.MaxHP), 0},
+		{"snorlax.walk_speed", c.Snorlax.WalkSpeed, 0},
+		{"snorlax.jump.height", c.Snorlax.Jump.Height, 0},
+		{"snorlax.jump.duration", c.Snorlax.Jump.Duration, 0},
+		{"snorlax.jump.slam_radius", c.Snorlax.Jump.SlamRadius, 0},
 		{"snorlax.hyper_beam.charge_duration", c.Snorlax.HyperBeam.ChargeDuration, 0},
 		{"snorlax.hyper_beam.sweep_duration", c.Snorlax.HyperBeam.SweepDuration, 0},
 		{"snorlax.hyper_beam.damage", float64(c.Snorlax.HyperBeam.Damage), 0},
@@ -125,42 +162,46 @@ func (c Config) validate() error {
 			return fmt.Errorf("%s must be > %v, got %v", f.name, f.min, f.v)
 		}
 	}
-	if !(c.Pikachu.DashCooldown >= 0) {
-		return fmt.Errorf("pikachu.dash_cooldown must be >= 0, got %v", c.Pikachu.DashCooldown)
+	for name, l := range map[string]float64{"court.mobile.length": c.Court.Mobile.Length, "court.web.length": c.Court.Web.Length} {
+		if !(l >= 2*spawnHalfGap) { // the players start spawnHalfGap either side of the middle
+			return fmt.Errorf("%s must be >= %v so both players start inside it, got %v", name, 2*spawnHalfGap, l)
+		}
 	}
-	if !(c.Pikachu.Thunder.Interval >= 0) {
-		return fmt.Errorf("pikachu.thunder.interval must be >= 0, got %v", c.Pikachu.Thunder.Interval)
-	}
-	if !(c.Snorlax.JumpCooldown >= 0) {
-		return fmt.Errorf("snorlax.jump_cooldown must be >= 0, got %v", c.Snorlax.JumpCooldown)
-	}
-	if !(c.Snorlax.AirSpeedFirstHalf >= 0) {
-		return fmt.Errorf("snorlax.air_speed_first_half must be >= 0, got %v", c.Snorlax.AirSpeedFirstHalf)
-	}
-	if !(c.Snorlax.AirSpeedSecondHalf >= 0) {
-		return fmt.Errorf("snorlax.air_speed_second_half must be >= 0, got %v", c.Snorlax.AirSpeedSecondHalf)
-	}
-	if !(c.Pikachu.Thunder.Cooldown >= 0) {
-		return fmt.Errorf("pikachu.thunder.cooldown must be >= 0, got %v", c.Pikachu.Thunder.Cooldown)
-	}
-	if !(c.Snorlax.HyperBeam.Cooldown >= 0) {
-		return fmt.Errorf("snorlax.hyper_beam.cooldown must be >= 0, got %v", c.Snorlax.HyperBeam.Cooldown)
-	}
-	if !(c.Pikachu.Thunder.FollowSpeed >= 0) {
-		return fmt.Errorf("pikachu.thunder.follow_speed must be >= 0, got %v", c.Pikachu.Thunder.FollowSpeed)
+	for _, f := range []struct {
+		name string
+		v    float64
+	}{
+		{"pikachu.dash.cooldown", c.Pikachu.Dash.Cooldown},
+		{"pikachu.thunder.interval", c.Pikachu.Thunder.Interval},
+		{"pikachu.thunder.cooldown", c.Pikachu.Thunder.Cooldown},
+		{"pikachu.thunder.follow_speed", c.Pikachu.Thunder.FollowSpeed},
+		{"snorlax.jump.cooldown", c.Snorlax.Jump.Cooldown},
+		{"snorlax.jump.air_speed_first_half", c.Snorlax.Jump.AirSpeedFirstHalf},
+		{"snorlax.jump.air_speed_second_half", c.Snorlax.Jump.AirSpeedSecondHalf},
+		{"snorlax.hyper_beam.cooldown", c.Snorlax.HyperBeam.Cooldown},
+		{"snorlax.hyper_beam.recharge_duration", c.Snorlax.HyperBeam.RechargeDuration},
+	} {
+		if !(f.v >= 0) {
+			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
+		}
 	}
 	if a := c.Snorlax.HyperBeam.SweepAngle; !(a >= 0 && a <= 180) { // 0 = a fixed beam, 180 = a full circle
 		return fmt.Errorf("snorlax.hyper_beam.sweep_angle must be between 0 and 180, got %v", a)
-	}
-	if !(c.Snorlax.HyperBeam.RechargeDuration >= 0) {
-		return fmt.Errorf("snorlax.hyper_beam.recharge_duration must be >= 0, got %v", c.Snorlax.HyperBeam.RechargeDuration)
 	}
 	return nil
 }
 
 // A jump that peaks at h and lands after T seconds is a parabola with
 // v0 = 4h/T and g = 8h/T^2.
-func (c Config) jumpV() float64 { return 4 * c.Snorlax.JumpHeight / c.Snorlax.JumpDuration }
+func (c Config) jumpV() float64 { return 4 * c.Snorlax.Jump.Height / c.Snorlax.Jump.Duration }
 func (c Config) gravity() float64 {
-	return 8 * c.Snorlax.JumpHeight / (c.Snorlax.JumpDuration * c.Snorlax.JumpDuration)
+	return 8 * c.Snorlax.Jump.Height / (c.Snorlax.Jump.Duration * c.Snorlax.Jump.Duration)
+}
+
+// courtFor is the court of a room opened from the given view ("mobile" or "web").
+func (c Config) courtFor(mode string) CourtSize {
+	if mode == modeWeb {
+		return c.Court.Web
+	}
+	return c.Court.Mobile
 }

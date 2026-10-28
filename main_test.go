@@ -12,7 +12,16 @@ import (
 
 func dial(t *testing.T, srv *httptest.Server, room string) *websocket.Conn {
 	t.Helper()
+	return dialIn(t, srv, room, "")
+}
+
+// dialIn opens the socket the way the page does from a given view ("mobile", "web" or "" for none).
+func dialIn(t *testing.T, srv *httptest.Server, room, mode string) *websocket.Conn {
+	t.Helper()
 	url := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws?room=" + room
+	if mode != "" {
+		url += "&mode=" + mode
+	}
 	c, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
@@ -52,6 +61,12 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	}
 	if arena, ok := hi["arena"].(map[string]any); !ok || arena["w"] != float64(2000) || arena["h"] != float64(1000) {
 		t.Fatalf("hi.arena = %v, want 2000x1000", hi["arena"])
+	}
+	if rd, ok := hi["radius"].([]any); !ok || len(rd) != 2 || rd[0] != float64(16) || rd[1] != float64(24) {
+		t.Fatalf("hi.radius = %v, want [16 24]: the client draws each body at its size", hi["radius"])
+	}
+	if mh, ok := hi["maxhp"].([]any); !ok || len(mh) != 2 || mh[0] != float64(100) || mh[1] != float64(100) {
+		t.Fatalf("hi.maxhp = %v, want [100 100]: the client scales the HP bars with it", hi["maxhp"])
 	}
 	// The client draws the beam's warning line from these, not from hard-coded numbers.
 	if beam, ok := hi["beam"].(map[string]any); !ok || beam["len"] != float64(450) || beam["w"] != float64(50) || beam["charge"] != float64(0.6) || beam["angle"] != float64(30) {
@@ -97,6 +112,48 @@ func TestInputMovesPlayerAndLeaveSendsWait(t *testing.T) {
 
 	a.Close()
 	next(t, b, "wait")
+}
+
+// The room takes the court of the view it was opened from, whatever the second player opens it with.
+func TestRoomCourtFollowsTheViewThatOpenedIt(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Court.Mobile = CourtSize{Width: 600, Length: 1200}
+	cfg.Court.Web = CourtSize{Width: 900, Length: 1600}
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	arenaOf := func(hi map[string]any) (w, h float64) {
+		a := hi["arena"].(map[string]any)
+		return a["w"].(float64), a["h"].(float64)
+	}
+	for _, tc := range []struct {
+		name, first, second string
+		w, h                float64
+	}{
+		{"phone opens", "mobile", "web", 1200, 600},
+		{"web opens", "web", "mobile", 1600, 900},
+		{"no mode counts as phone", "", "web", 1200, 600},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			room := "c" + tc.first + tc.second // short, lower-case, unique per row
+			a := dialIn(t, srv, room, tc.first)
+			if w, h := arenaOf(next(t, a, "hi")); w != tc.w || h != tc.h {
+				t.Fatalf("first player's arena = %vx%v, want %vx%v", w, h, tc.w, tc.h)
+			}
+			b := dialIn(t, srv, room, tc.second)
+			if w, h := arenaOf(next(t, b, "hi")); w != tc.w || h != tc.h {
+				t.Fatalf("second player's arena = %vx%v, want the room's %vx%v", w, h, tc.w, tc.h)
+			}
+		})
+	}
+}
+
+func TestBadModeRejected(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	url := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws?room=abc&mode=tablet"
+	if _, resp, err := websocket.DefaultDialer.Dial(url, nil); err == nil || resp == nil || resp.StatusCode != 400 {
+		t.Fatalf("want HTTP 400 handshake failure, got err=%v resp=%v", err, resp)
+	}
 }
 
 func TestBadRoomIDRejected(t *testing.T) {

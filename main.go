@@ -48,7 +48,7 @@ type hub struct {
 func newHub(cfg Config) *hub { return &hub{rooms: map[string]*room{}, cfg: cfg} }
 
 // join claims a slot in the room. Lock order is always hub.mu -> room.mu.
-func (h *hub) join(id string, c *client) (r *room, idx int, ok bool) {
+func (h *hub) join(id, mode string, c *client) (r *room, idx int, ok bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	r = h.rooms[id]
@@ -56,7 +56,7 @@ func (h *hub) join(id string, c *client) (r *room, idx int, ok bool) {
 		if len(h.rooms) >= maxRooms {
 			return nil, 0, false
 		}
-		r = &room{g: NewGame(h.cfg), winner: -1}
+		r = &room{g: NewGameFor(h.cfg, mode), winner: -1}
 		h.rooms[id] = r
 	}
 	r.mu.Lock()
@@ -145,12 +145,20 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "bad room id", http.StatusBadRequest)
 		return
 	}
+	mode := req.URL.Query().Get("mode") // the view the player opened the page in; it only matters to whoever opens the room
+	if mode == "" {
+		mode = modeMobile
+	}
+	if mode != modeMobile && mode != modeWeb {
+		http.Error(w, "bad mode", http.StatusBadRequest)
+		return
+	}
 	conn, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		return
 	}
 	c := &client{conn: conn, send: make(chan []byte, 8)}
-	r, idx, ok := h.join(id, c)
+	r, idx, ok := h.join(id, mode, c)
 	if !ok {
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"t":"full"}`))
 		conn.Close()
@@ -161,11 +169,13 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	r.mu.Lock()
 	hb, th := r.g.cfg.Snorlax.HyperBeam, r.g.cfg.Pikachu.Thunder // tunable, so the client takes them from here instead of hard-coding
 	hi, _ := json.Marshal(map[string]any{
-		"t": "hi", "you": idx, "arena": map[string]float64{"w": arenaW, "h": arenaH},
+		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
+		"radius":  []float64{r.g.cfg.Pikachu.Radius, r.g.cfg.Snorlax.Radius},
+		"maxhp":   []int{r.g.cfg.Pikachu.MaxHP, r.g.cfg.Snorlax.MaxHP},
 		"beam":    map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},
 		"thunder": map[string]float64{"radius": th.Radius, "delay": th.Delay, "interval": th.Interval, "strikes": float64(th.Strikes)},
 		// full cooldowns, so the pad's buttons can show how much of each is left
-		"cooldown": map[string]float64{"dash": r.g.cfg.Pikachu.DashCooldown, "thunder": th.Cooldown, "jump": r.g.cfg.Snorlax.JumpCooldown, "beam": hb.Cooldown},
+		"cooldown": map[string]float64{"dash": r.g.cfg.Pikachu.Dash.Cooldown, "thunder": th.Cooldown, "jump": r.g.cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown},
 	})
 	c.send <- hi
 	if r.c[1-idx] == nil {

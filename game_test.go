@@ -59,7 +59,7 @@ func TestJumpHeightAndDurationFollowConfig(t *testing.T) {
 		{72, 0.8}, {100, 1.0}, {40, 0.5}, {150, 1.2},
 	} {
 		cfg := DefaultConfig()
-		cfg.Snorlax.JumpHeight, cfg.Snorlax.JumpDuration = tc.height, tc.duration
+		cfg.Snorlax.Jump.Height, cfg.Snorlax.Jump.Duration = tc.height, tc.duration
 		g := NewGame(cfg)
 		g.P[snorlax].In.Skill = true
 
@@ -98,7 +98,7 @@ func TestSnorlaxSteersAtOneSpeedRisingAndAnotherFalling(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := DefaultConfig() // 0.8s jump: the halves are 0.4s each
-			cfg.Snorlax.AirSpeedFirstHalf, cfg.Snorlax.AirSpeedSecondHalf = tc.first, tc.second
+			cfg.Snorlax.Jump.AirSpeedFirstHalf, cfg.Snorlax.Jump.AirSpeedSecondHalf = tc.first, tc.second
 			g := NewGame(cfg)
 			g.P[snorlax].X = 800
 			g.P[snorlax].In = Input{Skill: true}
@@ -139,7 +139,7 @@ func TestSnorlaxSteersAtOneSpeedRisingAndAnotherFalling(t *testing.T) {
 
 func TestAirSpeedOnlyAffectsSnorlax(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Snorlax.AirSpeedFirstHalf, cfg.Snorlax.AirSpeedSecondHalf = 0, 0
+	cfg.Snorlax.Jump.AirSpeedFirstHalf, cfg.Snorlax.Jump.AirSpeedSecondHalf = 0, 0
 	g := NewGame(cfg)
 	x := g.P[pikachu].X
 	g.P[pikachu].In = Input{DX: 1}
@@ -154,7 +154,7 @@ func TestAirSpeedOnlyAffectsSnorlax(t *testing.T) {
 func TestJumpLandsOnTheTickTheConfiguredDurationEnds(t *testing.T) {
 	for _, duration := range []float64{0.5, 0.8, 1.0, 1.2} {
 		cfg := DefaultConfig()
-		cfg.Snorlax.JumpDuration = duration
+		cfg.Snorlax.Jump.Duration = duration
 		g := NewGame(cfg)
 		g.P[snorlax].In = Input{Skill: true}
 		g.Step(dt) // tick 1: take-off
@@ -200,7 +200,7 @@ func TestJumpCooldownCountsFromTakeoff(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := DefaultConfig()
-			cfg.Snorlax.JumpCooldown = tc.cooldown
+			cfg.Snorlax.Jump.Cooldown = tc.cooldown
 			if got := takeoffs(cfg, 100); fmt.Sprint(got) != fmt.Sprint(tc.want) {
 				t.Fatalf("take-offs on ticks %v, want %v", got, tc.want)
 			}
@@ -231,7 +231,7 @@ func TestPikachuQuakeKeepsItsFixedReach(t *testing.T) {
 	for _, tc := range []struct {
 		gap float64
 		hit bool
-	}{{90, true}, {110, false}} {
+	}{{120, true}, {130, false}} { // reach 100 plus Snorlax's body (24)
 		g := newTestGame()
 		g.P[pikachu].X, g.P[pikachu].Y = 800, 500
 		g.P[snorlax].X, g.P[snorlax].Y = 800+tc.gap, 500
@@ -263,12 +263,12 @@ func TestSlamReachFollowsConfig(t *testing.T) {
 		{"default 70: 60 away is hit", 70, 60, true},
 		{"default 70: 90 away is not", 70, 90, false},
 		{"widened to 200: 190 away is hit", 200, 190, true},
-		{"widened to 200: 210 away is not", 200, 210, false},
+		{"widened to 200: 220 away is not", 200, 220, false}, // reach 200 plus Pikachu's body (16)
 		{"shrunk to 30: 60 away is not", 30, 60, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := DefaultConfig()
-			cfg.Snorlax.SlamRadius = tc.radius
+			cfg.Snorlax.Jump.SlamRadius = tc.radius
 			g := NewGame(cfg)
 			g.P[snorlax].X, g.P[snorlax].Y = 800, 500
 			g.P[pikachu].X, g.P[pikachu].Y = 800-tc.gap, 500
@@ -321,7 +321,7 @@ func TestDashCoversConfiguredDistanceInConfiguredTime(t *testing.T) {
 		{220, 0.2}, {120, 0.35}, {300, 0.1}, // 0.35 and 0.1 are not multiples of a tick
 	} {
 		cfg := DefaultConfig()
-		cfg.Pikachu.DashDistance, cfg.Pikachu.DashDuration = tc.distance, tc.duration
+		cfg.Pikachu.Dash.Distance, cfg.Pikachu.Dash.Duration = tc.distance, tc.duration
 		g := NewGame(cfg)
 		g.P[pikachu].X = 100
 		g.P[pikachu].In = Input{DX: 1, Skill: true}
@@ -378,8 +378,8 @@ func TestDashDirection(t *testing.T) {
 			if sign(dx) != tc.wantDX || sign(dy) != tc.wantDY {
 				t.Fatalf("moved (%.1f, %.1f), want direction (%v, %v)", dx, dy, tc.wantDX, tc.wantDY)
 			}
-			if d := math.Hypot(dx, dy); math.Abs(d-DefaultConfig().Pikachu.DashDistance) > 0.01 {
-				t.Fatalf("diagonal dash covered %.2f, want %v (no diagonal bonus)", d, DefaultConfig().Pikachu.DashDistance)
+			if d := math.Hypot(dx, dy); math.Abs(d-DefaultConfig().Pikachu.Dash.Distance) > 0.01 {
+				t.Fatalf("diagonal dash covered %.2f, want %v (no diagonal bonus)", d, DefaultConfig().Pikachu.Dash.Distance)
 			}
 		})
 	}
@@ -425,14 +425,14 @@ func TestDashCooldownBlocksChainDashing(t *testing.T) {
 		g.Step(dt)
 		g.P[pikachu].In.DX = 0 // stop walking so only dashes move it
 	}
-	if got := g.P[pikachu].X - 50; math.Abs(got-cfg.Pikachu.DashDistance) > 0.01 {
-		t.Fatalf("moved %.2f in 0.5s, want exactly one dash (%v)", got, cfg.Pikachu.DashDistance)
+	if got := g.P[pikachu].X - 50; math.Abs(got-cfg.Pikachu.Dash.Distance) > 0.01 {
+		t.Fatalf("moved %.2f in 0.5s, want exactly one dash (%v)", got, cfg.Pikachu.Dash.Distance)
 	}
 	// Once the cooldown has passed, the held key dashes again.
 	for i := 0; i < tickRate/2; i++ {
 		g.Step(dt)
 	}
-	if got := g.P[pikachu].X - 50; got < 2*cfg.Pikachu.DashDistance-0.01 {
+	if got := g.P[pikachu].X - 50; got < 2*cfg.Pikachu.Dash.Distance-0.01 {
 		t.Fatalf("moved %.2f after the cooldown, want a second dash", got)
 	}
 }
@@ -980,6 +980,7 @@ func TestThunderShadowFollowSpeedDecidesWhetherYouCanOutrunIt(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := DefaultConfig()
+			cfg.Snorlax.Radius = 1 // so the miss is decided by the 60 radius of the strike
 			cfg.Pikachu.Thunder.FollowSpeed = tc.speed
 			cfg.Pikachu.Thunder.Strikes = 1
 			g := thunderGame(cfg)
@@ -1020,6 +1021,7 @@ func TestThunderHitAreaIsTheConfiguredRadius(t *testing.T) {
 	}{{"inside", 55, true}, {"on the edge", 60, true}, {"just outside", 65, false}} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := DefaultConfig()
+			cfg.Snorlax.Radius = 0              // a point target: the area alone decides
 			cfg.Pikachu.Thunder.FollowSpeed = 0 // the shadow stays where it appeared
 			cfg.Pikachu.Thunder.Strikes = 1
 			g := thunderGame(cfg)
@@ -1264,6 +1266,117 @@ func TestPlayersSpawnCentredInTheArenaFourHundredApart(t *testing.T) {
 	}
 	if arenaW != 2000 || arenaH != 1000 {
 		t.Fatalf("arena = %vx%v, want 2000x1000 (long enough for a phone held upright)", arenaW, arenaH)
+	}
+}
+
+// ---- body size: a skill hits when its area touches the target's body ----
+
+// Every skill reaches its own radius plus the target's body: at 130 apart, a reach of 100 misses a
+// body of radius 10 and touches one of radius 40.
+func TestBodyRadiusWidensWhatEverySkillCanHit(t *testing.T) {
+	const gap = 130.0
+	newG := func(r float64) *Game {
+		cfg := DefaultConfig()
+		cfg.Pikachu.Radius, cfg.Snorlax.Radius = r, r
+		cfg.Pikachu.Thunder.Strikes, cfg.Pikachu.Thunder.FollowSpeed, cfg.Pikachu.Thunder.Radius = 1, 0, 100
+		cfg.Snorlax.Jump.SlamRadius = 100
+		hb := &cfg.Snorlax.HyperBeam
+		hb.Length, hb.Width, hb.SweepAngle = 100, 20, 0 // a short fixed beam
+		g := NewGame(cfg)
+		g.P[pikachu].X, g.P[pikachu].Y = 800, 500
+		g.P[snorlax].X, g.P[snorlax].Y = 800+gap, 500
+		return g
+	}
+	skills := map[string]func(g *Game) bool{
+		"thunder": func(g *Game) bool {
+			castThunder(g) // the shadow appears on Snorlax and, not chasing, stays there
+			g.P[snorlax].X += gap
+			for i := 0; i < 2*tickRate; i++ {
+				g.Step(dt)
+			}
+			return g.P[snorlax].HP < maxHP
+		},
+		"earthquake": func(g *Game) bool {
+			g.P[pikachu].In = Input{Attack: true}
+			g.Step(dt)
+			return g.P[snorlax].HP < maxHP
+		},
+		"slam": func(g *Game) bool {
+			g.P[snorlax].Z, g.P[snorlax].VZ = 1, -100 // lands on the next step
+			g.Step(dt)
+			return g.P[pikachu].HP < maxHP
+		},
+		"hyper beam": func(g *Game) bool {
+			stepBeam(g)
+			for i := 0; i < 3*tickRate; i++ {
+				g.Step(dt)
+			}
+			return g.P[pikachu].HP < maxHP
+		},
+	}
+	for name, hits := range skills {
+		t.Run(name, func(t *testing.T) {
+			if hits(newG(10)) {
+				t.Fatal("a body of radius 10 is out of reach")
+			}
+			if !hits(newG(40)) {
+				t.Fatal("a body of radius 40 must be touched")
+			}
+		})
+	}
+}
+
+// ---- court, hit points and walking speed come from the config ----
+
+// The view a room is opened from picks its court: a phone gets the tall one, the web page the wide one.
+func TestCourtSizeDecidesSpawnAndWalls(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Court.Mobile = CourtSize{Width: 600, Length: 1200}
+	cfg.Court.Web = CourtSize{Width: 900, Length: 1600}
+	for _, tc := range []struct {
+		mode string
+		w, l float64
+	}{{modeMobile, 600, 1200}, {modeWeb, 900, 1600}} {
+		g := NewGameFor(cfg, tc.mode)
+		if a, b := g.P[pikachu], g.P[snorlax]; a.X != tc.l/2-200 || b.X != tc.l/2+200 || a.Y != tc.w/2 || b.Y != tc.w/2 {
+			t.Fatalf("%s: spawns at (%v,%v) and (%v,%v), want 200 either side of the middle of a %vx%v court", tc.mode, a.X, a.Y, b.X, b.Y, tc.l, tc.w)
+		}
+		g.P[pikachu].In = Input{DX: -1, DY: -1}
+		g.P[snorlax].In = Input{DX: 1, DY: 1}
+		for i := 0; i < 30*tickRate; i++ {
+			g.Step(dt)
+		}
+		if a, b := g.P[pikachu], g.P[snorlax]; a.X != 0 || a.Y != 0 || b.X != tc.l || b.Y != tc.w {
+			t.Fatalf("%s: after walking into the corners: (%v,%v) and (%v,%v), want (0,0) and (%v,%v)", tc.mode, a.X, a.Y, b.X, b.Y, tc.l, tc.w)
+		}
+	}
+}
+
+func TestMaxHPIsPerCharacter(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP = 60, 250
+	g := NewGame(cfg)
+	if g.P[pikachu].HP != 60 || g.P[snorlax].HP != 250 {
+		t.Fatalf("HP = %d and %d, want 60 and 250", g.P[pikachu].HP, g.P[snorlax].HP)
+	}
+	g.Reset()
+	if g.P[pikachu].HP != 60 || g.P[snorlax].HP != 250 {
+		t.Fatalf("after Reset HP = %d and %d, want 60 and 250", g.P[pikachu].HP, g.P[snorlax].HP)
+	}
+}
+
+func TestWalkSpeedIsPerCharacter(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.WalkSpeed, cfg.Snorlax.WalkSpeed = 90, 240
+	g := NewGame(cfg)
+	x0, x1 := g.P[pikachu].X, g.P[snorlax].X
+	g.P[pikachu].In, g.P[snorlax].In = Input{DX: -1}, Input{DX: 1}
+	g.Step(dt)
+	if got := x0 - g.P[pikachu].X; math.Abs(got-90*dt) > 1e-9 {
+		t.Fatalf("Pikachu walked %.4f, want %.4f", got, 90*dt)
+	}
+	if got := g.P[snorlax].X - x1; math.Abs(got-240*dt) > 1e-9 {
+		t.Fatalf("Snorlax walked %.4f, want %.4f", got, 240*dt)
 	}
 }
 
