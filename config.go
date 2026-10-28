@@ -30,6 +30,7 @@ type Config struct {
 		JumpHeight   float64 `json:"jump_height"`
 		JumpDuration float64 `json:"jump_duration"`
 		JumpCooldown float64 `json:"jump_cooldown"` // before the next jump; counted from take-off
+		SlamRadius   float64 `json:"slam_radius"`   // reach of the landing shock; the earthquake effect is drawn at this size
 		// Steering speed in the air (walking is 180); 0 = no steering. The first half of the
 		// jump is the rise, the second half the fall.
 		AirSpeedFirstHalf  float64 `json:"air_speed_first_half"`
@@ -62,6 +63,7 @@ func DefaultConfig() Config {
 	c.Snorlax.JumpHeight = 72
 	c.Snorlax.JumpDuration = 0.8
 	c.Snorlax.JumpCooldown = 1.5
+	c.Snorlax.SlamRadius = slamRadius
 	c.Snorlax.AirSpeedFirstHalf = speed // the same as walking, i.e. no change until it is tuned
 	c.Snorlax.AirSpeedSecondHalf = speed
 	c.Snorlax.HyperBeam.ChargeDuration = 0.6
@@ -112,6 +114,7 @@ func (c Config) validate() error {
 		{"pikachu.thunder.strikes", float64(c.Pikachu.Thunder.Strikes), 0},
 		{"snorlax.jump_height", c.Snorlax.JumpHeight, 0},
 		{"snorlax.jump_duration", c.Snorlax.JumpDuration, 0},
+		{"snorlax.slam_radius", c.Snorlax.SlamRadius, 0},
 		{"snorlax.hyper_beam.charge_duration", c.Snorlax.HyperBeam.ChargeDuration, 0},
 		{"snorlax.hyper_beam.sweep_duration", c.Snorlax.HyperBeam.SweepDuration, 0},
 		{"snorlax.hyper_beam.damage", float64(c.Snorlax.HyperBeam.Damage), 0},

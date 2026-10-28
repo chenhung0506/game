@@ -50,8 +50,8 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if th, ok := hi["thunder"].(map[string]any); !ok || th["radius"] != float64(60) || th["delay"] != float64(1) || th["interval"] != float64(0.5) || th["strikes"] != float64(3) {
 		t.Fatalf("hi.thunder = %v, want the configured radius/delay/interval/strikes", hi["thunder"])
 	}
-	if arena, ok := hi["arena"].(map[string]any); !ok || arena["w"] != float64(1600) || arena["h"] != float64(1000) {
-		t.Fatalf("hi.arena = %v, want 1600x1000", hi["arena"])
+	if arena, ok := hi["arena"].(map[string]any); !ok || arena["w"] != float64(2000) || arena["h"] != float64(1000) {
+		t.Fatalf("hi.arena = %v, want 2000x1000", hi["arena"])
 	}
 	// The client draws the beam's warning line from these, not from hard-coded numbers.
 	if beam, ok := hi["beam"].(map[string]any); !ok || beam["len"] != float64(450) || beam["w"] != float64(50) || beam["charge"] != float64(0.6) || beam["angle"] != float64(30) {

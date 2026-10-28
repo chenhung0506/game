@@ -62,6 +62,7 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 		"negative follow speed":      `{"pikachu":{"thunder":{"follow_speed":-1}}}`,
 		"negative thunder cooldown":  `{"pikachu":{"thunder":{"cooldown":-1}}}`,
 		"negative beam cooldown":     `{"snorlax":{"hyper_beam":{"cooldown":-1}}}`,
+		"zero slam radius":           `{"snorlax":{"slam_radius":0}}`,
 		"retired quake_radius key":   `{"snorlax":{"quake_radius":100}}`,
 		"negative air speed rising":  `{"snorlax":{"air_speed_first_half":-1}}`,
 		"negative air speed falling": `{"snorlax":{"air_speed_second_half":-1}}`,

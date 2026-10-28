@@ -4,11 +4,11 @@ import "math"
 
 // Game units: arena is 800x500, time in seconds.
 const (
-	arenaW        = 1600.0
+	arenaW        = 2000.0 // the long side: the vertical one on a phone, which is held upright
 	arenaH        = 1000.0
 	speed         = 180.0
 	groundZ       = 12.0 // a target above this height counts as airborne
-	slamRadius    = 70.0
+	slamRadius    = 70.0 // the default of snorlax.slam_radius
 	slamDamage    = 20
 	quakeRadius   = 100.0
 	quakeDamage   = 10
@@ -298,8 +298,8 @@ func (g *Game) Step(dt float64) []Event {
 
 		// The slam resolves on the landing frame, not while falling.
 		if landed {
-			events = append(events, Event{T: "slam", X: p.X, Y: p.Y, R: slamRadius}) // the client draws the real reach
-			if dist(p, other) < slamRadius && other.Z < groundZ {
+			events = append(events, Event{T: "slam", X: p.X, Y: p.Y, R: g.cfg.Snorlax.SlamRadius}) // the client draws the real reach
+			if dist(p, other) < g.cfg.Snorlax.SlamRadius && other.Z < groundZ {
 				g.hit(other, slamDamage)
 			}
 		}

@@ -252,6 +252,43 @@ func TestPikachuQuakeKeepsItsFixedReach(t *testing.T) {
 	}
 }
 
+// The landing's reach is slam_radius, and the event tells the client so the effect grows with it.
+func TestSlamReachFollowsConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		radius float64
+		gap    float64 // distance to Pikachu
+		hit    bool
+	}{
+		{"default 70: 60 away is hit", 70, 60, true},
+		{"default 70: 90 away is not", 70, 90, false},
+		{"widened to 200: 190 away is hit", 200, 190, true},
+		{"widened to 200: 210 away is not", 200, 210, false},
+		{"shrunk to 30: 60 away is not", 30, 60, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Snorlax.SlamRadius = tc.radius
+			g := NewGame(cfg)
+			g.P[snorlax].X, g.P[snorlax].Y = 800, 500
+			g.P[pikachu].X, g.P[pikachu].Y = 800-tc.gap, 500
+			g.P[snorlax].Z, g.P[snorlax].VZ = 1, -100 // lands on the next step
+			var r float64
+			for _, e := range g.Step(dt) {
+				if e.T == "slam" {
+					r = e.R
+				}
+			}
+			if got := g.P[pikachu].HP < maxHP; got != tc.hit {
+				t.Fatalf("hit = %v, want %v", got, tc.hit)
+			}
+			if r != tc.radius {
+				t.Fatalf("slam event reach = %v, want %v so the effect matches", r, tc.radius)
+			}
+		})
+	}
+}
+
 // The landing is drawn with the earthquake effect, so the event tells the client how far it reaches.
 func TestSlamEventCarriesItsReachToTheClient(t *testing.T) {
 	g := newTestGame()
@@ -1225,8 +1262,8 @@ func TestPlayersSpawnCentredInTheArenaFourHundredApart(t *testing.T) {
 	if mid := (a.X + b.X) / 2; mid != arenaW/2 || b.X-a.X != 400 {
 		t.Fatalf("spawn x = %v and %v, want them 400 apart around the middle %v", a.X, b.X, arenaW/2)
 	}
-	if arenaW != 1600 || arenaH != 1000 {
-		t.Fatalf("arena = %vx%v, want 1600x1000 (twice the original 800x500)", arenaW, arenaH)
+	if arenaW != 2000 || arenaH != 1000 {
+		t.Fatalf("arena = %vx%v, want 2000x1000 (long enough for a phone held upright)", arenaW, arenaH)
 	}
 }
 

@@ -11,10 +11,12 @@
   code { background: #262a33; padding: 2px 6px; border-radius: 4px; word-break: break-all; }
   #bar:empty { display: none; }
   /* Portrait (the default, for phones): the canvas fills the screen and the pad is drawn over it. */
+  html { touch-action: none; overscroll-behavior: none; }
   body.portrait { height: 100dvh; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   body.portrait canvas { margin: 0; border: 0; max-width: 100vw; max-height: 100dvh; }
   body.portrait #bar { position: fixed; top: 0; left: 0; right: 0; z-index: 2; background: #000b; padding: 6px 12px; font-size: 12px; }
   body.portrait #bar2 { display: none; }
+  #unzoom { position: fixed; left: 0; top: 0; transform-origin: 0 0; z-index: 9; display: none; margin: 12px; padding: 10px 14px; border-radius: 8px; border: 2px solid #fff; background: #000c; color: #fff; font: bold 14px system-ui; }
   .stick, .btn { position: fixed; z-index: 3; border-radius: 50%; touch-action: none; user-select: none; -webkit-user-select: none; }
   .stick { left: 18px; bottom: 28px; width: 140px; height: 140px; background: #ffffff22; border: 2px solid #ffffff44; }
   .knob { position: absolute; left: 38px; top: 38px; width: 60px; height: 60px; border-radius: 50%; background: #ffffff88; pointer-events: none; }
@@ -26,7 +28,7 @@
 </head>
 <body>
 <div id="bar"></div>
-<canvas id="c" width="1600" height="1000"></canvas>
+<canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
 <script>
 // Portrait is the default (phones): the two players are one above the other and you are always at the
@@ -60,7 +62,7 @@ if (!room) { room = Math.random().toString(36).slice(2, 8); query.set('room', ro
 const bar = document.getElementById('bar');
 const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
-let arena = { w: 1600, h: 1000 }; // replaced by the server's values in 'hi'
+let arena = { w: 2000, h: 1000 }; // replaced by the server's values in 'hi'
 if (PORTRAIT) { cv.width = arena.h; cv.height = arena.w; }
 let you = -1, snap = null, waiting = true, status = '連線中…';
 const disp = [{ x: null, y: 0, z: 0 }, { x: null, y: 0, z: 0 }]; // smoothed positions; set from the first snapshot
@@ -128,6 +130,35 @@ addEventListener('keydown', (e) => { if (e.key === ' ') e.preventDefault(); keys
 addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); sendInput(); });
 addEventListener('blur', () => { keys.clear(); stick = { x: 0, y: 0 }; for (const n in touch) touch[n] = false; sendInput(); }); // no stuck keys after alt-tab
 addEventListener('contextmenu', (e) => { if (PORTRAIT) e.preventDefault(); }); // a long press must not open a menu
+
+// Keep the page from zooming. The viewport tag and touch-action cover most browsers; iOS Safari ignores
+// user-scalable=no, so pinches (the gesture events) and double-taps are also cancelled here. Nothing
+// guarantees it on every browser, so a zoomed page also gets a button that puts the size back.
+if (PORTRAIT) {
+  for (const t of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(t, (e) => e.preventDefault());
+  document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false }); // two fingers
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', (e) => { const now = Date.now(); if (now - lastTouchEnd < 350) e.preventDefault(); lastTouchEnd = now; }, { passive: false }); // double tap
+  const btn = document.createElement('button');
+  btn.id = 'unzoom'; btn.textContent = '還原畫面大小';
+  document.body.append(btn);
+  const vv = window.visualViewport;
+  // The button follows the visible part of the page, at its normal size, and only shows while zoomed in.
+  const follow = () => {
+    if (!vv) return;
+    const zoomed = vv.scale > 1.01;
+    btn.style.display = zoomed ? 'block' : 'none';
+    if (zoomed) btn.style.transform = `translate(${vv.offsetLeft}px, ${vv.offsetTop}px) scale(${1 / vv.scale})`;
+  };
+  if (vv) { vv.addEventListener('resize', follow); vv.addEventListener('scroll', follow); }
+  btn.addEventListener('click', () => {
+    // Changing the viewport tag makes the browser lay the page out again at scale 1.
+    const meta = document.querySelector('meta[name=viewport]'), orig = meta.content;
+    meta.content = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no';
+    scrollTo(0, 0);
+    setTimeout(() => { meta.content = orig; follow(); }, 300);
+  });
+}
 
 // The pad: a stick bottom-left, and bottom-right a big main button with small ones around it.
 // A small slot that is null is reserved and not drawn.
