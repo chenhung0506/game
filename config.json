@@ -14,11 +14,11 @@
     }
   },
   "snorlax": {
-    "jump_height": 72,
-    "jump_duration": 0.8,
+    "jump_height": 100,
+    "jump_duration": 1.5,
     "jump_cooldown": 1.5,
-    "air_speed": 180,
-    "quake_radius": 100,
+    "air_speed_first_half": 320,
+    "air_speed_second_half": 120,
     "hyper_beam": {
       "charge_duration": 0.6,
       "sweep_angle": 35,

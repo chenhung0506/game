@@ -28,7 +28,7 @@ type Input struct {
 	DX      int  `json:"dx"`
 	DY      int  `json:"dy"`
 	Skill   bool `json:"skill"`
-	Attack  bool `json:"atk"`
+	Attack  bool `json:"atk"`     // Pikachu only: earthquake
 	Beam    bool `json:"beam"`    // Snorlax only: Hyper Beam
 	Thunder bool `json:"thunder"` // Pikachu only: Thunder
 }
@@ -70,7 +70,7 @@ type Player struct {
 
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
-	T string  `json:"t"` // "slam" | "quake" | "thunder"
+	T string  `json:"t"` // "slam" | "quake" | "thunder" | "skybolt"
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 	R float64 `json:"r,omitempty"` // quake reach, so the effect can match it
@@ -151,7 +151,7 @@ func (g *Game) Step(dt float64) []Event {
 		}
 
 		// Pikachu's skill: dash toward the held direction (or where it faces).
-		if i == pikachu && p.In.Skill && p.DashT == 0 && p.DashCD == 0 {
+		if i == pikachu && p.In.Skill && p.DashT == 0 && p.DashCD == 0 && p.ThunderLeft == 0 {
 			dx, dy := float64(p.In.DX), float64(p.In.DY)
 			if dx == 0 && dy == 0 {
 				dx, dy = float64(p.FX), float64(p.FY)
@@ -165,6 +165,7 @@ func (g *Game) Step(dt float64) []Event {
 		// Snorlax's Hyper Beam: charge -> sweep -> recharge. It is rooted through all
 		// three. The aim is locked on the opponent's position when the beam is used.
 		busy := false
+		casting := false // Pikachu is rooted while Thunder runs
 		if i == snorlax {
 			hb := g.cfg.Snorlax.HyperBeam
 			if p.JumpCD > 0 {
@@ -218,8 +219,9 @@ func (g *Game) Step(dt float64) []Event {
 			busy = p.BeamT > 0 || p.SweepT > 0 || p.RechargeT > 0
 		}
 
-		// Pikachu's Thunder. It does not root Pikachu, and a new cast waits for the
-		// current one to finish. Bolts come from the sky, so height gives no cover.
+		// Pikachu's Thunder. Pikachu cannot move until the last bolt has struck, and a
+		// new cast waits for the current one to finish. Bolts come from the sky, so
+		// height gives no cover. Each strike is also fired up into the sky from Pikachu.
 		if i == pikachu {
 			th := g.cfg.Pikachu.Thunder
 			if p.ThunderCD > 0 {
@@ -230,8 +232,10 @@ func (g *Game) Step(dt float64) []Event {
 			if p.In.Thunder && p.ThunderLeft == 0 && p.ThunderCD == 0 {
 				p.ThunderLeft, p.ThunderIn = th.Strikes, th.Delay
 				p.ThunderCD = th.Cooldown
+				p.DashT = 0                             // a dash in progress (or begun this tick) stops: casting roots Pikachu at once
 				p.ShadowX, p.ShadowY = other.X, other.Y // appears right where the opponent stands
 			}
+			casting = p.ThunderLeft > 0 // rooted through the tick of the last bolt, free from the next
 			if p.ThunderLeft > 0 {
 				dx, dy := other.X-p.ShadowX, other.Y-p.ShadowY
 				if d := math.Hypot(dx, dy); d > 0 { // chase, without overshooting
@@ -241,7 +245,7 @@ func (g *Game) Step(dt float64) []Event {
 				}
 				p.ThunderIn -= dt
 				for p.ThunderLeft > 0 && p.ThunderIn < 1e-9 { // a loop so a tiny interval cannot lose bolts
-					events = append(events, Event{T: "thunder", X: p.ShadowX, Y: p.ShadowY})
+					events = append(events, Event{T: "skybolt", X: p.X, Y: p.Y}, Event{T: "thunder", X: p.ShadowX, Y: p.ShadowY})
 					if math.Hypot(other.X-p.ShadowX, other.Y-p.ShadowY) <= th.Radius {
 						g.hit(other, th.Damage)
 					}
@@ -261,11 +265,15 @@ func (g *Game) Step(dt float64) []Event {
 			if p.DashT -= step; p.DashT < 1e-9 {
 				p.DashT = 0
 			}
-		} else if n := math.Hypot(float64(p.In.DX), float64(p.In.DY)); !busy && n > 0 {
-			// Normalise diagonals so they are not faster. Snorlax steers more slowly in the air.
+		} else if n := math.Hypot(float64(p.In.DX), float64(p.In.DY)); !busy && !casting && n > 0 {
+			// Normalise diagonals so they are not faster. Snorlax steers at its own speeds in
+			// the air: rising is the first half of the jump, falling the second.
 			v := speed
 			if i == snorlax && p.Z > 0 {
-				v = g.cfg.Snorlax.AirSpeed
+				v = g.cfg.Snorlax.AirSpeedSecondHalf
+				if p.VZ > 0 {
+					v = g.cfg.Snorlax.AirSpeedFirstHalf
+				}
 			}
 			p.X += float64(p.In.DX) / n * v * dt
 			p.Y += float64(p.In.DY) / n * v * dt
@@ -290,24 +298,21 @@ func (g *Game) Step(dt float64) []Event {
 
 		// The slam resolves on the landing frame, not while falling.
 		if landed {
-			events = append(events, Event{T: "slam", X: p.X, Y: p.Y})
+			events = append(events, Event{T: "slam", X: p.X, Y: p.Y, R: slamRadius}) // the client draws the real reach
 			if dist(p, other) < slamRadius && other.Z < groundZ {
 				g.hit(other, slamDamage)
 			}
 		}
 
-		// Ground attack: only from the ground, and it cannot reach airborne targets.
+		// Pikachu's earthquake: only from the ground, and it cannot reach airborne targets.
+		// Snorlax has none; its jump landing is its ground shock.
 		if p.CD > 0 {
 			p.CD = math.Max(0, p.CD-dt)
 		}
-		if p.In.Attack && p.CD == 0 && p.Z == 0 && !busy {
+		if i == pikachu && p.In.Attack && p.CD == 0 && p.Z == 0 && !busy {
 			p.CD = quakeCooldown
-			qr := quakeRadius
-			if i == snorlax {
-				qr = g.cfg.Snorlax.QuakeRadius // Pikachu keeps the fixed radius
-			}
-			events = append(events, Event{T: "quake", X: p.X, Y: p.Y, R: qr}) // the client draws the real reach
-			if dist(p, other) < qr && other.Z < groundZ {
+			events = append(events, Event{T: "quake", X: p.X, Y: p.Y, R: quakeRadius}) // the client draws the real reach
+			if dist(p, other) < quakeRadius && other.Z < groundZ {
 				g.hit(other, quakeDamage)
 			}
 		}

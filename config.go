@@ -30,9 +30,11 @@ type Config struct {
 		JumpHeight   float64 `json:"jump_height"`
 		JumpDuration float64 `json:"jump_duration"`
 		JumpCooldown float64 `json:"jump_cooldown"` // before the next jump; counted from take-off
-		AirSpeed     float64 `json:"air_speed"`     // steering speed while airborne (walking is 180); 0 = no steering in the air
-		QuakeRadius  float64 `json:"quake_radius"`  // reach of Snorlax's earthquake (J)
-		HyperBeam    struct {
+		// Steering speed in the air (walking is 180); 0 = no steering. The first half of the
+		// jump is the rise, the second half the fall.
+		AirSpeedFirstHalf  float64 `json:"air_speed_first_half"`
+		AirSpeedSecondHalf float64 `json:"air_speed_second_half"`
+		HyperBeam          struct {
 			ChargeDuration   float64 `json:"charge_duration"`   // rooted and aim locked on the opponent; the warning fan shows
 			SweepAngle       float64 `json:"sweep_angle"`       // degrees each side of the facing; the beam goes +angle -> -angle
 			SweepDuration    float64 `json:"sweep_duration"`    // seconds the beam takes to cross that arc
@@ -60,8 +62,8 @@ func DefaultConfig() Config {
 	c.Snorlax.JumpHeight = 72
 	c.Snorlax.JumpDuration = 0.8
 	c.Snorlax.JumpCooldown = 1.5
-	c.Snorlax.AirSpeed = speed // the same as walking, i.e. no change until it is tuned
-	c.Snorlax.QuakeRadius = quakeRadius
+	c.Snorlax.AirSpeedFirstHalf = speed // the same as walking, i.e. no change until it is tuned
+	c.Snorlax.AirSpeedSecondHalf = speed
 	c.Snorlax.HyperBeam.ChargeDuration = 0.6
 	c.Snorlax.HyperBeam.SweepAngle = 30
 	c.Snorlax.HyperBeam.SweepDuration = 0.5
@@ -110,7 +112,6 @@ func (c Config) validate() error {
 		{"pikachu.thunder.strikes", float64(c.Pikachu.Thunder.Strikes), 0},
 		{"snorlax.jump_height", c.Snorlax.JumpHeight, 0},
 		{"snorlax.jump_duration", c.Snorlax.JumpDuration, 0},
-		{"snorlax.quake_radius", c.Snorlax.QuakeRadius, 0},
 		{"snorlax.hyper_beam.charge_duration", c.Snorlax.HyperBeam.ChargeDuration, 0},
 		{"snorlax.hyper_beam.sweep_duration", c.Snorlax.HyperBeam.SweepDuration, 0},
 		{"snorlax.hyper_beam.damage", float64(c.Snorlax.HyperBeam.Damage), 0},
@@ -130,8 +131,11 @@ func (c Config) validate() error {
 	if !(c.Snorlax.JumpCooldown >= 0) {
 		return fmt.Errorf("snorlax.jump_cooldown must be >= 0, got %v", c.Snorlax.JumpCooldown)
 	}
-	if !(c.Snorlax.AirSpeed >= 0) {
-		return fmt.Errorf("snorlax.air_speed must be >= 0, got %v", c.Snorlax.AirSpeed)
+	if !(c.Snorlax.AirSpeedFirstHalf >= 0) {
+		return fmt.Errorf("snorlax.air_speed_first_half must be >= 0, got %v", c.Snorlax.AirSpeedFirstHalf)
+	}
+	if !(c.Snorlax.AirSpeedSecondHalf >= 0) {
+		return fmt.Errorf("snorlax.air_speed_second_half must be >= 0, got %v", c.Snorlax.AirSpeedSecondHalf)
 	}
 	if !(c.Pikachu.Thunder.Cooldown >= 0) {
 		return fmt.Errorf("pikachu.thunder.cooldown must be >= 0, got %v", c.Pikachu.Thunder.Cooldown)
