@@ -37,12 +37,12 @@
     "hyper_beam": {
       "charge_duration": 0.6,
       "sweep_angle": 35,
-      "sweep_duration": 0.5,
+      "sweep_duration": 0.75,
       "recharge_duration": 1.5,
       "cooldown": 5,
-      "damage": 40,
-      "knockback": 100,
-      "hit_interval": 0.3,
+      "damage": 20,
+      "knockback": 80,
+      "hit_interval": 0.15,
       "length": 550,
       "width": 50
     }
