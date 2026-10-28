@@ -1972,3 +1972,42 @@ func TestBallIntervalDoesNotCarryOverToTheNextSweep(t *testing.T) {
 		}
 	}
 }
+
+// The tick is 1/30 s, so a hit_interval that is not a whole number of ticks must still give the right
+// number of hits over time: 0.05s used to become 0.067s (every 2nd tick) and 0.08s 0.1s (every 3rd).
+func TestHitIntervalIsAnAverageNotRoundedUpToATick(t *testing.T) {
+	const sweep = 3.0 // seconds of beam, 90 ticks
+	for _, interval := range []float64{0.05, 0.08, 0.1, 0.25} {
+		want := sweep / interval
+		t.Run(fmt.Sprint(interval), func(t *testing.T) {
+			g := longBeam(sweep, interval, 0)
+			g.cfg.Snorlax.HyperBeam.Damage = 1
+			if got := float64(len(hitTicks(g, 5*tickRate))); math.Abs(got-want) > 1.5 {
+				t.Fatalf("a player in a %vs beam was hit %v times, want about %v (every %vs)", sweep, got, want, interval)
+			}
+			b := beamVsBall(sweep, interval, 0, 0, 0, Ball{X: 450, Y: 250})
+			stepBeam(b)
+			for i := 0; i < 5*tickRate; i++ {
+				b.Step(dt)
+			}
+			if got := float64(100000-b.Balls[0].HP) / 10; math.Abs(got-want) > 1.5 {
+				t.Fatalf("a ball in a %vs beam was hit %v times, want about %v (every %vs)", sweep, got, want, interval)
+			}
+		})
+	}
+}
+
+// Below one tick there is nothing finer to give: one hit per tick, never more.
+func TestHitIntervalBelowOneTickMeansOneHitPerTick(t *testing.T) {
+	g := longBeam(1.0, 0.01, 0) // 30 ticks of beam
+	g.cfg.Snorlax.HyperBeam.Damage = 1
+	got := hitTicks(g, 4*tickRate)
+	if len(got) < 29 || len(got) > 30 {
+		t.Fatalf("hits = %d, want one per tick of the 30-tick beam", len(got))
+	}
+	for i := 1; i < len(got); i++ {
+		if got[i]-got[i-1] != 1 {
+			t.Fatalf("hits on ticks %v, want every tick", got)
+		}
+	}
+}

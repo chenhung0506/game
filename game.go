@@ -153,6 +153,21 @@ func (g *Game) knockBack(sx, sy float64, target *Player, d, fx, fy float64) {
 	target.X, target.Y = g.pushedAway(target.X, target.Y, sx, sy, d, fx, fy)
 }
 
+// The beam's hit cooldown counts down in whole ticks, so an interval would round up to the next tick
+// (0.05s would become 0.067s, 0.08s would become 0.1s). To keep the average rate right, the time by
+// which a countdown overshoots zero is credited to the next one: hitCDTick lets it go negative for the
+// tick it crosses zero, and hitCDNext starts the next interval from that credit.
+func hitCDTick(cd, dt float64) float64 {
+	if cd > 0 {
+		return cd - dt
+	}
+	return 0 // no cooldown running: any credit is spent
+}
+
+// hitCDNext is the cooldown after a hit made with cd on the clock. It cannot be shorter than 0, so an
+// interval below one tick still means at most one hit per tick.
+func hitCDNext(cd, interval float64) float64 { return math.Max(cd+interval, 0) }
+
 // pushedAway is where a point at (x, y) ends up pushed d units away from (sx, sy), inside the court.
 func (g *Game) pushedAway(x, y, sx, sy, d, fx, fy float64) (float64, float64) {
 	dx, dy := x-sx, y-sy
@@ -268,17 +283,13 @@ func (g *Game) Step(dt float64) []Event {
 					p.SweepT = 0
 				}
 				p.BeamA = hb.SweepAngle * (2*p.SweepT/hb.SweepDuration - 1) // +angle -> -angle
-				if p.BeamHitCD > 0 {
-					if p.BeamHitCD -= dt; p.BeamHitCD < 1e-9 {
-						p.BeamHitCD = 0
-					}
-				}
+				p.BeamHitCD = hitCDTick(p.BeamHitCD, dt)
 				// Like the quake, the beam travels along the ground and misses airborne targets.
 				// It hits again every hit_interval for as long as the target stays in the beam (0 = once per sweep).
-				ready := p.BeamHitCD == 0 && (hb.HitInterval > 0 || !p.SweptHit)
+				ready := p.BeamHitCD <= 1e-9 && (hb.HitInterval > 0 || !p.SweptHit)
 				if ready && other.Z < groundZ && sweepHits(p, other, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+g.radius(1-i), hb.Width+2*g.radius(1-i)) {
 					g.hit(other, hb.Damage)
-					p.SweptHit, p.BeamHitCD = true, hb.HitInterval
+					p.SweptHit, p.BeamHitCD = true, hitCDNext(p.BeamHitCD, hb.HitInterval)
 					g.knockBack(p.X, p.Y, other, hb.Knockback, p.BeamX, p.BeamY)
 				}
 				br := g.cfg.Pikachu.ElectroBall.Radius
@@ -288,15 +299,11 @@ func (g *Game) Step(dt float64) []Event {
 				push := math.Max(0, hb.Mass-g.cfg.Pikachu.ElectroBall.Mass)
 				for j := range g.Balls {
 					b := &g.Balls[j]
-					if b.HitCD > 0 {
-						if b.HitCD -= dt; b.HitCD < 1e-9 {
-							b.HitCD = 0
-						}
-					}
-					ready := b.HitCD == 0 && (hb.HitInterval > 0 || b.LastSweep != p.SweepID)
+					b.HitCD = hitCDTick(b.HitCD, dt)
+					ready := b.HitCD <= 1e-9 && (hb.HitInterval > 0 || b.LastSweep != p.SweepID)
 					if ready && sweepHits(p, &Player{X: b.X, Y: b.Y}, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+br, hb.Width+2*br) {
 						b.HP -= hb.Damage
-						b.LastSweep, b.HitCD = p.SweepID, hb.HitInterval
+						b.LastSweep, b.HitCD = p.SweepID, hitCDNext(b.HitCD, hb.HitInterval)
 						b.X, b.Y = g.pushedAway(b.X, b.Y, p.X, p.Y, push, p.BeamX, p.BeamY)
 					}
 				}
