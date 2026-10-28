@@ -24,7 +24,7 @@
     "electro_ball": {
       "charge_time": 0.5,
       "speed": 400,
-      "radius": 14,
+      "radius": 50,
       "hp": 30,
       "explosion_radius": 180,
       "explosion_damage": 25,
