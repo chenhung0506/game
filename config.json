@@ -34,9 +34,20 @@
     }
   },
   "snorlax": {
-    "max_hp": 100,
-    "walk_speed": 150,
+    "max_hp": 140,
+    "walk_speed": 140,
     "radius": 30,
+    "ice_punch": {
+      "charge_duration": 0.4,
+      "recharge_duration": 0.6,
+      "cooldown": 5,
+      "speed": 900,
+      "distance": 250,
+      "radius": 40,
+      "freeze_duration": 1.5,
+      "damage": 10,
+      "mass": 150
+    },
     "jump": {
       "height": 100,
       "duration": 1.7,
@@ -49,7 +60,7 @@
       "charge_duration": 0.4,
       "sweep_angle": 35,
       "sweep_duration": 0.65,
-      "recharge_duration": 1.5,
+      "recharge_duration": 2,
       "cooldown": 5,
       "damage": 10,
       "knockback": 80,
