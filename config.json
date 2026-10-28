@@ -1,11 +1,11 @@
 {
   "pikachu": {
-    "dash_distance": 220,
+    "dash_distance": 200,
     "dash_duration": 0.2,
-    "dash_cooldown": 0.6,
+    "dash_cooldown": 1.2,
     "thunder": {
       "delay": 1.2,
-      "radius": 80,
+      "radius": 90,
       "damage": 15,
       "strikes": 3,
       "interval": 0.5,
@@ -16,7 +16,7 @@
   "snorlax": {
     "jump_height": 100,
     "jump_duration": 1.5,
-    "jump_cooldown": 1.5,
+    "jump_cooldown": 2,
     "air_speed_first_half": 320,
     "air_speed_second_half": 120,
     "hyper_beam": {
