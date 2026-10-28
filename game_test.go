@@ -1390,3 +1390,146 @@ func TestWinner(t *testing.T) {
 		t.Fatalf("winner = %d, want 0", g.Winner())
 	}
 }
+
+// ---- Hyper Beam: knockback and repeated hits ----
+
+// longBeam is a fixed beam (no sweep angle) that stays on its line for `seconds`, so a target in it can be hit again.
+func longBeam(seconds, interval, knockback float64) *Game {
+	cfg := DefaultConfig()
+	hb := &cfg.Snorlax.HyperBeam
+	hb.SweepAngle, hb.SweepDuration, hb.HitInterval, hb.Knockback = 0, seconds, interval, knockback
+	hb.Damage, hb.Length = 10, 550
+	return beamGame(cfg) // Snorlax at (600,250) facing left, Pikachu at (300,250) in the line
+}
+
+// hitTicks fires the beam (the press is tick 1) and returns the ticks on which Pikachu lost HP.
+func hitTicks(g *Game, until int) []int {
+	var ticks []int
+	stepBeam(g)
+	hp := g.P[pikachu].HP
+	for tick := 2; tick <= until; tick++ {
+		g.Step(dt)
+		if g.P[pikachu].HP < hp {
+			ticks = append(ticks, tick)
+		}
+		hp = g.P[pikachu].HP
+	}
+	return ticks
+}
+
+func TestBeamKnocksTheTargetStraightAwayFromSnorlax(t *testing.T) {
+	g := longBeam(0.5, 0, 100)
+	g.P[pikachu].X, g.P[pikachu].Y = 400, 250 // 200 to Snorlax's left, on the line
+	hitTicks(g, 4*tickRate)
+	if p := g.P[pikachu]; p.X != 300 || p.Y != 250 {
+		t.Fatalf("Pikachu at (%v,%v), want it pushed 100 away from Snorlax to (300,250)", p.X, p.Y)
+	}
+}
+
+func TestBeamKnockbackFollowsTheLineFromSnorlaxNotTheWorldAxes(t *testing.T) {
+	g := longBeam(0.5, 0, 100)
+	g.P[pikachu].X, g.P[pikachu].Y = 600-200*math.Cos(math.Pi/6), 250+200*math.Sin(math.Pi/6) // 30 degrees off, 200 away
+	g.P[snorlax].X, g.P[snorlax].Y = 600, 250
+	stepBeam(g)
+	for i := 0; i < 2*tickRate && g.P[pikachu].HP == maxHP; i++ {
+		g.Step(dt)
+	}
+	want := math.Hypot(g.P[pikachu].X-600, g.P[pikachu].Y-250)
+	if math.Abs(want-300) > 1e-6 {
+		t.Fatalf("Pikachu is %.3f from Snorlax, want 300 (200 + 100 along the same line)", want)
+	}
+}
+
+func TestBeamKnockbackZeroLeavesTheTargetWhereItWas(t *testing.T) {
+	g := longBeam(0.5, 0, 0)
+	hitTicks(g, 3*tickRate)
+	if p := g.P[pikachu]; p.X != 300 || p.HP == maxHP {
+		t.Fatalf("Pikachu x=%v HP=%d, want it hit and not moved", p.X, p.HP)
+	}
+}
+
+func TestBeamKnockbackStopsAtTheWall(t *testing.T) {
+	g := longBeam(0.5, 0, 500)
+	g.P[pikachu].X = 100
+	stepBeam(g)
+	for i := 0; i < 3*tickRate && g.P[pikachu].HP == maxHP; i++ {
+		g.Step(dt)
+	}
+	// Looked at on the very tick of the hit: that is what the clients are sent.
+	if g.P[pikachu].HP == maxHP {
+		t.Fatal("setup: Pikachu was never hit")
+	}
+	if x := g.P[pikachu].X; x != 0 {
+		t.Fatalf("Pikachu x = %v in the snapshot of the hit, want it stopped by the wall at 0", x)
+	}
+}
+
+func TestBeamKnockbackWithNoDirectionUsesTheBeamAim(t *testing.T) {
+	g := longBeam(0.5, 0, 100)
+	g.P[pikachu].X, g.P[pikachu].Y = 600, 250 // on top of Snorlax, which faces left
+	hitTicks(g, 3*tickRate)
+	if p := g.P[pikachu]; p.X != 500 || p.Y != 250 {
+		t.Fatalf("Pikachu at (%v,%v), want it pushed 100 along the aim to (500,250)", p.X, p.Y)
+	}
+}
+
+// A target that stays in the beam is hit again every hit_interval, the first hit being at once.
+func TestBeamHitsAgainEveryIntervalWhileTheTargetStaysIn(t *testing.T) {
+	g := longBeam(2.0, 0.5, 0) // 60 ticks of beam, a hit every 15
+	got := hitTicks(g, 4*tickRate)
+	chargeEnd := chargeTicks(DefaultConfig()) + 1 // the sweep starts the tick after the charge ends
+	if len(got) != 4 {
+		t.Fatalf("hits on ticks %v, want 4 (every 0.5s of a 2s beam)", got)
+	}
+	for i := 1; i < len(got); i++ {
+		if got[i]-got[i-1] != 15 {
+			t.Fatalf("hits on ticks %v, want them 15 ticks (0.5s) apart", got)
+		}
+	}
+	if got[0] > chargeEnd+1 {
+		t.Fatalf("first hit on tick %d, want it as soon as the beam is out (about tick %d)", got[0], chargeEnd)
+	}
+}
+
+// The case that matters: each hit throws the target further out, and it is hit again only while it is still within the beam's reach.
+func TestBeamRepeatHitsStopOnceKnockbackCarriesTheTargetOutOfReach(t *testing.T) {
+	g := longBeam(3.0, 0.2, 100) // reach: 550 + Pikachu's body 16
+	got := hitTicks(g, 5*tickRate)
+	// Pikachu starts 300 away: hit at 300, 400, 500 (each inside 566), then it stands 600 away.
+	if len(got) != 3 {
+		t.Fatalf("hits on ticks %v, want 3", got)
+	}
+	if x := g.P[pikachu].X; x != 0 {
+		t.Fatalf("Pikachu x = %v, want 0: three knockbacks of 100 from x=300", x)
+	}
+	if g.P[pikachu].HP != maxHP-30 {
+		t.Fatalf("HP = %d, want %d", g.P[pikachu].HP, maxHP-30)
+	}
+}
+
+func TestBeamIntervalZeroHitsOnlyOncePerSweep(t *testing.T) {
+	g := longBeam(2.0, 0, 0)
+	if got := hitTicks(g, 4*tickRate); len(got) != 1 {
+		t.Fatalf("hits on ticks %v, want exactly one for a lingering target", got)
+	}
+}
+
+// Every sweep starts afresh: the previous sweep's interval must not delay the first hit of the next.
+func TestBeamIntervalDoesNotCarryOverToTheNextSweep(t *testing.T) {
+	cfg := DefaultConfig()
+	hb := &cfg.Snorlax.HyperBeam
+	hb.SweepAngle, hb.SweepDuration, hb.HitInterval, hb.Cooldown, hb.RechargeDuration = 0, 0.1, 5, 0, 0
+	hb.Damage = 10
+	g := beamGame(cfg)
+	if got := hitTicks(g, 2*tickRate); len(got) != 1 {
+		t.Fatalf("first sweep hit on ticks %v, want 1", got)
+	}
+	hp := g.P[pikachu].HP
+	stepBeam(g)
+	for i := 0; i < 2*tickRate; i++ {
+		g.Step(dt)
+	}
+	if g.P[pikachu].HP != hp-10 {
+		t.Fatalf("second sweep: HP %d -> %d, want one more hit despite the 5s interval", hp, g.P[pikachu].HP)
+	}
+}

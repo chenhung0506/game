@@ -61,6 +61,8 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 		"negative interval":          `{"pikachu":{"thunder":{"interval":-0.1}}}`,
 		"negative follow speed":      `{"pikachu":{"thunder":{"follow_speed":-1}}}`,
 		"negative thunder cooldown":  `{"pikachu":{"thunder":{"cooldown":-1}}}`,
+		"negative knockback":         `{"snorlax":{"hyper_beam":{"knockback":-1}}}`,
+		"negative hit interval":      `{"snorlax":{"hyper_beam":{"hit_interval":-0.1}}}`,
 		"negative beam cooldown":     `{"snorlax":{"hyper_beam":{"cooldown":-1}}}`,
 		"zero slam radius":           `{"snorlax":{"jump":{"slam_radius":0}}}`,
 		"retired quake_radius key":   `{"snorlax":{"quake_radius":100}}`,
@@ -104,6 +106,8 @@ func TestZeroCooldownAndRechargeAreAllowed(t *testing.T) {
 		`{"snorlax":{"jump":{"air_speed_first_half":0}}}`,  // no steering while rising
 		`{"snorlax":{"jump":{"air_speed_second_half":0}}}`, // no steering while falling
 		`{"snorlax":{"hyper_beam":{"cooldown":0}}}`,
+		`{"snorlax":{"hyper_beam":{"knockback":0}}}`,     // no push
+		`{"snorlax":{"hyper_beam":{"hit_interval":0}}}`,  // one hit per sweep
 		`{"pikachu":{"thunder":{"interval":0}}}`,         // all bolts at once
 		`{"pikachu":{"thunder":{"follow_speed":0}}}`,     // a shadow that stays put
 		`{"snorlax":{"hyper_beam":{"sweep_angle":0}}}`,   // a fixed beam

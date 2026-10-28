@@ -62,7 +62,9 @@ type Config struct {
 			SweepDuration    float64 `json:"sweep_duration"`    // seconds the beam takes to cross that arc
 			RechargeDuration float64 `json:"recharge_duration"` // rooted after the sweep
 			Cooldown         float64 `json:"cooldown"`          // before the next beam; counted from the moment it is used
-			Damage           int     `json:"damage"`            // a sweep hits a target at most once
+			Damage           int     `json:"damage"`            // per hit
+			Knockback        float64 `json:"knockback"`         // each hit pushes the target this far straight away from Snorlax; 0 = none
+			HitInterval      float64 `json:"hit_interval"`      // a target still in the beam is hit again this often; 0 = a sweep hits only once
 			Length           float64 `json:"length"`            // reach (radius of the fan)
 			Width            float64 `json:"width"`
 		} `json:"hyper_beam"`
@@ -179,6 +181,8 @@ func (c Config) validate() error {
 		{"snorlax.jump.air_speed_first_half", c.Snorlax.Jump.AirSpeedFirstHalf},
 		{"snorlax.jump.air_speed_second_half", c.Snorlax.Jump.AirSpeedSecondHalf},
 		{"snorlax.hyper_beam.cooldown", c.Snorlax.HyperBeam.Cooldown},
+		{"snorlax.hyper_beam.knockback", c.Snorlax.HyperBeam.Knockback},
+		{"snorlax.hyper_beam.hit_interval", c.Snorlax.HyperBeam.HitInterval},
 		{"snorlax.hyper_beam.recharge_duration", c.Snorlax.HyperBeam.RechargeDuration},
 	} {
 		if !(f.v >= 0) {

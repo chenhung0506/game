@@ -58,7 +58,8 @@ type Player struct {
 	BeamX     float64 `json:"bx"` // aim (unit vector toward the opponent), locked when the beam is used
 	BeamY     float64 `json:"by"`
 	BeamA     float64 `json:"ba"`  // beam angle from the facing in degrees, counter-clockwise on screen is positive
-	SweptHit  bool    `json:"-"`   // a sweep hits a target at most once
+	SweptHit  bool    `json:"-"`   // the sweep has hit its target at least once
+	BeamHitCD float64 `json:"-"`   // until the beam may hit again (hyper_beam.hit_interval); 0 = it may now
 	BeamCD    float64 `json:"bcd"` // counted from the moment the beam is used
 	JumpCD    float64 `json:"jcd"` // counted from the moment of take-off
 
@@ -125,6 +126,18 @@ func (g *Game) radius(i int) float64 {
 		return g.cfg.Pikachu.Radius
 	}
 	return g.cfg.Snorlax.Radius
+}
+
+// knockBack pushes target dist units straight away from src, stopping at the walls. Standing exactly
+// on src there is no "away", so it goes along (fx, fy).
+func (g *Game) knockBack(src, target *Player, d, fx, fy float64) {
+	dx, dy := target.X-src.X, target.Y-src.Y
+	n := math.Hypot(dx, dy)
+	if n < 1e-9 {
+		dx, dy, n = fx, fy, math.Hypot(fx, fy)
+	}
+	target.X = math.Min(math.Max(target.X+dx/n*d, 0), g.court.Length)
+	target.Y = math.Min(math.Max(target.Y+dy/n*d, 0), g.court.Width)
 }
 
 func dist(a, b *Player) float64 { return math.Hypot(a.X-b.X, a.Y-b.Y) }
@@ -220,7 +233,7 @@ func (g *Game) Step(dt float64) []Event {
 					p.BeamT = 0
 					p.SweepT = hb.SweepDuration
 					p.BeamA = hb.SweepAngle
-					p.SweptHit = false
+					p.SweptHit, p.BeamHitCD = false, 0
 				}
 			} else if p.SweepT > 0 {
 				prev := p.BeamA
@@ -228,10 +241,18 @@ func (g *Game) Step(dt float64) []Event {
 					p.SweepT = 0
 				}
 				p.BeamA = hb.SweepAngle * (2*p.SweepT/hb.SweepDuration - 1) // +angle -> -angle
+				if p.BeamHitCD > 0 {
+					if p.BeamHitCD -= dt; p.BeamHitCD < 1e-9 {
+						p.BeamHitCD = 0
+					}
+				}
 				// Like the quake, the beam travels along the ground and misses airborne targets.
-				if !p.SweptHit && other.Z < groundZ && sweepHits(p, other, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+g.radius(1-i), hb.Width+2*g.radius(1-i)) {
+				// It hits again every hit_interval for as long as the target stays in the beam (0 = once per sweep).
+				ready := p.BeamHitCD == 0 && (hb.HitInterval > 0 || !p.SweptHit)
+				if ready && other.Z < groundZ && sweepHits(p, other, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+g.radius(1-i), hb.Width+2*g.radius(1-i)) {
 					g.hit(other, hb.Damage)
-					p.SweptHit = true
+					p.SweptHit, p.BeamHitCD = true, hb.HitInterval
+					g.knockBack(p, other, hb.Knockback, p.BeamX, p.BeamY)
 				}
 				if p.SweepT == 0 {
 					p.RechargeT = hb.RechargeDuration
