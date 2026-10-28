@@ -42,10 +42,10 @@ type Player struct {
 	CD float64 `json:"cd"`
 	In Input   `json:"-"`
 
-	FX, FY       int     `json:"-"` // last non-zero direction held; a dash with no keys goes this way
-	DashT        float64 `json:"-"` // seconds of dash left
-	DashX, DashY float64 `json:"-"` // unit dash direction
-	DashCD       float64 `json:"-"`
+	FX, FY       int     `json:"-"`   // last non-zero direction held; a dash with no keys goes this way
+	DashT        float64 `json:"-"`   // seconds of dash left
+	DashX, DashY float64 `json:"-"`   // unit dash direction
+	DashCD       float64 `json:"dcd"` // cooldowns are sent so the client can draw their countdown
 
 	// Hyper Beam: charge (BeamT) -> sweep (SweepT) -> recharge (RechargeT).
 	// The client draws the warning fan, the rotating beam and "must recharge" from these.
@@ -54,10 +54,10 @@ type Player struct {
 	RechargeT float64 `json:"rt"` // seconds of recovery left
 	BeamX     float64 `json:"bx"` // aim (unit vector toward the opponent), locked when the beam is used
 	BeamY     float64 `json:"by"`
-	BeamA     float64 `json:"ba"` // beam angle from the facing in degrees, counter-clockwise on screen is positive
-	SweptHit  bool    `json:"-"`  // a sweep hits a target at most once
-	BeamCD    float64 `json:"-"`  // counted from the moment the beam is used
-	JumpCD    float64 `json:"-"`  // counted from the moment of take-off
+	BeamA     float64 `json:"ba"`  // beam angle from the facing in degrees, counter-clockwise on screen is positive
+	SweptHit  bool    `json:"-"`   // a sweep hits a target at most once
+	BeamCD    float64 `json:"bcd"` // counted from the moment the beam is used
+	JumpCD    float64 `json:"jcd"` // counted from the moment of take-off
 
 	// Thunder: a shadow chases the opponent, then bolts hit wherever it is.
 	// ThunderLeft is the number of bolts still to come (0 = no cast running).
@@ -65,7 +65,7 @@ type Player struct {
 	ThunderIn   float64 `json:"ti"` // seconds until the next bolt
 	ShadowX     float64 `json:"sx"`
 	ShadowY     float64 `json:"sy"`
-	ThunderCD   float64 `json:"-"` // counted from the moment the cast starts
+	ThunderCD   float64 `json:"tcd"` // counted from the moment the cast starts
 }
 
 // Event is a one-shot effect the client plays (ring, screen shake).

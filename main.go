@@ -164,6 +164,8 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": arenaW, "h": arenaH},
 		"beam":    map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},
 		"thunder": map[string]float64{"radius": th.Radius, "delay": th.Delay, "interval": th.Interval, "strikes": float64(th.Strikes)},
+		// full cooldowns, so the pad's buttons can show how much of each is left
+		"cooldown": map[string]float64{"dash": r.g.cfg.Pikachu.DashCooldown, "thunder": th.Cooldown, "jump": r.g.cfg.Snorlax.JumpCooldown, "beam": hb.Cooldown},
 	})
 	c.send <- hi
 	if r.c[1-idx] == nil {

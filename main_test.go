@@ -57,6 +57,10 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if beam, ok := hi["beam"].(map[string]any); !ok || beam["len"] != float64(450) || beam["w"] != float64(50) || beam["charge"] != float64(0.6) || beam["angle"] != float64(30) {
 		t.Fatalf("hi.beam = %v, want the configured length/width/charge", hi["beam"])
 	}
+	// The pad's buttons draw their countdown from these.
+	if cd, ok := hi["cooldown"].(map[string]any); !ok || cd["dash"] != float64(0.6) || cd["thunder"] != float64(4) || cd["jump"] != float64(1.5) || cd["beam"] != float64(5) {
+		t.Fatalf("hi.cooldown = %v, want dash 0.6 / thunder 4 / jump 1.5 / beam 5", hi["cooldown"])
+	}
 	next(t, a, "wait")
 
 	b := dial(t, srv, "abc")

@@ -20,6 +20,8 @@
   .knob { position: absolute; left: 38px; top: 38px; width: 60px; height: 60px; border-radius: 50%; background: #ffffff88; pointer-events: none; }
   .btn { display: flex; align-items: center; justify-content: center; background: #ffffff2a; border: 2px solid #ffffff66; color: #fff; font-weight: bold; }
   .btn.on { background: #ffffff77; }
+  /* cooldown: a dark pie over the button, the part still to wait, shrinking clockwise from the top */
+  .cd { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: conic-gradient(#000000b0 var(--cd, 0deg), transparent 0); }
 </style>
 </head>
 <body>
@@ -45,6 +47,8 @@ const beamLook = { ang: null, tail: null }; // smoothed beam angle, and the fadi
 const TAIL = 0.2; // seconds
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }; // replaced by the server's values in 'hi'
 let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewise
+let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0 }; // full cooldowns, from 'hi'
+const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
 const shadow = { x: null, y: null }; // smoothed thunder shadow position
 const smoke = []; // puffs rising off Snorlax while it recharges
 let smokeAcc = 0;
@@ -65,7 +69,7 @@ let fx = [], shake = 0;
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room);
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; arena = m.arena; setView(); document.getElementById('bar2').textContent = HELP[you]; if (PORTRAIT) buildPad(); }
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; arena = m.arena; setView(); document.getElementById('bar2').textContent = HELP[you]; if (PORTRAIT) buildPad(); }
   else if (m.t === 'wait') { waiting = true; snap = null; }
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
@@ -133,6 +137,7 @@ const PAD = [
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
+  cdBtns.length = 0;
   const el = (cls) => { const d = document.createElement('div'); d.className = cls; document.body.append(d); return d; };
 
   const base = el('stick'), knob = document.createElement('div'); knob.className = 'knob'; base.append(knob);
@@ -152,8 +157,12 @@ function buildPad() {
 
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
+  // which snapshot field holds the time left, and which cooldown is its full length
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'] }];
   const hold = (b, label, name) => {
     b.textContent = label; let id = null;
+    const span = document.createElement('div'); span.className = 'cd'; b.append(span);
+    cdBtns.push({ span, field: CD[you][name][0], total: CD[you][name][1] });
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (id !== null) return; id = e.pointerId; b.setPointerCapture(id); touch[name] = true; b.classList.add('on'); sendInput(); });
     const up = (e) => { if (e.pointerId !== id) return; id = null; touch[name] = false; b.classList.remove('on'); sendInput(); };
     for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(t, up);
@@ -404,7 +413,17 @@ function drawPlayer(i, p) {
   });
 }
 
+// Each button's dark pie is the share of its cooldown still to wait.
+function drawCooldowns() {
+  if (!snap) return;
+  for (const c of cdBtns) {
+    const total = cdCfg[c.total], left = snap.p[you][c.field];
+    c.span.style.setProperty('--cd', (total > 0 ? Math.min(Math.max(left / total, 0), 1) * 360 : 0) + 'deg');
+  }
+}
+
 function frame() {
+  drawCooldowns();
   ctx.save();
   ctx.clearRect(0, 0, cv.width, cv.height);
   if (shake > 0) { ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake); shake *= 0.85; if (shake < .5) shake = 0; }
