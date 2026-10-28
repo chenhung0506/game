@@ -34,6 +34,7 @@ type Input struct {
 	Attack  bool `json:"atk"`     // Pikachu only: earthquake
 	Beam    bool `json:"beam"`    // Snorlax only: Hyper Beam
 	Thunder bool `json:"thunder"` // Pikachu only: Thunder
+	Ball    bool `json:"ball"`    // Pikachu only: Electro Ball
 }
 
 type Player struct {
@@ -45,7 +46,8 @@ type Player struct {
 	CD float64 `json:"cd"`
 	In Input   `json:"-"`
 
-	FX, FY       int     `json:"-"`   // last non-zero direction held; a dash with no keys goes this way
+	FX           int     `json:"fx"` // last non-zero direction held; a dash with no keys goes this way, and so does the ball
+	FY           int     `json:"fy"`
 	DashT        float64 `json:"-"`   // seconds of dash left
 	DashX, DashY float64 `json:"-"`   // unit dash direction
 	DashCD       float64 `json:"dcd"` // cooldowns are sent so the client can draw their countdown
@@ -58,6 +60,7 @@ type Player struct {
 	BeamX     float64 `json:"bx"` // aim (unit vector toward the opponent), locked when the beam is used
 	BeamY     float64 `json:"by"`
 	BeamA     float64 `json:"ba"`  // beam angle from the facing in degrees, counter-clockwise on screen is positive
+	SweepID   int     `json:"-"`   // counts this player's sweeps
 	SweptHit  bool    `json:"-"`   // the sweep has hit its target at least once
 	BeamHitCD float64 `json:"-"`   // until the beam may hit again (hyper_beam.hit_interval); 0 = it may now
 	BeamCD    float64 `json:"bcd"` // counted from the moment the beam is used
@@ -70,11 +73,24 @@ type Player struct {
 	ShadowX     float64 `json:"sx"`
 	ShadowY     float64 `json:"sy"`
 	ThunderCD   float64 `json:"tcd"` // counted from the moment the cast starts
+
+	// Electro Ball: BallT is the charge time left (0 = not charging).
+	BallT  float64 `json:"kt"`
+	BallCD float64 `json:"ecd"` // counted from the moment the charge starts
+}
+
+// Ball is a thrown Electro Ball: it flies straight until it explodes.
+type Ball struct {
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	DX, DY    float64 `json:"-"` // unit direction
+	HP        int     `json:"hp"`
+	LastSweep int     `json:"-"` // the Hyper Beam sweep that last hit it, so one sweep hits it once
 }
 
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
-	T string  `json:"t"` // "slam" | "quake" | "thunder" | "skybolt"
+	T string  `json:"t"` // "slam" | "quake" | "thunder" | "skybolt" | "explode"
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 	R float64 `json:"r,omitempty"` // quake reach, so the effect can match it
@@ -90,6 +106,7 @@ type Game struct {
 	cfg   Config
 	court CourtSize
 	P     [2]Player
+	Balls []Ball
 }
 
 func NewGame(cfg Config) *Game { return NewGameFor(cfg, modeWeb) }
@@ -105,6 +122,7 @@ func (g *Game) Reset() {
 	c := g.court
 	g.P[pikachu] = Player{X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.cfg.Pikachu.MaxHP, FX: 1}
 	g.P[snorlax] = Player{X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.cfg.Snorlax.MaxHP, FX: -1}
+	g.Balls = nil
 }
 
 // Winner returns the index of the surviving player, or -1 while both are alive.
@@ -128,10 +146,10 @@ func (g *Game) radius(i int) float64 {
 	return g.cfg.Snorlax.Radius
 }
 
-// knockBack pushes target dist units straight away from src, stopping at the walls. Standing exactly
-// on src there is no "away", so it goes along (fx, fy).
-func (g *Game) knockBack(src, target *Player, d, fx, fy float64) {
-	dx, dy := target.X-src.X, target.Y-src.Y
+// knockBack pushes target d units straight away from (sx, sy), stopping at the walls. Standing exactly
+// on it there is no "away", so it goes along (fx, fy).
+func (g *Game) knockBack(sx, sy float64, target *Player, d, fx, fy float64) {
+	dx, dy := target.X-sx, target.Y-sy
 	n := math.Hypot(dx, dy)
 	if n < 1e-9 {
 		dx, dy, n = fx, fy, math.Hypot(fx, fy)
@@ -185,7 +203,7 @@ func (g *Game) Step(dt float64) []Event {
 		}
 
 		// Pikachu's skill: dash toward the held direction (or where it faces).
-		if i == pikachu && p.In.Skill && p.DashT == 0 && p.DashCD == 0 && p.ThunderLeft == 0 {
+		if i == pikachu && p.In.Skill && p.DashT == 0 && p.DashCD == 0 && p.ThunderLeft == 0 && p.BallT == 0 {
 			dx, dy := float64(p.In.DX), float64(p.In.DY)
 			if dx == 0 && dy == 0 {
 				dx, dy = float64(p.FX), float64(p.FY)
@@ -234,6 +252,7 @@ func (g *Game) Step(dt float64) []Event {
 					p.SweepT = hb.SweepDuration
 					p.BeamA = hb.SweepAngle
 					p.SweptHit, p.BeamHitCD = false, 0
+					p.SweepID++
 				}
 			} else if p.SweepT > 0 {
 				prev := p.BeamA
@@ -252,7 +271,15 @@ func (g *Game) Step(dt float64) []Event {
 				if ready && other.Z < groundZ && sweepHits(p, other, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+g.radius(1-i), hb.Width+2*g.radius(1-i)) {
 					g.hit(other, hb.Damage)
 					p.SweptHit, p.BeamHitCD = true, hb.HitInterval
-					g.knockBack(p, other, hb.Knockback, p.BeamX, p.BeamY)
+					g.knockBack(p.X, p.Y, other, hb.Knockback, p.BeamX, p.BeamY)
+				}
+				br := g.cfg.Pikachu.ElectroBall.Radius
+				for j := range g.Balls { // the beam hits a ball once per sweep
+					b := &g.Balls[j]
+					if b.LastSweep != p.SweepID && sweepHits(p, &Player{X: b.X, Y: b.Y}, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+br, hb.Width+2*br) {
+						b.HP -= hb.Damage
+						b.LastSweep = p.SweepID
+					}
 				}
 				if p.SweepT == 0 {
 					p.RechargeT = hb.RechargeDuration
@@ -271,7 +298,7 @@ func (g *Game) Step(dt float64) []Event {
 					p.ThunderCD = 0
 				}
 			}
-			if p.In.Thunder && p.ThunderLeft == 0 && p.ThunderCD == 0 {
+			if p.In.Thunder && p.ThunderLeft == 0 && p.ThunderCD == 0 && p.BallT == 0 {
 				p.ThunderLeft, p.ThunderIn = th.Strikes, th.Delay
 				p.ThunderCD = th.Cooldown
 				p.DashT = 0                             // a dash in progress (or begun this tick) stops: casting roots Pikachu at once
@@ -293,6 +320,31 @@ func (g *Game) Step(dt float64) []Event {
 					}
 					p.ThunderLeft--
 					p.ThunderIn += th.Interval
+				}
+			}
+		}
+
+		// Pikachu's Electro Ball: charge rooted, then throw it where Pikachu faces. Holding a direction
+		// while charging turns the aim. Only one charge or Thunder cast at a time.
+		if i == pikachu {
+			bc := g.cfg.Pikachu.ElectroBall
+			if p.BallCD > 0 {
+				if p.BallCD -= dt; p.BallCD < 1e-9 {
+					p.BallCD = 0
+				}
+			}
+			if p.In.Ball && p.BallT == 0 && p.ThunderLeft == 0 && p.BallCD == 0 {
+				p.BallT, p.BallCD = bc.ChargeTime, bc.Cooldown
+				p.DashT = 0 // charging roots Pikachu at once
+			}
+			if p.BallT > 0 {
+				casting = true // rooted through the tick of the throw, free from the next
+				if p.BallT -= dt; p.BallT < 1e-9 {
+					p.BallT = 0
+					fx, fy := float64(p.FX), float64(p.FY)
+					n := math.Hypot(fx, fy)
+					off := g.radius(pikachu) + bc.Radius + 1 // start just clear of Pikachu's body
+					g.Balls = append(g.Balls, Ball{X: p.X + fx/n*off, Y: p.Y + fy/n*off, DX: fx / n, DY: fy / n, HP: bc.HP})
 				}
 			}
 		}
@@ -347,6 +399,12 @@ func (g *Game) Step(dt float64) []Event {
 			if dist(p, other) < g.cfg.Snorlax.Jump.SlamRadius+g.radius(1-i) && other.Z < groundZ {
 				g.hit(other, slamDamage)
 			}
+			for j := range g.Balls { // the shock wave is a ground attack: it hits balls too
+				b := &g.Balls[j]
+				if math.Hypot(b.X-p.X, b.Y-p.Y) < g.cfg.Snorlax.Jump.SlamRadius+g.cfg.Pikachu.ElectroBall.Radius {
+					b.HP -= slamDamage
+				}
+			}
 		}
 
 		// Pikachu's earthquake: only from the ground, and it cannot reach airborne targets.
@@ -362,5 +420,60 @@ func (g *Game) Step(dt float64) []Event {
 			}
 		}
 	}
+	return append(events, g.stepBalls(dt)...)
+}
+
+// stepBalls flies the balls and blows up those that touched the opponent, reached a wall or ran out of HP.
+func (g *Game) stepBalls(dt float64) []Event {
+	var events []Event
+	bc := g.cfg.Pikachu.ElectroBall
+	foe := &g.P[snorlax]
+	kept := g.Balls[:0]
+	for _, b := range g.Balls {
+		boom := b.HP <= 0 // shot down where it is
+		if !boom {
+			x0, y0 := b.X, b.Y
+			b.X += b.DX * bc.Speed * dt
+			b.Y += b.DY * bc.Speed * dt
+			if b.X <= 0 || b.X >= g.court.Length || b.Y <= 0 || b.Y >= g.court.Width {
+				b.X = math.Min(math.Max(b.X, 0), g.court.Length)
+				b.Y = math.Min(math.Max(b.Y, 0), g.court.Width)
+				boom = true
+			}
+			// Along the whole step, so a fast ball cannot jump over the opponent between two ticks.
+			// Like the ground attacks it flies under an airborne opponent.
+			if foe.Z < groundZ && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= bc.Radius+g.radius(snorlax) {
+				b.X, b.Y = closestOnSegment(foe.X, foe.Y, x0, y0, b.X, b.Y) // it blows up where it met the opponent
+				boom = true
+			}
+		}
+		if !boom {
+			kept = append(kept, b)
+			continue
+		}
+		events = append(events, Event{T: "explode", X: b.X, Y: b.Y, R: bc.ExplosionRadius})
+		if foe.Z < groundZ && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= bc.ExplosionRadius+g.radius(snorlax) {
+			g.hit(foe, bc.ExplosionDamage)
+			g.knockBack(b.X, b.Y, foe, bc.Knockback, b.DX, b.DY)
+		}
+	}
+	g.Balls = kept
 	return events
+}
+
+// closestOnSegment is the point of the segment (x0, y0)-(x1, y1) nearest to (px, py).
+func closestOnSegment(px, py, x0, y0, x1, y1 float64) (float64, float64) {
+	dx, dy := x1-x0, y1-y0
+	l2 := dx*dx + dy*dy
+	t := 0.0
+	if l2 > 0 {
+		t = math.Min(math.Max(((px-x0)*dx+(py-y0)*dy)/l2, 0), 1)
+	}
+	return x0 + t*dx, y0 + t*dy
+}
+
+// segDist is how far the point (px, py) is from the segment (x0, y0)-(x1, y1).
+func segDist(px, py, x0, y0, x1, y1 float64) float64 {
+	cx, cy := closestOnSegment(px, py, x0, y0, x1, y1)
+	return math.Hypot(px-cx, py-cy)
 }

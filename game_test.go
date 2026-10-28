@@ -889,7 +889,7 @@ func TestPlayerSnapshotCarriesBeamState(t *testing.T) {
 	}
 	var m map[string]any
 	json.Unmarshal(b, &m)
-	for _, k := range []string{"x", "y", "z", "hp", "cd", "bt", "st", "rt", "bx", "by", "ba", "tn", "ti", "sx", "sy", "dcd", "bcd", "jcd", "tcd"} {
+	for _, k := range []string{"x", "y", "z", "hp", "cd", "bt", "st", "rt", "bx", "by", "ba", "tn", "ti", "sx", "sy", "dcd", "bcd", "jcd", "tcd", "kt", "ecd", "fx", "fy"} {
 		if _, ok := m[k]; !ok {
 			t.Errorf("snapshot is missing %q: %s", k, b)
 		}
@@ -1531,5 +1531,312 @@ func TestBeamIntervalDoesNotCarryOverToTheNextSweep(t *testing.T) {
 	}
 	if g.P[pikachu].HP != hp-10 {
 		t.Fatalf("second sweep: HP %d -> %d, want one more hit despite the 5s interval", hp, g.P[pikachu].HP)
+	}
+}
+
+// ---- Pikachu: Electro Ball ----
+
+// ballGame has Pikachu at (600,500) facing right and Snorlax at (1400,500), 800 apart.
+func ballGame(cfg Config) *Game {
+	g := NewGame(cfg)
+	g.P[pikachu].X, g.P[pikachu].Y = 600, 500
+	g.P[snorlax].X, g.P[snorlax].Y = 1400, 500
+	return g
+}
+
+func pressBall(g *Game) []Event {
+	g.P[pikachu].In = Input{Ball: true}
+	ev := g.Step(dt)
+	g.P[pikachu].In = Input{}
+	return ev
+}
+
+func explodeEvents(ev []Event) (n int, last Event) {
+	for _, e := range ev {
+		if e.T == "explode" {
+			n, last = n+1, e
+		}
+	}
+	return
+}
+
+func TestBallIsThrownWhenTheChargeEnds(t *testing.T) {
+	g := ballGame(DefaultConfig()) // 0.5s = 15 ticks
+	pressBall(g)                   // tick 1
+	for tick := 2; tick <= 14; tick++ {
+		g.Step(dt)
+		if len(g.Balls) != 0 {
+			t.Fatalf("a ball exists on tick %d, before the charge ended", tick)
+		}
+	}
+	g.Step(dt) // tick 15
+	if len(g.Balls) != 1 {
+		t.Fatalf("balls after the charge = %d, want 1", len(g.Balls))
+	}
+	if b := g.Balls[0]; b.HP != DefaultConfig().Pikachu.ElectroBall.HP {
+		t.Fatalf("ball HP = %d, want the configured %d", b.HP, DefaultConfig().Pikachu.ElectroBall.HP)
+	}
+}
+
+func TestPikachuIsRootedWhileChargingTheBall(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	x, y := g.P[pikachu].X, g.P[pikachu].Y
+	for tick := 1; tick <= 15; tick++ { // up to and including the tick of the throw
+		g.P[pikachu].In = Input{DX: -1, DY: 1, Skill: true, Ball: tick == 1}
+		g.Step(dt)
+		if g.P[pikachu].X != x || g.P[pikachu].Y != y {
+			t.Fatalf("tick %d: Pikachu moved to (%v,%v) while charging", tick, g.P[pikachu].X, g.P[pikachu].Y)
+		}
+	}
+	g.P[pikachu].In = Input{DX: -1}
+	g.Step(dt)
+	if g.P[pikachu].X >= x {
+		t.Fatal("Pikachu must be free to move again once the ball is thrown")
+	}
+}
+
+func TestBallFliesStraightAtTheConfiguredSpeedWhereTheAimPoints(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.ElectroBall.Speed = 300
+	g := ballGame(cfg)
+	g.P[snorlax].X, g.P[snorlax].Y = 1900, 900 // out of the way
+	g.P[pikachu].In = Input{Ball: true}
+	g.Step(dt)
+	g.P[pikachu].In = Input{DY: -1} // turn to face up while charging
+	for i := 0; i < 14; i++ {
+		g.Step(dt)
+	}
+	if len(g.Balls) != 1 {
+		t.Fatal("setup: no ball")
+	}
+	b0 := g.Balls[0]
+	if b0.X != 600 || b0.Y >= 500 {
+		t.Fatalf("ball starts at (%v,%v), want it straight above Pikachu", b0.X, b0.Y)
+	}
+	g.P[pikachu].In = Input{}
+	g.Step(dt)
+	b1 := g.Balls[0]
+	if b1.X != 600 || math.Abs((b0.Y-b1.Y)-300*dt) > 1e-9 {
+		t.Fatalf("ball moved (%v,%v) -> (%v,%v), want 300*dt = %v straight up", b0.X, b0.Y, b1.X, b1.Y, 300*dt)
+	}
+}
+
+func TestBallExplodesOnTheOpponentAndKnocksItAway(t *testing.T) {
+	cfg := DefaultConfig()
+	g := ballGame(cfg)
+	pressBall(g)
+	var boom Event
+	var n int
+	for tick := 2; tick <= 3*tickRate && n == 0; tick++ {
+		n, boom = explodeEvents(g.Step(dt))
+	}
+	bc := cfg.Pikachu.ElectroBall
+	if n != 1 || boom.R != bc.ExplosionRadius {
+		t.Fatalf("explosions = %d with reach %v, want one with reach %v", n, boom.R, bc.ExplosionRadius)
+	}
+	if len(g.Balls) != 0 {
+		t.Fatal("an exploded ball must be gone")
+	}
+	if g.P[snorlax].HP != maxHP-bc.ExplosionDamage {
+		t.Fatalf("Snorlax HP = %d, want %d", g.P[snorlax].HP, maxHP-bc.ExplosionDamage)
+	}
+	// The ball touched Snorlax from the left, so the blast pushes it straight right by the knockback.
+	if want := 1400 + bc.Knockback; g.P[snorlax].X != want || g.P[snorlax].Y != 500 {
+		t.Fatalf("Snorlax at (%v,%v), want (%v,500)", g.P[snorlax].X, g.P[snorlax].Y, want)
+	}
+	if boom.X >= 1400 || boom.X < 1400-bc.Radius-cfg.Snorlax.Radius-bc.Speed*dt {
+		t.Fatalf("it exploded at x=%v, want it where it met Snorlax's body", boom.X)
+	}
+}
+
+func TestBallExplodesAtTheWall(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	g.P[snorlax].X, g.P[snorlax].Y = 1900, 900 // far from the north wall
+	g.P[pikachu].In = Input{Ball: true, DY: -1}
+	g.Step(dt)
+	g.P[pikachu].In = Input{DY: -1}
+	var boom Event
+	var n int
+	for tick := 2; tick <= 6*tickRate && n == 0; tick++ {
+		n, boom = explodeEvents(g.Step(dt))
+	}
+	if n != 1 || boom.Y != 0 || len(g.Balls) != 0 {
+		t.Fatalf("explosions = %d at y=%v with %d balls left, want one at the wall (y=0)", n, boom.Y, len(g.Balls))
+	}
+	if g.P[snorlax].HP != maxHP {
+		t.Fatal("a blast at the far wall must not reach Snorlax")
+	}
+}
+
+func TestBallWithNoHPLeftExplodesWhereItIs(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	g.Balls = []Ball{{X: 1300, Y: 500, DX: -1, HP: 0}} // 100 from Snorlax, inside the 90 + 24 reach
+	n, boom := explodeEvents(g.Step(dt))
+	if n != 1 || boom.X != 1300 {
+		t.Fatalf("explosions = %d at x=%v, want one right where the ball hung", n, boom.X)
+	}
+	if g.P[snorlax].HP != maxHP-DefaultConfig().Pikachu.ElectroBall.ExplosionDamage {
+		t.Fatalf("Snorlax HP = %d, the blast should have reached it", g.P[snorlax].HP)
+	}
+}
+
+func TestSnorlaxSkillsTakeHPOffTheBall(t *testing.T) {
+	t.Run("a slam", func(t *testing.T) {
+		g := ballGame(DefaultConfig())
+		g.P[snorlax].X, g.P[snorlax].Y = 1000, 500
+		g.Balls = []Ball{{X: 1000, Y: 560, DX: 0, DY: 1, HP: 30}}
+		g.P[snorlax].Z, g.P[snorlax].VZ = 1, -100 // lands on the next step
+		g.Step(dt)
+		if len(g.Balls) != 1 || g.Balls[0].HP != 30-slamDamage {
+			t.Fatalf("balls = %+v, want one left with %d HP", g.Balls, 30-slamDamage)
+		}
+	})
+	t.Run("a beam, once per sweep", func(t *testing.T) {
+		cfg := DefaultConfig()
+		cfg.Snorlax.HyperBeam.SweepAngle, cfg.Snorlax.HyperBeam.SweepDuration = 0, 1
+		cfg.Snorlax.HyperBeam.Damage = 12
+		g := ballGame(cfg)
+		g.P[snorlax].X, g.P[snorlax].Y = 1400, 500
+		g.P[pikachu].X, g.P[pikachu].Y = 1000, 500 // the beam aims at Pikachu, along the line the ball sits on
+		g.Balls = []Ball{{X: 1200, Y: 500, DX: 0, DY: 0, HP: 30}}
+		cfg.Pikachu.ElectroBall.Speed = 0
+		stepBeam(g)
+		for i := 0; i < 3*tickRate && len(g.Balls) == 1; i++ {
+			g.P[pikachu].X, g.P[pikachu].Y = 1000, 500
+			g.Step(dt)
+		}
+		if len(g.Balls) != 1 || g.Balls[0].HP != 18 {
+			t.Fatalf("balls = %+v, want one left with 18 HP: a 1s sweep must hit it once, not every tick", g.Balls)
+		}
+	})
+	t.Run("a beam that finishes it", func(t *testing.T) {
+		g := ballGame(DefaultConfig())
+		g.P[pikachu].X, g.P[pikachu].Y = 1000, 500
+		g.Balls = []Ball{{X: 1200, Y: 500, HP: 30}}
+		stepBeam(g)
+		var blasts int
+		for i := 0; i < 3*tickRate; i++ {
+			n, _ := explodeEvents(g.Step(dt))
+			blasts += n
+		}
+		if blasts != 1 || len(g.Balls) != 0 {
+			t.Fatalf("blasts = %d, balls = %d: a 40-damage beam must shoot down a 30 HP ball", blasts, len(g.Balls))
+		}
+	})
+}
+
+func TestBlastReachIsItsRadiusPlusTheTargetsBody(t *testing.T) {
+	cfg := DefaultConfig() // reach 90, Snorlax body 24
+	for _, tc := range []struct {
+		gap float64
+		hit bool
+	}{{113, true}, {115, false}} {
+		g := ballGame(cfg)
+		g.P[snorlax].X, g.P[snorlax].Y = 1000+tc.gap, 500
+		g.Balls = []Ball{{X: 1000, Y: 500, HP: 0}}
+		g.Step(dt)
+		if got := g.P[snorlax].HP < maxHP; got != tc.hit {
+			t.Fatalf("gap %v: hit = %v, want %v", tc.gap, got, tc.hit)
+		}
+	}
+}
+
+func TestPikachuIsImmuneToItsOwnBlast(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	g.Balls = []Ball{{X: g.P[pikachu].X, Y: g.P[pikachu].Y, HP: 0}}
+	g.Step(dt)
+	if g.P[pikachu].HP != maxHP {
+		t.Fatalf("Pikachu HP = %d, its own ball must not hurt it", g.P[pikachu].HP)
+	}
+}
+
+// Like the other ground attacks, the ball flies under an airborne opponent and its blast misses one.
+func TestBallPassesUnderAnAirborneOpponent(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	g.P[snorlax].Z, g.P[snorlax].VZ = 100, 0
+	g.Balls = []Ball{{X: 1300, Y: 500, DX: 1, HP: 30}}
+	for i := 0; i < 10; i++ {
+		g.P[snorlax].Z = 100 // hold it up
+		if n, _ := explodeEvents(g.Step(dt)); n != 0 {
+			t.Fatal("the ball exploded on an opponent that was in the air")
+		}
+	}
+	if g.P[snorlax].HP != maxHP {
+		t.Fatal("an airborne opponent took damage from the ball")
+	}
+}
+
+func TestFastBallCannotJumpOverTheOpponentBetweenTwoTicks(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.ElectroBall.Speed = 30000 // 1000 units a tick
+	g := ballGame(cfg)
+	g.Balls = []Ball{{X: 700, Y: 500, DX: 1, HP: 30}}
+	n, _ := explodeEvents(g.Step(dt))
+	if n != 1 || g.P[snorlax].HP == maxHP {
+		t.Fatalf("explosions = %d, Snorlax HP = %d: a ball crossing Snorlax within one tick must still hit it", n, g.P[snorlax].HP)
+	}
+}
+
+func TestBallCooldownCountsFromTheStartOfTheCharge(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.ElectroBall.Cooldown = 2 // 60 ticks from the press
+	g := ballGame(cfg)
+	g.P[snorlax].X, g.P[snorlax].Y = 1900, 900
+	var thrownOn []int
+	g.P[pikachu].In = Input{Ball: true} // held the whole time
+	prev := 0
+	for tick := 1; tick <= 130; tick++ {
+		g.Step(dt)
+		if len(g.Balls) > prev {
+			thrownOn = append(thrownOn, tick)
+		}
+		prev = len(g.Balls)
+	}
+	// press on tick 1, thrown on tick 15; the next press is allowed on tick 61, thrown on tick 75
+	if len(thrownOn) < 2 || thrownOn[0] != 15 || thrownOn[1] != 75 {
+		t.Fatalf("balls thrown on ticks %v, want 15 then 75", thrownOn)
+	}
+}
+
+func TestBallAndThunderAreOneAtATime(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	g.P[pikachu].In = Input{Thunder: true}
+	g.Step(dt)
+	g.P[pikachu].In = Input{Ball: true}
+	for i := 0; i < 20; i++ {
+		g.Step(dt)
+	}
+	if g.P[pikachu].BallT != 0 || len(g.Balls) != 0 {
+		t.Fatal("a ball started charging in the middle of a Thunder cast")
+	}
+
+	g = ballGame(DefaultConfig())
+	pressBall(g)
+	g.P[pikachu].In = Input{Thunder: true}
+	g.Step(dt)
+	if g.P[pikachu].ThunderLeft != 0 {
+		t.Fatal("Thunder started in the middle of a ball charge")
+	}
+}
+
+func TestOnlyPikachuThrowsBalls(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	g.P[snorlax].In = Input{Ball: true}
+	for i := 0; i < 2*tickRate; i++ {
+		g.Step(dt)
+	}
+	if len(g.Balls) != 0 {
+		t.Fatal("Snorlax threw an Electro Ball")
+	}
+}
+
+func TestBallSnapshotKeys(t *testing.T) {
+	b, _ := json.Marshal(Ball{X: 1, Y: 2, HP: 3})
+	var m map[string]any
+	json.Unmarshal(b, &m)
+	for _, k := range []string{"x", "y", "hp"} {
+		if _, ok := m[k]; !ok {
+			t.Errorf("ball is missing %q: %s", k, b)
+		}
 	}
 }

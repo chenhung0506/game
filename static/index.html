@@ -41,7 +41,7 @@ let ROT = 0;               // how far the arena is turned on screen (radians); 0
 let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Slot 0 is always Pikachu, slot 1 Snorlax (fixed by the server).
 const HELP = [
-  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
+  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震　K＝電球（續能後朝面向的方向丟出，續能時按方向鍵轉向，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
   '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
 ];
 const ghosts = []; // dash afterimages
@@ -54,7 +54,8 @@ let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewis
 let radius = [16, 24];
 const REF = [16, 24];
 let maxHp = [100, 100]; // each character's full HP, from 'hi'
-let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0 }; // full cooldowns, from 'hi'
+let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
+let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
 const shadow = { x: null, y: null }; // smoothed thunder shadow position
 const smoke = []; // puffs rising off Snorlax while it recharges
@@ -76,7 +77,7 @@ let fx = [], shake = 0;
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // the first player's view picks the court
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); document.getElementById('bar2').textContent = HELP[you]; if (PORTRAIT) buildPad(); }
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); document.getElementById('bar2').textContent = HELP[you]; if (PORTRAIT) buildPad(); }
   else if (m.t === 'wait') { waiting = true; snap = null; }
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
@@ -90,6 +91,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'slam') shake = 16;
       if (ev.t === 'thunder') shake = 10;
       if (ev.t === 'quake') shake = 16;
+      if (ev.t === 'explode') shake = 14;
     }
   }
 };
@@ -115,7 +117,7 @@ function upright(x, y, fn) { ctx.save(); ctx.translate(x, y); ctx.rotate(-ROT); 
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { skill: false, thunder: false, beam: false }; // the pad's buttons
+const touch = { skill: false, thunder: false, beam: false, ball: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let last = '';
 function sendInput() {
@@ -127,7 +129,7 @@ function sendInput() {
   const msg = JSON.stringify({
     dx: Math.round(sx * c + sy * s) || 0,
     dy: Math.round(-sx * s + sy * c) || 0,
-    skill: k(' ') || touch.skill, atk: k('j'), beam: k('k') || touch.beam, thunder: k('l') || touch.thunder,
+    skill: k(' ') || touch.skill, atk: k('j'), beam: k('k') || touch.beam, ball: k('k') || touch.ball, thunder: k('l') || touch.thunder,
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
@@ -168,7 +170,7 @@ if (PORTRAIT) {
 // The pad: a stick bottom-left, and bottom-right a big main button with small ones around it.
 // A small slot that is null is reserved and not drawn.
 const PAD = [
-  { main: ['衝刺', 'skill'], small: [['打雷', 'thunder'], null] }, // Pikachu
+  { main: ['衝刺', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball']] }, // Pikachu
   { main: ['跳躍', 'skill'], small: [['死光', 'beam'], null] },    // Snorlax
 ];
 function buildPad() {
@@ -194,7 +196,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'] }];
   const hold = (b, label, name) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -293,6 +295,67 @@ function drawBeams() {
     drawBeamLine(t.x, t.y, t.ang, 1 - t.age / TAIL);
     if ((t.age += 1 / 60) >= TAIL) beamLook.tail = null;
   }
+}
+
+// Electro Ball: the aim line and a growing orb while Pikachu charges, and the balls in flight, each with
+// a small HP bar (the opponent's skills wear it down; at 0 it explodes).
+function drawBalls() {
+  const p = snap.p[0], d = disp[0];
+  if (p.kt > 0) {
+    const k = 1 - p.kt / ballCfg.charge, n = Math.hypot(p.fx, p.fy) || 1, ux = p.fx / n, uy = p.fy / n;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,235,90,${0.3 + 0.4 * k})`; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
+    ctx.beginPath(); ctx.moveTo(d.x + ux * 30, d.y + uy * 30); ctx.lineTo(d.x + ux * 220, d.y + uy * 220); ctx.stroke();
+    ctx.setLineDash([]);
+    const r = ballCfg.radius * (0.3 + 0.7 * k), ox = d.x + ux * (radius[0] + ballCfg.radius), oy = d.y + uy * (radius[0] + ballCfg.radius);
+    const gr = ctx.createRadialGradient(ox, oy, 0, ox, oy, r * 1.8);
+    gr.addColorStop(0, '#fff'); gr.addColorStop(0.4, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(ox, oy, r * 1.8, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  for (const b of snap.b || []) {
+    const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
+    gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.8, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; // crackling spark inside the orb
+    ctx.beginPath();
+    for (let a = 0; a < 5; a++) { const ang = Math.random() * 6.28; ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + Math.cos(ang) * r * 1.5, b.y + Math.sin(ang) * r * 1.5); }
+    ctx.stroke();
+    upright(b.x, b.y, () => {
+      ctx.fillStyle = '#000a'; ctx.fillRect(-14, -r - 16, 28, 4);
+      ctx.fillStyle = '#ffe14a'; ctx.fillRect(-14, -r - 16, 28 * Math.max(b.hp, 0) / ballCfg.hp, 4);
+    });
+  }
+}
+
+// The blast: a bright disc of the real reach (f.r), a ring racing out, and forked bolts bursting from the
+// centre to the edge, redrawn jagged every frame so they crackle.
+function drawExplosion(f) {
+  const R = f.r, k = f.age / 0.5, a = 1 - k;
+  ctx.save();
+  const disc = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
+  disc.addColorStop(0, `rgba(255,255,255,${0.9 * a})`);
+  disc.addColorStop(0.5, `rgba(255,230,80,${0.5 * a})`);
+  disc.addColorStop(1, `rgba(255,200,40,${0.15 * a})`);
+  ctx.fillStyle = disc; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,245,160,${a})`; ctx.lineWidth = 8 * a + 1;
+  ctx.beginPath(); ctx.arc(f.x, f.y, R * Math.min(1, k * 2.5), 0, 7); ctx.stroke();
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const reach = Math.min(1, k * 4); // the bolts shoot out in the first fifth of the effect, then fade
+  for (let i = 0; i < 12; i++) {
+    const ang = i * 0.5236 + (i % 2) * 0.12, len = R * (0.75 + 0.25 * ((i * 7) % 5) / 4) * reach;
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    const pts = [[f.x, f.y]];
+    for (let s = 1; s <= 5; s++) { // zig-zag out along the ray
+      const off = (Math.random() - 0.5) * 26;
+      pts.push([f.x + dx * len * s / 5 - dy * off, f.y + dy * len * s / 5 + dx * off]);
+    }
+    for (const [wd, col] of [[9, `rgba(255,225,70,${0.45 * a})`], [3, `rgba(255,255,255,${a})`]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = wd;
+      ctx.beginPath(); pts.forEach(([x, y], n) => (n ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 // Thunder: a dark circle the size of the strike area sits where the bolt will land.
@@ -473,14 +536,16 @@ function frame() {
     while (ghosts.length && ghosts[0].a <= 0) ghosts.shift();
     drawTelegraph();
     drawShadow();
+    drawBalls();
     drawBeams();
     drawSmoke(); // under the players, so the labels and HP bars stay readable
     // Draw lower players first so the one nearer the camera overlaps correctly.
     [0, 1].sort((a, b) => screenY(snap.p[a].x, snap.p[a].y) - screenY(snap.p[b].x, snap.p[b].y)).forEach((i) => drawPlayer(i, snap.p[i]));
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'quake' || f.t === 'slam' ? QUAKE_LIFE : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'quake' || f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
+      else if (f.t === 'explode') drawExplosion(f);
       else drawQuake(f); // 'quake' and 'slam'
     }
     ctx.restore();

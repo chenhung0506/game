@@ -41,6 +41,18 @@ type Config struct {
 			FollowSpeed float64 `json:"follow_speed"` // how fast the shadow chases the target; 0 = it stays put
 			Cooldown    float64 `json:"cooldown"`     // before the next cast; counted from the start of this one
 		} `json:"thunder"`
+		// Electro Ball: Pikachu charges, then throws a ball straight ahead. It explodes when it touches
+		// the opponent, when it reaches a wall, or when its HP runs out (the opponent's skills hit it).
+		ElectroBall struct {
+			ChargeTime      float64 `json:"charge_time"`      // rooted while charging; the aim follows the direction held
+			Speed           float64 `json:"speed"`            // of the ball
+			Radius          float64 `json:"radius"`           // size of the ball; it touches the opponent when the bodies overlap
+			HP              int     `json:"hp"`               // opponent skills that hit the ball take this off; at 0 it explodes
+			ExplosionRadius float64 `json:"explosion_radius"` // reach of the blast, from the ball's centre
+			ExplosionDamage int     `json:"explosion_damage"`
+			Knockback       float64 `json:"knockback"` // the blast pushes the target this far straight away from its centre
+			Cooldown        float64 `json:"cooldown"`  // before the next ball; counted from the start of the charge
+		} `json:"electro_ball"`
 	} `json:"pikachu"`
 	Snorlax struct {
 		MaxHP     int     `json:"max_hp"`
@@ -88,6 +100,14 @@ func DefaultConfig() Config {
 	c.Pikachu.Thunder.Interval = 0.5
 	c.Pikachu.Thunder.FollowSpeed = 120
 	c.Pikachu.Thunder.Cooldown = 4
+	c.Pikachu.ElectroBall.ChargeTime = 0.5
+	c.Pikachu.ElectroBall.Speed = 400
+	c.Pikachu.ElectroBall.Radius = 14
+	c.Pikachu.ElectroBall.HP = 30
+	c.Pikachu.ElectroBall.ExplosionRadius = 90
+	c.Pikachu.ElectroBall.ExplosionDamage = 25
+	c.Pikachu.ElectroBall.Knockback = 120
+	c.Pikachu.ElectroBall.Cooldown = 3
 	c.Snorlax.MaxHP = maxHP
 	c.Snorlax.WalkSpeed = speed
 	c.Snorlax.Radius = snorlaxRadius
@@ -149,6 +169,12 @@ func (c Config) validate() error {
 		{"pikachu.thunder.radius", c.Pikachu.Thunder.Radius, 0},
 		{"pikachu.thunder.damage", float64(c.Pikachu.Thunder.Damage), 0},
 		{"pikachu.thunder.strikes", float64(c.Pikachu.Thunder.Strikes), 0},
+		{"pikachu.electro_ball.charge_time", c.Pikachu.ElectroBall.ChargeTime, 0},
+		{"pikachu.electro_ball.speed", c.Pikachu.ElectroBall.Speed, 0},
+		{"pikachu.electro_ball.radius", c.Pikachu.ElectroBall.Radius, 0},
+		{"pikachu.electro_ball.hp", float64(c.Pikachu.ElectroBall.HP), 0},
+		{"pikachu.electro_ball.explosion_radius", c.Pikachu.ElectroBall.ExplosionRadius, 0},
+		{"pikachu.electro_ball.explosion_damage", float64(c.Pikachu.ElectroBall.ExplosionDamage), 0},
 		{"snorlax.max_hp", float64(c.Snorlax.MaxHP), 0},
 		{"snorlax.walk_speed", c.Snorlax.WalkSpeed, 0},
 		{"snorlax.jump.height", c.Snorlax.Jump.Height, 0},
@@ -177,6 +203,8 @@ func (c Config) validate() error {
 		{"pikachu.thunder.interval", c.Pikachu.Thunder.Interval},
 		{"pikachu.thunder.cooldown", c.Pikachu.Thunder.Cooldown},
 		{"pikachu.thunder.follow_speed", c.Pikachu.Thunder.FollowSpeed},
+		{"pikachu.electro_ball.knockback", c.Pikachu.ElectroBall.Knockback},
+		{"pikachu.electro_ball.cooldown", c.Pikachu.ElectroBall.Cooldown},
 		{"snorlax.jump.cooldown", c.Snorlax.Jump.Cooldown},
 		{"snorlax.jump.air_speed_first_half", c.Snorlax.Jump.AirSpeedFirstHalf},
 		{"snorlax.jump.air_speed_second_half", c.Snorlax.Jump.AirSpeedSecondHalf},
