@@ -889,7 +889,7 @@ func TestPlayerSnapshotCarriesBeamState(t *testing.T) {
 	}
 	var m map[string]any
 	json.Unmarshal(b, &m)
-	for _, k := range []string{"x", "y", "z", "hp", "cd", "bt", "st", "rt", "bx", "by", "ba", "tn", "ti", "sx", "sy", "dcd", "bcd", "jcd", "tcd", "kt", "ecd", "fx", "fy", "ut", "ud", "ur", "udx", "udy", "pcd", "fz"} {
+	for _, k := range []string{"x", "y", "z", "hp", "cd", "bt", "st", "rt", "bx", "by", "ba", "tn", "ti", "sx", "sy", "dcd", "bcd", "jcd", "tcd", "kt", "ecd", "fx", "fy", "ut", "ud", "ur", "udx", "udy", "pcd", "fz", "ax", "ay"} {
 		if _, ok := m[k]; !ok {
 			t.Errorf("snapshot is missing %q: %s", k, b)
 		}
@@ -2290,5 +2290,111 @@ func TestOnlySnorlaxThrowsIcePunches(t *testing.T) {
 	}
 	if g.P[pikachu].PunchT != 0 || g.P[pikachu].PunchID != 0 {
 		t.Fatal("Pikachu threw an Ice Punch")
+	}
+}
+
+// ---- aiming: the stick gives any angle, the keyboard 8 directions; walking stays 8-way ----
+
+func deg(a float64) (float64, float64) {
+	return math.Cos(a * math.Pi / 180), math.Sin(a * math.Pi / 180)
+}
+
+// throwBall presses the ball key with the given input held for the whole charge and returns the ball.
+func throwBall(t *testing.T, in Input) Ball {
+	t.Helper()
+	g := ballGame(DefaultConfig())
+	g.P[snorlax].X, g.P[snorlax].Y = 1900, 900 // out of the way
+	in.Ball = true
+	g.P[pikachu].In = in
+	for i := 0; i < 15; i++ {
+		g.Step(dt)
+	}
+	if len(g.Balls) != 1 {
+		t.Fatalf("balls = %d, want one after the charge", len(g.Balls))
+	}
+	return g.Balls[0]
+}
+
+func TestBallFliesAlongTheStickAtAnyAngle(t *testing.T) {
+	for _, a := range []float64{11.25, 22.5, 67.5, 100, 200, 337.5} {
+		ax, ay := deg(a)
+		b := throwBall(t, Input{AimX: ax, AimY: ay})
+		if math.Abs(b.DX-ax) > 1e-9 || math.Abs(b.DY-ay) > 1e-9 {
+			t.Fatalf("aim %v degrees: ball direction (%.4f,%.4f), want (%.4f,%.4f)", a, b.DX, b.DY, ax, ay)
+		}
+	}
+}
+
+func TestStickAimIsNormalisedWhateverItsLength(t *testing.T) {
+	ax, ay := deg(30)
+	b := throwBall(t, Input{AimX: ax * 1000, AimY: ay * 1000})
+	if math.Abs(b.DX-ax) > 1e-9 || math.Abs(b.DY-ay) > 1e-9 || math.Abs(math.Hypot(b.DX, b.DY)-1) > 1e-9 {
+		t.Fatalf("ball direction (%v,%v), want the unit vector (%v,%v)", b.DX, b.DY, ax, ay)
+	}
+}
+
+func TestStickAimWinsOverTheKeysAndKeysAimWithoutAStick(t *testing.T) {
+	ax, ay := deg(22.5)
+	if b := throwBall(t, Input{DX: 1, AimX: ax, AimY: ay}); math.Abs(b.DX-ax) > 1e-9 || math.Abs(b.DY-ay) > 1e-9 {
+		t.Fatalf("with both: direction (%v,%v), want the stick's (%v,%v)", b.DX, b.DY, ax, ay)
+	}
+	d := 1 / math.Sqrt2
+	if b := throwBall(t, Input{DX: -1, DY: -1}); math.Abs(b.DX+d) > 1e-9 || math.Abs(b.DY+d) > 1e-9 {
+		t.Fatalf("keys only: direction (%v,%v), want the diagonal (%v,%v)", b.DX, b.DY, -d, -d)
+	}
+}
+
+// Letting go of the stick leaves the aim where it was, like the keys' last direction.
+func TestAimStaysWhereTheStickLeftIt(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	g.P[snorlax].X, g.P[snorlax].Y = 1900, 900
+	ax, ay := deg(22.5)
+	g.P[pikachu].In = Input{Ball: true, AimX: ax, AimY: ay}
+	g.Step(dt)
+	g.P[pikachu].In = Input{} // stick released, nothing held
+	for i := 0; i < 14; i++ {
+		g.Step(dt)
+	}
+	if len(g.Balls) != 1 || math.Abs(g.Balls[0].DX-ax) > 1e-9 || math.Abs(g.Balls[0].DY-ay) > 1e-9 {
+		t.Fatalf("balls %+v, want one flying along the last stick direction (%v,%v)", g.Balls, ax, ay)
+	}
+}
+
+func TestIcePunchDashesAlongTheStickAtAnyAngle(t *testing.T) {
+	for _, a := range []float64{22.5, 67.5, 135 + 11.25} {
+		g := punchGame(DefaultConfig())
+		g.P[pikachu].X, g.P[pikachu].Y = 100, 100
+		x0, y0 := g.P[snorlax].X, g.P[snorlax].Y
+		ax, ay := deg(a)
+		g.P[snorlax].In = Input{Punch: true, AimX: ax, AimY: ay}
+		for i := 0; i < 40; i++ {
+			g.Step(dt)
+		}
+		dx, dy := g.P[snorlax].X-x0, g.P[snorlax].Y-y0
+		if math.Abs(dx-250*ax) > 1e-6 || math.Abs(dy-250*ay) > 1e-6 {
+			t.Fatalf("aim %v degrees: dashed (%.3f,%.3f), want 250 along (%.4f,%.4f)", a, dx, dy, ax, ay)
+		}
+	}
+}
+
+// Only the aim is analog: the stick's exact angle must not change which way a character walks.
+func TestWalkingStaysEightWayWhateverTheStickAim(t *testing.T) {
+	g := newTestGame()
+	x, y := g.P[pikachu].X, g.P[pikachu].Y
+	ax, ay := deg(22.5)
+	g.P[pikachu].In = Input{DX: 1, AimX: ax, AimY: ay}
+	g.Step(dt)
+	if g.P[pikachu].Y != y || math.Abs(g.P[pikachu].X-x-g.cfg.Pikachu.WalkSpeed*dt) > 1e-9 {
+		t.Fatalf("Pikachu moved (%v,%v) -> (%v,%v), want it to walk straight along x", x, y, g.P[pikachu].X, g.P[pikachu].Y)
+	}
+}
+
+func TestInputCarriesTheStickAimOverTheWire(t *testing.T) {
+	var in Input
+	if err := json.Unmarshal([]byte(`{"dx":1,"ax":0.38,"ay":-0.92}`), &in); err != nil {
+		t.Fatal(err)
+	}
+	if in.AimX != 0.38 || in.AimY != -0.92 {
+		t.Fatalf("aim = (%v,%v), want (0.38,-0.92)", in.AimX, in.AimY)
 	}
 }

@@ -122,6 +122,7 @@ function upright(x, y, fn) { ctx.save(); ctx.translate(x, y); ctx.rotate(-ROT); 
 const keys = new Set();
 const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
+let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
 function sendInput() {
   const k = (n) => keys.has(n);
@@ -132,13 +133,16 @@ function sendInput() {
   const msg = JSON.stringify({
     dx: Math.round(sx * c + sy * s) || 0,
     dy: Math.round(-sx * s + sy * c) || 0,
+    // the aim of the Electro Ball and the Ice Punch: the stick's exact direction (2 decimals is 0.6 degrees)
+    ax: Math.round((stickAim.x * c + stickAim.y * s) * 100) / 100 || 0,
+    ay: Math.round((-stickAim.x * s + stickAim.y * c) * 100) / 100 || 0,
     skill: k(' ') || touch.skill, atk: k('j'), punch: k('j') || touch.punch, beam: k('k') || touch.beam, ball: k('k') || touch.ball, thunder: k('l') || touch.thunder,
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
 addEventListener('keydown', (e) => { if (e.key === ' ') e.preventDefault(); keys.add(e.key.toLowerCase()); sendInput(); });
 addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); sendInput(); });
-addEventListener('blur', () => { keys.clear(); stick = { x: 0, y: 0 }; for (const n in touch) touch[n] = false; sendInput(); }); // no stuck keys after alt-tab
+addEventListener('blur', () => { keys.clear(); stick = { x: 0, y: 0 }; stickAim = { x: 0, y: 0 }; for (const n in touch) touch[n] = false; sendInput(); }); // no stuck keys after alt-tab
 addEventListener('contextmenu', (e) => { if (PORTRAIT) e.preventDefault(); }); // a long press must not open a menu
 
 // Keep the page from zooming. The viewport tag and touch-action cover most browsers; iOS Safari ignores
@@ -188,10 +192,11 @@ function buildPad() {
     const len = Math.hypot(vx, vy), ux = len ? vx / len : 0, uy = len ? vy / len : 0, pull = Math.min(len, MAXR);
     knob.style.transform = `translate(${ux * pull}px, ${uy * pull}px)`;
     // 8 directions; 0.38 = cos(67.5deg) splits the circle into eight equal sectors
+    stickAim = len < MAXR * 0.35 ? { x: 0, y: 0 } : { x: ux, y: uy };
     stick = len < MAXR * 0.35 ? { x: 0, y: 0 } : { x: ux > 0.38 ? 1 : ux < -0.38 ? -1 : 0, y: uy > 0.38 ? 1 : uy < -0.38 ? -1 : 0 };
     sendInput();
   };
-  const release = (e) => { if (e.pointerId !== sid) return; sid = null; knob.style.transform = ''; stick = { x: 0, y: 0 }; sendInput(); };
+  const release = (e) => { if (e.pointerId !== sid) return; sid = null; knob.style.transform = ''; stick = { x: 0, y: 0 }; stickAim = { x: 0, y: 0 }; sendInput(); };
   base.addEventListener('pointerdown', (e) => { if (sid !== null) return; sid = e.pointerId; base.setPointerCapture(sid); aim(e); });
   base.addEventListener('pointermove', (e) => { if (e.pointerId === sid) aim(e); });
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) base.addEventListener(t, release);
@@ -305,7 +310,7 @@ function drawBeams() {
 function drawBalls() {
   const p = snap.p[0], d = disp[0];
   if (p.kt > 0) {
-    const k = 1 - p.kt / ballCfg.charge, n = Math.hypot(p.fx, p.fy) || 1, ux = p.fx / n, uy = p.fy / n;
+    const k = 1 - p.kt / ballCfg.charge, ux = p.ax, uy = p.ay;
     ctx.save();
     ctx.strokeStyle = `rgba(255,235,90,${0.3 + 0.4 * k})`; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
     ctx.beginPath(); ctx.moveTo(d.x + ux * 30, d.y + uy * 30); ctx.lineTo(d.x + ux * 220, d.y + uy * 220); ctx.stroke();
@@ -365,8 +370,7 @@ function drawExplosion(f) {
 // then Snorlax is wrapped in an icy aura with the fist in front while it dashes, leaving fading ice puffs.
 function drawIcePunch() {
   const p = snap.p[1], d = disp[1], R = punchCfg.radius;
-  const n = Math.hypot(p.fx, p.fy) || 1;
-  let ux = p.fx / n, uy = p.fy / n, k = 0, dashing = false;
+  let ux = p.ax, uy = p.ay, k = 0, dashing = false;
   if (p.ut > 0) k = 1 - p.ut / punchCfg.charge;
   else if (p.ud > 0) { ux = p.udx; uy = p.udy; k = 1; dashing = true; }
   else k = -1; // not punching

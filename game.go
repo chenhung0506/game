@@ -36,6 +36,10 @@ type Input struct {
 	Thunder bool `json:"thunder"` // Pikachu only: Thunder
 	Ball    bool `json:"ball"`    // Pikachu only: Electro Ball
 	Punch   bool `json:"punch"`   // Snorlax only: Ice Punch
+	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
+	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
+	AimX float64 `json:"ax"`
+	AimY float64 `json:"ay"`
 }
 
 type Player struct {
@@ -49,6 +53,8 @@ type Player struct {
 
 	FX           int     `json:"fx"` // last non-zero direction held; a dash with no keys goes this way, and so does the ball
 	FY           int     `json:"fy"`
+	AimX         float64 `json:"ax"` // unit vector the Electro Ball and the Ice Punch go along: the stick's, else the last direction held
+	AimY         float64 `json:"ay"`
 	DashT        float64 `json:"-"`   // seconds of dash left
 	DashX, DashY float64 `json:"-"`   // unit dash direction
 	DashCD       float64 `json:"dcd"` // cooldowns are sent so the client can draw their countdown
@@ -134,8 +140,8 @@ func NewGameFor(cfg Config, mode string) *Game {
 func (g *Game) Reset() {
 	// 400 apart, centred in the arena.
 	c := g.court
-	g.P[pikachu] = Player{X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.cfg.Pikachu.MaxHP, FX: 1}
-	g.P[snorlax] = Player{X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.cfg.Snorlax.MaxHP, FX: -1}
+	g.P[pikachu] = Player{X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.cfg.Pikachu.MaxHP, FX: 1, AimX: 1}
+	g.P[snorlax] = Player{X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.cfg.Snorlax.MaxHP, FX: -1, AimX: -1}
 	g.Balls = nil
 }
 
@@ -239,6 +245,13 @@ func (g *Game) Step(dt float64) []Event {
 		}
 		if in.DX != 0 || in.DY != 0 {
 			p.FX, p.FY = in.DX, in.DY
+		}
+		// The aim keeps its last value when nothing is held, like the facing.
+		if n := math.Hypot(in.AimX, in.AimY); n > 1e-9 && !math.IsInf(n, 0) {
+			p.AimX, p.AimY = in.AimX/n, in.AimY/n
+		} else if in.DX != 0 || in.DY != 0 {
+			n := math.Hypot(float64(in.DX), float64(in.DY))
+			p.AimX, p.AimY = float64(in.DX)/n, float64(in.DY)/n
 		}
 		if p.DashCD > 0 {
 			p.DashCD = math.Max(0, p.DashCD-dt)
@@ -391,10 +404,8 @@ func (g *Game) Step(dt float64) []Event {
 				casting = true // rooted through the tick of the throw, free from the next
 				if p.BallT -= dt; p.BallT < 1e-9 {
 					p.BallT = 0
-					fx, fy := float64(p.FX), float64(p.FY)
-					n := math.Hypot(fx, fy)
 					off := g.radius(pikachu) + bc.Radius + 1 // start just clear of Pikachu's body
-					g.Balls = append(g.Balls, Ball{X: p.X + fx/n*off, Y: p.Y + fy/n*off, DX: fx / n, DY: fy / n, HP: bc.HP})
+					g.Balls = append(g.Balls, Ball{X: p.X + p.AimX*off, Y: p.Y + p.AimY*off, DX: p.AimX, DY: p.AimY, HP: bc.HP})
 				}
 			}
 		}
@@ -492,9 +503,7 @@ func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 	case p.PunchT > 0:
 		if p.PunchT -= dt; p.PunchT < 1e-9 { // charged: go
 			p.PunchT = 0
-			fx, fy := float64(p.FX), float64(p.FY)
-			n := math.Hypot(fx, fy)
-			p.PunchDX, p.PunchDY = fx/n, fy/n
+			p.PunchDX, p.PunchDY = p.AimX, p.AimY
 			p.PunchLeft, p.PunchHit = ip.Distance, false
 			p.PunchID++
 		}
