@@ -95,7 +95,7 @@
     "seismic_toss": {
       "speed": 700,
       "radius": 100,
-      "damage": 50,
+      "damage": 40,
       "cooldown": 7,
       "length": 400,
       "high": 300
