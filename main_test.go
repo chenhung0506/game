@@ -141,7 +141,7 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	next(t, d, "lobby")
 }
 
-// Nobody plays before both have picked, the picks decide who is who, and a character cannot be picked twice.
+// Nobody plays before both have picked, and the picks decide who is who.
 func TestPickingCharactersStartsTheMatch(t *testing.T) {
 	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
@@ -149,8 +149,6 @@ func TestPickingCharactersStartsTheMatch(t *testing.T) {
 
 	pick(t, a, snorlax)
 	lobbyWith(t, b, [2]int{snorlax, -1}) // the opponent sees what was picked
-	pick(t, b, snorlax)                  // already taken
-	lobbyWith(t, a, [2]int{snorlax, -1}) // the refusal changes nothing
 	pick(t, b, 7)                        // no such character
 	pick(t, b, -1)
 	lobbyWith(t, b, [2]int{snorlax, -1})
@@ -185,8 +183,6 @@ func TestLeavingReturnsToTheLobby(t *testing.T) {
 	lobbyWith(t, a, [2]int{pikachu, -1})
 
 	c := dial(t, srv, "lv")
-	pick(t, c, pikachu) // taken by a
-	lobbyWith(t, a, [2]int{pikachu, -1})
 	pick(t, c, charizard)
 	ps := next(t, a, "s")["p"].([]any)
 	if k := ps[1].(map[string]any)["k"]; k != float64(charizard) {
@@ -263,4 +259,16 @@ func TestBadRoomIDRejected(t *testing.T) {
 	if _, resp, err := websocket.DefaultDialer.Dial(url, nil); err == nil || resp == nil || resp.StatusCode != 400 {
 		t.Fatalf("want HTTP 400 handshake failure, got err=%v resp=%v", err, resp)
 	}
+}
+
+// Both players may pick the same character.
+func TestBothPlayersMayPickTheSameCharacter(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	a, b := startMatch(t, srv, "same", snorlax, snorlax)
+	ps := next(t, a, "s")["p"].([]any)
+	if k0, k1 := ps[0].(map[string]any)["k"], ps[1].(map[string]any)["k"]; k0 != float64(snorlax) || k1 != float64(snorlax) {
+		t.Fatalf("kinds = %v, %v, want snorlax twice", k0, k1)
+	}
+	_ = b
 }

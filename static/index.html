@@ -32,7 +32,6 @@
   .card b { display: block; margin-top: 6px; font-size: 16px; }
   .card small { display: block; margin-top: 4px; opacity: .75; line-height: 1.5; text-align: left; font-size: 12px; }
   .card.mine { border-color: #6fd36f; background: #243026; }
-  .card.taken { opacity: .35; cursor: not-allowed; }
   #pickmsg { margin-top: 14px; text-align: center; line-height: 1.7; }
   .cd { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: conic-gradient(#000000b0 var(--cd, 0deg), transparent 0); }
 </style>
@@ -56,12 +55,12 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍'];
 const BLURB = ['衝刺・打雷・電球・地震', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投'];
 const HELP = [
-  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震　K＝電球（續能後朝面向的方向丟出，續能時按方向鍵轉向，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
+  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
   '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　J＝急凍拳（蓄力時按方向鍵決定方向，朝該方向衝拳，打到的敵人被冰凍）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
   '你是噴火龍　移動 WASD / 方向鍵　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　K＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　J＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
 ];
 const ghosts = []; // dash afterimages
-const beamLook = { ang: null, tail: null }; // smoothed beam angle, and the fading afterimage when a sweep ends
+const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }; // replaced by the server's values in 'hi'
 let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewise
@@ -76,7 +75,7 @@ const iceTrail = []; // fading ice puffs the dash leaves behind
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
-const shadow = { x: null, y: null }; // smoothed thunder shadow position
+const shadow = [{ x: null, y: null }, { x: null, y: null }]; // per slot: the smoothed thunder shadow position
 const smoke = []; // puffs rising off Snorlax while it recharges
 const flames = []; // fading flames Charizard leaves while it runs with a catch
 let smokeAcc = 0;
@@ -96,7 +95,7 @@ let fx = [], shake = 0;
 
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // the first player's view picks the court
 let picks = [-1, -1], here = [true, false], padKind = -1;
-const slotOf = (k) => (snap ? snap.p.findIndex((q) => q.k === k) : -1); // which slot plays that character, -1 if nobody
+const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
   if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
@@ -108,15 +107,16 @@ ws.onmessage = (e) => {
   }
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
-    if (!snap) { ghosts.length = iceTrail.length = smoke.length = flames.length = 0; fx = []; beamLook.ang = beamLook.tail = null; shadow.x = null; for (const d of disp) d.x = null; } // a new match starts clean
-    const sn = m.p.findIndex((q) => q.k === 1);
-    const prevSt = snap && sn >= 0 ? snap.p[sn].st : 0;
+    if (!snap) { ghosts.length = iceTrail.length = smoke.length = flames.length = 0; fx = []; for (const b of beamLook) b.ang = b.tail = null; for (const sh of shadow) sh.x = null; for (const d of disp) d.x = null; } // a new match starts clean
+    const old = snap;
     waiting = false; snap = m;
     document.getElementById('pick').style.display = 'none';
     if (padKind !== m.p[you].k) { padKind = m.p[you].k; document.getElementById('bar2').textContent = HELP[padKind]; if (PORTRAIT) buildPad(); }
-    const st = sn >= 0 ? m.p[sn].st : 0;
-    if (st > 0 && !(prevSt > 0)) shake = 14; // the sweep begins
-    if (!(st > 0) && prevSt > 0 && beamLook.ang !== null) beamLook.tail = { x: disp[sn].x, y: disp[sn].y - 6, ang: beamLook.ang, age: 0 };
+    for (const i of slotsOf(1)) {
+      const st = m.p[i].st, prevSt = old ? old.p[i].st : 0;
+      if (st > 0 && !(prevSt > 0)) shake = 14; // the sweep begins
+      if (!(st > 0) && prevSt > 0 && beamLook[i].ang !== null) beamLook[i].tail = { x: disp[i].x, y: disp[i].y - 6, ang: beamLook[i].ang, age: 0 };
+    }
     for (const ev of m.e || []) {
       fx.push({ ...ev, age: 0 });
       if (ev.t === 'slam') shake = 16;
@@ -158,7 +158,7 @@ function buildCards() {
     const b = document.createElement('b'); b.textContent = name;
     const sm = document.createElement('small'); sm.textContent = `HP ${maxHp[k]}　${BLURB[k]}`;
     el.append(cvs, b, sm); box.append(el);
-    el.addEventListener('click', () => { if (picks[1 - you] !== k && ws.readyState === 1) ws.send(JSON.stringify({ pick: k })); });
+    el.addEventListener('click', () => { if (ws.readyState === 1) ws.send(JSON.stringify({ pick: k })); });
     cardEls.push({ el, cvs });
   });
 }
@@ -166,15 +166,14 @@ function showPick() {
   document.getElementById('pick').style.display = 'flex';
   cardEls.forEach(({ el }, k) => {
     el.classList.toggle('mine', picks[you] === k);
-    el.classList.toggle('taken', picks[1 - you] === k);
   });
   const link = location.origin + location.pathname + '?room=' + room;
   const mine = picks[you], theirs = picks[1 - you];
   const lines = [];
   if (!here[1 - you]) lines.push(`等待對手加入… 把這個連結傳給對方：<br><code>${link}</code><br>（電腦橫式版：在自己的網址後面加上 &landscape）`);
-  else if (mine < 0 && theirs >= 0) lines.push(`對手選了${NAMES[theirs]}，換你選`);
+  else if (mine < 0 && theirs >= 0) lines.push(`對手選了${NAMES[theirs]}，換你選（可以選一樣的）`);
   else if (mine >= 0 && theirs < 0) lines.push('對手選擇中…');
-  if (mine >= 0) lines.push(`你選了${NAMES[mine]}（對手還沒選好以前，可以重選）`);
+  if (mine >= 0) lines.push(`你選了${NAMES[mine]}（對手還沒選好以前，可以重選；兩人可以選同一隻）`);
   else if (here[1 - you] && theirs < 0) lines.push('點一隻寶可夢開始');
   document.getElementById('pickmsg').innerHTML = lines.join('<br>');
 }
@@ -382,9 +381,11 @@ function drawBody(kind, X, Y, alpha, lift = 0, flap = 0) {
 const tele = document.createElement('canvas'); tele.width = arena.w; tele.height = arena.h;
 const teleCtx = tele.getContext('2d');
 function drawTelegraph() {
-  const si = slotOf(1);
-  if (si < 0 || !(snap.p[si].bt > 0)) return;
-  const p = snap.p[si], d = disp[si], k = 1 - p.bt / beamCfg.charge; // 0 -> 1 as the charge fills
+  for (const si of slotsOf(1)) drawFan(snap.p[si], disp[si]);
+}
+function drawFan(p, d) {
+  if (!(p.bt > 0)) return;
+  const k = 1 - p.bt / beamCfg.charge; // 0 -> 1 as the charge fills
   const base = Math.atan2(p.by, p.bx), A = beamCfg.angle * Math.PI / 180;
   teleCtx.clearRect(0, 0, tele.width, tele.height);
   teleCtx.fillStyle = teleCtx.strokeStyle = '#ff4628';
@@ -416,9 +417,10 @@ function drawBeamLine(x0, y0, ang, a) {
 // The beam is drawn from the snapshot, so it turns as the server turns it. The
 // server's angle is counter-clockwise positive, which is a smaller canvas angle.
 function drawBeams() {
-  const si = slotOf(1);
-  if (si < 0) { beamLook.ang = null; return; }
-  const p = snap.p[si], d = disp[si];
+  for (const i of [0, 1]) drawBeam(i, snap.p[i], disp[i], beamLook[i]);
+}
+function drawBeam(i, p, d, beamLook) {
+  if (p.k !== 1) { beamLook.ang = null; return; }
   if (p.st > 0) {
     const target = Math.atan2(p.by, p.bx) - p.ba * Math.PI / 180;
     beamLook.ang = beamLook.ang === null ? target : beamLook.ang + (target - beamLook.ang) * 0.5; // 30 snapshots/s -> smooth at 60fps
@@ -436,7 +438,10 @@ function drawBeams() {
 // Electro Ball: the aim line and a growing orb while Pikachu charges, and the balls in flight, each with
 // a small HP bar (the opponent's skills wear it down; at 0 it explodes).
 function drawBalls() {
-  const pi = slotOf(0), p = pi >= 0 ? snap.p[pi] : { kt: 0 }, d = disp[pi < 0 ? 0 : pi];
+  for (const pi of slotsOf(0)) drawBallCharge(snap.p[pi], disp[pi]);
+  for (const b of snap.b || []) drawBall(b);
+}
+function drawBallCharge(p, d) {
   if (p.kt > 0) {
     const k = 1 - p.kt / ballCfg.charge, ux = p.ax, uy = p.ay;
     ctx.save();
@@ -449,8 +454,10 @@ function drawBalls() {
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(ox, oy, r * 1.8, 0, 7); ctx.fill();
     ctx.restore();
   }
-  for (const b of snap.b || []) {
-    if (b.k === 1) { drawFireBall(b); continue; }
+}
+function drawBall(b) {
+  if (b.k === 1) { drawFireBall(b); return; }
+  {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.8, 0, 7); ctx.fill();
@@ -533,21 +540,22 @@ function drawExplosion(f) {
 // Ice Punch: a white ice fist grows in front of Snorlax while it charges (with a dashed line along the aim),
 // then Snorlax is wrapped in an icy aura with the fist in front while it dashes, leaving fading ice puffs.
 function drawIcePunch() {
-  const si = slotOf(1);
-  if (si < 0) return;
-  const p = snap.p[si], d = disp[si], R = punchCfg.radius;
+  for (const si of slotsOf(1)) drawFist(snap.p[si], disp[si]);
+  for (const t of iceTrail) { // the puffs the dashes left, fading
+    const a = 1 - t.age / 0.45; t.age += 1 / 60;
+    if (a <= 0) continue;
+    ctx.fillStyle = `rgba(215,242,255,${0.5 * a})`;
+    ctx.beginPath(); ctx.arc(t.x, t.y, punchCfg.radius * (0.55 + 0.35 * a), 0, 7); ctx.fill();
+  }
+  while (iceTrail.length && iceTrail[0].age >= 0.45) iceTrail.shift();
+}
+function drawFist(p, d) {
+  const R = punchCfg.radius;
   let ux = p.ax, uy = p.ay, k = 0, dashing = false;
   if (p.ut > 0) k = 1 - p.ut / punchCfg.charge;
   else if (p.ud > 0) { ux = p.udx; uy = p.udy; k = 1; dashing = true; }
   else k = -1; // not punching
   if (dashing) iceTrail.push({ x: d.x, y: d.y, age: 0 });
-  for (const t of iceTrail) {
-    const a = 1 - t.age / 0.45; t.age += 1 / 60;
-    if (a <= 0) continue;
-    ctx.fillStyle = `rgba(215,242,255,${0.5 * a})`;
-    ctx.beginPath(); ctx.arc(t.x, t.y, R * (0.55 + 0.35 * a), 0, 7); ctx.fill();
-  }
-  while (iceTrail.length && iceTrail[0].age >= 0.45) iceTrail.shift();
   if (k < 0) return;
   ctx.save();
   if (!dashing) { // the aim, so the direction can be chosen while charging
@@ -610,8 +618,10 @@ function drawFreezeBurst(f) {
 // Thunder: a dark circle the size of the strike area sits where the bolt will land.
 // It darkens and a ring closes in on it as the bolt gets near.
 function drawShadow() {
-  const pi = slotOf(0), p = pi >= 0 ? snap.p[pi] : null;
-  if (!p || !(p.tn > 0)) { shadow.x = null; return; }
+  for (const i of [0, 1]) drawThunderShadow(snap.p[i], shadow[i]);
+}
+function drawThunderShadow(p, shadow) {
+  if (p.k !== 0 || !(p.tn > 0)) { shadow.x = null; return; }
   if (shadow.x === null) { shadow.x = p.sx; shadow.y = p.sy; }
   shadow.x += (p.sx - shadow.x) * 0.4; shadow.y += (p.sy - shadow.y) * 0.4;
   const period = p.tn === thunderCfg.strikes ? thunderCfg.delay : thunderCfg.interval; // time the current wait started from
@@ -704,9 +714,10 @@ function drawSkyBolt(f) {
 
 // Smoke over Snorlax's head while it cannot move (recharging after Hyper Beam).
 function drawSmoke() {
-  const si = slotOf(1), p = si >= 0 ? snap.p[si] : { rt: 0 }, d = disp[si < 0 ? 0 : si];
-  if (p.rt > 0) {
-    for (smokeAcc += 1 / 60; smokeAcc > 0.06; smokeAcc -= 0.06) {
+  const resting = slotsOf(1).filter((i) => snap.p[i].rt > 0);
+  if (resting.length) {
+    for (smokeAcc += 1 / 60; smokeAcc > 0.06; smokeAcc -= 0.06) for (const i of resting) {
+      const d = disp[i];
       // x, y: the ground point it left from; u, v: its offset on screen from there (v < 0 is up)
       smoke.push({ x: d.x, y: d.y, u: (Math.random() - 0.5) * 18, v: -d.z - 30, vx: (Math.random() - 0.5) * 12, vy: -(26 + Math.random() * 16), age: 0, life: 0.9 + Math.random() * 0.5 });
     }

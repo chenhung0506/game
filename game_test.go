@@ -1599,10 +1599,10 @@ func TestBallFliesStraightAtTheConfiguredSpeedWhereTheAimPoints(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Pikachu.ElectroBall.Speed = 300
 	g := ballGame(cfg)
-	g.P[snorlax].X, g.P[snorlax].Y = 1900, 900 // out of the way
+	g.P[snorlax].X, g.P[snorlax].Y = 600, 100 // straight above Pikachu
 	g.P[pikachu].In = Input{Ball: true}
 	g.Step(dt)
-	g.P[pikachu].In = Input{DY: -1} // turn to face up while charging
+	g.P[pikachu].In = Input{}
 	for i := 0; i < 14; i++ {
 		g.Step(dt)
 	}
@@ -1651,13 +1651,14 @@ func TestBallExplodesOnTheOpponentAndKnocksItAway(t *testing.T) {
 
 func TestBallExplodesAtTheWall(t *testing.T) {
 	g := ballGame(DefaultConfig())
-	g.P[snorlax].X, g.P[snorlax].Y = 1900, 900 // far from the north wall
-	g.P[pikachu].In = Input{Ball: true, DY: -1}
+	g.P[snorlax].X, g.P[snorlax].Y = 600, 100 // straight above Pikachu, but in the air: the ball flies under it to the north wall
+	g.P[pikachu].In = Input{Ball: true}
 	g.Step(dt)
-	g.P[pikachu].In = Input{DY: -1}
+	g.P[pikachu].In = Input{}
 	var boom Event
 	var n int
 	for tick := 2; tick <= 6*tickRate && n == 0; tick++ {
+		g.P[snorlax].Z, g.P[snorlax].VZ = 100, 0 // held up
 		n, boom = explodeEvents(g.Step(dt))
 	}
 	if n != 1 || boom.Y != 0 || len(g.Balls) != 0 {
@@ -2299,14 +2300,16 @@ func deg(a float64) (float64, float64) {
 	return math.Cos(a * math.Pi / 180), math.Sin(a * math.Pi / 180)
 }
 
-// throwBall presses the ball key with the given input held for the whole charge and returns the ball.
-func throwBall(t *testing.T, in Input) Ball {
+// throwBall has Pikachu charge a ball with the given input held, Snorlax standing at (sx, sy) but in the air,
+// so the ball cannot stop on it, and returns the ball.
+func throwBall(t *testing.T, in Input, sx, sy float64) Ball {
 	t.Helper()
 	g := ballGame(DefaultConfig())
-	g.P[snorlax].X, g.P[snorlax].Y = 1900, 900 // out of the way
+	g.P[snorlax].X, g.P[snorlax].Y = sx, sy
 	in.Ball = true
 	g.P[pikachu].In = in
 	for i := 0; i < 15; i++ {
+		g.P[snorlax].Z, g.P[snorlax].VZ = 100, 0
 		g.Step(dt)
 	}
 	if len(g.Balls) != 1 {
@@ -2315,48 +2318,68 @@ func throwBall(t *testing.T, in Input) Ball {
 	return g.Balls[0]
 }
 
-func TestBallFliesAlongTheStickAtAnyAngle(t *testing.T) {
-	for _, a := range []float64{11.25, 22.5, 67.5, 100, 200, 337.5} {
-		ax, ay := deg(a)
-		b := throwBall(t, Input{AimX: ax, AimY: ay})
-		if math.Abs(b.DX-ax) > 1e-9 || math.Abs(b.DY-ay) > 1e-9 {
-			t.Fatalf("aim %v degrees: ball direction (%.4f,%.4f), want (%.4f,%.4f)", a, b.DX, b.DY, ax, ay)
+// The ball goes at the opponent, whatever the stick or the keys say and wherever the opponent stands.
+func TestBallGoesAtTheOpponentWhateverTheStickSays(t *testing.T) {
+	for _, a := range []float64{0, 11.25, 67.5, 100, 200, 337.5} {
+		ox, oy := deg(a)
+		for _, in := range []Input{{}, {AimX: -ox, AimY: -oy}, {DX: -1, DY: 1}, {AimX: 1000, AimY: 3}} {
+			b := throwBall(t, in, 600+ox*300, 500+oy*300) // Pikachu is at (600,500)
+			if math.Abs(b.DX-ox) > 1e-9 || math.Abs(b.DY-oy) > 1e-9 || math.Abs(math.Hypot(b.DX, b.DY)-1) > 1e-9 {
+				t.Fatalf("opponent at %v degrees, input %+v: ball direction (%.4f,%.4f), want (%.4f,%.4f)", a, in, b.DX, b.DY, ox, oy)
+			}
 		}
 	}
 }
 
-func TestStickAimIsNormalisedWhateverItsLength(t *testing.T) {
-	ax, ay := deg(30)
-	b := throwBall(t, Input{AimX: ax * 1000, AimY: ay * 1000})
-	if math.Abs(b.DX-ax) > 1e-9 || math.Abs(b.DY-ay) > 1e-9 || math.Abs(math.Hypot(b.DX, b.DY)-1) > 1e-9 {
-		t.Fatalf("ball direction (%v,%v), want the unit vector (%v,%v)", b.DX, b.DY, ax, ay)
-	}
-}
-
-func TestStickAimWinsOverTheKeysAndKeysAimWithoutAStick(t *testing.T) {
-	ax, ay := deg(22.5)
-	if b := throwBall(t, Input{DX: 1, AimX: ax, AimY: ay}); math.Abs(b.DX-ax) > 1e-9 || math.Abs(b.DY-ay) > 1e-9 {
-		t.Fatalf("with both: direction (%v,%v), want the stick's (%v,%v)", b.DX, b.DY, ax, ay)
-	}
-	d := 1 / math.Sqrt2
-	if b := throwBall(t, Input{DX: -1, DY: -1}); math.Abs(b.DX+d) > 1e-9 || math.Abs(b.DY+d) > 1e-9 {
-		t.Fatalf("keys only: direction (%v,%v), want the diagonal (%v,%v)", b.DX, b.DY, -d, -d)
-	}
-}
-
-// Letting go of the stick leaves the aim where it was, like the keys' last direction.
-func TestAimStaysWhereTheStickLeftIt(t *testing.T) {
+// The aim keeps following the opponent through the charge, so the ball goes where it is when the charge ends.
+func TestBallAimFollowsTheOpponentThroughTheCharge(t *testing.T) {
 	g := ballGame(DefaultConfig())
-	g.P[snorlax].X, g.P[snorlax].Y = 1900, 900
-	ax, ay := deg(22.5)
-	g.P[pikachu].In = Input{Ball: true, AimX: ax, AimY: ay}
+	g.P[snorlax].X, g.P[snorlax].Y = 1000, 500
+	g.P[pikachu].In = Input{Ball: true}
 	g.Step(dt)
-	g.P[pikachu].In = Input{} // stick released, nothing held
+	g.P[pikachu].In = Input{}
+	g.P[snorlax].X, g.P[snorlax].Y = 600, 900 // it runs to straight below
 	for i := 0; i < 14; i++ {
+		g.P[snorlax].Z, g.P[snorlax].VZ = 100, 0
 		g.Step(dt)
 	}
-	if len(g.Balls) != 1 || math.Abs(g.Balls[0].DX-ax) > 1e-9 || math.Abs(g.Balls[0].DY-ay) > 1e-9 {
-		t.Fatalf("balls %+v, want one flying along the last stick direction (%v,%v)", g.Balls, ax, ay)
+	if len(g.Balls) != 1 || g.Balls[0].DX != 0 || g.Balls[0].DY != 1 {
+		t.Fatalf("balls %+v, want one flying straight down at where Snorlax went", g.Balls)
+	}
+	if g.P[pikachu].AimY != 1 {
+		t.Fatalf("aim (%v,%v) at the throw, want the dashed aim line on the opponent too", g.P[pikachu].AimX, g.P[pikachu].AimY)
+	}
+}
+
+// Standing exactly on the opponent there is no direction: the ball goes along the aim it already had.
+func TestBallOnTopOfTheOpponentKeepsTheOldAim(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	g.P[snorlax].X, g.P[snorlax].Y = g.P[pikachu].X, g.P[pikachu].Y
+	g.P[pikachu].AimX, g.P[pikachu].AimY = 0, -1
+	g.P[pikachu].In = Input{Ball: true}
+	for i := 0; i < 15; i++ {
+		g.P[snorlax].Z, g.P[snorlax].VZ = 100, 0
+		g.Step(dt)
+	}
+	if len(g.Balls) != 1 || math.IsNaN(g.Balls[0].DX) || g.Balls[0].DY != -1 {
+		t.Fatalf("balls %+v, want one along the old aim (0,-1), no NaN", g.Balls)
+	}
+}
+
+// A ball belongs to whoever threw it, not to a slot: Pikachu in slot 1 still hurts slot 0, and not itself.
+func TestBallTargetsTheOtherPlayerWhicheverSlotThrowsIt(t *testing.T) {
+	g := NewGame(DefaultConfig())
+	g.SetKinds(snorlax, pikachu)
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 900, 500, 500, 500
+	g.P[1].In = Input{Ball: true}
+	for i := 0; i < 60 && g.P[0].HP == g.cfg.Snorlax.MaxHP; i++ {
+		g.Step(dt)
+	}
+	if g.P[0].HP >= g.cfg.Snorlax.MaxHP {
+		t.Fatal("the ball never hurt the opponent in slot 0")
+	}
+	if g.P[1].HP != g.cfg.Pikachu.MaxHP {
+		t.Fatalf("Pikachu hurt itself: HP %d", g.P[1].HP)
 	}
 }
 

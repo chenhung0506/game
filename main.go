@@ -97,10 +97,9 @@ func (r *room) playing() bool {
 }
 
 // choose records slot idx's pick and starts the match once both players have one. It reports whether the
-// pick was taken: an unknown character, or the one the opponent already has, is refused, and so is any pick
-// while a match is on. Must be called with r.mu held.
+// pick was taken: an unknown character is refused, and so is any pick while a match is on. Both players may play the same one. Must be called with r.mu held.
 func (r *room) choose(idx, kind int) bool {
-	if r.playing() || kind < 0 || kind >= kinds || r.pick[1-idx] == kind {
+	if r.playing() || kind < 0 || kind >= kinds {
 		return false
 	}
 	r.pick[idx] = kind

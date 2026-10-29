@@ -463,8 +463,9 @@ func (g *Game) Step(dt float64) []Event {
 			}
 		}
 
-		// Pikachu's Electro Ball: charge rooted, then throw it where Pikachu faces. Holding a direction
-		// while charging turns the aim. Only one charge or Thunder cast at a time.
+		// Pikachu's Electro Ball: charge rooted, then throw it at the opponent. The aim follows the opponent
+		// while charging, so the ball goes where it stands when the charge ends. Only one charge or Thunder
+		// cast at a time.
 		if p.Kind == pikachu {
 			bc := g.cfg.Pikachu.ElectroBall
 			if p.BallCD > 0 {
@@ -477,11 +478,15 @@ func (g *Game) Step(dt float64) []Event {
 				p.DashT = 0 // charging roots Pikachu at once
 			}
 			if p.BallT > 0 {
-				casting = true // rooted through the tick of the throw, free from the next
+				casting = true                                                     // rooted through the tick of the throw, free from the next
+				if dx, dy := other.X-p.X, other.Y-p.Y; math.Hypot(dx, dy) > 1e-9 { // on top of it there is no direction: the aim stays
+					n := math.Hypot(dx, dy)
+					p.AimX, p.AimY = dx/n, dy/n
+				}
 				if p.BallT -= dt; p.BallT < 1e-9 {
 					p.BallT = 0
 					off := g.radius(i) + bc.Radius + 1 // start just clear of Pikachu's body
-					g.Balls = append(g.Balls, Ball{X: p.X + p.AimX*off, Y: p.Y + p.AimY*off, DX: p.AimX, DY: p.AimY, HP: bc.HP})
+					g.Balls = append(g.Balls, Ball{Owner: i, X: p.X + p.AimX*off, Y: p.Y + p.AimY*off, DX: p.AimX, DY: p.AimY, HP: bc.HP})
 				}
 			}
 		}

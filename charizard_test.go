@@ -660,3 +660,48 @@ func TestSeismicTossStopsTheBreath(t *testing.T) {
 		t.Fatalf("BreathT=%v, %d -> %d fire balls: the breath should stop when the toss starts", g.P[0].BreathT, n, fires(g))
 	}
 }
+
+// Mirror matches: with the same character on both sides every skill still works from either slot, and
+// nothing hurts the one who used it.
+func TestMirrorMatchesRunEverySkillWithoutHurtingTheUser(t *testing.T) {
+	for kind := 0; kind < kinds; kind++ {
+		g := duel(DefaultConfig(), kind, kind)
+		g.P[1].X = 500 // close enough for every skill to reach
+		all := Input{Skill: true, Attack: true, Beam: true, Thunder: true, Ball: true, Punch: true, Fire: true, Toss: true, DX: 1}
+		for tick := 0; tick < 20*tickRate; tick++ {
+			g.P[0].In, g.P[1].In = all, all
+			g.P[tick%2].In.DX = -1 // they do not stand still
+			g.Step(dt)
+			for i := range g.P {
+				p := g.P[i]
+				if math.IsNaN(p.X) || math.IsNaN(p.Y) || math.IsNaN(p.Z) || p.X < 0 || p.X > g.court.Length || p.Y < 0 || p.Y > g.court.Width {
+					t.Fatalf("kind %d tick %d: player %d at %v,%v,%v", kind, tick, i, p.X, p.Y, p.Z)
+				}
+			}
+			if g.Winner() >= 0 {
+				break
+			}
+		}
+		if g.P[0].HP == g.cfg.maxHPOf(kind) && g.P[1].HP == g.cfg.maxHPOf(kind) {
+			t.Fatalf("kind %d: nobody was hurt in 20 s of everything at once", kind)
+		}
+	}
+}
+
+func TestMirrorFireAndBallsHurtOnlyTheOpponent(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Charizard.FireBreath.RandomOffsetAngle = 0
+	g := duel(cfg, charizard, charizard)
+	g.P[1].X = 700        // inside the breath's length
+	g.P[0].In.Fire = true // only slot 0 breathes
+	steps(g, 200)
+	if g.P[0].HP != cfg.Charizard.MaxHP || g.P[1].HP == cfg.Charizard.MaxHP {
+		t.Fatalf("HP %d / %d: the breath must hurt slot 1 only", g.P[0].HP, g.P[1].HP)
+	}
+	g = duel(cfg, pikachu, pikachu)
+	g.P[1].In.Ball = true // only slot 1 throws
+	steps(g, 120)
+	if g.P[1].HP != cfg.Pikachu.MaxHP || g.P[0].HP == cfg.Pikachu.MaxHP {
+		t.Fatalf("HP %d / %d: the ball must hurt slot 0 only", g.P[0].HP, g.P[1].HP)
+	}
+}

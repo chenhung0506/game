@@ -41,10 +41,10 @@ type Config struct {
 			FollowSpeed float64 `json:"follow_speed"` // how fast the shadow chases the target; 0 = it stays put
 			Cooldown    float64 `json:"cooldown"`     // before the next cast; counted from the start of this one
 		} `json:"thunder"`
-		// Electro Ball: Pikachu charges, then throws a ball straight ahead. It explodes when it touches
+		// Electro Ball: Pikachu charges, then throws a ball straight at the opponent (the aim follows it). It explodes when it touches
 		// the opponent, when it reaches a wall, or when its HP runs out (the opponent's skills hit it).
 		ElectroBall struct {
-			ChargeTime      float64 `json:"charge_time"`      // rooted while charging; the aim follows the direction held
+			ChargeTime      float64 `json:"charge_time"`      // rooted while charging
 			Speed           float64 `json:"speed"`            // of the ball
 			Radius          float64 `json:"radius"`           // size of the ball; it touches the opponent when the bodies overlap
 			HP              int     `json:"hp"`               // opponent skills that hit the ball take this off; at 0 it explodes
