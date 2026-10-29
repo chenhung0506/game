@@ -81,24 +81,24 @@
       "height": 90
     },
     "fire_breath": {
-      "speed": 450,
+      "speed": 250,
       "radius": 10,
-      "hp": 10,
-      "damage": 2,
+      "hp": 5,
+      "damage": 1,
       "cooldown": 8,
       "mass": 20,
-      "duration": 4,
-      "quantity": 40,
-      "random_offset_angle": 7.5,
+      "duration": 5,
+      "quantity": 50,
+      "random_offset_angle": 9,
       "length": 500
     },
     "seismic_toss": {
       "speed": 700,
-      "radius": 60,
-      "damage": 35,
-      "cooldown": 10,
-      "length": 300,
-      "high": 180
+      "radius": 100,
+      "damage": 50,
+      "cooldown": 7,
+      "length": 400,
+      "high": 300
     }
   }
 }
