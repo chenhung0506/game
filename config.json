@@ -78,7 +78,7 @@
       "duration": 6,
       "cooldown": 8,
       "speed": 260,
-      "height": 90
+      "height": 40
     },
     "fire_breath": {
       "speed": 250,
