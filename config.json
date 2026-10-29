@@ -76,9 +76,9 @@
     "radius": 30,
     "fly": {
       "duration": 6,
-      "cooldown": 8,
+      "cooldown": 6,
       "speed": 260,
-      "height": 40
+      "height": 30
     },
     "fire_breath": {
       "speed": 250,
