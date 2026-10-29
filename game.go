@@ -1,6 +1,10 @@
 package main
 
-import "math"
+import (
+	"math"
+	"math/rand/v2"
+	"time"
+)
 
 // Game units: arena is 800x500, time in seconds.
 const (
@@ -11,6 +15,7 @@ const (
 	snorlaxRadius = 24.0
 	spawnHalfGap  = 200.0 // each player starts this far from the middle of the court
 	groundZ       = 12.0  // a target above this height counts as airborne
+	flyRiseTime   = 0.25  // seconds Charizard takes to climb to its flying height, and to come down
 	slamRadius    = 70.0  // the default of snorlax.slam_radius
 	slamDamage    = 20
 	quakeRadius   = 100.0
@@ -19,10 +24,13 @@ const (
 	maxHP         = 100 // default
 )
 
-// Player slots are fixed characters: the first to join is Pikachu.
+// Characters ("kinds"). A player slot (0 or 1, the order of joining) holds whichever one its player picked;
+// with the default NewGame, slot 0 is Pikachu and slot 1 is Snorlax.
 const (
-	pikachu = 0
-	snorlax = 1
+	pikachu   = 0
+	snorlax   = 1
+	charizard = 2
+	kinds     = 3
 )
 
 // Input is the only thing a client controls: which keys are held. Skill is the
@@ -36,6 +44,8 @@ type Input struct {
 	Thunder bool `json:"thunder"` // Pikachu only: Thunder
 	Ball    bool `json:"ball"`    // Pikachu only: Electro Ball
 	Punch   bool `json:"punch"`   // Snorlax only: Ice Punch
+	Fire    bool `json:"fire"`    // Charizard only: Fire Breath
+	Toss    bool `json:"toss"`    // Charizard only: Seismic Toss
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
@@ -43,13 +53,14 @@ type Input struct {
 }
 
 type Player struct {
-	X  float64 `json:"x"`
-	Y  float64 `json:"y"`
-	Z  float64 `json:"z"` // height above ground; the screen position is (X, Y-Z)
-	VZ float64 `json:"-"`
-	HP int     `json:"hp"`
-	CD float64 `json:"cd"`
-	In Input   `json:"-"`
+	Kind int     `json:"k"` // which character this slot plays: pikachu, snorlax or charizard
+	X    float64 `json:"x"`
+	Y    float64 `json:"y"`
+	Z    float64 `json:"z"` // height above ground; the screen position is (X, Y-Z)
+	VZ   float64 `json:"-"`
+	HP   int     `json:"hp"`
+	CD   float64 `json:"cd"`
+	In   Input   `json:"-"`
 
 	FX           int     `json:"fx"` // last non-zero direction held; a dash with no keys goes this way, and so does the ball
 	FY           int     `json:"fy"`
@@ -95,10 +106,45 @@ type Player struct {
 	// Electro Ball: BallT is the charge time left (0 = not charging).
 	BallT  float64 `json:"kt"`
 	BallCD float64 `json:"ecd"` // counted from the moment the charge starts
+
+	// Charizard. Fly: seconds of flight left (the height follows in Z) and the cooldown, which starts on landing.
+	FlyT  float64 `json:"ft"`
+	FlyCD float64 `json:"fcd"`
+	// Fire Breath: seconds of breathing left, and how many of the config's quantity have left the mouth.
+	BreathT    float64 `json:"ht"`
+	BreathN    int     `json:"-"`
+	BreathCD   float64 `json:"hcd"` // counted from the moment the breath starts
+	BreathLeft float64 `json:"-"`   // the full duration, to tell how far along the breath is
+	// Seismic Toss: TossPhase is tossNone, tossDash (running at the target), tossRise (carrying it up) or tossFall.
+	TossPhase int     `json:"gp"`
+	TossLeft  float64 `json:"-"` // dash distance left
+	TossDX    float64 `json:"gdx"`
+	TossDY    float64 `json:"gdy"`
+	TossCD    float64 `json:"gcd"` // counted from the moment the dash starts
+	Held      bool    `json:"hd"`  // caught in a Seismic Toss: cannot move or act until it lands
 }
 
-// Ball is a thrown Electro Ball: it flies straight until it explodes.
+// Seismic Toss phases.
+const (
+	tossNone = iota
+	tossDash
+	tossRise
+	tossFall
+)
+
+// The two kinds of projectile. Both live in Game.Balls and are hurt by the same skills; a fire ball is
+// Charizard's and a plain Ball is Pikachu's Electro Ball.
+const (
+	ballElectro = 0
+	ballFire    = 1
+)
+
+// Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
+// touches the opponent, runs out of range or HP, or reaches a wall.
 type Ball struct {
+	K         int     `json:"k,omitempty"` // ballElectro | ballFire
+	Owner     int     `json:"-"`           // the slot that threw it; the other slot is its target
+	Left      float64 `json:"-"`           // fire ball: range left
 	X         float64 `json:"x"`
 	Y         float64 `json:"y"`
 	DX, DY    float64 `json:"-"` // unit direction
@@ -127,21 +173,29 @@ type Game struct {
 	court CourtSize
 	P     [2]Player
 	Balls []Ball
+	rng   *rand.Rand // the fire's random spread; tests replace it
 }
 
 func NewGame(cfg Config) *Game { return NewGameFor(cfg, modeWeb) }
 
 func NewGameFor(cfg Config, mode string) *Game {
-	g := &Game{cfg: cfg, court: cfg.courtFor(mode)}
+	g := &Game{cfg: cfg, court: cfg.courtFor(mode), rng: rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 1))}
+	g.P[0].Kind, g.P[1].Kind = pikachu, snorlax
 	g.Reset()
 	return g
 }
 
+// SetKinds picks the characters of slots 0 and 1 and starts a fresh round.
+func (g *Game) SetKinds(a, b int) {
+	g.P[0].Kind, g.P[1].Kind = a, b
+	g.Reset()
+}
+
+// Reset starts a round over with the same characters: 400 apart, centred in the arena.
 func (g *Game) Reset() {
-	// 400 apart, centred in the arena.
 	c := g.court
-	g.P[pikachu] = Player{X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.cfg.Pikachu.MaxHP, FX: 1, AimX: 1}
-	g.P[snorlax] = Player{X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.cfg.Snorlax.MaxHP, FX: -1, AimX: -1}
+	g.P[0] = Player{Kind: g.P[0].Kind, X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.cfg.maxHPOf(g.P[0].Kind), FX: 1, AimX: 1}
+	g.P[1] = Player{Kind: g.P[1].Kind, X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.cfg.maxHPOf(g.P[1].Kind), FX: -1, AimX: -1}
 	g.Balls = nil
 }
 
@@ -159,11 +213,25 @@ func (g *Game) Winner() int {
 }
 
 // radius is how big a character's body is: a skill hits when its area touches the body.
-func (g *Game) radius(i int) float64 {
-	if i == pikachu {
-		return g.cfg.Pikachu.Radius
+func (g *Game) radius(i int) float64 { return g.cfg.radiusOf(g.P[i].Kind) }
+
+// reachable is whether the ground-level skills that only the Electro Ball and the Ice Punch share still
+// touch p: they miss anyone airborne (Snorlax mid-jump), but not Charizard, who keeps flying within their reach.
+func reachable(p *Player) bool { return p.Z < groundZ || p.Kind == charizard }
+
+// ballRadius and ballMass are the size and weight of a projectile, which depend on whose it is.
+func (g *Game) ballRadius(b *Ball) float64 {
+	if b.K == ballFire {
+		return g.cfg.Charizard.FireBreath.Radius
 	}
-	return g.cfg.Snorlax.Radius
+	return g.cfg.Pikachu.ElectroBall.Radius
+}
+
+func (g *Game) ballMass(b *Ball) float64 {
+	if b.K == ballFire {
+		return g.cfg.Charizard.FireBreath.Mass
+	}
+	return g.cfg.Pikachu.ElectroBall.Mass
 }
 
 // knockBack pushes target d units straight away from (sx, sy), stopping at the walls. Standing exactly
@@ -234,14 +302,18 @@ func (g *Game) Step(dt float64) []Event {
 	for i := range g.P {
 		p, other := &g.P[i], &g.P[1-i]
 
-		// A frozen player is deaf to its keys until it thaws: the held keys take effect again afterwards.
+		// A frozen or held player is deaf to its keys until it thaws or lands: the held keys take effect
+		// again afterwards.
 		in := p.In
-		if p.FrozenT > 0 {
-			if p.FrozenT -= dt; p.FrozenT < 1e-9 {
-				p.FrozenT = 0
+		if p.FrozenT > 0 || p.Held {
+			if p.FrozenT > 0 {
+				if p.FrozenT -= dt; p.FrozenT < 1e-9 {
+					p.FrozenT = 0
+				}
 			}
 			in = Input{}
-			p.DashT, p.BallT = 0, 0 // a dash or a charge in progress is cut short
+			p.DashT, p.BallT, p.BreathT = 0, 0, 0 // a dash, a charge or a breath in progress is cut short
+			g.dropToss(i)                         // a Charizard caught mid-toss lets go
 		}
 		if in.DX != 0 || in.DY != 0 {
 			p.FX, p.FY = in.DX, in.DY
@@ -258,7 +330,7 @@ func (g *Game) Step(dt float64) []Event {
 		}
 
 		// Pikachu's skill: dash toward the held direction (or where it faces).
-		if i == pikachu && in.Skill && p.DashT == 0 && p.DashCD == 0 && p.ThunderLeft == 0 && p.BallT == 0 {
+		if p.Kind == pikachu && in.Skill && p.DashT == 0 && p.DashCD == 0 && p.ThunderLeft == 0 && p.BallT == 0 {
 			dx, dy := float64(in.DX), float64(in.DY)
 			if dx == 0 && dy == 0 {
 				dx, dy = float64(p.FX), float64(p.FY)
@@ -273,7 +345,7 @@ func (g *Game) Step(dt float64) []Event {
 		// three. The aim is locked on the opponent's position when the beam is used.
 		busy := false
 		casting := false // Pikachu is rooted while Thunder runs
-		if i == snorlax {
+		if p.Kind == snorlax {
 			hb := g.cfg.Snorlax.HyperBeam
 			if p.JumpCD > 0 {
 				if p.JumpCD -= dt; p.JumpCD < 1e-9 {
@@ -328,13 +400,12 @@ func (g *Game) Step(dt float64) []Event {
 					p.SweptHit, p.BeamHitCD = true, hitCDNext(p.BeamHitCD, hb.HitInterval)
 					g.knockBack(p.X, p.Y, other, hb.Knockback, p.BeamX, p.BeamY)
 				}
-				br := g.cfg.Pikachu.ElectroBall.Radius
 				// A ball is hit like a player: at once, then every hit_interval while it stays in the beam
 				// (0 = once per sweep). Each hit also pushes it away from Snorlax by the beam's mass minus
 				// the ball's, so a heavy beam can hold a light ball back while the ball keeps flying forward.
-				push := math.Max(0, hb.Mass-g.cfg.Pikachu.ElectroBall.Mass)
 				for j := range g.Balls {
 					b := &g.Balls[j]
+					br, push := g.ballRadius(b), math.Max(0, hb.Mass-g.ballMass(b))
 					b.HitCD = hitCDTick(b.HitCD, dt)
 					ready := b.HitCD <= 1e-9 && (hb.HitInterval > 0 || b.LastSweep != p.SweepID)
 					if ready && sweepHits(p, &Player{X: b.X, Y: b.Y}, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+br, hb.Width+2*br) {
@@ -351,10 +422,15 @@ func (g *Game) Step(dt float64) []Event {
 			busy = p.BeamT > 0 || p.SweepT > 0 || p.RechargeT > 0 || p.PunchT > 0 || p.PunchLeft > 0 || p.PunchRecover > 0
 		}
 
+		if p.Kind == charizard {
+			events = append(events, g.stepCharizard(i, in, dt)...)
+			casting = p.TossPhase != tossNone // rooted but for the dash itself, which moves it
+		}
+
 		// Pikachu's Thunder. Pikachu cannot move until the last bolt has struck, and a
 		// new cast waits for the current one to finish. Bolts come from the sky, so
 		// height gives no cover. Each strike is also fired up into the sky from Pikachu.
-		if i == pikachu {
+		if p.Kind == pikachu {
 			th := g.cfg.Pikachu.Thunder
 			if p.ThunderCD > 0 {
 				if p.ThunderCD -= dt; p.ThunderCD < 1e-9 {
@@ -389,7 +465,7 @@ func (g *Game) Step(dt float64) []Event {
 
 		// Pikachu's Electro Ball: charge rooted, then throw it where Pikachu faces. Holding a direction
 		// while charging turns the aim. Only one charge or Thunder cast at a time.
-		if i == pikachu {
+		if p.Kind == pikachu {
 			bc := g.cfg.Pikachu.ElectroBall
 			if p.BallCD > 0 {
 				if p.BallCD -= dt; p.BallCD < 1e-9 {
@@ -404,7 +480,7 @@ func (g *Game) Step(dt float64) []Event {
 				casting = true // rooted through the tick of the throw, free from the next
 				if p.BallT -= dt; p.BallT < 1e-9 {
 					p.BallT = 0
-					off := g.radius(pikachu) + bc.Radius + 1 // start just clear of Pikachu's body
+					off := g.radius(i) + bc.Radius + 1 // start just clear of Pikachu's body
 					g.Balls = append(g.Balls, Ball{X: p.X + p.AimX*off, Y: p.Y + p.AimY*off, DX: p.AimX, DY: p.AimY, HP: bc.HP})
 				}
 			}
@@ -423,11 +499,11 @@ func (g *Game) Step(dt float64) []Event {
 		} else if n := math.Hypot(float64(in.DX), float64(in.DY)); !busy && !casting && n > 0 {
 			// Normalise diagonals so they are not faster. Snorlax steers at its own speeds in
 			// the air: rising is the first half of the jump, falling the second.
-			v := g.cfg.Pikachu.WalkSpeed
-			if i == snorlax {
-				v = g.cfg.Snorlax.WalkSpeed
+			v := g.cfg.walkSpeedOf(p.Kind)
+			if p.Kind == charizard && p.FlyT > 0 {
+				v = g.cfg.Charizard.Fly.Speed
 			}
-			if i == snorlax && p.Z > 0 {
+			if p.Kind == snorlax && p.Z > 0 {
 				v = g.cfg.Snorlax.Jump.AirSpeedSecondHalf
 				if p.VZ > 0 {
 					v = g.cfg.Snorlax.Jump.AirSpeedFirstHalf
@@ -440,12 +516,12 @@ func (g *Game) Step(dt float64) []Event {
 		p.Y = math.Min(math.Max(p.Y, 0), g.court.Width)
 
 		// Snorlax's skill: jump. Exact parabola so height and air time match the config.
-		if i == snorlax && in.Skill && p.Z == 0 && !busy && p.JumpCD == 0 {
+		if p.Kind == snorlax && in.Skill && p.Z == 0 && !busy && p.JumpCD == 0 {
 			p.VZ = g.cfg.jumpV()
 			p.JumpCD = g.cfg.Snorlax.Jump.Cooldown // counted from the moment of take-off
 		}
 		landed := false
-		if p.Z > 0 || p.VZ > 0 {
+		if p.Kind == snorlax && !p.Held && (p.Z > 0 || p.VZ > 0) {
 			gr := g.cfg.gravity()
 			p.Z += p.VZ*dt - 0.5*gr*dt*dt
 			p.VZ -= gr * dt
@@ -462,7 +538,7 @@ func (g *Game) Step(dt float64) []Event {
 			}
 			for j := range g.Balls { // the shock wave is a ground attack: it hits balls too
 				b := &g.Balls[j]
-				if math.Hypot(b.X-p.X, b.Y-p.Y) < g.cfg.Snorlax.Jump.SlamRadius+g.cfg.Pikachu.ElectroBall.Radius {
+				if math.Hypot(b.X-p.X, b.Y-p.Y) < g.cfg.Snorlax.Jump.SlamRadius+g.ballRadius(b) {
 					b.HP -= slamDamage
 				}
 			}
@@ -473,7 +549,7 @@ func (g *Game) Step(dt float64) []Event {
 		if p.CD > 0 {
 			p.CD = math.Max(0, p.CD-dt)
 		}
-		if i == pikachu && in.Attack && p.CD == 0 && p.Z == 0 && !busy {
+		if p.Kind == pikachu && in.Attack && p.CD == 0 && p.Z == 0 && !busy {
 			p.CD = quakeCooldown
 			events = append(events, Event{T: "quake", X: p.X, Y: p.Y, R: quakeRadius}) // the client draws the real reach
 			if dist(p, other) < quakeRadius+g.radius(1-i) && other.Z < groundZ {
@@ -517,7 +593,7 @@ func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 		}
 		// Like the other ground attacks it misses an airborne opponent. Tested along the whole step so a
 		// fast fist cannot jump over a body between two ticks.
-		if !p.PunchHit && other.Z < groundZ && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.radius(1-i) {
+		if !p.PunchHit && reachable(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.radius(1-i) {
 			p.PunchHit = true
 			g.hit(other, ip.Damage)
 			other.FrozenT = math.Max(other.FrozenT, ip.FreezeDuration)
@@ -525,11 +601,11 @@ func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 		}
 		for j := range g.Balls {
 			b := &g.Balls[j]
-			if b.LastPunch != p.PunchID && segDist(b.X, b.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.cfg.Pikachu.ElectroBall.Radius {
+			if b.LastPunch != p.PunchID && segDist(b.X, b.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.ballRadius(b) {
 				b.LastPunch = p.PunchID
 				b.HP -= ip.Damage
 				// carried along the dash by the mass the punch has over the ball
-				push := math.Max(0, ip.Mass-g.cfg.Pikachu.ElectroBall.Mass)
+				push := math.Max(0, ip.Mass-g.ballMass(b))
 				b.X, b.Y = g.pushedAway(b.X, b.Y, b.X-p.PunchDX, b.Y-p.PunchDY, push, p.PunchDX, p.PunchDY)
 			}
 		}
@@ -541,13 +617,37 @@ func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 	return events
 }
 
-// stepBalls flies the balls and blows up those that touched the opponent, reached a wall or ran out of HP.
+// stepBalls flies the projectiles. An Electro Ball blows up when it touches the opponent, reaches a wall or
+// runs out of HP, and the blast also burns fire balls caught in it. A fire ball is spent when it touches the
+// opponent (hurting it), reaches a wall, runs out of range or runs out of HP.
 func (g *Game) stepBalls(dt float64) []Event {
 	var events []Event
-	bc := g.cfg.Pikachu.ElectroBall
-	foe := &g.P[snorlax]
+	bc, fb := g.cfg.Pikachu.ElectroBall, g.cfg.Charizard.FireBreath
+	type blast struct{ x, y float64 }
+	var blasts []blast
 	kept := g.Balls[:0]
 	for _, b := range g.Balls {
+		foe := &g.P[1-b.Owner]
+		if b.K == ballFire {
+			if b.HP > 0 {
+				x0, y0 := b.X, b.Y
+				step := math.Min(fb.Speed*dt, b.Left)
+				b.X += b.DX * step
+				b.Y += b.DY * step
+				b.Left -= step
+				// Fire is breathed from above, so height gives no cover. Along the whole step, so a fast
+				// fire ball cannot jump over the opponent.
+				if segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= fb.Radius+g.radius(1-b.Owner) {
+					g.hit(foe, fb.Damage)
+					continue
+				}
+				inside := b.X > 0 && b.X < g.court.Length && b.Y > 0 && b.Y < g.court.Width
+				if inside && b.Left > 1e-9 {
+					kept = append(kept, b)
+				}
+			}
+			continue
+		}
 		boom := b.HP <= 0 // shot down where it is
 		if !boom {
 			x0, y0 := b.X, b.Y
@@ -560,7 +660,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}
 			// Along the whole step, so a fast ball cannot jump over the opponent between two ticks.
 			// Like the ground attacks it flies under an airborne opponent.
-			if foe.Z < groundZ && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= bc.Radius+g.radius(snorlax) {
+			if reachable(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= bc.Radius+g.radius(1-b.Owner) {
 				b.X, b.Y = closestOnSegment(foe.X, foe.Y, x0, y0, b.X, b.Y) // it blows up where it met the opponent
 				boom = true
 			}
@@ -570,13 +670,155 @@ func (g *Game) stepBalls(dt float64) []Event {
 			continue
 		}
 		events = append(events, Event{T: "explode", X: b.X, Y: b.Y, R: bc.ExplosionRadius})
-		if foe.Z < groundZ && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= bc.ExplosionRadius+g.radius(snorlax) {
+		blasts = append(blasts, blast{b.X, b.Y})
+		if reachable(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= bc.ExplosionRadius+g.radius(1-b.Owner) {
 			g.hit(foe, bc.ExplosionDamage)
 			g.knockBack(b.X, b.Y, foe, bc.Knockback, b.DX, b.DY)
 		}
 	}
 	g.Balls = kept
+	// The blast burns the fire balls near it; they are gone on the next step.
+	for _, e := range blasts {
+		for j := range g.Balls {
+			if b := &g.Balls[j]; b.K == ballFire && math.Hypot(b.X-e.x, b.Y-e.y) <= bc.ExplosionRadius+fb.Radius {
+				b.HP -= bc.ExplosionDamage
+			}
+		}
+	}
 	return events
+}
+
+// stepCharizard runs Charizard's three skills.
+//
+// Fly: the space bar lifts it to fly.height for fly.duration seconds; it only moves faster (fly.speed), and
+// the Electro Ball and the Ice Punch still reach it (see reachable). Its cooldown starts when it has landed.
+//
+// Fire Breath: for `duration` seconds it breathes `quantity` fire balls, evenly spaced, each aimed at where
+// the opponent stands when it leaves the mouth, then turned by a random angle within +-random_offset_angle.
+// Charizard can walk or fly meanwhile.
+//
+// Seismic Toss: it runs `length` along the aim at `speed`. A body the run touches (radius) is caught: Charizard
+// carries it up `high` and slams it down, where it takes `damage`.
+func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
+	var events []Event
+	p, other := &g.P[i], &g.P[1-i]
+	cz := g.cfg.Charizard
+	stunned := p.FrozenT > 0 || p.Held // in is already empty then; this only stops new skills
+	tick := func(v *float64) {
+		if *v > 0 {
+			if *v -= dt; *v < 1e-9 {
+				*v = 0
+			}
+		}
+	}
+	tick(&p.FlyCD)
+	tick(&p.BreathCD)
+	tick(&p.TossCD)
+
+	// ---- Fly ----
+	rise := cz.Fly.Height / flyRiseTime
+	if in.Skill && p.FlyT == 0 && p.FlyCD == 0 && p.Z == 0 && p.TossPhase == tossNone && !stunned {
+		p.FlyT = cz.Fly.Duration
+	}
+	if p.TossPhase == tossNone {
+		if p.FlyT > 0 {
+			if p.FlyT -= dt; p.FlyT < 1e-9 {
+				p.FlyT = 0
+			}
+			p.Z = math.Min(p.Z+rise*dt, cz.Fly.Height)
+		} else if p.Z > 0 {
+			if p.Z -= rise * dt; p.Z <= 1e-9 {
+				p.Z, p.FlyCD = 0, cz.Fly.Cooldown
+			}
+		}
+	}
+
+	// ---- Fire Breath ----
+	fb := cz.FireBreath
+	if in.Fire && p.BreathT == 0 && p.BreathCD == 0 && p.TossPhase == tossNone && !stunned {
+		p.BreathT, p.BreathLeft, p.BreathN, p.BreathCD = fb.Duration, fb.Duration, 0, fb.Cooldown
+	}
+	if p.BreathT > 0 {
+		if p.BreathT -= dt; p.BreathT < 1e-9 {
+			p.BreathT = 0
+		}
+		due := fb.Quantity // all of them once the time is up
+		if p.BreathT > 0 {
+			due = int(float64(fb.Quantity)*(1-p.BreathT/p.BreathLeft) + 1e-9)
+		}
+		for ; p.BreathN < due; p.BreathN++ {
+			dx, dy := other.X-p.X, other.Y-p.Y
+			n := math.Hypot(dx, dy)
+			if n < 1e-9 { // standing on the opponent: no direction, so use the facing
+				dx, dy = float64(p.FX), float64(p.FY)
+				n = math.Hypot(dx, dy)
+			}
+			a := (g.rng.Float64()*2 - 1) * fb.RandomOffsetAngle * math.Pi / 180
+			ux, uy := dx/n, dy/n
+			ux, uy = ux*math.Cos(a)-uy*math.Sin(a), ux*math.Sin(a)+uy*math.Cos(a)
+			off := g.radius(i) + fb.Radius + 1 // starts just clear of Charizard's body
+			g.Balls = append(g.Balls, Ball{K: ballFire, Owner: i, Left: fb.Length, X: p.X + ux*off, Y: p.Y + uy*off, DX: ux, DY: uy, HP: fb.HP})
+		}
+	}
+
+	// ---- Seismic Toss ----
+	ts := cz.SeismicToss
+	if in.Toss && p.TossPhase == tossNone && p.TossCD == 0 && p.FlyT == 0 && p.Z == 0 && !stunned {
+		p.TossPhase, p.TossLeft, p.TossCD = tossDash, ts.Length, ts.Cooldown
+		p.TossDX, p.TossDY = p.AimX, p.AimY
+		p.BreathT = 0 // it is all fire on the run: the breath stops
+	}
+	switch p.TossPhase {
+	case tossDash:
+		step := math.Min(ts.Speed*dt, p.TossLeft)
+		x0, y0 := p.X, p.Y
+		p.X = math.Min(math.Max(p.X+p.TossDX*step, 0), g.court.Length)
+		p.Y = math.Min(math.Max(p.Y+p.TossDY*step, 0), g.court.Width)
+		p.TossLeft -= step
+		// A ground attack like the punch: it misses an opponent who is in the air. Tested along the whole step.
+		if other.Z < groundZ && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ts.Radius+g.radius(1-i) {
+			other.Held = true
+			other.VZ = 0
+			p.TossPhase = tossRise
+		} else if p.TossLeft < 1e-9 {
+			p.TossPhase = tossNone // missed
+		}
+	case tossRise:
+		p.Z = math.Min(p.Z+ts.Speed*dt, ts.High)
+		if p.Z >= ts.High {
+			p.TossPhase = tossFall
+		}
+	case tossFall:
+		if p.Z -= ts.Speed * dt; p.Z <= 1e-9 {
+			p.Z, p.TossPhase = 0, tossNone
+			g.hit(other, ts.Damage)
+			other.Held, other.Z = false, 0
+			events = append(events, Event{T: "slam", X: other.X, Y: other.Y, R: ts.Radius}) // the same shock as Snorlax's landing
+		}
+	}
+	if other.Held && p.TossPhase != tossNone { // the caught body hangs in front of Charizard
+		off := g.radius(i) + g.radius(1-i)
+		other.X = math.Min(math.Max(p.X+p.TossDX*off, 0), g.court.Length)
+		other.Y = math.Min(math.Max(p.Y+p.TossDY*off, 0), g.court.Width)
+		other.Z = p.Z
+	}
+	return events
+}
+
+// dropToss lets go of a caught opponent: Charizard was frozen (or caught itself) mid-toss. The opponent falls
+// where it is, unhurt.
+func (g *Game) dropToss(i int) {
+	p, other := &g.P[i], &g.P[1-i]
+	if p.TossPhase == tossNone {
+		return
+	}
+	if other.Held {
+		other.Held, other.Z = false, 0
+	}
+	if p.TossPhase != tossDash {
+		p.Z = 0
+	}
+	p.TossPhase = tossNone
 }
 
 // closestOnSegment is the point of the segment (x0, y0)-(x1, y1) nearest to (px, py).

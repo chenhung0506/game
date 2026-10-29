@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -47,6 +48,37 @@ func next(t *testing.T, c *websocket.Conn, want string) map[string]any {
 	}
 }
 
+// pick sends the character choice the page sends from its selection screen.
+func pick(t *testing.T, c *websocket.Conn, kind int) {
+	t.Helper()
+	if err := c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(`{"pick":%d}`, kind))); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// lobbyWith reads lobby messages until the picks are want (-1 = none yet).
+func lobbyWith(t *testing.T, c *websocket.Conn, want [2]int) {
+	t.Helper()
+	for {
+		m := next(t, c, "lobby")
+		p := m["picks"].([]any)
+		if p[0] == float64(want[0]) && p[1] == float64(want[1]) {
+			return
+		}
+	}
+}
+
+// startMatch connects two players to a room and has them pick the given characters.
+func startMatch(t *testing.T, srv *httptest.Server, room string, ka, kb int) (a, b *websocket.Conn) {
+	t.Helper()
+	a, b = dial(t, srv, room), dial(t, srv, room)
+	pick(t, a, ka)
+	pick(t, b, kb)
+	next(t, a, "s")
+	next(t, b, "s")
+	return a, b
+}
+
 func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
@@ -62,8 +94,8 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if arena, ok := hi["arena"].(map[string]any); !ok || arena["w"] != float64(2000) || arena["h"] != float64(1000) {
 		t.Fatalf("hi.arena = %v, want 2000x1000", hi["arena"])
 	}
-	if rd, ok := hi["radius"].([]any); !ok || len(rd) != 2 || rd[0] != float64(16) || rd[1] != float64(24) {
-		t.Fatalf("hi.radius = %v, want [16 24]: the client draws each body at its size", hi["radius"])
+	if rd, ok := hi["radius"].([]any); !ok || len(rd) != 3 || rd[0] != float64(16) || rd[1] != float64(24) || rd[2] != float64(26) {
+		t.Fatalf("hi.radius = %v, want [16 24 26]: the client draws each body at its size, indexed by character", hi["radius"])
 	}
 	if pu, ok := hi["punch"].(map[string]any); !ok || pu["charge"] != float64(0.4) || pu["radius"] != float64(40) || pu["freeze"] != float64(1.5) {
 		t.Fatalf("hi.punch = %v, want charge 0.4 / radius 40 / freeze 1.5", hi["punch"])
@@ -71,8 +103,8 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if cd, ok := hi["cooldown"].(map[string]any); !ok || cd["punch"] != float64(5) {
 		t.Fatalf("hi.cooldown.punch = %v, want 5", hi["cooldown"])
 	}
-	if mh, ok := hi["maxhp"].([]any); !ok || len(mh) != 2 || mh[0] != float64(100) || mh[1] != float64(100) {
-		t.Fatalf("hi.maxhp = %v, want [100 100]: the client scales the HP bars with it", hi["maxhp"])
+	if mh, ok := hi["maxhp"].([]any); !ok || len(mh) != 3 || mh[0] != float64(100) || mh[1] != float64(100) || mh[2] != float64(120) {
+		t.Fatalf("hi.maxhp = %v, want [100 100 120]: the client scales the HP bars with it", hi["maxhp"])
 	}
 	// The client draws the beam's warning line from these, not from hard-coded numbers.
 	if beam, ok := hi["beam"].(map[string]any); !ok || beam["len"] != float64(450) || beam["w"] != float64(50) || beam["charge"] != float64(0.6) || beam["angle"] != float64(30) {
@@ -82,13 +114,23 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if cd, ok := hi["cooldown"].(map[string]any); !ok || cd["dash"] != float64(0.6) || cd["thunder"] != float64(4) || cd["jump"] != float64(1.5) || cd["beam"] != float64(5) {
 		t.Fatalf("hi.cooldown = %v, want dash 0.6 / thunder 4 / jump 1.5 / beam 5", hi["cooldown"])
 	}
-	next(t, a, "wait")
+	if cd := hi["cooldown"].(map[string]any); cd["fly"] != float64(8) || cd["fire"] != float64(8) || cd["toss"] != float64(10) {
+		t.Fatalf("hi.cooldown = %v, want Charizard's fly 8 / fire 8 / toss 10", cd)
+	}
+	if l := next(t, a, "lobby"); l["here"].([]any)[1] != false {
+		t.Fatalf("lobby = %v, want the opponent absent", l)
+	}
 
 	b := dial(t, srv, "abc")
 	if got := next(t, b, "hi")["you"]; got != float64(1) {
 		t.Fatalf("second player index = %v, want 1", got)
 	}
-	next(t, a, "s") // snapshots flow once both are present
+	if l := next(t, a, "lobby"); l["here"].([]any)[1] != true {
+		t.Fatalf("lobby = %v, want the opponent here once it joined", l)
+	}
+	pick(t, a, charizard)
+	pick(t, b, pikachu)
+	next(t, a, "s") // snapshots flow once both are here and both have picked
 	next(t, b, "s")
 
 	c := dial(t, srv, "abc")
@@ -96,15 +138,67 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 
 	// A different room is independent.
 	d := dial(t, srv, "other")
-	next(t, d, "wait")
+	next(t, d, "lobby")
+}
+
+// Nobody plays before both have picked, the picks decide who is who, and a character cannot be picked twice.
+func TestPickingCharactersStartsTheMatch(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	a, b := dial(t, srv, "pk"), dial(t, srv, "pk")
+
+	pick(t, a, snorlax)
+	lobbyWith(t, b, [2]int{snorlax, -1}) // the opponent sees what was picked
+	pick(t, b, snorlax)                  // already taken
+	lobbyWith(t, a, [2]int{snorlax, -1}) // the refusal changes nothing
+	pick(t, b, 7)                        // no such character
+	pick(t, b, -1)
+	lobbyWith(t, b, [2]int{snorlax, -1})
+
+	pick(t, b, charizard)
+	ps := next(t, a, "s")["p"].([]any)
+	if k0, k1 := ps[0].(map[string]any)["k"], ps[1].(map[string]any)["k"]; k0 != float64(snorlax) || k1 != float64(charizard) {
+		t.Fatalf("kinds in the snapshot = %v, %v, want snorlax in slot 0 and charizard in slot 1", k0, k1)
+	}
+	if hp := ps[1].(map[string]any)["hp"]; hp != float64(120) {
+		t.Fatalf("charizard's hp = %v, want its max_hp 120", hp)
+	}
+
+	// Once the match is on, picks are ignored: nobody changes character mid-fight.
+	pick(t, a, pikachu)
+	for i := 0; i < 5; i++ {
+		ps = next(t, b, "s")["p"].([]any)
+		if k := ps[0].(map[string]any)["k"]; k != float64(snorlax) {
+			t.Fatalf("slot 0's kind = %v after a pick during the match, want it unchanged", k)
+		}
+	}
+}
+
+// Leaving sends the other player back to the character choice, keeping its pick; the next one chooses
+// something else and the match starts again with them.
+func TestLeavingReturnsToTheLobby(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	a, b := startMatch(t, srv, "lv", pikachu, snorlax)
+
+	b.Close()
+	lobbyWith(t, a, [2]int{pikachu, -1})
+
+	c := dial(t, srv, "lv")
+	pick(t, c, pikachu) // taken by a
+	lobbyWith(t, a, [2]int{pikachu, -1})
+	pick(t, c, charizard)
+	ps := next(t, a, "s")["p"].([]any)
+	if k := ps[1].(map[string]any)["k"]; k != float64(charizard) {
+		t.Fatalf("slot 1's kind = %v, want charizard", k)
+	}
 }
 
 func TestInputMovesPlayerAndLeaveSendsWait(t *testing.T) {
 	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
 
-	a, b := dial(t, srv, "mv"), dial(t, srv, "mv")
-	next(t, a, "s")
+	a, b := startMatch(t, srv, "mv", pikachu, snorlax)
 	x0 := next(t, b, "s")["p"].([]any)[0].(map[string]any)["x"].(float64) // the real spawn point
 
 	a.WriteMessage(websocket.TextMessage, []byte(`{"dx":1,"dy":0}`))
@@ -117,7 +211,7 @@ func TestInputMovesPlayerAndLeaveSendsWait(t *testing.T) {
 	}
 
 	a.Close()
-	next(t, b, "wait")
+	lobbyWith(t, b, [2]int{-1, snorlax})
 }
 
 // The room takes the court of the view it was opened from, whatever the second player opens it with.

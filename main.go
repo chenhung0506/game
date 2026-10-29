@@ -34,6 +34,7 @@ type room struct {
 	mu      sync.Mutex
 	g       *Game
 	c       [2]*client
+	pick    [2]int // the character each slot chose; -1 until it does
 	running bool
 	overAt  time.Time // zero while a round is in progress
 	winner  int
@@ -56,7 +57,7 @@ func (h *hub) join(id, mode string, c *client) (r *room, idx int, ok bool) {
 		if len(h.rooms) >= maxRooms {
 			return nil, 0, false
 		}
-		r = &room{g: NewGameFor(h.cfg, mode), winner: -1}
+		r = &room{g: NewGameFor(h.cfg, mode), winner: -1, pick: [2]int{-1, -1}}
 		h.rooms[id] = r
 	}
 	r.mu.Lock()
@@ -64,12 +65,7 @@ func (h *hub) join(id, mode string, c *client) (r *room, idx int, ok bool) {
 	for i := range r.c {
 		if r.c[i] == nil {
 			r.c[i] = c
-			r.g.Reset()
-			r.overAt, r.winner = time.Time{}, -1
-			if r.c[0] != nil && r.c[1] != nil && !r.running {
-				r.running = true
-				go r.loop()
-			}
+			r.pick[i] = -1
 			return r, i, true
 		}
 	}
@@ -85,13 +81,45 @@ func (h *hub) leave(id string, r *room, idx int) {
 		close(c.send) // only closed under r.mu, which is also held while broadcasting
 		r.c[idx] = nil
 	}
+	r.pick[idx] = -1
 	if r.c[0] == nil && r.c[1] == nil {
 		delete(h.rooms, id)
 		return
 	}
-	// The remaining player waits for a new opponent.
-	r.g.Reset()
-	r.broadcast([]byte(`{"t":"wait"}`))
+	// The remaining player keeps its pick and waits in the lobby for a new opponent, who picks something else.
+	r.overAt, r.winner = time.Time{}, -1
+	r.broadcastLobby()
+}
+
+// playing is whether a match is on: both players are here and both have picked. Must be called with r.mu held.
+func (r *room) playing() bool {
+	return r.c[0] != nil && r.c[1] != nil && r.pick[0] >= 0 && r.pick[1] >= 0
+}
+
+// choose records slot idx's pick and starts the match once both players have one. It reports whether the
+// pick was taken: an unknown character, or the one the opponent already has, is refused, and so is any pick
+// while a match is on. Must be called with r.mu held.
+func (r *room) choose(idx, kind int) bool {
+	if r.playing() || kind < 0 || kind >= kinds || r.pick[1-idx] == kind {
+		return false
+	}
+	r.pick[idx] = kind
+	if r.playing() {
+		r.g.SetKinds(r.pick[0], r.pick[1])
+		r.overAt, r.winner = time.Time{}, -1
+		if !r.running {
+			r.running = true
+			go r.loop()
+		}
+	}
+	return true
+}
+
+// broadcastLobby tells both players who is here and what they picked; the page shows its character
+// choice until snapshots start. Must be called with r.mu held.
+func (r *room) broadcastLobby() {
+	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.c[0] != nil, r.c[1] != nil}})
+	r.broadcast(msg)
 }
 
 // broadcast must be called with r.mu held. A client whose buffer is full
@@ -113,7 +141,7 @@ func (r *room) loop() {
 	defer t.Stop()
 	for range t.C {
 		r.mu.Lock()
-		if r.c[0] == nil || r.c[1] == nil {
+		if !r.playing() {
 			r.running = false
 			r.mu.Unlock()
 			return
@@ -168,26 +196,30 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	go c.writePump()
 
 	r.mu.Lock()
-	hb, th := r.g.cfg.Snorlax.HyperBeam, r.g.cfg.Pikachu.Thunder // tunable, so the client takes them from here instead of hard-coding
+	cfg := r.g.cfg
+	hb, th, fb, ts := cfg.Snorlax.HyperBeam, cfg.Pikachu.Thunder, cfg.Charizard.FireBreath, cfg.Charizard.SeismicToss // tunable, so the client takes them from here instead of hard-coding
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
-		"radius":  []float64{r.g.cfg.Pikachu.Radius, r.g.cfg.Snorlax.Radius},
-		"punch":   map[string]float64{"charge": r.g.cfg.Snorlax.IcePunch.ChargeDuration, "radius": r.g.cfg.Snorlax.IcePunch.Radius, "freeze": r.g.cfg.Snorlax.IcePunch.FreezeDuration, "distance": r.g.cfg.Snorlax.IcePunch.Distance},
-		"ball":    map[string]float64{"radius": r.g.cfg.Pikachu.ElectroBall.Radius, "hp": float64(r.g.cfg.Pikachu.ElectroBall.HP), "charge": r.g.cfg.Pikachu.ElectroBall.ChargeTime},
-		"maxhp":   []int{r.g.cfg.Pikachu.MaxHP, r.g.cfg.Snorlax.MaxHP},
+		// per character: pikachu, snorlax, charizard
+		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius},
+		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP},
+		"punch":   map[string]float64{"charge": cfg.Snorlax.IcePunch.ChargeDuration, "radius": cfg.Snorlax.IcePunch.Radius, "freeze": cfg.Snorlax.IcePunch.FreezeDuration, "distance": cfg.Snorlax.IcePunch.Distance},
+		"ball":    map[string]float64{"radius": cfg.Pikachu.ElectroBall.Radius, "hp": float64(cfg.Pikachu.ElectroBall.HP), "charge": cfg.Pikachu.ElectroBall.ChargeTime},
 		"beam":    map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},
 		"thunder": map[string]float64{"radius": th.Radius, "delay": th.Delay, "interval": th.Interval, "strikes": float64(th.Strikes)},
+		"fire":    map[string]float64{"radius": fb.Radius, "hp": float64(fb.HP)},
+		"toss":    map[string]float64{"radius": ts.Radius, "high": ts.High},
+		"fly":     map[string]float64{"height": cfg.Charizard.Fly.Height},
 		// full cooldowns, so the pad's buttons can show how much of each is left
-		"cooldown": map[string]float64{"dash": r.g.cfg.Pikachu.Dash.Cooldown, "thunder": th.Cooldown, "jump": r.g.cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown, "ball": r.g.cfg.Pikachu.ElectroBall.Cooldown, "punch": r.g.cfg.Snorlax.IcePunch.Cooldown},
+		"cooldown": map[string]float64{"dash": cfg.Pikachu.Dash.Cooldown, "thunder": th.Cooldown, "jump": cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown, "ball": cfg.Pikachu.ElectroBall.Cooldown, "punch": cfg.Snorlax.IcePunch.Cooldown,
+			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown},
 	})
 	c.send <- hi
-	if r.c[1-idx] == nil {
-		c.send <- []byte(`{"t":"wait"}`)
-	}
+	r.broadcastLobby() // both players learn who joined
 	r.mu.Unlock()
 
 	defer h.leave(id, r, idx)
-	conn.SetReadLimit(256)
+	conn.SetReadLimit(512)
 	conn.SetReadDeadline(time.Now().Add(pongWait))
 	conn.SetPongHandler(func(string) error {
 		return conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -197,12 +229,23 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			return
 		}
-		var in Input
-		if json.Unmarshal(data, &in) != nil {
+		// The one other message from the page is the character choice {"pick":2}; the rest is held keys.
+		var m struct {
+			Pick *int `json:"pick"`
+			Input
+		}
+		if json.Unmarshal(data, &m) != nil {
 			continue
 		}
-		in.DX, in.DY = clampDir(in.DX), clampDir(in.DY)
 		r.mu.Lock()
+		if m.Pick != nil {
+			r.choose(idx, *m.Pick)
+			r.broadcastLobby() // also when refused, so the page learns what is taken
+			r.mu.Unlock()
+			continue
+		}
+		in := m.Input
+		in.DX, in.DY = clampDir(in.DX), clampDir(in.DY)
 		r.g.P[idx].In = in
 		r.mu.Unlock()
 	}

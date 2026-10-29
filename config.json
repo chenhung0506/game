@@ -59,7 +59,7 @@
     "hyper_beam": {
       "charge_duration": 0.4,
       "sweep_angle": 35,
-      "sweep_duration": 0.65,
+      "sweep_duration": 1,
       "recharge_duration": 2,
       "cooldown": 5,
       "damage": 10,
@@ -68,6 +68,37 @@
       "mass": 130,
       "length": 650,
       "width": 50
+    }
+  },
+  "charizard": {
+    "max_hp": 120,
+    "walk_speed": 150,
+    "radius": 30,
+    "fly": {
+      "duration": 6,
+      "cooldown": 8,
+      "speed": 260,
+      "height": 90
+    },
+    "fire_breath": {
+      "speed": 450,
+      "radius": 10,
+      "hp": 10,
+      "damage": 2,
+      "cooldown": 8,
+      "mass": 20,
+      "duration": 4,
+      "quantity": 40,
+      "random_offset_angle": 7.5,
+      "length": 500
+    },
+    "seismic_toss": {
+      "speed": 700,
+      "radius": 60,
+      "damage": 35,
+      "cooldown": 10,
+      "length": 300,
+      "high": 180
     }
   }
 }

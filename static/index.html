@@ -23,11 +23,23 @@
   .btn { display: flex; align-items: center; justify-content: center; background: #ffffff2a; border: 2px solid #ffffff66; color: #fff; font-weight: bold; }
   .btn.on { background: #ffffff77; }
   /* cooldown: a dark pie over the button, the part still to wait, shrinking clockwise from the top */
+  /* character choice: shown from connecting until the match starts */
+  #pick { position: fixed; inset: 0; z-index: 4; background: #14161c; display: none; flex-direction: column; align-items: center; padding: 56px 12px 12px; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; }
+  #pick h2 { margin: 6px 0 12px; font-size: 20px; }
+  #cards { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .card { width: 148px; border: 2px solid #3d4a40; border-radius: 12px; padding: 8px; background: #1b1f27; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .card canvas { margin: 0; border: 0; width: 120px; height: 100px; border-radius: 8px; background: #2b3a2f; }
+  .card b { display: block; margin-top: 6px; font-size: 16px; }
+  .card small { display: block; margin-top: 4px; opacity: .75; line-height: 1.5; text-align: left; font-size: 12px; }
+  .card.mine { border-color: #6fd36f; background: #243026; }
+  .card.taken { opacity: .35; cursor: not-allowed; }
+  #pickmsg { margin-top: 14px; text-align: center; line-height: 1.7; }
   .cd { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: conic-gradient(#000000b0 var(--cd, 0deg), transparent 0); }
 </style>
 </head>
 <body>
 <div id="bar"></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="cards"></div><div id="pickmsg"></div></div>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
 <script>
@@ -39,10 +51,14 @@ document.body.classList.toggle('portrait', PORTRAIT);
 const QUAKE_LIFE = 0.75; // seconds the earthquake effect stays on screen (it also plays on a landing)
 let ROT = 0;               // how far the arena is turned on screen (radians); 0 in landscape
 let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
-// Slot 0 is always Pikachu, slot 1 Snorlax (fixed by the server).
+// Each player picks a character in the lobby; a snapshot's p[i].k says who is who (0 Pikachu, 1 Snorlax, 2 Charizard).
+// Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
+const NAMES = ['皮卡丘', '卡比獸', '噴火龍'];
+const BLURB = ['衝刺・打雷・電球・地震', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投'];
 const HELP = [
   '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震　K＝電球（續能後朝面向的方向丟出，續能時按方向鍵轉向，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
   '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　J＝急凍拳（蓄力時按方向鍵決定方向，朝該方向衝拳，打到的敵人被冰凍）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
+  '你是噴火龍　移動 WASD / 方向鍵　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　K＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　J＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
 ];
 const ghosts = []; // dash afterimages
 const beamLook = { ang: null, tail: null }; // smoothed beam angle, and the fading afterimage when a sweep ends
@@ -51,16 +67,18 @@ let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }; // replaced by the se
 let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewise
 // Body sizes from 'hi' (world units). The art below was drawn at REF, so it is scaled by radius / REF;
 // that is also the size the server hits with, and it does not depend on the court's size.
-let radius = [16, 24];
-const REF = [16, 24];
-let maxHp = [100, 100]; // each character's full HP, from 'hi'
+let radius = [16, 24, 26]; // indexed by character
+const REF = [16, 24, 26];
+let maxHp = [100, 100, 120]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
-let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0 }; // full cooldowns, from 'hi'
+let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
+let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
 const shadow = { x: null, y: null }; // smoothed thunder shadow position
 const smoke = []; // puffs rising off Snorlax while it recharges
+const flames = []; // fading flames Charizard leaves while it runs with a catch
 let smokeAcc = 0;
 
 const query = new URLSearchParams(location.search);
@@ -77,17 +95,28 @@ const disp = [{ x: null, y: 0, z: 0 }, { x: null, y: 0, z: 0 }]; // smoothed pos
 let fx = [], shake = 0;
 
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // the first player's view picks the court
+let picks = [-1, -1], here = [true, false], padKind = -1;
+const slotOf = (k) => (snap ? snap.p.findIndex((q) => q.k === k) : -1); // which slot plays that character, -1 if nobody
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); document.getElementById('bar2').textContent = HELP[you]; if (PORTRAIT) buildPad(); }
-  else if (m.t === 'wait') { waiting = true; snap = null; }
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
+  else if (m.t === 'lobby') {
+    if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
+    picks = m.picks; here = m.here; waiting = !(here[0] && here[1]); snap = null; padKind = -1;
+    document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
+    showPick();
+  }
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
-    const prevSt = snap ? snap.p[1].st : 0;
+    if (!snap) { ghosts.length = iceTrail.length = smoke.length = flames.length = 0; fx = []; beamLook.ang = beamLook.tail = null; shadow.x = null; for (const d of disp) d.x = null; } // a new match starts clean
+    const sn = m.p.findIndex((q) => q.k === 1);
+    const prevSt = snap && sn >= 0 ? snap.p[sn].st : 0;
     waiting = false; snap = m;
-    const st = m.p[1].st;
+    document.getElementById('pick').style.display = 'none';
+    if (padKind !== m.p[you].k) { padKind = m.p[you].k; document.getElementById('bar2').textContent = HELP[padKind]; if (PORTRAIT) buildPad(); }
+    const st = sn >= 0 ? m.p[sn].st : 0;
     if (st > 0 && !(prevSt > 0)) shake = 14; // the sweep begins
-    if (!(st > 0) && prevSt > 0 && beamLook.ang !== null) beamLook.tail = { x: disp[1].x, y: disp[1].y - 6, ang: beamLook.ang, age: 0 };
+    if (!(st > 0) && prevSt > 0 && beamLook.ang !== null) beamLook.tail = { x: disp[sn].x, y: disp[sn].y - 6, ang: beamLook.ang, age: 0 };
     for (const ev of m.e || []) {
       fx.push({ ...ev, age: 0 });
       if (ev.t === 'slam') shake = 16;
@@ -98,7 +127,7 @@ ws.onmessage = (e) => {
     }
   }
 };
-ws.onclose = () => { status = '連線中斷，重新整理頁面再試'; waiting = false; snap = null; };
+ws.onclose = () => { status = '連線中斷，重新整理頁面再試'; waiting = false; snap = null; document.getElementById('pick').style.display = 'none'; };
 
 // The view: the world is drawn through VIEW, so everything that is not upright art (rings, beams, the
 // strike areas) just follows. Pikachu starts on the left, so its view turns the arena a quarter turn
@@ -117,10 +146,55 @@ const rv = (x, y) => [x * Math.cos(ROT) - y * Math.sin(ROT), x * Math.sin(ROT) +
 // Draw upright art at a world point: the origin is that point and the axes are the screen's.
 function upright(x, y, fn) { ctx.save(); ctx.translate(x, y); ctx.rotate(-ROT); fn(); ctx.restore(); }
 
+// ---- the character choice ----
+const cardEls = [];
+function buildCards() {
+  const box = document.getElementById('cards');
+  box.textContent = '';
+  cardEls.length = 0;
+  NAMES.forEach((name, k) => {
+    const el = document.createElement('div'); el.className = 'card';
+    const cvs = document.createElement('canvas'); cvs.width = 240; cvs.height = 200; // drawn at 2x
+    const b = document.createElement('b'); b.textContent = name;
+    const sm = document.createElement('small'); sm.textContent = `HP ${maxHp[k]}　${BLURB[k]}`;
+    el.append(cvs, b, sm); box.append(el);
+    el.addEventListener('click', () => { if (picks[1 - you] !== k && ws.readyState === 1) ws.send(JSON.stringify({ pick: k })); });
+    cardEls.push({ el, cvs });
+  });
+}
+function showPick() {
+  document.getElementById('pick').style.display = 'flex';
+  cardEls.forEach(({ el }, k) => {
+    el.classList.toggle('mine', picks[you] === k);
+    el.classList.toggle('taken', picks[1 - you] === k);
+  });
+  const link = location.origin + location.pathname + '?room=' + room;
+  const mine = picks[you], theirs = picks[1 - you];
+  const lines = [];
+  if (!here[1 - you]) lines.push(`等待對手加入… 把這個連結傳給對方：<br><code>${link}</code><br>（電腦橫式版：在自己的網址後面加上 &landscape）`);
+  else if (mine < 0 && theirs >= 0) lines.push(`對手選了${NAMES[theirs]}，換你選`);
+  else if (mine >= 0 && theirs < 0) lines.push('對手選擇中…');
+  if (mine >= 0) lines.push(`你選了${NAMES[mine]}（對手還沒選好以前，可以重選）`);
+  else if (here[1 - you] && theirs < 0) lines.push('點一隻寶可夢開始');
+  document.getElementById('pickmsg').innerHTML = lines.join('<br>');
+}
+// The cards show the real art, moving: the same drawing the arena uses.
+function drawCards() {
+  if (document.getElementById('pick').style.display !== 'flex') return;
+  const t = performance.now() / 1000;
+  cardEls.forEach(({ cvs }, k) => {
+    const c = cvs.getContext('2d');
+    c.clearRect(0, 0, cvs.width, cvs.height);
+    c.save(); c.translate(cvs.width / 2, cvs.height / 2 + 6); c.scale(2.4, 2.4);
+    art(c, k, 0, 0, t, k === 2 && Math.sin(t * 0.8) > 0.2 ? 1 : 0); // Charizard now and then beats its wings hard
+    c.restore();
+  });
+}
+
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false }; // the pad's buttons
+const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -137,6 +211,8 @@ function sendInput() {
     ax: Math.round((stickAim.x * c + stickAim.y * s) * 100) / 100 || 0,
     ay: Math.round((-stickAim.x * s + stickAim.y * c) * 100) / 100 || 0,
     skill: k(' ') || touch.skill, atk: k('j'), punch: k('j') || touch.punch, beam: k('k') || touch.beam, ball: k('k') || touch.ball, thunder: k('l') || touch.thunder,
+    // the keys are shared between the characters (J and K each do whatever the one you play has); the server uses the ones that fit
+    fire: k('k') || touch.fire, toss: k('j') || touch.toss,
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
@@ -179,6 +255,7 @@ if (PORTRAIT) {
 const PAD = [
   { main: ['衝刺', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball']] }, // Pikachu
   { main: ['跳躍', 'skill'], small: [['死光', 'beam'], ['冰拳', 'punch']] }, // Snorlax
+  { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
@@ -204,21 +281,21 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }];
   const hold = (b, label, name) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
-    cdBtns.push({ span, field: CD[you][name][0], total: CD[you][name][1] });
+    cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1] });
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (id !== null) return; id = e.pointerId; b.setPointerCapture(id); touch[name] = true; b.classList.add('on'); sendInput(); });
     const up = (e) => { if (e.pointerId !== id) return; id = null; touch[name] = false; b.classList.remove('on'); sendInput(); };
     for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(t, up);
   };
   const mcx = EDGE + MAIN / 2, mcy = BOTTOM + MAIN / 2; // centre of the main button, from the right / bottom edges
-  const [mainLabel, mainKey] = PAD[you].main;
+  const [mainLabel, mainKey] = PAD[padKind].main;
   const main = el('btn'); place(main, MAIN, mcx, mcy); main.style.fontSize = '20px'; hold(main, mainLabel, mainKey);
   const R = MAIN / 2 + SMALL / 2 + 8;
   [165, 105].forEach((deg, n) => { // slot angles: round the upper-left of the main button
-    const def = PAD[you].small[n];
+    const def = PAD[padKind].small[n];
     if (!def) return;
     const b = el('btn'), a = deg * Math.PI / 180;
     place(b, SMALL, mcx - R * Math.cos(a), mcy + R * Math.sin(a)); b.style.fontSize = '14px'; hold(b, def[0], def[1]);
@@ -227,25 +304,74 @@ function buildPad() {
 
 // ---- render ----
 // Placeholder art drawn with shapes; (x, y) is the centre of the body.
+// art() draws one character (0 Pikachu, 1 Snorlax, 2 Charizard) in an upright frame on any context; the
+// arena and the character cards both use it. flap (Charizard only) is 1 while it flies, to beat the wings hard.
+function el(c, x, y, rx, ry, fill, rot = 0) { c.fillStyle = fill; c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, 7); c.fill(); }
+function art(c, kind, x, y, t, flap) {
+  if (kind === 0) { // Pikachu
+    c.fillStyle = '#f5c542'; c.fillRect(x - 14, y - 14, 28, 28);
+    c.fillRect(x - 12, y - 26, 6, 12); c.fillRect(x + 6, y - 26, 6, 12);
+    c.fillStyle = '#222'; c.fillRect(x - 12, y - 26, 6, 4); c.fillRect(x + 6, y - 26, 6, 4);
+    c.fillRect(x - 8, y - 6, 4, 4); c.fillRect(x + 4, y - 6, 4, 4);
+    c.fillStyle = '#e34'; c.fillRect(x - 13, y + 2, 5, 5); c.fillRect(x + 8, y + 2, 5, 5);
+  } else if (kind === 1) { // Snorlax
+    c.fillStyle = '#3f6f86'; c.fillRect(x - 22, y - 18, 44, 36);
+    c.fillRect(x - 18, y - 26, 8, 8); c.fillRect(x + 10, y - 26, 8, 8);
+    c.fillStyle = '#e8dcc0'; c.beginPath(); c.ellipse(x, y + 5, 15, 11, 0, 0, 7); c.fill();
+    c.fillStyle = '#222'; c.fillRect(x - 10, y - 8, 7, 2); c.fillRect(x + 3, y - 8, 7, 2);
+  } else { artCharizard(c, x, y, t, flap); }
+}
+
+// Charizard: orange body and cream belly, a flame at the tail tip and two big teal wings. The wings beat all
+// the time, a lazy flutter standing and a hard fast beat in flight, with a small fast tremor on top.
+function artCharizard(c, x, y, t, flap) {
+  const beat = flap ? Math.sin(t * 26) * 0.5 : Math.sin(t * 9) * 0.14;
+  const ang = beat + Math.sin(t * 61) * 0.035; // the tremor
+  c.save();
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  // tail curling up behind, with a flickering flame on the tip
+  c.strokeStyle = '#d9622a'; c.lineWidth = 7;
+  c.beginPath(); c.moveTo(x + 7, y + 15); c.bezierCurveTo(x + 22, y + 23, x + 33, y + 11, x + 29, y - 3); c.stroke();
+  const fk = 1 + 0.22 * Math.sin(t * 31) + 0.12 * Math.sin(t * 47), tx = x + 29, ty = y - 5;
+  c.fillStyle = '#ff7a1a'; c.beginPath(); c.moveTo(tx - 5, ty + 2); c.quadraticCurveTo(tx - 6, ty - 8 * fk, tx + 1, ty - 17 * fk); c.quadraticCurveTo(tx + 7, ty - 8 * fk, tx + 5, ty + 2); c.closePath(); c.fill();
+  c.fillStyle = '#ffd84a'; c.beginPath(); c.moveTo(tx - 2.5, ty + 1); c.quadraticCurveTo(tx - 3, ty - 5 * fk, tx + 1, ty - 10 * fk); c.quadraticCurveTo(tx + 4, ty - 5 * fk, tx + 2.5, ty + 1); c.closePath(); c.fill();
+  // wings, behind the body: a bone along the front edge, a teal membrane with a scalloped back edge
+  for (const sd of [-1, 1]) {
+    c.save(); c.translate(x + sd * 8, y - 9); c.scale(sd, 1); c.rotate(-0.75 - ang);
+    c.fillStyle = '#2e9aa8'; c.strokeStyle = '#17606b'; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(38, -4); c.lineTo(33, 6); c.lineTo(27, 3); c.lineTo(24, 14); c.lineTo(17, 9); c.lineTo(12, 19); c.lineTo(6, 11); c.lineTo(0, 14); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = '#17606b'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(38, -4); c.lineTo(24, 14); c.moveTo(38, -4); c.lineTo(12, 19); c.moveTo(38, -4); c.lineTo(0, 14); c.stroke();
+    c.strokeStyle = '#e8762a'; c.lineWidth = 3.2; c.beginPath(); c.moveTo(0, 0); c.lineTo(38, -4); c.stroke(); // the leading bone
+    el(c, 39, -4, 2.2, 2.2, '#f6d58a'); // the claw at the wing's tip
+    c.restore();
+  }
+  // feet, body, belly, arms
+  el(c, x - 8, y + 21, 6.5, 4.5, '#d9622a'); el(c, x + 8, y + 21, 6.5, 4.5, '#d9622a');
+  el(c, x, y + 5, 15, 18, '#f08030');
+  el(c, x, y + 9, 9, 13, '#f6d58a');
+  c.strokeStyle = '#e0b866'; c.lineWidth = 1;
+  for (let r = 0; r < 4; r++) { c.beginPath(); c.moveTo(x - 7, y + 3 + r * 5); c.quadraticCurveTo(x, y + 5 + r * 5, x + 7, y + 3 + r * 5); c.stroke(); }
+  el(c, x - 16.5, y + 3, 4.5, 8, '#f08030', 0.25); el(c, x + 16.5, y + 3, 4.5, 8, '#f08030', -0.25);
+  // head: horns swept back, snout, eyes
+  c.fillStyle = '#c4501f';
+  c.beginPath(); c.moveTo(x - 6, y - 22); c.lineTo(x - 13, y - 33); c.lineTo(x - 2, y - 25); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(x + 6, y - 22); c.lineTo(x + 13, y - 33); c.lineTo(x + 2, y - 25); c.closePath(); c.fill();
+  el(c, x, y - 16, 11.5, 10, '#f08030');
+  el(c, x, y - 11.5, 6.5, 4.8, '#f59a58');
+  el(c, x - 2.3, y - 12.5, 0.9, 1.1, '#6b2a10'); el(c, x + 2.3, y - 12.5, 0.9, 1.1, '#6b2a10');
+  el(c, x - 5.2, y - 19, 2.7, 3.1, '#fff'); el(c, x + 5.2, y - 19, 2.7, 3.1, '#fff');
+  el(c, x - 5.2, y - 18.4, 1.4, 2, '#1b5e8c'); el(c, x + 5.2, y - 18.4, 1.4, 2, '#1b5e8c');
+  c.restore();
+}
+
 // (x, y) is a ground point in the world and lift is the height above it, which is up on screen.
-function drawBody(i, X, Y, alpha, lift = 0) {
-  const bs = radius[i] / REF[i];
+function drawBody(kind, X, Y, alpha, lift = 0, flap = 0) {
+  const bs = radius[kind] / REF[kind];
   ctx.save(); ctx.translate(X, Y); ctx.rotate(-ROT); // upright whatever the view
   ctx.scale(bs, bs);
-  const x = 0, y = -lift / bs; // lift is a height in world units, so it is not scaled
   ctx.globalAlpha = alpha;
-  if (i === 0) { // Pikachu
-    ctx.fillStyle = '#f5c542'; ctx.fillRect(x - 14, y - 14, 28, 28);
-    ctx.fillRect(x - 12, y - 26, 6, 12); ctx.fillRect(x + 6, y - 26, 6, 12);
-    ctx.fillStyle = '#222'; ctx.fillRect(x - 12, y - 26, 6, 4); ctx.fillRect(x + 6, y - 26, 6, 4);
-    ctx.fillRect(x - 8, y - 6, 4, 4); ctx.fillRect(x + 4, y - 6, 4, 4);
-    ctx.fillStyle = '#e34'; ctx.fillRect(x - 13, y + 2, 5, 5); ctx.fillRect(x + 8, y + 2, 5, 5);
-  } else { // Snorlax
-    ctx.fillStyle = '#3f6f86'; ctx.fillRect(x - 22, y - 18, 44, 36);
-    ctx.fillRect(x - 18, y - 26, 8, 8); ctx.fillRect(x + 10, y - 26, 8, 8);
-    ctx.fillStyle = '#e8dcc0'; ctx.beginPath(); ctx.ellipse(x, y + 5, 15, 11, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#222'; ctx.fillRect(x - 10, y - 8, 7, 2); ctx.fillRect(x + 3, y - 8, 7, 2);
-  }
+  art(ctx, kind, 0, -lift / bs, performance.now() / 1000, flap); // lift is a height in world units, so it is not scaled
   ctx.restore();
 }
 
@@ -256,9 +382,9 @@ function drawBody(i, X, Y, alpha, lift = 0) {
 const tele = document.createElement('canvas'); tele.width = arena.w; tele.height = arena.h;
 const teleCtx = tele.getContext('2d');
 function drawTelegraph() {
-  const p = snap.p[1];
-  if (!(p.bt > 0)) return;
-  const d = disp[1], k = 1 - p.bt / beamCfg.charge; // 0 -> 1 as the charge fills
+  const si = slotOf(1);
+  if (si < 0 || !(snap.p[si].bt > 0)) return;
+  const p = snap.p[si], d = disp[si], k = 1 - p.bt / beamCfg.charge; // 0 -> 1 as the charge fills
   const base = Math.atan2(p.by, p.bx), A = beamCfg.angle * Math.PI / 180;
   teleCtx.clearRect(0, 0, tele.width, tele.height);
   teleCtx.fillStyle = teleCtx.strokeStyle = '#ff4628';
@@ -290,7 +416,9 @@ function drawBeamLine(x0, y0, ang, a) {
 // The beam is drawn from the snapshot, so it turns as the server turns it. The
 // server's angle is counter-clockwise positive, which is a smaller canvas angle.
 function drawBeams() {
-  const p = snap.p[1], d = disp[1];
+  const si = slotOf(1);
+  if (si < 0) { beamLook.ang = null; return; }
+  const p = snap.p[si], d = disp[si];
   if (p.st > 0) {
     const target = Math.atan2(p.by, p.bx) - p.ba * Math.PI / 180;
     beamLook.ang = beamLook.ang === null ? target : beamLook.ang + (target - beamLook.ang) * 0.5; // 30 snapshots/s -> smooth at 60fps
@@ -308,7 +436,7 @@ function drawBeams() {
 // Electro Ball: the aim line and a growing orb while Pikachu charges, and the balls in flight, each with
 // a small HP bar (the opponent's skills wear it down; at 0 it explodes).
 function drawBalls() {
-  const p = snap.p[0], d = disp[0];
+  const pi = slotOf(0), p = pi >= 0 ? snap.p[pi] : { kt: 0 }, d = disp[pi < 0 ? 0 : pi];
   if (p.kt > 0) {
     const k = 1 - p.kt / ballCfg.charge, ux = p.ax, uy = p.ay;
     ctx.save();
@@ -322,6 +450,7 @@ function drawBalls() {
     ctx.restore();
   }
   for (const b of snap.b || []) {
+    if (b.k === 1) { drawFireBall(b); continue; }
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.8, 0, 7); ctx.fill();
@@ -334,6 +463,41 @@ function drawBalls() {
       ctx.fillStyle = '#ffe14a'; ctx.fillRect(-14, -r - 16, 28 * Math.max(b.hp, 0) / ballCfg.hp, 4);
     });
   }
+}
+
+// A fire ball: a hot white-yellow core in a flickering orange flame; a bar shows its HP once it has been hurt.
+function drawFireBall(b) {
+  const r = fireCfg.radius, f = 0.85 + 0.3 * Math.random(), R = r * 1.9 * f;
+  const gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, R);
+  gr.addColorStop(0, '#fff6c0'); gr.addColorStop(0.35, '#ffb030'); gr.addColorStop(0.7, 'rgba(255,90,20,0.7)'); gr.addColorStop(1, 'rgba(255,60,10,0)');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, 7); ctx.fill();
+  if (b.hp < fireCfg.hp) {
+    upright(b.x, b.y, () => {
+      ctx.fillStyle = '#000a'; ctx.fillRect(-9, -r - 10, 18, 3);
+      ctx.fillStyle = '#ffb030'; ctx.fillRect(-9, -r - 10, 18 * Math.max(b.hp, 0) / fireCfg.hp, 3);
+    });
+  }
+}
+
+// Seismic Toss: while it runs Charizard is wrapped in flame, shedding flames behind it; while it carries
+// its catch up it burns less fiercely.
+function drawToss() {
+  for (const [i, p] of snap.p.entries()) {
+    if (p.k !== 2 || !(p.gp > 0)) continue;
+    const d = disp[i], R = tossCfg.radius * (p.gp === 1 ? 1 : 0.7);
+    if (p.gp === 1) flames.push({ x: d.x, y: d.y, age: 0, r: R * (0.5 + Math.random() * 0.4) });
+    const gr = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, R);
+    gr.addColorStop(0, 'rgba(255,240,170,0.6)'); gr.addColorStop(0.6, 'rgba(255,130,30,0.45)'); gr.addColorStop(1, 'rgba(255,60,10,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(d.x, d.y - (p.gp === 1 ? 0 : d.z), R, 0, 7); ctx.fill();
+  }
+  for (const f of flames) {
+    const a = 1 - f.age / 0.4; f.age += 1 / 60;
+    if (a <= 0) continue;
+    const gr = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+    gr.addColorStop(0, `rgba(255,220,120,${0.55 * a})`); gr.addColorStop(1, 'rgba(255,70,10,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 7); ctx.fill();
+  }
+  while (flames.length && flames[0].age >= 0.4) flames.shift();
 }
 
 // The blast: a bright disc of the real reach (f.r), a ring racing out, and forked bolts bursting from the
@@ -369,7 +533,9 @@ function drawExplosion(f) {
 // Ice Punch: a white ice fist grows in front of Snorlax while it charges (with a dashed line along the aim),
 // then Snorlax is wrapped in an icy aura with the fist in front while it dashes, leaving fading ice puffs.
 function drawIcePunch() {
-  const p = snap.p[1], d = disp[1], R = punchCfg.radius;
+  const si = slotOf(1);
+  if (si < 0) return;
+  const p = snap.p[si], d = disp[si], R = punchCfg.radius;
   let ux = p.ax, uy = p.ay, k = 0, dashing = false;
   if (p.ut > 0) k = 1 - p.ut / punchCfg.charge;
   else if (p.ud > 0) { ux = p.udx; uy = p.udy; k = 1; dashing = true; }
@@ -409,7 +575,7 @@ function drawIcePunch() {
 // A frozen player sits inside an iceberg; in its last half second the ice flickers and cracks.
 function drawFrozen(p, i, d) {
   if (!(p.fz > 0)) return;
-  const r = Math.max(radius[i] * 1.9, 30), melting = p.fz < 0.5;
+  const r = Math.max(radius[p.k] * 1.9, 30), melting = p.fz < 0.5;
   const a = melting ? 0.45 + 0.35 * Math.abs(Math.sin(p.fz * 30)) : 0.8;
   const pts = [[-1.1, 0.75], [-0.85, -0.15], [-0.5, 0.05], [-0.25, -1.0], [0.1, -0.35], [0.45, -0.85], [0.8, -0.05], [1.1, 0.75]];
   upright(d.x, d.y, () => {
@@ -444,8 +610,8 @@ function drawFreezeBurst(f) {
 // Thunder: a dark circle the size of the strike area sits where the bolt will land.
 // It darkens and a ring closes in on it as the bolt gets near.
 function drawShadow() {
-  const p = snap.p[0];
-  if (!(p.tn > 0)) { shadow.x = null; return; }
+  const pi = slotOf(0), p = pi >= 0 ? snap.p[pi] : null;
+  if (!p || !(p.tn > 0)) { shadow.x = null; return; }
   if (shadow.x === null) { shadow.x = p.sx; shadow.y = p.sy; }
   shadow.x += (p.sx - shadow.x) * 0.4; shadow.y += (p.sy - shadow.y) * 0.4;
   const period = p.tn === thunderCfg.strikes ? thunderCfg.delay : thunderCfg.interval; // time the current wait started from
@@ -538,7 +704,7 @@ function drawSkyBolt(f) {
 
 // Smoke over Snorlax's head while it cannot move (recharging after Hyper Beam).
 function drawSmoke() {
-  const p = snap.p[1], d = disp[1];
+  const si = slotOf(1), p = si >= 0 ? snap.p[si] : { rt: 0 }, d = disp[si < 0 ? 0 : si];
   if (p.rt > 0) {
     for (smokeAcc += 1 / 60; smokeAcc > 0.06; smokeAcc -= 0.06) {
       // x, y: the ground point it left from; u, v: its offset on screen from there (v < 0 is up)
@@ -561,19 +727,19 @@ function drawPlayer(i, p) {
   // Snapshots arrive at 30/s; ease toward them so 60fps motion looks smooth.
   d.x += (p.x - d.x) * 0.4; d.y += (p.y - d.y) * 0.4; d.z += (p.z - d.z) * 0.5;
   // Only a dash moves this fast along the ground (walking is ~3px/frame): leave an afterimage.
-  if (Math.hypot(d.x - px, d.y - py) > 8) ghosts.push({ i, x: d.x, y: d.y, z: d.z, a: 0.5 });
-  const lift = Math.min(d.z, 200) / 200, bs = radius[i] / REF[i]; // bs: how much bigger than the reference art
+  if (Math.hypot(d.x - px, d.y - py) > 8) ghosts.push({ k: p.k, x: d.x, y: d.y, z: d.z, a: 0.5 });
+  const lift = Math.min(d.z, 200) / 200, bs = radius[p.k] / REF[p.k]; // bs: how much bigger than the reference art
   // Shadow stays on the ground and shrinks/fades as the player rises.
   upright(d.x, d.y, () => {
     ctx.fillStyle = `rgba(0,0,0,${0.35 - 0.2 * lift})`;
     ctx.beginPath(); ctx.ellipse(0, 14 * bs, 18 * bs * (1 - 0.4 * lift), 7 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.fill();
   });
-  drawBody(i, d.x, d.y, 1, d.z); // the body floats d.z above the ground
+  drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.
   const top = -d.z;
   upright(d.x, d.y, () => {
-    if (i === 1 && p.bt > 0) { // glowing orb with radiating lines, growing as the charge fills
+    if (p.k === 1 && p.bt > 0) { // glowing orb with radiating lines, growing as the charge fills
       const k = 1 - p.bt / beamCfg.charge, [ax, ay] = rv(p.bx, p.by), ox = ax * 26 * bs, oy = top - 4 * bs + ay * 26 * bs, r = 4 + 12 * k;
       ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5;
       for (let a = 0; a < 6.28; a += 0.5236) {
@@ -586,15 +752,23 @@ function drawPlayer(i, p) {
       gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#ffb040'); gr.addColorStop(1, 'rgba(255,90,30,0)');
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(ox, oy, r * 1.8, 0, 7); ctx.fill();
     }
-    if (i === 1 && (p.bt > 0 || p.st > 0 || p.rt > 0)) {
+    if (p.k === 1 && (p.bt > 0 || p.st > 0 || p.rt > 0)) {
       ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
       ctx.fillStyle = p.rt > 0 ? '#ff8a5c' : '#ffd27a';
       ctx.fillText(p.rt > 0 ? 'MUST RECHARGE' : '破壞死光！', 0, top - 54 * bs);
     }
+    if (p.k === 2 && p.ht > 0) { // Fire Breath: flames at the mouth, toward the opponent
+      const o = disp[1 - i], [vx, vy] = rv(o.x - d.x, o.y - d.y), n = Math.hypot(vx, vy) || 1, ux = vx / n, uy = vy / n;
+      const mx = ux * 18 * bs, my = top - 11 * bs + uy * 18 * bs, R = 17 * bs * (0.8 + 0.4 * Math.random());
+      const gr = ctx.createRadialGradient(mx, my, 0, mx, my, R);
+      gr.addColorStop(0, '#fff6c0'); gr.addColorStop(0.4, '#ffb030'); gr.addColorStop(1, 'rgba(255,70,10,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(mx, my, R, 0, 7); ctx.fill();
+    }
+    if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, top - 54 * bs); }
     if (i === you) { ctx.fillStyle = '#fff'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 你', 0, top - 40 * bs); }
     // HP bar follows the body.
     ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 36 * bs, 40, 6);
-    ctx.fillStyle = p.hp > 0.3 * maxHp[i] ? '#6fd36f' : '#e55'; ctx.fillRect(-20, top - 36 * bs, 40 * p.hp / maxHp[i], 6);
+    ctx.fillStyle = p.hp > 0.3 * maxHp[p.k] ? '#6fd36f' : '#e55'; ctx.fillRect(-20, top - 36 * bs, 40 * p.hp / maxHp[p.k], 6);
   });
 }
 
@@ -609,6 +783,7 @@ function drawCooldowns() {
 
 function frame() {
   drawCooldowns();
+  drawCards();
   ctx.save();
   ctx.clearRect(0, 0, cv.width, cv.height);
   if (shake > 0) { ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake); shake *= 0.85; if (shake < .5) shake = 0; }
@@ -616,11 +791,12 @@ function frame() {
   if (snap) {
     ctx.save();
     ctx.transform(...VIEW); // from here on, coordinates are the world's
-    for (const g of ghosts) { drawBody(g.i, g.x, g.y, Math.max(g.a, 0), g.z); g.a -= 0.04; }
+    for (const g of ghosts) { drawBody(g.k, g.x, g.y, Math.max(g.a, 0), g.z); g.a -= 0.04; }
     while (ghosts.length && ghosts[0].a <= 0) ghosts.shift();
     drawTelegraph();
     drawShadow();
     drawBalls();
+    drawToss();
     drawIcePunch();
     drawBeams();
     drawSmoke(); // under the players, so the labels and HP bars stay readable

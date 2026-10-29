@@ -96,6 +96,47 @@ type Config struct {
 			Width            float64 `json:"width"`
 		} `json:"hyper_beam"`
 	} `json:"snorlax"`
+	Charizard struct {
+		MaxHP     int     `json:"max_hp"`
+		WalkSpeed float64 `json:"walk_speed"`
+		Radius    float64 `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
+		// Fly: the main button lifts Charizard for `duration` seconds. It only moves faster; the Electro Ball and
+		// the Ice Punch still hit it, though ground attacks that miss anyone airborne (earthquake, landing shock,
+		// Hyper Beam, Seismic Toss) do not.
+		Fly struct {
+			Duration float64 `json:"duration"`
+			Cooldown float64 `json:"cooldown"` // starts when it has landed
+			Speed    float64 `json:"speed"`    // walking speed while flying
+			Height   float64 `json:"height"`
+		} `json:"fly"`
+		// Fire Breath: for `duration` seconds Charizard spits `quantity` fire balls, evenly spaced, each at the
+		// opponent's position when it leaves the mouth, turned by a random angle within +-random_offset_angle.
+		// It can walk or fly while breathing. A fire ball hurts the first thing it touches and is gone; the
+		// opponent's skills wear its HP down, and it ends at `length` or at a wall.
+		FireBreath struct {
+			Speed             float64 `json:"speed"`
+			Radius            float64 `json:"radius"`
+			HP                int     `json:"hp"`
+			Damage            int     `json:"damage"`              // per fire ball that lands
+			Cooldown          float64 `json:"cooldown"`            // counted from the start of the breath
+			Mass              float64 `json:"mass"`                // see hyper_beam.mass: a heavier beam or punch pushes it back by the difference
+			Duration          float64 `json:"duration"`            // seconds the breath lasts
+			Quantity          int     `json:"quantity"`            // fire balls in one breath
+			RandomOffsetAngle float64 `json:"random_offset_angle"` // degrees: each ball is turned by a random angle in [-this, +this]
+			Length            float64 `json:"length"`              // how far a fire ball flies
+		} `json:"fire_breath"`
+		// Seismic Toss: Charizard, on fire, runs `length` along the aim at `speed`. The body it touches (within
+		// `radius`) is caught and cannot move or act: Charizard flies up `high` with it, then slams it down for
+		// `damage`, with the same shock as Snorlax's landing (drawn `radius` wide). The rise and the fall go at `speed`.
+		SeismicToss struct {
+			Speed    float64 `json:"speed"`
+			Radius   float64 `json:"radius"`
+			Damage   int     `json:"damage"`
+			Cooldown float64 `json:"cooldown"` // counted from the start of the run
+			Length   float64 `json:"length"`
+			High     float64 `json:"high"`
+		} `json:"seismic_toss"`
+	} `json:"charizard"`
 }
 
 func DefaultConfig() Config {
@@ -149,6 +190,29 @@ func DefaultConfig() Config {
 	c.Snorlax.HyperBeam.Damage = 40
 	c.Snorlax.HyperBeam.Length = 450
 	c.Snorlax.HyperBeam.Width = 50
+	c.Charizard.MaxHP = 120
+	c.Charizard.WalkSpeed = 150
+	c.Charizard.Radius = 26
+	c.Charizard.Fly.Duration = 6
+	c.Charizard.Fly.Cooldown = 8
+	c.Charizard.Fly.Speed = 260
+	c.Charizard.Fly.Height = 90
+	c.Charizard.FireBreath.Speed = 450
+	c.Charizard.FireBreath.Radius = 10
+	c.Charizard.FireBreath.HP = 10
+	c.Charizard.FireBreath.Damage = 2
+	c.Charizard.FireBreath.Cooldown = 8
+	c.Charizard.FireBreath.Mass = 20
+	c.Charizard.FireBreath.Duration = 4
+	c.Charizard.FireBreath.Quantity = 40
+	c.Charizard.FireBreath.RandomOffsetAngle = 7.5
+	c.Charizard.FireBreath.Length = 500
+	c.Charizard.SeismicToss.Speed = 700
+	c.Charizard.SeismicToss.Radius = 45
+	c.Charizard.SeismicToss.Damage = 35
+	c.Charizard.SeismicToss.Cooldown = 10
+	c.Charizard.SeismicToss.Length = 300
+	c.Charizard.SeismicToss.High = 180
 	return c
 }
 
@@ -214,6 +278,22 @@ func (c Config) validate() error {
 		{"snorlax.hyper_beam.damage", float64(c.Snorlax.HyperBeam.Damage), 0},
 		{"snorlax.hyper_beam.length", c.Snorlax.HyperBeam.Length, 0},
 		{"snorlax.hyper_beam.width", c.Snorlax.HyperBeam.Width, 0},
+		{"charizard.max_hp", float64(c.Charizard.MaxHP), 0},
+		{"charizard.walk_speed", c.Charizard.WalkSpeed, 0},
+		{"charizard.radius", c.Charizard.Radius, 0},
+		{"charizard.fly.duration", c.Charizard.Fly.Duration, 0},
+		{"charizard.fly.speed", c.Charizard.Fly.Speed, 0},
+		{"charizard.fly.height", c.Charizard.Fly.Height, 0},
+		{"charizard.fire_breath.speed", c.Charizard.FireBreath.Speed, 0},
+		{"charizard.fire_breath.radius", c.Charizard.FireBreath.Radius, 0},
+		{"charizard.fire_breath.hp", float64(c.Charizard.FireBreath.HP), 0},
+		{"charizard.fire_breath.duration", c.Charizard.FireBreath.Duration, 0},
+		{"charizard.fire_breath.quantity", float64(c.Charizard.FireBreath.Quantity), 0},
+		{"charizard.fire_breath.length", c.Charizard.FireBreath.Length, 0},
+		{"charizard.seismic_toss.speed", c.Charizard.SeismicToss.Speed, 0},
+		{"charizard.seismic_toss.radius", c.Charizard.SeismicToss.Radius, 0},
+		{"charizard.seismic_toss.length", c.Charizard.SeismicToss.Length, 0},
+		{"charizard.seismic_toss.high", c.Charizard.SeismicToss.High, 0},
 	} {
 		if !(f.v > f.min) { // also rejects NaN
 			return fmt.Errorf("%s must be > %v, got %v", f.name, f.min, f.v)
@@ -247,6 +327,12 @@ func (c Config) validate() error {
 		{"snorlax.hyper_beam.knockback", c.Snorlax.HyperBeam.Knockback},
 		{"snorlax.hyper_beam.hit_interval", c.Snorlax.HyperBeam.HitInterval},
 		{"snorlax.hyper_beam.recharge_duration", c.Snorlax.HyperBeam.RechargeDuration},
+		{"charizard.fly.cooldown", c.Charizard.Fly.Cooldown},
+		{"charizard.fire_breath.damage", float64(c.Charizard.FireBreath.Damage)},
+		{"charizard.fire_breath.cooldown", c.Charizard.FireBreath.Cooldown},
+		{"charizard.fire_breath.mass", c.Charizard.FireBreath.Mass},
+		{"charizard.seismic_toss.damage", float64(c.Charizard.SeismicToss.Damage)},
+		{"charizard.seismic_toss.cooldown", c.Charizard.SeismicToss.Cooldown},
 	} {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
@@ -255,7 +341,41 @@ func (c Config) validate() error {
 	if a := c.Snorlax.HyperBeam.SweepAngle; !(a >= 0 && a <= 180) { // 0 = a fixed beam, 180 = a full circle
 		return fmt.Errorf("snorlax.hyper_beam.sweep_angle must be between 0 and 180, got %v", a)
 	}
+	if a := c.Charizard.FireBreath.RandomOffsetAngle; !(a >= 0 && a <= 90) { // 0 = every fire ball flies straight at the target
+		return fmt.Errorf("charizard.fire_breath.random_offset_angle must be between 0 and 90, got %v", a)
+	}
 	return nil
+}
+
+// maxHPOf, walkSpeedOf and radiusOf are a character's full HP, walking speed and body size.
+func (c Config) maxHPOf(kind int) int {
+	switch kind {
+	case snorlax:
+		return c.Snorlax.MaxHP
+	case charizard:
+		return c.Charizard.MaxHP
+	}
+	return c.Pikachu.MaxHP
+}
+
+func (c Config) walkSpeedOf(kind int) float64 {
+	switch kind {
+	case snorlax:
+		return c.Snorlax.WalkSpeed
+	case charizard:
+		return c.Charizard.WalkSpeed
+	}
+	return c.Pikachu.WalkSpeed
+}
+
+func (c Config) radiusOf(kind int) float64 {
+	switch kind {
+	case snorlax:
+		return c.Snorlax.Radius
+	case charizard:
+		return c.Charizard.Radius
+	}
+	return c.Pikachu.Radius
 }
 
 // A jump that peaks at h and lands after T seconds is a parabola with
