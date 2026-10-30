@@ -244,10 +244,10 @@
       "max_height": 1000,
       "hp": 100,
       "speed": 90,
-      "radius": 100,
+      "radius": 60,
       "duration": 8,
       "distance": 800,
-      "charge_duration": 0.8,
+      "charge_duration": 1,
       "recharge_duration": 0.6,
       "spin_interval": 0.5,
       "spin_damage": 4,
@@ -256,7 +256,7 @@
       "spin_duration": 3,
       "cooldown": 12,
       "mass": 100,
-      "scale": 1
+      "scale": 1.4
     }
   }
 }

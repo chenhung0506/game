@@ -1376,11 +1376,23 @@ function drawArrowAims() {
   }
 }
 
+// While Rowlet charges a tornado, a small one stands where it will appear (in front of Rowlet, along its aim, so it
+// moves as the aim does) and grows to full size as the charge fills; the ground ring shows the final reach.
+function drawTornadoWarnings() {
+  for (const si of slotsOf(5)) {
+    const p = snap.p[si];
+    if (!(p.qt > 0)) continue;
+    const d = disp[si], k = 1 - p.qt / Math.max(tornadoCfg.charge, 1e-6), off = radius[5] + tornadoCfg.radius;
+    const b = { x: Math.min(Math.max(d.x + p.ax * off, 0), arena.w), y: Math.min(Math.max(d.y + p.ay * off, 0), arena.h), hp: tornadoCfg.hp };
+    ctx.save(); ctx.globalAlpha = 0.45 + 0.4 * k; drawTornado(b, 0.2 + 0.8 * k * k); ctx.restore();
+  }
+}
+
 // A tornado: a funnel that is narrow at the ground and wide at the top, rings turning round it and leaves carried
 // round and up in it. The dashed circle on the ground is what it catches within. Leaves behind the funnel are drawn
 // first and the ones in front over it. It leans a little as it travels; a bar shows its HP.
-function drawTornado(b) {
-  const hit = tornadoCfg.radius, R = hit * (tornadoCfg.scale || 1), H = R * 2.8, t = performance.now() / 1000, held = !!b.cg, w = (u) => R * (0.16 + 0.84 * u), lean = (u) => Math.sin(t * 2.6 + u * 3.2) * R * 0.12 * u;
+function drawTornado(b, grow = 1) { // grow < 1: the small one that shows where a tornado is about to appear
+  const hit = tornadoCfg.radius, R = hit * (tornadoCfg.scale || 1) * grow, H = R * 2.8, t = performance.now() / 1000, held = !!b.cg, w = (u) => R * (0.16 + 0.84 * u), lean = (u) => Math.sin(t * 2.6 + u * 3.2) * R * 0.12 * u;
   ctx.save();
   ctx.strokeStyle = held ? 'rgba(150,235,120,.6)' : 'rgba(150,230,120,.4)'; ctx.lineWidth = 2; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -t * 40;
   ctx.beginPath(); ctx.arc(b.x, b.y, hit, 0, 7); ctx.stroke(); // the real reach, whatever size it is drawn at
@@ -1687,6 +1699,7 @@ function frame() {
     while (ghosts.length && ghosts[0].a <= 0) ghosts.shift();
     drawTelegraph();
     drawArrowAims();
+    drawTornadoWarnings();
     drawFrost();
     drawShadow();
     drawStorms();
