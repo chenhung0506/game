@@ -203,13 +203,15 @@ type Config struct {
 		// (dash, jump, fly, Ice Punch, Seismic Toss, Leaf Slash). Chikorita is rooted while it swings.
 		VineWhip struct {
 			Reach
-			Length        float64 `json:"length"`
-			Width         float64 `json:"width"`
-			SweepAngle    float64 `json:"sweep_angle"`
-			SweepDuration float64 `json:"sweep_duration"`
-			Damage        int     `json:"damage"`
-			BindDuration  float64 `json:"bind_duration"`
-			Cooldown      float64 `json:"cooldown"` // counted from the start of the swing
+			ChargeDuration   float64 `json:"charge_duration"`   // the vines unfurl and the aim follows the stick; rooted
+			RechargeDuration float64 `json:"recharge_duration"` // rooted after the swing, while the vines pull back
+			Length           float64 `json:"length"`
+			Width            float64 `json:"width"`
+			SweepAngle       float64 `json:"sweep_angle"`
+			SweepDuration    float64 `json:"sweep_duration"`
+			Damage           int     `json:"damage"`
+			BindDuration     float64 `json:"bind_duration"`
+			Cooldown         float64 `json:"cooldown"` // counted from the start of the swing
 		} `json:"vine_whip"`
 	} `json:"chikorita"`
 }
@@ -322,6 +324,8 @@ func DefaultConfig() Config {
 	c.Chikorita.RazorLeaf.Mass = 20
 	c.Chikorita.RazorLeaf.Cooldown = 8
 	c.Chikorita.VineWhip.Reach = groundReach
+	c.Chikorita.VineWhip.ChargeDuration = 0.4
+	c.Chikorita.VineWhip.RechargeDuration = 0.5
 	c.Chikorita.VineWhip.Length = 160
 	c.Chikorita.VineWhip.Width = 24
 	c.Chikorita.VineWhip.SweepAngle = 70
@@ -476,6 +480,8 @@ func (c Config) validate() error {
 		{"chikorita.razor_leaf.damage", float64(c.Chikorita.RazorLeaf.Damage)},
 		{"chikorita.razor_leaf.mass", c.Chikorita.RazorLeaf.Mass},
 		{"chikorita.razor_leaf.cooldown", c.Chikorita.RazorLeaf.Cooldown},
+		{"chikorita.vine_whip.charge_duration", c.Chikorita.VineWhip.ChargeDuration},
+		{"chikorita.vine_whip.recharge_duration", c.Chikorita.VineWhip.RechargeDuration},
 		{"chikorita.vine_whip.damage", float64(c.Chikorita.VineWhip.Damage)},
 		{"chikorita.vine_whip.bind_duration", c.Chikorita.VineWhip.BindDuration},
 		{"chikorita.vine_whip.cooldown", c.Chikorita.VineWhip.Cooldown},

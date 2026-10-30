@@ -56,7 +56,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 | 噴火龍 | K / 小按鈕「噴火」 | 在 `duration` 秒內噴出 `quantity` 團小火球，每團朝噴出當下敵人位置、再隨機偏 ±`random_offset_angle` 度；可邊走邊噴；火球有 HP，會被死光、落地震波、急凍拳、電球爆炸打掉；打到人就消失，不分高度 |
 | 菊草葉 | 空白鍵 / 主按鈕「葉刃」 | 葉刃連斬：朝按住的方向跳 `jump_distance`（空中 `jump_duration` 秒、最高 `jump_height`，落地不傷人），接著甩葉子 `slashes` 下（每下 `slash_interval` 秒；第一下左上→右下、第二下右上→左下，輪流），每下朝敵人前進 `slash_step`（碰到身體就停），每下在揮到一半時打中半徑 `slash_radius` 內的人 `damage`；技能期間頭上的葉子放大 `leaf_scale` 倍（只影響畫面），並真的被甩過去當刀，原本的刀光留作淡淡的殘影；冷卻從起跳算；被冰凍或抓住會中斷 |
 | 菊草葉 | K / 小按鈕「飛葉」 | 飛葉快刀：在身邊 `scatter_radius` 內隨機距離灑出 `count` 片樹葉（`Game.Balls` 裡 `K=ballLeaf`，`Wait` 時掛在原地）；各自隨機等 `min_delay`～`max_delay` 秒後朝當時敵人的位置以 `speed` 衝出，碰到就 `damage` 並消失；樹葉有 `leaf_hp`，會被死光、落地震波、急凍拳、電球爆炸打掉 |
-| 菊草葉 | J / 小按鈕「藤鞭」 | 藤鞭：朝瞄準方向同時揮出左右兩條藤鞭，各從 ±`sweep_angle` 度在 `sweep_duration` 秒內掃向 0 度會合；長 `length`、寬 `width`；一次揮擊只打一下，被打中的敵人 `bind_duration` 秒內不能走路、不能用位移技能（衝刺、跳躍、飛行、急凍拳、地球上投、葉刃連斬），其他技能照用（`Player.BoundT`）；揮擊時菊草葉自己定身 |
+| 菊草葉 | J / 小按鈕「藤鞭」 | 藤鞭：先蓄力 `charge_duration` 秒（藤鞭伸出來，地上出現警示扇形，瞄準還跟著搖桿，期間定身），再朝瞄準方向（此時鎖定）同時揮出左右兩條藤鞭，各從 ±`sweep_angle` 度在 `sweep_duration` 秒內掃向 0 度會合；長 `length`、寬 `width`；一次揮擊只打一下，被打中的敵人 `bind_duration` 秒內不能走路、不能用位移技能（衝刺、跳躍、飛行、急凍拳、地球上投、葉刃連斬），其他技能照用（`Player.BoundT`）；揮擊後還要定身 `recharge_duration` 秒（藤鞭縮回）；冷卻從蓄力開始算 |
 | 噴火龍 | J / 小按鈕「上投」 | 地球上投：朝瞄準方向衝 `length`，碰到（地面上的）敵人就抓住（`Held`，不能動不能用技能）、飛到 `high` 再摔下，落地受 `damage` 並播落地震波特效；噴火龍中途被冰凍會鬆手 |
 
 技能判定都是「技能範圍 + 對方身體半徑 `radius`」，另外每個攻擊技能都有自己的**高度範圍**

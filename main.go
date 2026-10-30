@@ -204,7 +204,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP},
 		"leaf":    map[string]float64{"radius": cfg.Chikorita.LeafSlash.SlashRadius, "scale": cfg.Chikorita.LeafSlash.LeafScale},
 		"razor":   map[string]float64{"radius": cfg.Chikorita.RazorLeaf.Radius, "scale": cfg.Chikorita.RazorLeaf.LeafScale, "hp": float64(cfg.Chikorita.RazorLeaf.LeafHP)},
-		"vine":    map[string]float64{"len": cfg.Chikorita.VineWhip.Length, "w": cfg.Chikorita.VineWhip.Width, "angle": cfg.Chikorita.VineWhip.SweepAngle, "duration": cfg.Chikorita.VineWhip.SweepDuration},
+		"vine":    map[string]float64{"len": cfg.Chikorita.VineWhip.Length, "w": cfg.Chikorita.VineWhip.Width, "angle": cfg.Chikorita.VineWhip.SweepAngle, "duration": cfg.Chikorita.VineWhip.SweepDuration, "charge": cfg.Chikorita.VineWhip.ChargeDuration, "recharge": cfg.Chikorita.VineWhip.RechargeDuration},
 		"punch":   map[string]float64{"charge": cfg.Snorlax.IcePunch.ChargeDuration, "radius": cfg.Snorlax.IcePunch.Radius, "freeze": cfg.Snorlax.IcePunch.FreezeDuration, "distance": cfg.Snorlax.IcePunch.Distance},
 		"ball":    map[string]float64{"radius": cfg.Pikachu.ElectroBall.Radius, "hp": float64(cfg.Pikachu.ElectroBall.HP), "charge": cfg.Pikachu.ElectroBall.ChargeTime},
 		"beam":    map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},

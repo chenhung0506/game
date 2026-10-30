@@ -73,7 +73,7 @@ let maxHp = [100, 100, 120, 110]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
-let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35 }; // Chikorita's Leaf Slash reach, from 'hi'
+let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
@@ -994,19 +994,32 @@ function drawRazorLeaf(b) {
 // so it bends away from the aim until the two come together.
 function drawVines() { for (const si of slotsOf(3)) drawVine(snap.p[si], disp[si]); }
 function drawVine(p, d) {
-  if (!(p.vt > 0)) return;
+  const charging = p.vc > 0, swinging = p.vt > 0, pulling = p.vr > 0;
+  if (!charging && !swinging && !pulling) return;
   const [ax, ay] = rv(p.vx, p.vy), base = Math.atan2(ay, ax), L = vineCfg.len, bs = radius[3] / REF[3];
-  const k = 1 - p.vt / vineCfg.duration, grow = Math.min(1, k * 6 + 0.4); // they lash out almost at once
+  // charging: the vines unfurl towards where they will start from, with a fan on the ground showing what they are about to sweep;
+  // swinging: in from either side; pulling back: they shrink away along the aim
+  const ck = charging ? 1 - p.vc / Math.max(vineCfg.charge, 1e-6) : 1, ease = 1 - (1 - ck) * (1 - ck);
+  const deg = charging ? vineCfg.angle : swinging ? p.va : 0;
+  const len = charging ? L * ease : pulling && !swinging ? L * Math.min(p.vr / Math.max(vineCfg.recharge, 1e-6), 1) : L;
+  const alpha = charging ? 0.45 + 0.55 * ck : 1, t = performance.now() / 1000;
   upright(d.x, d.y, () => {
     ctx.translate(0, -d.z - 8 * bs);
+    if (charging) { // the warning fan
+      const A = vineCfg.angle * Math.PI / 180;
+      ctx.fillStyle = `rgba(60,170,60,${0.07 + 0.12 * ck})`; ctx.strokeStyle = `rgba(90,210,90,${0.25 + 0.35 * ck})`; ctx.lineWidth = 2; ctx.setLineDash([8, 6]);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, L, base - A, base + A); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.globalAlpha = alpha;
     for (const side of [-1, 1]) {
-      const a = base + side * p.va * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), len = L * grow;
-      const bend = side * 0.2 * len * (p.va / vineCfg.angle), nx = -uy, ny = ux; // outward, away from the aim
+      const shake = charging ? Math.sin(t * 40 + side) * 0.05 * (1 - ck) : 0; // trembling as they uncoil
+      const a = base + side * deg * Math.PI / 180 + shake, ux = Math.cos(a), uy = Math.sin(a);
+      const bend = side * 0.2 * len * (deg / vineCfg.angle), nx = -uy, ny = ux; // outward, away from the aim
       const cx = ux * len * 0.5 + nx * bend, cy = uy * len * 0.5 + ny * bend, ex = ux * len, ey = uy * len;
       const pts = [], n = 14;
       for (let i = 0; i <= n; i++) {
-        const t = i / n, x = 2 * (1 - t) * t * cx + t * t * ex, y = 2 * (1 - t) * t * cy + t * t * ey;
-        const tx = 2 * (1 - t) * cx + 2 * t * (ex - cx), ty = 2 * (1 - t) * cy + 2 * t * (ey - cy), tl = Math.hypot(tx, ty) || 1;
+        const u = i / n, x = 2 * (1 - u) * u * cx + u * u * ex, y = 2 * (1 - u) * u * cy + u * u * ey;
+        const tx = 2 * (1 - u) * cx + 2 * u * (ex - cx), ty = 2 * (1 - u) * cy + 2 * u * (ey - cy), tl = Math.hypot(tx, ty) || 1;
         pts.push([x, y, -ty / tl, tx / tl, vineCfg.w * 0.26]); // the same width from root to tip
       }
       ctx.beginPath();

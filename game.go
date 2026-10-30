@@ -136,14 +136,16 @@ type Player struct {
 
 	// Razor Leaf cooldown; Vine Whip: seconds of swing left, the angle each vine is at now (degrees off the aim,
 	// they swing in from sweep_angle to 0), the locked aim, whether it has struck, and the cooldown.
-	RazorCD float64 `json:"rcd"`
-	VineT   float64 `json:"vt"`
-	VineA   float64 `json:"va"`
-	VineX   float64 `json:"vx"`
-	VineY   float64 `json:"vy"`
-	VineHit bool    `json:"-"`
-	VineCD  float64 `json:"vcd"`
-	BoundT  float64 `json:"bd"` // seconds left bound by a vine: cannot walk or use a movement skill
+	RazorCD     float64 `json:"rcd"`
+	VineChargeT float64 `json:"vc"` // seconds of unfurling left before the swing; the aim still follows the stick
+	VineRecT    float64 `json:"vr"` // seconds of recovery left after the swing
+	VineT       float64 `json:"vt"`
+	VineA       float64 `json:"va"`
+	VineX       float64 `json:"vx"`
+	VineY       float64 `json:"vy"`
+	VineHit     bool    `json:"-"`
+	VineCD      float64 `json:"vcd"`
+	BoundT      float64 `json:"bd"` // seconds left bound by a vine: cannot walk or use a movement skill
 }
 
 // Leaf Slash phases.
@@ -357,7 +359,7 @@ func (g *Game) Step(dt float64) []Event {
 			p.DashT, p.BallT, p.BreathT = 0, 0, 0 // a dash, a charge or a breath in progress is cut short
 			g.dropToss(i)                         // a Charizard caught mid-toss lets go
 			g.dropLeaf(i)                         // a Chikorita mid-hop or mid-slash is stopped
-			p.VineT = 0
+			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
 		}
 		if p.BoundT > 0 { // bound by a vine: no walking and no movement skill (the others still work)
 			if p.BoundT -= dt; p.BoundT < 1e-9 {
@@ -479,7 +481,7 @@ func (g *Game) Step(dt float64) []Event {
 
 		if p.Kind == chikorita {
 			events = append(events, g.stepChikorita(i, in, dt)...)
-			casting = p.LeafPhase != leafNone || p.VineT > 0 // the hop and the advance move it themselves; the vines root it
+			casting = p.LeafPhase != leafNone || p.vineBusy() // the hop and the advance move it themselves; the vines root it
 		}
 
 		// Pikachu's Thunder. Pikachu cannot move until the last bolt has struck, and a
@@ -901,7 +903,7 @@ func (g *Game) stepChikorita(i int, in Input, dt float64) []Event {
 			p.LeafCD = 0
 		}
 	}
-	if in.Skill && p.LeafPhase == leafNone && p.VineT == 0 && p.LeafCD == 0 && p.FrozenT == 0 && !p.Held {
+	if in.Skill && p.LeafPhase == leafNone && !p.vineBusy() && p.LeafCD == 0 && p.FrozenT == 0 && !p.Held {
 		dx, dy := float64(in.DX), float64(in.DY)
 		if dx == 0 && dy == 0 {
 			dx, dy = float64(p.FX), float64(p.FY)
@@ -961,7 +963,7 @@ func (g *Game) stepChikoritaVines(i int, in Input, dt float64) []Event {
 	var events []Event
 	p, other := &g.P[i], &g.P[1-i]
 	rl, vw := g.cfg.Chikorita.RazorLeaf, g.cfg.Chikorita.VineWhip
-	ready := p.LeafPhase == leafNone && p.VineT == 0 && p.Z == 0 && p.FrozenT == 0 && !p.Held
+	ready := p.LeafPhase == leafNone && !p.vineBusy() && p.Z == 0 && p.FrozenT == 0 && !p.Held
 	for _, cd := range []*float64{&p.RazorCD, &p.VineCD} {
 		if *cd > 0 {
 			if *cd -= dt; *cd < 1e-9 {
@@ -988,13 +990,23 @@ func (g *Game) stepChikoritaVines(i int, in Input, dt float64) []Event {
 
 	// ---- Vine Whip: two vines swing in from either side of the aim and meet on it ----
 	if in.Vine && ready && p.VineCD == 0 {
+		p.VineChargeT, p.VineHit, p.VineCD = vw.ChargeDuration, false, vw.Cooldown
 		p.VineX, p.VineY = p.AimX, p.AimY
-		p.VineT, p.VineA, p.VineHit, p.VineCD = vw.SweepDuration, vw.SweepAngle, false, vw.Cooldown
+		if p.VineChargeT == 0 {
+			p.VineT, p.VineA = vw.SweepDuration, vw.SweepAngle
+		}
+	}
+	if p.VineChargeT > 0 { // unfurling: rooted, and the vines keep pointing where the stick does
+		p.VineX, p.VineY = p.AimX, p.AimY
+		if p.VineChargeT -= dt; p.VineChargeT < 1e-9 {
+			p.VineChargeT = 0
+			p.VineT, p.VineA = vw.SweepDuration, vw.SweepAngle // the aim is locked from here
+		}
 	}
 	if p.VineT > 0 {
 		prev := p.VineA
 		if p.VineT -= dt; p.VineT < 1e-9 {
-			p.VineT = 0
+			p.VineT, p.VineRecT = 0, vw.RechargeDuration
 		}
 		p.VineA = vw.SweepAngle * p.VineT / vw.SweepDuration
 		// The vines are mirror images, so one test along the swept angles of each covers both. Whichever touches
@@ -1008,8 +1020,16 @@ func (g *Game) stepChikoritaVines(i int, in Input, dt float64) []Event {
 			events = append(events, Event{T: "leaf", X: other.X, Y: other.Y})
 		}
 	}
+	if p.VineRecT > 0 && p.VineT == 0 {
+		if p.VineRecT -= dt; p.VineRecT < 1e-9 {
+			p.VineRecT = 0
+		}
+	}
 	return events
 }
+
+// vineBusy is whether Chikorita is anywhere in a Vine Whip: unfurling, swinging or pulling the vines back.
+func (p *Player) vineBusy() bool { return p.VineChargeT > 0 || p.VineT > 0 || p.VineRecT > 0 }
 
 // dropLeaf stops a Leaf Slash in progress (Chikorita was frozen or caught): it comes straight down.
 func (g *Game) dropLeaf(i int) {

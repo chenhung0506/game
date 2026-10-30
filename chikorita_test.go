@@ -441,7 +441,15 @@ func vineFoe(g *Game, b, r float64) {
 	g.P[1].X, g.P[1].Y = g.P[0].X+r*math.Cos(rad), g.P[0].Y-r*math.Sin(rad)
 }
 
+// castVine presses the key for a tick and lets the vines unfurl, so the swing is under way when it returns.
 func castVine(g *Game) {
+	pressVine(g)
+	for g.P[0].VineChargeT > 0 {
+		g.Step(dt)
+	}
+}
+
+func pressVine(g *Game) {
 	g.P[0].In = Input{Vine: true}
 	g.Step(dt)
 	g.P[0].In = Input{}
@@ -505,11 +513,13 @@ func TestVineWhipHurtsOnceEvenWhenBothVinesMeetOnTheTarget(t *testing.T) {
 func TestVineWhipFollowsTheAimAndLocksIt(t *testing.T) {
 	cfg := DefaultConfig()
 	g := chGame(cfg)
-	g.P[0].In = Input{AimX: 0, AimY: 1} // aim straight down
+	g.P[0].In = Input{Vine: true, AimX: 0, AimY: 1} // aim straight down
 	g.Step(dt)
-	g.P[0].In = Input{Vine: true, AimX: 0, AimY: 1}
-	g.Step(dt)
-	g.P[0].In = Input{AimX: 1, AimY: 0} // turning the stick afterwards changes nothing
+	g.P[0].In = Input{AimX: 0, AimY: 1}
+	for g.P[0].VineChargeT > 0 {
+		g.Step(dt)
+	}
+	g.P[0].In = Input{AimX: 1, AimY: 0} // turning the stick once the swing has begun changes nothing
 	if g.P[0].VineX != 0 || g.P[0].VineY != 1 {
 		t.Fatalf("vine aim = %v,%v, want 0,1", g.P[0].VineX, g.P[0].VineY)
 	}
@@ -626,32 +636,149 @@ func TestChikoritaSnapshotCarriesVineAndRazorState(t *testing.T) {
 
 func TestNewChikoritaSkillConfigLoadsAndRefusesBadValues(t *testing.T) {
 	c, err := loadJSON(t, `{"chikorita":{"razor_leaf":{"count":12,"scatter_radius":200,"min_delay":0.1,"max_delay":0.4,"leaf_hp":9,"leaf_scale":2.5,"max_height":80},
-		"vine_whip":{"length":200,"sweep_angle":80,"sweep_duration":0.5,"bind_duration":3}}}`)
+		"vine_whip":{"length":200,"sweep_angle":80,"sweep_duration":0.5,"bind_duration":3,"charge_duration":0.7,"recharge_duration":0.9}}}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if r := c.Chikorita.RazorLeaf; r.Count != 12 || r.ScatterRadius != 200 || r.MinDelay != 0.1 || r.MaxDelay != 0.4 || r.LeafHP != 9 || r.LeafScale != 2.5 || r.MaxHeight != 80 {
 		t.Fatalf("razor_leaf = %+v", r)
 	}
-	if v := c.Chikorita.VineWhip; v.Length != 200 || v.SweepAngle != 80 || v.SweepDuration != 0.5 || v.BindDuration != 3 {
+	if v := c.Chikorita.VineWhip; v.Length != 200 || v.SweepAngle != 80 || v.SweepDuration != 0.5 || v.BindDuration != 3 || v.ChargeDuration != 0.7 || v.RechargeDuration != 0.9 {
 		t.Fatalf("vine_whip = %+v", v)
 	}
 	for name, body := range map[string]string{
-		"no leaves":       `{"chikorita":{"razor_leaf":{"count":0}}}`,
-		"too many":        `{"chikorita":{"razor_leaf":{"count":201}}}`,
-		"delays reversed": `{"chikorita":{"razor_leaf":{"min_delay":2,"max_delay":1}}}`,
-		"zero leaf scale": `{"chikorita":{"razor_leaf":{"leaf_scale":0}}}`,
-		"no leaf hp":      `{"chikorita":{"razor_leaf":{"leaf_hp":0}}}`,
-		"zero scatter":    `{"chikorita":{"razor_leaf":{"scatter_radius":0}}}`,
-		"zero length":     `{"chikorita":{"vine_whip":{"length":0}}}`,
-		"zero angle":      `{"chikorita":{"vine_whip":{"sweep_angle":0}}}`,
-		"angle too wide":  `{"chikorita":{"vine_whip":{"sweep_angle":181}}}`,
-		"zero duration":   `{"chikorita":{"vine_whip":{"sweep_duration":0}}}`,
-		"negative bind":   `{"chikorita":{"vine_whip":{"bind_duration":-1}}}`,
-		"vine band":       `{"chikorita":{"vine_whip":{"min_height":5,"max_height":1}}}`,
+		"no leaves":         `{"chikorita":{"razor_leaf":{"count":0}}}`,
+		"too many":          `{"chikorita":{"razor_leaf":{"count":201}}}`,
+		"delays reversed":   `{"chikorita":{"razor_leaf":{"min_delay":2,"max_delay":1}}}`,
+		"zero leaf scale":   `{"chikorita":{"razor_leaf":{"leaf_scale":0}}}`,
+		"no leaf hp":        `{"chikorita":{"razor_leaf":{"leaf_hp":0}}}`,
+		"zero scatter":      `{"chikorita":{"razor_leaf":{"scatter_radius":0}}}`,
+		"zero length":       `{"chikorita":{"vine_whip":{"length":0}}}`,
+		"zero angle":        `{"chikorita":{"vine_whip":{"sweep_angle":0}}}`,
+		"angle too wide":    `{"chikorita":{"vine_whip":{"sweep_angle":181}}}`,
+		"zero duration":     `{"chikorita":{"vine_whip":{"sweep_duration":0}}}`,
+		"negative charge":   `{"chikorita":{"vine_whip":{"charge_duration":-1}}}`,
+		"negative recharge": `{"chikorita":{"vine_whip":{"recharge_duration":-1}}}`,
+		"negative bind":     `{"chikorita":{"vine_whip":{"bind_duration":-1}}}`,
+		"vine band":         `{"chikorita":{"vine_whip":{"min_height":5,"max_height":1}}}`,
 	} {
 		if _, err := loadJSON(t, body); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
+	}
+}
+
+// ---- Vine Whip: charge and recharge ----
+
+func TestVineWhipUnfurlsFirstAndHurtsNobodyUntilTheSwing(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Chikorita.VineWhip.ChargeDuration = 0.5 // 15 ticks
+	g := chGame(cfg)
+	g.P[0].AimX, g.P[0].AimY = 1, 0
+	vineFoe(g, 0, 100)
+	pressVine(g)
+	if g.P[0].VineChargeT <= 0 || g.P[0].VineT != 0 {
+		t.Fatalf("charge %v, sweep %v right after the key, want it unfurling", g.P[0].VineChargeT, g.P[0].VineT)
+	}
+	steps(g, 12)
+	if g.P[1].HP != cfg.Snorlax.MaxHP || g.P[0].VineT != 0 {
+		t.Fatalf("HP %d, sweep %v: nothing should land while the vines unfurl", g.P[1].HP, g.P[0].VineT)
+	}
+	steps(g, 6)
+	if g.P[0].VineT <= 0 && g.P[1].HP == cfg.Snorlax.MaxHP {
+		t.Fatal("the swing never began")
+	}
+}
+
+func TestVineChargeFollowsTheStickThenLocks(t *testing.T) {
+	cfg := DefaultConfig()
+	g := chGame(cfg)
+	g.P[0].In = Input{Vine: true, AimX: 0, AimY: 1}
+	g.Step(dt)
+	g.P[0].In = Input{AimX: 1, AimY: 0} // turned during the charge: the vines follow
+	g.Step(dt)
+	if g.P[0].VineX != 1 || g.P[0].VineY != 0 {
+		t.Fatalf("aim during the charge = %v,%v, want it following the stick", g.P[0].VineX, g.P[0].VineY)
+	}
+}
+
+func TestVineWhipRootsChikoritaThroughChargeSwingAndRecharge(t *testing.T) {
+	cfg := DefaultConfig()
+	g := chGame(cfg)
+	g.P[1].X, g.P[1].Y = 1900, 900
+	pressVine(g)
+	x := g.P[0].X
+	phases := map[string]bool{}
+	g.P[0].In = Input{DX: 1, Skill: true, Razor: true}
+	for i := 0; i < 5*tickRate && g.P[0].vineBusy(); i++ {
+		switch {
+		case g.P[0].VineChargeT > 0:
+			phases["charge"] = true
+		case g.P[0].VineT > 0:
+			phases["swing"] = true
+		case g.P[0].VineRecT > 0:
+			phases["recharge"] = true
+		}
+		g.Step(dt)
+		if g.P[0].vineBusy() && (g.P[0].X != x || g.P[0].LeafPhase != leafNone || leaves(g) != 0) {
+			t.Fatalf("moved or used another skill in the middle of the whip (x %v, phase %d)", g.P[0].X, g.P[0].LeafPhase)
+		}
+	}
+	if !phases["charge"] || !phases["swing"] || !phases["recharge"] {
+		t.Fatalf("saw only %v", phases)
+	}
+}
+
+func TestVineWhipTakesChargePlusSweepPlusRecharge(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Chikorita.VineWhip.ChargeDuration, cfg.Chikorita.VineWhip.SweepDuration, cfg.Chikorita.VineWhip.RechargeDuration = 0.3, 0.3, 0.6
+	g := chGame(cfg)
+	g.P[1].X, g.P[1].Y = 1900, 900
+	pressVine(g)
+	n := 1
+	for g.P[0].vineBusy() && n < 200 {
+		g.Step(dt)
+		n++
+	}
+	if secs := float64(n) * dt; secs < 1.2-3*dt || secs > 1.2+3*dt {
+		t.Fatalf("the whip took %.2f s, want about 1.2 (0.3 + 0.3 + 0.6)", secs)
+	}
+}
+
+func TestVineCooldownCountsFromTheStartOfTheCharge(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Chikorita.VineWhip.Cooldown = 4
+	g := chGame(cfg)
+	g.P[1].X, g.P[1].Y = 1900, 900
+	pressVine(g)
+	if g.P[0].VineCD < 3.9 {
+		t.Fatalf("VineCD = %v right after the key, want the cooldown running from the start", g.P[0].VineCD)
+	}
+}
+
+func TestZeroChargeAndRechargeMakeTheWhipInstant(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Chikorita.VineWhip.ChargeDuration, cfg.Chikorita.VineWhip.RechargeDuration = 0, 0
+	g := chGame(cfg)
+	g.P[0].AimX, g.P[0].AimY = 1, 0
+	vineFoe(g, 0, 100)
+	pressVine(g)
+	if g.P[0].VineT <= 0 && g.P[1].HP == cfg.Snorlax.MaxHP {
+		t.Fatal("with no charge the swing should begin at once")
+	}
+	steps(g, 15)
+	if g.P[0].vineBusy() {
+		t.Fatal("with no recharge Chikorita should be free at once")
+	}
+}
+
+func TestFrozenChikoritaDropsTheVineWhip(t *testing.T) {
+	g := chGame(DefaultConfig())
+	g.P[1].X, g.P[1].Y = 1900, 900
+	pressVine(g)
+	g.P[0].FrozenT = 1
+	g.Step(dt)
+	if g.P[0].vineBusy() {
+		t.Fatal("the whip went on while frozen")
 	}
 }
