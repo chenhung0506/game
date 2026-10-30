@@ -276,6 +276,60 @@ type Config struct {
 			PillarDuration  float64 `json:"pillar_duration"`
 		} `json:"freeze_beam"`
 	} `json:"vulpix"`
+	Rowlet struct {
+		MaxHP     int     `json:"max_hp"`
+		WalkSpeed float64 `json:"walk_speed"`
+		Radius    float64 `json:"radius"`   // body size: drawn at this size, and it widens what skills can hit
+		FlyHigh   float64 `json:"fly_high"` // Rowlet is always this high in the air: only skills whose min_height..max_height take it in can hurt it
+		// Crescent Drift (the main button): Rowlet runs `speed` for `duration` seconds along a circle of `radius`, starting
+		// along the direction held and curving towards the opponent's side, like a car skidding round. It covers
+		// speed x duration / radius of the circle. It hurts nobody.
+		CrescentDrift struct {
+			Radius   float64 `json:"radius"`
+			Speed    float64 `json:"speed"`
+			Duration float64 `json:"duration"`
+			Cooldown float64 `json:"cooldown"` // counted from the start of the drift
+		} `json:"crescent_drift"`
+		// Arrows: `count` arrows fan out at once, `angle` degrees apart and centred on the opponent, at `speed`. An
+		// arrow that touches the opponent hurts it (`damage`) and slows it by the fraction `slow` (0..1) for
+		// `slow_duration` seconds, and is spent. An arrow has `hp` that the opponent's skills can wear down.
+		Arrows struct {
+			Reach
+			Speed        float64 `json:"speed"`
+			Radius       float64 `json:"radius"` // size of an arrow: it touches the opponent when the bodies overlap
+			HP           int     `json:"hp"`
+			Damage       int     `json:"damage"`
+			Count        int     `json:"count"`
+			Angle        float64 `json:"angle"`
+			SlowDuration float64 `json:"slow_duration"`
+			Slow         float64 `json:"slow"`
+			Cooldown     float64 `json:"cooldown"` // counted from the cast
+			Mass         float64 `json:"mass"`     // see hyper_beam.mass
+		} `json:"arrows"`
+		// Tornado: Rowlet charges (`charge_duration`, rooted), the tornado appears in front of it and Rowlet recovers
+		// (`recharge_duration`, rooted). The tornado chases the opponent at `speed` for at most `distance` of travel or
+		// `duration` seconds, and has `hp` that the opponent's skills can wear down. A tornado that touches the opponent
+		// (within `radius`, at a height inside min_height..max_height) holds it: the opponent cannot move or act, is
+		// carried up to `lift_height` and spun for `spin_duration` seconds, taking `spin_damage` every `spin_interval`,
+		// then falls and takes `landing_damage` with the same shock as Snorlax's landing. Breaking the tornado lets it
+		// fall at once.
+		Tornado struct {
+			Reach
+			HP               int     `json:"hp"`
+			Speed            float64 `json:"speed"`
+			Radius           float64 `json:"radius"`
+			Duration         float64 `json:"duration"`
+			Distance         float64 `json:"distance"`
+			ChargeDuration   float64 `json:"charge_duration"`
+			RechargeDuration float64 `json:"recharge_duration"`
+			SpinInterval     float64 `json:"spin_interval"`
+			SpinDamage       int     `json:"spin_damage"`
+			LandingDamage    int     `json:"landing_damage"`
+			LiftHeight       float64 `json:"lift_height"`
+			SpinDuration     float64 `json:"spin_duration"`
+			Cooldown         float64 `json:"cooldown"` // counted from the start of the charge
+		} `json:"tornado"`
+	} `json:"rowlet"`
 }
 
 func DefaultConfig() Config {
@@ -432,6 +486,39 @@ func DefaultConfig() Config {
 	c.Vulpix.FreezeBeam.PillarRadius = 24
 	c.Vulpix.FreezeBeam.PillarHP = 25
 	c.Vulpix.FreezeBeam.PillarDuration = 8
+	c.Rowlet.MaxHP = 100
+	c.Rowlet.WalkSpeed = 150
+	c.Rowlet.Radius = 13
+	c.Rowlet.FlyHigh = 50
+	c.Rowlet.CrescentDrift.Radius = 120
+	c.Rowlet.CrescentDrift.Speed = 600
+	c.Rowlet.CrescentDrift.Duration = 0.5
+	c.Rowlet.CrescentDrift.Cooldown = 4
+	c.Rowlet.Arrows.Reach = anyHeight
+	c.Rowlet.Arrows.Speed = 500
+	c.Rowlet.Arrows.Radius = 8
+	c.Rowlet.Arrows.HP = 2
+	c.Rowlet.Arrows.Damage = 6
+	c.Rowlet.Arrows.Count = 5
+	c.Rowlet.Arrows.Angle = 12
+	c.Rowlet.Arrows.SlowDuration = 2
+	c.Rowlet.Arrows.Slow = 0.4
+	c.Rowlet.Arrows.Cooldown = 6
+	c.Rowlet.Arrows.Mass = 20
+	c.Rowlet.Tornado.Reach = anyHeight
+	c.Rowlet.Tornado.HP = 40
+	c.Rowlet.Tornado.Speed = 90
+	c.Rowlet.Tornado.Radius = 50
+	c.Rowlet.Tornado.Duration = 8
+	c.Rowlet.Tornado.Distance = 500
+	c.Rowlet.Tornado.ChargeDuration = 0.4
+	c.Rowlet.Tornado.RechargeDuration = 0.4
+	c.Rowlet.Tornado.SpinInterval = 0.5
+	c.Rowlet.Tornado.SpinDamage = 4
+	c.Rowlet.Tornado.LandingDamage = 20
+	c.Rowlet.Tornado.LiftHeight = 200
+	c.Rowlet.Tornado.SpinDuration = 3
+	c.Rowlet.Tornado.Cooldown = 12
 	return c
 }
 
@@ -534,6 +621,25 @@ func (c Config) validate() error {
 		{"vulpix.freeze_beam.pillar_radius", c.Vulpix.FreezeBeam.PillarRadius, 0},
 		{"vulpix.freeze_beam.pillar_hp", float64(c.Vulpix.FreezeBeam.PillarHP), 0},
 		{"vulpix.freeze_beam.pillar_duration", c.Vulpix.FreezeBeam.PillarDuration, 0},
+		{"rowlet.max_hp", float64(c.Rowlet.MaxHP), 0},
+		{"rowlet.walk_speed", c.Rowlet.WalkSpeed, 0},
+		{"rowlet.radius", c.Rowlet.Radius, 0},
+		{"rowlet.fly_high", c.Rowlet.FlyHigh, 0},
+		{"rowlet.crescent_drift.radius", c.Rowlet.CrescentDrift.Radius, 0},
+		{"rowlet.crescent_drift.speed", c.Rowlet.CrescentDrift.Speed, 0},
+		{"rowlet.crescent_drift.duration", c.Rowlet.CrescentDrift.Duration, 0},
+		{"rowlet.arrows.speed", c.Rowlet.Arrows.Speed, 0},
+		{"rowlet.arrows.radius", c.Rowlet.Arrows.Radius, 0},
+		{"rowlet.arrows.hp", float64(c.Rowlet.Arrows.HP), 0},
+		{"rowlet.arrows.count", float64(c.Rowlet.Arrows.Count), 0},
+		{"rowlet.tornado.hp", float64(c.Rowlet.Tornado.HP), 0},
+		{"rowlet.tornado.speed", c.Rowlet.Tornado.Speed, 0},
+		{"rowlet.tornado.radius", c.Rowlet.Tornado.Radius, 0},
+		{"rowlet.tornado.duration", c.Rowlet.Tornado.Duration, 0},
+		{"rowlet.tornado.distance", c.Rowlet.Tornado.Distance, 0},
+		{"rowlet.tornado.spin_interval", c.Rowlet.Tornado.SpinInterval, 0}, // 0 would never end the spin's damage loop
+		{"rowlet.tornado.lift_height", c.Rowlet.Tornado.LiftHeight, 0},
+		{"rowlet.tornado.spin_duration", c.Rowlet.Tornado.SpinDuration, 0},
 		{"chikorita.walk_speed", c.Chikorita.WalkSpeed, 0},
 		{"chikorita.radius", c.Chikorita.Radius, 0},
 		{"chikorita.leaf_slash.jump_distance", c.Chikorita.LeafSlash.JumpDistance, 0},
@@ -616,6 +722,17 @@ func (c Config) validate() error {
 		{"vulpix.ice_storm.cooldown", c.Vulpix.IceStorm.Cooldown},
 		{"vulpix.ice_storm.freeze_duration", c.Vulpix.IceStorm.FreezeDuration},
 		{"vulpix.freeze_beam.cooldown", c.Vulpix.FreezeBeam.Cooldown},
+		{"rowlet.crescent_drift.cooldown", c.Rowlet.CrescentDrift.Cooldown},
+		{"rowlet.arrows.damage", float64(c.Rowlet.Arrows.Damage)},
+		{"rowlet.arrows.angle", c.Rowlet.Arrows.Angle},
+		{"rowlet.arrows.slow_duration", c.Rowlet.Arrows.SlowDuration},
+		{"rowlet.arrows.cooldown", c.Rowlet.Arrows.Cooldown},
+		{"rowlet.arrows.mass", c.Rowlet.Arrows.Mass},
+		{"rowlet.tornado.charge_duration", c.Rowlet.Tornado.ChargeDuration},
+		{"rowlet.tornado.recharge_duration", c.Rowlet.Tornado.RechargeDuration},
+		{"rowlet.tornado.spin_damage", float64(c.Rowlet.Tornado.SpinDamage)},
+		{"rowlet.tornado.landing_damage", float64(c.Rowlet.Tornado.LandingDamage)},
+		{"rowlet.tornado.cooldown", c.Rowlet.Tornado.Cooldown},
 	} {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
@@ -636,6 +753,8 @@ func (c Config) validate() error {
 		"vulpix.frost_field":     c.Vulpix.FrostField.Reach,
 		"vulpix.ice_storm":       c.Vulpix.IceStorm.Reach,
 		"vulpix.freeze_beam":     c.Vulpix.FreezeBeam.Reach,
+		"rowlet.arrows":          c.Rowlet.Arrows.Reach,
+		"rowlet.tornado":         c.Rowlet.Tornado.Reach,
 	} {
 		if !(r.MinHeight >= 0 && r.MaxHeight >= r.MinHeight) { // also rejects NaN
 			return fmt.Errorf("%s: need 0 <= min_height <= max_height, got %v and %v", name, r.MinHeight, r.MaxHeight)
@@ -654,6 +773,12 @@ func (c Config) validate() error {
 	}
 	if n := c.Vulpix.FrostField.Patches; n > 200 {
 		return fmt.Errorf("vulpix.frost_field.patches must be at most 200, got %d", n)
+	}
+	if n := c.Rowlet.Arrows.Count; n > 100 {
+		return fmt.Errorf("rowlet.arrows.count must be at most 100, got %d", n)
+	}
+	if v := c.Rowlet.Arrows.Slow; !(v >= 0 && v <= 1) { // 1 = a slowed body cannot walk at all
+		return fmt.Errorf("rowlet.arrows.slow must be between 0 and 1, got %v", v)
 	}
 	if v := c.Vulpix.FrostField.Slow; !(v >= 0 && v <= 1) { // 1 = a body on the frost cannot move at all
 		return fmt.Errorf("vulpix.frost_field.slow must be between 0 and 1, got %v", v)
@@ -675,6 +800,8 @@ func (c Config) maxHPOf(kind int) int {
 		return c.Chikorita.MaxHP
 	case vulpix:
 		return c.Vulpix.MaxHP
+	case rowlet:
+		return c.Rowlet.MaxHP
 	}
 	return c.Pikachu.MaxHP
 }
@@ -689,6 +816,8 @@ func (c Config) walkSpeedOf(kind int) float64 {
 		return c.Chikorita.WalkSpeed
 	case vulpix:
 		return c.Vulpix.WalkSpeed
+	case rowlet:
+		return c.Rowlet.WalkSpeed
 	}
 	return c.Pikachu.WalkSpeed
 }
@@ -703,6 +832,8 @@ func (c Config) radiusOf(kind int) float64 {
 		return c.Chikorita.Radius
 	case vulpix:
 		return c.Vulpix.Radius
+	case rowlet:
+		return c.Rowlet.Radius
 	}
 	return c.Pikachu.Radius
 }

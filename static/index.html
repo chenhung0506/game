@@ -64,16 +64,17 @@ document.body.classList.toggle('portrait', PORTRAIT);
 const QUAKE_LIFE = 0.75; // seconds the earthquake effect stays on screen (also on a landing)
 let ROT = 0;               // how far the arena is turned on screen (radians); 0 in landscape
 let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
-// Each player picks a character in the lobby; a snapshot's p[i].k says who is who (0 Pikachu, 1 Snorlax, 2 Charizard, 3 Chikorita, 4 Vulpix).
+// Each player picks a character in the lobby; a snapshot's p[i].k says who is who (0 Pikachu, 1 Snorlax, 2 Charizard, 3 Chikorita, 4 Vulpix, 5 Rowlet).
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
-const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾'];
-const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰霜場・冰風暴・急凍光線'];
+const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟'];
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰霜場・冰風暴・急凍光線', '甩尾・箭雨・龍捲風'];
 const HELP = [
   '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
   '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　J＝急凍拳（蓄力時按方向鍵決定方向，朝該方向衝拳，打到的敵人被冰凍）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
   '你是噴火龍　移動 WASD / 方向鍵　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　K＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　J＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
   '你是菊草葉　移動 WASD / 方向鍵　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　K＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　J＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）',
   '你是六尾　移動 WASD / 方向鍵　空白鍵＝冰霜場（一邊走一邊在身邊的地面灑出冰霜，站在自己的冰霜上走得更快，敵人踩上去會變慢）　K＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　J＝急凍光線（站定不動，方向鍵或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
+  '你是木木梟　移動 WASD / 方向鍵　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝甩尾（朝按住的方向衝出一道半月形弧線，彎向敵人那一側）　K＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　J＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
 ];
 const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
@@ -82,15 +83,16 @@ let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }; // replaced by the se
 let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewise
 // Body sizes from 'hi' (world units). The art below was drawn at REF, so it is scaled by radius / REF;
 // that is also the size the server hits with, and it does not depend on the court's size.
-let radius = [16, 24, 26, 18, 14]; // indexed by character
-const REF = [16, 24, 26, 18, 14];
-let maxHp = [100, 100, 120, 110, 100]; // each character's full HP, from 'hi'
+let radius = [16, 24, 26, 18, 14, 13]; // indexed by character
+const REF = [16, 24, 26, 18, 14, 13];
+let maxHp = [100, 100, 120, 110, 100, 100]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let voltCfg = { radius: 16, uses: 3, window: 2 }; // Volt Tackle, from 'hi'
 let frostCfg = { radius: 160, patch: 50, duration: 6, spray: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8 }; // Vulpix's, from 'hi'
+let arrowCfg = { radius: 8, hp: 2, slow: 2 }, tornadoCfg = { radius: 50, hp: 40, charge: 0.4, lift: 200 }; // Rowlet's, from 'hi'
 const stormLook = [{ x: null, y: 0 }, { x: null, y: 0 }], fbLook = [{ x: null, y: 0 }, { x: null, y: 0 }]; // per slot: the smoothed storm position and beam end
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
@@ -123,7 +125,7 @@ let teamMode = false, myOrder = [], sentOrder = ''; // the lobby's match type; t
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
     if (teamMode !== !!m.team) { teamMode = !!m.team; myOrder = []; sentOrder = ''; } // another match type: choose again
@@ -257,7 +259,7 @@ function drawCards() {
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false }; // the pad's buttons
+const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -278,6 +280,7 @@ function sendInput() {
     fire: k('k') || touch.fire, toss: k('j') || touch.toss,
     razor: k('k') || touch.razor, vine: k('j') || touch.vine,
     storm: k('k') || touch.storm, freeze: k('j') || touch.freeze,
+    arrow: k('k') || touch.arrow, twister: k('j') || touch.twister,
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
@@ -323,6 +326,7 @@ const PAD = [
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
   { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine']] }, // Chikorita
   { main: ['冰霜', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
+  { main: ['甩尾', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
@@ -348,7 +352,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }];
   const hold = (b, label, name) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -380,7 +384,8 @@ function art(c, kind, x, y, t, flap, pose = IDLE) {
   else if (kind === 1) artSnorlax(c, x, y, t, pose);
   else if (kind === 2) artCharizard(c, x, y, t, flap);
   else if (kind === 3) artChikorita(c, x, y, t, pose);
-  else artVulpix(c, x, y, t, pose);
+  else if (kind === 4) artVulpix(c, x, y, t, pose);
+  else artRowlet(c, x, y, t, pose);
 }
 
 // ---- Pikachu and Snorlax: one drawing per view ----
@@ -655,6 +660,52 @@ function artVulpix(c, x, y, t, pose) {
   c.restore();
 }
 
+// Rowlet (the grass owl): a round brown body with a white heart-shaped face, ear tufts, and a green leaf tied at the
+// neck like a bow. It never lands, so the wings beat all the time and the body bobs.
+function artRowlet(c, x, y, t, pose) {
+  const { dir, mv } = pose, flap = Math.sin(t * 19) * 0.55, bob = Math.sin(t * 5.5) * 1.4 - mv;
+  const BR = '#9a7650', BD = '#6a4f33', WING = '#7d5d3c', WL = '#e9dfc4', BEAK = '#e8b64c', G = '#5cbf4c', GD = '#2f7d34';
+  const wing = (sx, sy, side, ang) => { // a wing hinged at (sx, sy), turned by ang; side is -1 left, +1 right
+    c.save(); c.translate(sx, sy); c.rotate(side * ang);
+    ov(c, side * 9, 0, 11, 4.4, WING); ov(c, side * 14.5, 1, 4.6, 2.6, BD, 0, null); ov(c, side * 6, -1.2, 5, 1.8, '#a98660', 0, null);
+    c.restore();
+  };
+  c.save(); c.translate(x, y + bob);
+  if (dir === 2) c.scale(-1, 1);
+  if (dir === 0 || dir === 1) {
+    const back = dir === 1;
+    if (back) { wing(-8, 1, -1, 0.3 + flap); wing(8, 1, 1, 0.3 + flap); }
+    ov(c, 0, 12.5, 4.5, 2.4, BD, 0, null); // tail feathers
+    ov(c, 0, 4, 10, 11, BR);
+    if (!back) { ov(c, 0, 7, 6.2, 7, WL, 0, null); for (const fy of [4.5, 8, 11.5]) { c.strokeStyle = '#b79b6a'; c.lineWidth = 0.7; c.beginPath(); c.arc(0, fy, 2.4, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke(); } }
+    ov(c, 0, -3.5, 11.2, 10, BR);
+    poly(c, [[-9.5, -9], [-8, -17], [-3.4, -11.6]], BD); poly(c, [[9.5, -9], [8, -17], [3.4, -11.6]], BD); // ear tufts
+    if (!back) {
+      ov(c, -4.7, -3.2, 5.4, 5.8, '#f7f2e4'); ov(c, 4.7, -3.2, 5.4, 5.8, '#f7f2e4', 0, null); ov(c, 0, -5.2, 3.2, 3, '#f7f2e4', 0, null); // the heart-shaped face
+      eye(c, -4.8, -3.6, 2.5, 3); eye(c, 4.8, -3.6, 2.5, 3);
+      poly(c, [[-1.7, -0.4], [1.7, -0.4], [0, 2.8]], BEAK);
+      poly(c, [[0, 6], [-7.5, 2.6], [-6.4, 8.6]], G, GD); poly(c, [[0, 6], [7.5, 2.6], [6.4, 8.6]], G, GD); ov(c, 0, 6, 1.9, 1.9, GD, 0, null); // the leaf bow
+      ov(c, -3.4, 15, 2.6, 1.5, BEAK, 0, null); ov(c, 3.4, 15, 2.6, 1.5, BEAK, 0, null); // feet
+    } else {
+      poly(c, [[-4, 4], [0, 10], [4, 4], [0, 7]], G, GD); // the leaf on its back
+    }
+    if (!back) { wing(-8, 1, -1, 0.3 + flap); wing(8, 1, 1, 0.3 + flap); }
+  } else { // side view, facing right
+    c.save(); c.translate(-3, 2); c.rotate(-0.5 - flap * 0.6); // the far wing, behind the body
+    ov(c, -8, 0, 10, 4, BD); c.restore();
+    ov(c, -12, 8, 5.6, 2.5, BD, -0.3, null); // tail
+    ov(c, -1, 4, 11, 9.6, BR); ov(c, 3.5, 7, 6, 6, WL, 0, null);
+    ov(c, 4, -3, 10, 9.6, BR);
+    poly(c, [[-1.5, -9], [-1, -17.5], [4, -11.5]], BD);
+    ov(c, 7.6, -2.6, 5, 5.8, '#f7f2e4', 0, null); eye(c, 8.6, -3.4, 2.4, 2.9);
+    poly(c, [[12, -1.6], [16.5, 0.4], [12, 2]], BEAK);
+    poly(c, [[3, 6.8], [-3.5, 3.5], [-3, 9.5]], G, GD);
+    c.save(); c.translate(-3, 2); c.rotate(-0.2 - flap); ov(c, -7, 0, 11, 4.4, WING); ov(c, -12.6, 1, 4.6, 2.6, BD, 0, null); c.restore(); // the near wing
+    ov(c, 1, 15, 2.6, 1.4, BEAK, 0, null);
+  }
+  c.restore();
+}
+
 // Charizard: orange body and cream belly, a flame at the tail tip and two big teal wings. The wings beat all
 // the time, a lazy flutter standing and a hard fast beat in flight, with a small fast tremor on top.
 function artCharizard(c, x, y, t, flap) {
@@ -699,11 +750,12 @@ function artCharizard(c, x, y, t, flap) {
 }
 
 // (x, y) is a ground point in the world and lift is the height above it, which is up on screen.
-function drawBody(kind, X, Y, alpha, lift = 0, flap = 0, pose = IDLE) {
+function drawBody(kind, X, Y, alpha, lift = 0, flap = 0, pose = IDLE, spin = 0) {
   const bs = radius[kind] / REF[kind];
   ctx.save(); ctx.translate(X, Y); ctx.rotate(-ROT); // upright whatever the view
   ctx.scale(bs, bs);
   ctx.globalAlpha = alpha;
+  if (spin) { ctx.translate(0, -lift / bs); ctx.rotate(spin); ctx.translate(0, lift / bs); } // turned about its own centre (a tornado is spinning it)
   art(ctx, kind, 0, -lift / bs, performance.now() / 1000, flap, pose); // lift is a height in world units, so it is not scaled
   ctx.restore();
 }
@@ -793,6 +845,8 @@ function drawBall(b) {
   if (b.k === 1) { drawFireBall(b); return; }
   if (b.k === 2) { drawRazorLeaf(b); return; }
   if (b.k === 3) { drawPillar(b); return; }
+  if (b.k === 4) { drawArrow(b); return; }
+  if (b.k === 5) { drawTornado(b); return; }
   {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
@@ -1277,6 +1331,77 @@ function drawPillar(b) {
   });
 }
 
+// ---- Rowlet ----
+// An arrow: a green shaft with a leaf-shaped head, pointing the way it flies, trailing a pale streak. A bar shows
+// its HP once the opponent's skills have worn it down.
+function drawArrow(b) {
+  const ang = Math.atan2(b.dy || 0, b.dx || 0), L = 30, r = arrowCfg.radius;
+  ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang);
+  const gr = ctx.createLinearGradient(-L * 2.4, 0, -L * 0.6, 0); gr.addColorStop(0, 'rgba(170,235,120,0)'); gr.addColorStop(1, 'rgba(170,235,120,.5)');
+  ctx.fillStyle = gr; ctx.fillRect(-L * 2.4, -2.2, L * 1.8, 4.4);
+  ctx.lineCap = 'round'; ctx.strokeStyle = '#2b6a2f'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(L * 0.45, 0); ctx.stroke(); // the shaft
+  ctx.strokeStyle = '#7fd36a'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(L * 0.45, 0); ctx.stroke();
+  ctx.fillStyle = '#9be37b'; ctx.strokeStyle = '#2b6a2f'; ctx.lineWidth = 1.2; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(L * 0.9, 0); ctx.quadraticCurveTo(L * 0.45, -r * 0.95, L * 0.28, 0); ctx.quadraticCurveTo(L * 0.45, r * 0.95, L * 0.9, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); // the leaf head
+  for (const sgn of [-1, 1]) { // two feathers at the tail
+    ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(-L * 0.78, sgn * r * 0.9); ctx.lineTo(-L * 0.38, sgn * 1.2); ctx.closePath(); ctx.fillStyle = '#d6f2b0'; ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+  if (b.hp < arrowCfg.hp) {
+    upright(b.x, b.y, () => {
+      ctx.fillStyle = '#000a'; ctx.fillRect(-9, -r - 12, 18, 3);
+      ctx.fillStyle = '#9be37b'; ctx.fillRect(-9, -r - 12, 18 * Math.max(b.hp, 0) / arrowCfg.hp, 3);
+    });
+  }
+}
+
+// A tornado: a funnel that is narrow at the ground and wide at the top, rings turning round it and leaves carried
+// round and up in it. The dashed circle on the ground is what it catches within. Leaves behind the funnel are drawn
+// first and the ones in front over it. It leans a little as it travels; a bar shows its HP.
+function drawTornado(b) {
+  const R = tornadoCfg.radius, H = R * 2.8, t = performance.now() / 1000, held = !!b.cg, w = (u) => R * (0.16 + 0.84 * u), lean = (u) => Math.sin(t * 2.6 + u * 3.2) * R * 0.12 * u;
+  ctx.save();
+  ctx.strokeStyle = held ? 'rgba(150,235,120,.6)' : 'rgba(150,230,120,.4)'; ctx.lineWidth = 2; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -t * 40;
+  ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, 7); ctx.stroke();
+  ctx.restore();
+  const leaf = (u, a, k, front) => { // one leaf at height u and angle a round the funnel
+    const sn = Math.sin(a);
+    if ((sn >= 0) !== front) return;
+    const lx = Math.cos(a) * w(u) * 1.08 + lean(u), ly = -u * H + sn * w(u) * 0.3, sz = 4 + 3.2 * u + seeded(k) * 2;
+    ctx.save(); ctx.translate(lx, ly); ctx.rotate(a + Math.PI / 2 + t * 3 + k);
+    ctx.fillStyle = k % 3 === 0 ? '#9be37b' : k % 3 === 1 ? '#5cbf4c' : '#3f9a3a'; ctx.strokeStyle = '#1f5a28'; ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.ellipse(0, 0, sz, sz * 0.42, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  };
+  const LEAVES = 18, pos = (k) => { const u = (seeded(k * 3.7) + t * (0.22 + 0.1 * seeded(k))) % 1; return [u, t * (4.5 + 2.5 * seeded(k * 5)) * (1 + (1 - u)) + k * 2.4]; };
+  upright(b.x, b.y, () => {
+    for (let k = 0; k < LEAVES; k++) { const [u, a] = pos(k); leaf(u, a, k, false); }
+    const N = 14, top = [], bot = [];
+    for (let i = 0; i <= N; i++) { const u = i / N, y = -u * H; top.push([lean(u) - w(u), y]); bot.push([lean(u) + w(u), y]); }
+    const g = ctx.createLinearGradient(0, -H, 0, 0);
+    g.addColorStop(0, `rgba(215,240,205,${held ? 0.5 : 0.38})`); g.addColorStop(1, `rgba(120,190,110,${held ? 0.6 : 0.5})`);
+    ctx.fillStyle = g; ctx.beginPath();
+    top.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    for (let i = N; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1]);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(235,255,225,.55)'; ctx.lineWidth = 1.6; ctx.beginPath(); // the two edges
+    top.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+    ctx.beginPath(); bot.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+    ctx.lineWidth = 2; ctx.setLineDash([16, 12]); // rings turning round it
+    for (let i = 1; i <= 6; i++) {
+      const u = i / 6.4, ww = w(u);
+      ctx.strokeStyle = `rgba(240,255,235,${0.28 + 0.3 * u})`; ctx.lineDashOffset = -t * 70 * (1 + u) * (i % 2 ? 1 : -1);
+      ctx.beginPath(); ctx.ellipse(lean(u), -u * H, ww, ww * 0.3, 0, 0, 7); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    for (let k = 0; k < LEAVES; k++) { const [u, a] = pos(k); leaf(u, a, k, true); }
+    if (b.hp < tornadoCfg.hp) {
+      ctx.fillStyle = '#000a'; ctx.fillRect(-16, -H - 14, 32, 4);
+      ctx.fillStyle = '#9be37b'; ctx.fillRect(-16, -H - 14, 32 * Math.max(b.hp, 0) / tornadoCfg.hp, 4);
+    }
+  });
+}
+
 function drawLeafSlashes() { for (const si of slotsOf(3)) drawLeafSlash(snap.p[si], disp[si]); }
 function drawLeafSlash(p, d) {
   if (p.lp !== 2) return;
@@ -1431,14 +1556,14 @@ function drawPlayer(i, p) {
     else { lk.la += (0 - lk.la) * 0.25; lk.lb = (lk.lb || 0) * 0.7; }
     pose.leaf = { s: lk.ls, a: lk.la, bend: lk.lb || 0 };
   }
-  if (Math.hypot(d.x - px, d.y - py) > 8) ghosts.push({ k: p.k, x: d.x, y: d.y, z: d.z, a: 0.5, pose });
+  if (Math.hypot(d.x - px, d.y - py) > 8 || (p.k === 5 && p.mt > 0)) ghosts.push({ k: p.k, x: d.x, y: d.y, z: d.z, a: 0.5, pose });
   const lift = Math.min(d.z, 200) / 200, bs = radius[p.k] / REF[p.k]; // bs: how much bigger than the reference art
   // Shadow stays on the ground and shrinks/fades as the player rises.
   upright(d.x, d.y, () => {
     ctx.fillStyle = `rgba(0,0,0,${0.35 - 0.2 * lift})`;
     ctx.beginPath(); ctx.ellipse(0, 14 * bs, 18 * bs * (1 - 0.4 * lift), 7 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.fill();
   });
-  drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose); // the body floats d.z above the ground; Charizard beats its wings hard in flight
+  drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose, p.tw === 1 ? performance.now() / 1000 * 14 : 0); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
   if (p.bd > 0) drawBound(d, p);
   if (p.pz > 0) drawParalyzed(d, p);
@@ -1471,7 +1596,9 @@ function drawPlayer(i, p) {
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(mx, my, R, 0, 7); ctx.fill();
     }
     if (p.k === 4 && p.zt > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#a8e0ff'; ctx.fillText(`急凍光線 ${p.zt.toFixed(1)}s`, 0, top - 54 * bs); }
-    if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, top - 54 * bs); }
+    if (p.tw > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#9be37b'; ctx.fillText(p.tw === 1 ? '被龍捲風捲走！' : '摔下來了！', 0, top - 54 * bs); }
+    else if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, top - 54 * bs); }
+    if (p.sl > 0) { ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#b6e87a'; ctx.fillText(`緩速 ${p.sl.toFixed(1)}s`, 0, top - 68 * bs); }
     if (i === you) { ctx.fillStyle = '#fff'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 你', 0, top - 40 * bs); }
     // HP bar follows the body.
     ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 36 * bs, 40, 6);

@@ -710,8 +710,8 @@ func TestSeismicTossStopsTheBreath(t *testing.T) {
 func TestMirrorMatchesRunEverySkillWithoutHurtingTheUser(t *testing.T) {
 	for kind := 0; kind < kinds; kind++ {
 		g := duel(DefaultConfig(), kind, kind)
-		g.P[1].X = 500                                                                                                                                       // close enough for every skill to reach
-		all := Input{Skill: true, Beam: true, Thunder: true, Ball: true, Punch: true, Fire: true, Toss: kind != charizard, Storm: true, Freeze: true, DX: 1} // a toss pre-empts Charizard's breath and flight, so it has its own tests
+		g.P[1].X = 500                                                                                                                                                                   // close enough for every skill to reach
+		all := Input{Skill: true, Beam: true, Thunder: true, Ball: true, Punch: true, Fire: true, Toss: kind != charizard, Storm: true, Freeze: true, Arrow: true, Twister: true, DX: 1} // a toss pre-empts Charizard's breath and flight, so it has its own tests
 		for tick := 0; tick < 20*tickRate; tick++ {
 			g.P[0].In, g.P[1].In = all, all
 			g.P[tick%2].In.DX = -1 // they do not stand still
@@ -728,6 +728,9 @@ func TestMirrorMatchesRunEverySkillWithoutHurtingTheUser(t *testing.T) {
 		}
 		if kind == chikorita {
 			continue // its hop is aimed on the first tick, so this setup parts them: it has its own mirror test
+		}
+		if kind == rowlet {
+			continue // both sides shoot at once, so the arrows and the tornados cancel each other out head-on: it has its own mirror test
 		}
 		if g.P[0].HP == g.cfg.maxHPOf(kind) && g.P[1].HP == g.cfg.maxHPOf(kind) {
 			t.Fatalf("kind %d: nobody was hurt in 20 s of everything at once", kind)

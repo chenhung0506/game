@@ -211,5 +211,48 @@
       "pillar_hp": 30,
       "pillar_duration": 10
     }
+  },
+  "rowlet": {
+    "max_hp": 100,
+    "walk_speed": 150,
+    "radius": 13,
+    "fly_high": 50,
+    "crescent_drift": {
+      "radius": 120,
+      "speed": 600,
+      "duration": 0.5,
+      "cooldown": 4
+    },
+    "arrows": {
+      "min_height": 0,
+      "max_height": 1000,
+      "speed": 500,
+      "radius": 8,
+      "hp": 2,
+      "damage": 6,
+      "count": 5,
+      "angle": 12,
+      "slow_duration": 2,
+      "slow": 0.4,
+      "cooldown": 6,
+      "mass": 20
+    },
+    "tornado": {
+      "min_height": 0,
+      "max_height": 1000,
+      "hp": 200,
+      "speed": 90,
+      "radius": 50,
+      "duration": 8,
+      "distance": 500,
+      "charge_duration": 0.4,
+      "recharge_duration": 0.4,
+      "spin_interval": 0.5,
+      "spin_damage": 4,
+      "landing_damage": 20,
+      "lift_height": 200,
+      "spin_duration": 3,
+      "cooldown": 12
+    }
   }
 }

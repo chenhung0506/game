@@ -29,7 +29,8 @@ const (
 	charizard = 2
 	chikorita = 3
 	vulpix    = 4
-	kinds     = 5
+	rowlet    = 5
+	kinds     = 6
 )
 
 // Input is the only thing a client controls: which keys are held. Skill is the
@@ -48,6 +49,8 @@ type Input struct {
 	Vine    bool `json:"vine"`    // Chikorita only: Vine Whip
 	Storm   bool `json:"storm"`   // Vulpix only: Ice Storm
 	Freeze  bool `json:"freeze"`  // Vulpix only: Freeze Beam
+	Arrow   bool `json:"arrow"`   // Rowlet only: Arrows
+	Twister bool `json:"twister"` // Rowlet only: Tornado
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
@@ -55,7 +58,7 @@ type Input struct {
 }
 
 type Player struct {
-	Kind int     `json:"k"` // which character this slot plays: pikachu, snorlax, charizard or chikorita
+	Kind int     `json:"k"` // which character this slot plays: pikachu, snorlax, charizard, chikorita, vulpix or rowlet
 	X    float64 `json:"x"`
 	Y    float64 `json:"y"`
 	Z    float64 `json:"z"` // height above ground; the screen position is (X, Y-Z)
@@ -170,6 +173,24 @@ type Player struct {
 	FBeamX  float64 `json:"zx"`
 	FBeamY  float64 `json:"zy"`
 	FBeamCD float64 `json:"zcd"`
+
+	// Rowlet. Crescent Drift: seconds of drift left, the unit heading it is on now, which way it turns (+1 or -1), the cooldown.
+	DriftT  float64 `json:"mt"`
+	DriftX  float64 `json:"-"`
+	DriftY  float64 `json:"-"`
+	DriftS  float64 `json:"-"`
+	DriftCD float64 `json:"mcd"`
+	// Arrows: the cooldown. SlowT is the seconds left slowed by an arrow (any player can be).
+	ArrowCD float64 `json:"acd"`
+	SlowT   float64 `json:"sl"`
+	// Tornado: seconds of charge left, seconds of recovery left after it is let go, the cooldown.
+	TwistT    float64 `json:"qt"`
+	TwistRecT float64 `json:"qr"`
+	TwistCD   float64 `json:"qcd"`
+	// Twirl is what a tornado is doing to this player: twirlNone, twirlSpin (carried up and spun) or twirlFall.
+	// Held is set through both, so it cannot move or act; TwirlIn is the seconds to the next spin damage.
+	Twirl   int     `json:"tw"`
+	TwirlIn float64 `json:"-"`
 }
 
 // Leaf Slash phases.
@@ -194,6 +215,8 @@ const (
 	ballFire    = 1
 	ballLeaf    = 2 // Chikorita's Razor Leaf
 	ballPillar  = 3 // Vulpix's ice pillar: it stands where it rose, blocks the other player and is worn down like a projectile
+	ballArrow   = 4 // Rowlet's arrow: it hurts and slows what it touches
+	ballTornado = 5 // Rowlet's tornado: it chases the opponent, carries it up and lets it fall; it is worn down like a projectile
 )
 
 // Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
@@ -213,7 +236,8 @@ type Ball struct {
 	HitCD     float64 `json:"-"`            // until the beam may hit it again (hyper_beam.hit_interval)
 	LastPunch int     `json:"-"`            // the Ice Punch that last hit it
 	X0, Y0    float64 `json:"-"`            // where it was at the start of this step, for the projectile clash
-	Life      float64 `json:"lf,omitempty"` // pillar: seconds before it melts
+	Life      float64 `json:"lf,omitempty"` // pillar: seconds before it melts; tornado: seconds before it is gone (once it holds someone, the spin time left)
+	Caught    bool    `json:"cg,omitempty"` // tornado: it holds the opponent
 }
 
 // Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
@@ -282,6 +306,11 @@ func (g *Game) Reset() {
 	g.P[0] = Player{Kind: g.P[0].Kind, X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(0), FX: 1, AimX: 1}
 	g.P[1] = Player{Kind: g.P[1].Kind, X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(1), FX: -1, AimX: -1}
 	g.Balls, g.Frost = nil, nil
+	for i := range g.P {
+		if g.P[i].Kind == rowlet {
+			g.P[i].Z = g.cfg.Rowlet.FlyHigh // it is always in the air
+		}
+	}
 }
 
 // Winner returns the index of the surviving player, or -1 while both are alive.
@@ -309,6 +338,10 @@ func (g *Game) ballRadius(b *Ball) float64 {
 		return g.cfg.Chikorita.RazorLeaf.Radius
 	case ballPillar:
 		return g.cfg.Vulpix.FreezeBeam.PillarRadius
+	case ballArrow:
+		return g.cfg.Rowlet.Arrows.Radius
+	case ballTornado:
+		return g.cfg.Rowlet.Tornado.Radius
 	}
 	return g.cfg.Pikachu.ElectroBall.Radius
 }
@@ -319,8 +352,10 @@ func (g *Game) ballMass(b *Ball) float64 {
 		return g.cfg.Charizard.FireBreath.Mass
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Mass
-	case ballPillar:
-		return pillarMass
+	case ballPillar, ballTornado:
+		return pillarMass // a beam or a punch does not push it
+	case ballArrow:
+		return g.cfg.Rowlet.Arrows.Mass
 	}
 	return g.cfg.Pikachu.ElectroBall.Mass
 }
@@ -414,13 +449,14 @@ func (g *Game) Step(dt float64) []Event {
 			g.dropToss(i)                         // a Charizard caught mid-toss lets go
 			g.dropLeaf(i)                         // a Chikorita mid-hop or mid-slash is stopped
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
-			p.FrostT, p.FBeamT = 0, 0 // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
+			p.FrostT, p.FBeamT = 0, 0                 // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
+			p.DriftT, p.TwistT, p.TwistRecT = 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
 		}
 		// Bound by a vine or paralyzed by a Volt Tackle: no walking and no movement skill (the others still work).
 		if p.BoundT > 0 || p.ParalyzeT > 0 {
 			in.DX, in.DY, in.Skill, in.Punch, in.Toss = 0, 0, false, false, false
 		}
-		for _, t := range []*float64{&p.BoundT, &p.ParalyzeT} {
+		for _, t := range []*float64{&p.BoundT, &p.ParalyzeT, &p.SlowT} {
 			if *t > 0 {
 				if *t -= dt; *t < 1e-9 {
 					*t = 0
@@ -561,6 +597,12 @@ func (g *Game) Step(dt float64) []Event {
 			casting = p.FBeamT > 0 // the stick steers the beam, not the body
 		}
 
+		if p.Kind == rowlet {
+			var ev []Event
+			ev, casting = g.stepRowlet(i, in, dt) // the drift moves it itself; the tornado's charge and recovery root it
+			events = append(events, ev...)
+		}
+
 		// Pikachu's Thunder. Pikachu cannot move until the last bolt has struck, and a
 		// new cast waits for the current one to finish. Bolts come from the sky, so
 		// height gives no cover. Each strike is also fired up into the sky from Pikachu.
@@ -654,6 +696,9 @@ func (g *Game) Step(dt float64) []Event {
 			}
 			v *= float64(100-g.Ease[i]) / 100 // the handicap slows every way of walking, flying and steering in the air
 			v *= g.frostFactor(i)             // so does Vulpix's frost, or speeds it up
+			if p.SlowT > 0 {
+				v *= 1 - g.cfg.Rowlet.Arrows.Slow // and an arrow's slow
+			}
 			p.X += float64(in.DX) / n * v * dt
 			p.Y += float64(in.DY) / n * v * dt
 		}
@@ -691,7 +736,8 @@ func (g *Game) Step(dt float64) []Event {
 		}
 	}
 	g.tickFrost(dt)
-	return append(events, g.stepBalls(dt)...)
+	events = append(events, g.stepBalls(dt)...)
+	return append(events, g.stepTwirl(dt)...)
 }
 
 // stepIcePunch runs Snorlax's Ice Punch: charge -> dash -> recharge, rooted through all three. The aim is
@@ -755,6 +801,7 @@ func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 func (g *Game) stepBalls(dt float64) []Event {
 	var events []Event
 	bc, fb, rl := g.cfg.Pikachu.ElectroBall, g.cfg.Charizard.FireBreath, g.cfg.Chikorita.RazorLeaf
+	ar, tn := g.cfg.Rowlet.Arrows, g.cfg.Rowlet.Tornado
 	type blast struct{ x, y float64 }
 	var blasts []blast
 	kept := g.Balls[:0]
@@ -766,6 +813,54 @@ func (g *Game) stepBalls(dt float64) []Event {
 				if b.Life -= dt; b.Life > 1e-9 {
 					kept = append(kept, b)
 				}
+			}
+			continue
+		}
+		if b.K == ballArrow {
+			if b.HP > 0 {
+				x0, y0 := b.X, b.Y
+				b.X += b.DX * ar.Speed * dt
+				b.Y += b.DY * ar.Speed * dt
+				if ar.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= ar.Radius+g.radius(1-b.Owner) {
+					g.hit(foe, ar.Damage)
+					foe.SlowT = math.Max(foe.SlowT, ar.SlowDuration)
+					events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
+					continue
+				}
+				if b.X > 0 && b.X < g.court.Length && b.Y > 0 && b.Y < g.court.Width {
+					kept = append(kept, b)
+				}
+			}
+			continue
+		}
+		if b.K == ballTornado {
+			if b.HP <= 0 {
+				continue // blown away: whoever it held is let go by stepTwirl
+			}
+			if b.Caught { // it holds the opponent where it caught it, and Life is the spin time left
+				if b.Life -= dt; b.Life > 1e-9 {
+					kept = append(kept, b)
+				}
+				continue
+			}
+			// It chases the opponent without overshooting, for `distance` of travel or `duration` seconds.
+			if dx, dy := foe.X-b.X, foe.Y-b.Y; math.Hypot(dx, dy) > 1e-9 {
+				d := math.Hypot(dx, dy)
+				step := math.Min(math.Min(tn.Speed*dt, b.Left), d)
+				b.X += dx / d * step
+				b.Y += dy / d * step
+				b.Left -= step
+			}
+			b.Life -= dt
+			if !foe.Held && foe.Twirl == twirlNone && tn.Reach.hits(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= tn.Radius+g.radius(1-b.Owner) {
+				b.Caught, b.Life = true, tn.SpinDuration
+				foe.Twirl, foe.Held, foe.VZ, foe.TwirlIn = twirlSpin, true, 0, tn.SpinInterval
+				events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
+				kept = append(kept, b)
+				continue
+			}
+			if b.Left > 1e-9 && b.Life > 1e-9 {
+				kept = append(kept, b)
 			}
 			continue
 		}
@@ -868,6 +963,10 @@ func (g *Game) ballDamage(b *Ball) int {
 		return g.cfg.Chikorita.RazorLeaf.Damage
 	case ballPillar:
 		return pillarBlock
+	case ballArrow:
+		return g.cfg.Rowlet.Arrows.Damage
+	case ballTornado:
+		return g.cfg.Rowlet.Tornado.SpinDamage
 	}
 	return g.cfg.Pikachu.ElectroBall.ContactDamage
 }
@@ -887,7 +986,7 @@ func (g *Game) clashBalls() {
 		}
 		for j := i + 1; j < len(g.Balls); j++ {
 			b := &g.Balls[j]
-			if b.HP <= 0 || b.Wait || a.Owner == b.Owner || (a.K == ballPillar && b.K == ballPillar) {
+			if b.HP <= 0 || b.Wait || a.Owner == b.Owner || (a.K == ballPillar && (b.K == ballPillar || b.K == ballTornado)) || (a.K == ballTornado && b.K == ballPillar) {
 				continue
 			}
 			// b stands still at its start; a moves by the difference of their moves.
