@@ -152,12 +152,12 @@
     "vine_whip": {
       "min_height": 0,
       "max_height": 12,
-      "charge_duration": 0.4,
-      "recharge_duration": 0.6,
-      "length": 200,
+      "charge_duration": 0.5,
+      "recharge_duration": 0.1,
+      "length": 220,
       "width": 24,
       "sweep_angle": 70,
-      "sweep_duration": 0.4,
+      "sweep_duration": 0.8,
       "damage": 10,
       "bind_duration": 2,
       "cooldown": 5
