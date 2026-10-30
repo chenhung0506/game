@@ -474,14 +474,27 @@ function artSnorlax(c, x, y, t, pose) {
 // Chikorita: a green quadruped with a big leaf on its head (the leaf is the point: it is drawn well out of
 // proportion) and a ring of buds round the neck. It always stands on four legs; running it stretches out and
 // the legs swing. The leaf sways at rest and whips about while it runs.
-function chLeaf(c, bx, by, rot, back) {
+function chLeaf(c, bx, by, rot, back, bend = 12) {
+  // The leaf is bent: its midrib curves to one side (bend, in px at the tip) and the tip droops a little.
+  const H = 43, W = 18, N = 14, mid = (u) => [bend * u * u, -H * u + 6 * u * u * u];
   c.save(); c.translate(bx, by); c.rotate(rot);
-  c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(-19, -5, -18, -30, 0, -43); c.bezierCurveTo(18, -30, 19, -5, 0, 0);
-  c.fillStyle = back ? '#43a63f' : '#58c250'; c.fill(); c.strokeStyle = '#1f6a2c'; c.lineWidth = 1; c.stroke();
+  const L = [], R = [], V = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N, [mx, my] = mid(u), [nx2, ny2] = mid(Math.min(u + 0.02, 1)), [px, py] = mid(Math.max(u - 0.02, 0));
+    const tx = nx2 - px, ty = ny2 - py, tl = Math.hypot(tx, ty) || 1, ox = -ty / tl, oy = tx / tl; // normal to the midrib
+    const w = W * Math.pow(Math.sin(Math.PI * Math.pow(u, 0.75)), 0.9);
+    L.push([mx + ox * w, my + oy * w]); R.push([mx - ox * w, my - oy * w]); V.push([mx, my, ox, oy, w]);
+  }
+  c.beginPath(); L.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); R.reverse().forEach(([x, y]) => c.lineTo(x, y)); c.closePath();
+  c.fillStyle = back ? '#43a63f' : '#58c250'; c.fill(); c.strokeStyle = '#1f6a2c'; c.lineWidth = 1; c.lineJoin = 'round'; c.stroke();
   c.strokeStyle = back ? '#2f7f33' : '#3a9a40'; c.lineWidth = 1.3;
-  c.beginPath(); c.moveTo(0, -1); c.lineTo(0, -38); c.stroke();
+  c.beginPath(); V.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke();
   c.lineWidth = 0.8; c.beginPath();
-  for (const [y, w] of [[-9, 10], [-18, 11], [-27, 8]]) { c.moveTo(0, y); c.lineTo(-w, y - 6); c.moveTo(0, y); c.lineTo(w, y - 6); }
+  for (const i of [3, 6, 9]) { // side veins sweep up towards the tip
+    const [x, y, ox, oy, w] = V[i], [ux, uy] = V[i + 1];
+    c.moveTo(x, y); c.lineTo(x + ox * w * 0.85 + (ux - x) * 1.2, y + oy * w * 0.85 + (uy - y) * 1.2);
+    c.moveTo(x, y); c.lineTo(x - ox * w * 0.85 + (ux - x) * 1.2, y - oy * w * 0.85 + (uy - y) * 1.2);
+  }
   c.stroke(); c.restore();
 }
 function artChikorita(c, x, y, t, pose) {
@@ -505,19 +518,19 @@ function artChikorita(c, x, y, t, pose) {
       ov(c, -1.4, -0.5, 0.5, 0.5, '#2a4a20', 0, null); ov(c, 1.4, -0.5, 0.5, 0.5, '#2a4a20', 0, null);
       c.strokeStyle = '#2a4a20'; c.lineWidth = 0.9; c.beginPath(); c.arc(0, 0.6, 2.8, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
     }
-    for (let k = -2; k <= 2; k++) ov(c, k * 3.8, 5.5 - (2 - Math.abs(k)) * 0.6, 1.9, 1.9, BUD); // the ring of buds
-    chLeaf(c, 0, -13, sway, back);
+    for (const k of [-1.5, -0.5, 0.5, 1.5]) ov(c, k * 4.6, 5.6 - (1.5 - Math.abs(k)) * 0.7, 1.9, 1.9, BUD); // the ring of four buds
+    chLeaf(c, 0, -13, sway, back, 12 + sway * 70);
   } else { // side view, facing right
     const a = sw * 0.85;
     pikaLimb(c, 7, 12, 6, -a, 3, GD); pikaLimb(c, -9, 12, 6, a, 3, GD); // the far legs
     ov(c, -17, 6, 3.2, 2.2, GD, 0.5); // tail
     ov(c, -2, 7, 14.5 + 1.5 * mv, 8, G, -0.04 * mv); ov(c, 1, 10, 9, 4, CR, 0, null);
-    chLeaf(c, 7, -9, -0.3 + sway, false);
+    chLeaf(c, 7, -9, -0.15 + sway, false, -14 + sway * 70); // bends back over its head
     ov(c, 10, -1 + 1.5 * mv, 10.5, 9.5, G);
     ov(c, 18, 1 + 1.5 * mv, 3.4, 2.7, G);
     eye(13.8, -3 + 1.5 * mv, 2.2); ov(c, 20, 0.2 + 1.5 * mv, 0.6, 0.6, '#2a4a20', 0, null);
     c.strokeStyle = '#2a4a20'; c.lineWidth = 0.9; c.beginPath(); c.arc(16.5, 2 + 1.5 * mv, 2.3, 0.1 * Math.PI, 0.7 * Math.PI); c.stroke();
-    for (let k = 0; k < 3; k++) ov(c, 2.5 + k * 3.2, 6.5 + 1.5 * mv - Math.abs(k - 1) * 0.8, 1.9, 1.9, BUD);
+    for (let k = 0; k < 2; k++) ov(c, 3 + k * 4.4, 6.5 + 1.5 * mv - k * 0.4, 1.9, 1.9, BUD); // two of the four show from the side
     pikaLimb(c, 7, 12, 6, a, 3.2, G); pikaLimb(c, -9, 12, 6, -a, 3.2, G); // the near legs
   }
   c.restore();
