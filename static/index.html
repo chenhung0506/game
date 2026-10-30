@@ -51,7 +51,7 @@
 </head>
 <body>
 <div id="bar"></div>
-<div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">輪流戰（4 隻依序上場）</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（4 隻依序上場）</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
@@ -1285,7 +1285,6 @@ function drawPlayer(i, p) {
     }
     if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, top - 54 * bs); }
     if (i === you) { ctx.fillStyle = '#fff'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 你', 0, top - 40 * bs); }
-    if (snap.ez && snap.ez[i] > 0) { ctx.fillStyle = '#ffd36a'; ctx.font = '11px system-ui'; ctx.textAlign = 'left'; ctx.fillText('放水' + snap.ez[i] + '%', 24, top - 36 * bs + 6); }
     // HP bar follows the body.
     ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 36 * bs, 40, 6);
     ctx.fillStyle = p.hp > 0.3 * maxHp[p.k] ? '#6fd36f' : '#e55'; ctx.fillRect(-20, top - 36 * bs, 40 * p.hp / maxHp[p.k], 6);
