@@ -156,6 +156,28 @@ type Config struct {
 			High     float64 `json:"high"`
 		} `json:"seismic_toss"`
 	} `json:"charizard"`
+	Chikorita struct {
+		MaxHP     int     `json:"max_hp"`
+		WalkSpeed float64 `json:"walk_speed"`
+		Radius    float64 `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
+		// Leaf Slash (the main button): Chikorita hops `jump_distance` the way it is walking, `jump_duration` seconds
+		// in the air at the top `jump_height` (no damage on landing), then whips the leaf on its head `slashes` times,
+		// `slash_interval` seconds each: the first from the upper left to the lower right, the second from the upper
+		// right to the lower left, and so on. Each swing carries it `slash_step` towards the opponent and hits once,
+		// at the middle of the swing, anyone within `slash_radius` (plus their body).
+		LeafSlash struct {
+			Reach
+			JumpDistance  float64 `json:"jump_distance"`
+			JumpDuration  float64 `json:"jump_duration"`
+			JumpHeight    float64 `json:"jump_height"`
+			Slashes       int     `json:"slashes"`
+			SlashInterval float64 `json:"slash_interval"`
+			SlashStep     float64 `json:"slash_step"`
+			SlashRadius   float64 `json:"slash_radius"`
+			Damage        int     `json:"damage"`   // per swing that lands
+			Cooldown      float64 `json:"cooldown"` // counted from the start of the hop
+		} `json:"leaf_slash"`
+	} `json:"chikorita"`
 }
 
 func DefaultConfig() Config {
@@ -239,6 +261,19 @@ func DefaultConfig() Config {
 	c.Charizard.SeismicToss.Cooldown = 10
 	c.Charizard.SeismicToss.Length = 300
 	c.Charizard.SeismicToss.High = 180
+	c.Chikorita.MaxHP = 110
+	c.Chikorita.WalkSpeed = 170
+	c.Chikorita.Radius = 18
+	c.Chikorita.LeafSlash.Reach = groundReach
+	c.Chikorita.LeafSlash.JumpDistance = 220
+	c.Chikorita.LeafSlash.JumpDuration = 0.35
+	c.Chikorita.LeafSlash.JumpHeight = 40
+	c.Chikorita.LeafSlash.Slashes = 4
+	c.Chikorita.LeafSlash.SlashInterval = 0.25
+	c.Chikorita.LeafSlash.SlashStep = 40
+	c.Chikorita.LeafSlash.SlashRadius = 90
+	c.Chikorita.LeafSlash.Damage = 12
+	c.Chikorita.LeafSlash.Cooldown = 6
 	return c
 }
 
@@ -320,6 +355,14 @@ func (c Config) validate() error {
 		{"charizard.seismic_toss.radius", c.Charizard.SeismicToss.Radius, 0},
 		{"charizard.seismic_toss.length", c.Charizard.SeismicToss.Length, 0},
 		{"charizard.seismic_toss.high", c.Charizard.SeismicToss.High, 0},
+		{"chikorita.max_hp", float64(c.Chikorita.MaxHP), 0},
+		{"chikorita.walk_speed", c.Chikorita.WalkSpeed, 0},
+		{"chikorita.radius", c.Chikorita.Radius, 0},
+		{"chikorita.leaf_slash.jump_distance", c.Chikorita.LeafSlash.JumpDistance, 0},
+		{"chikorita.leaf_slash.jump_duration", c.Chikorita.LeafSlash.JumpDuration, 0},
+		{"chikorita.leaf_slash.slashes", float64(c.Chikorita.LeafSlash.Slashes), 0},
+		{"chikorita.leaf_slash.slash_interval", c.Chikorita.LeafSlash.SlashInterval, 0},
+		{"chikorita.leaf_slash.slash_radius", c.Chikorita.LeafSlash.SlashRadius, 0},
 	} {
 		if !(f.v > f.min) { // also rejects NaN
 			return fmt.Errorf("%s must be > %v, got %v", f.name, f.min, f.v)
@@ -360,6 +403,10 @@ func (c Config) validate() error {
 		{"charizard.fire_breath.mass", c.Charizard.FireBreath.Mass},
 		{"charizard.seismic_toss.damage", float64(c.Charizard.SeismicToss.Damage)},
 		{"charizard.seismic_toss.cooldown", c.Charizard.SeismicToss.Cooldown},
+		{"chikorita.leaf_slash.jump_height", c.Chikorita.LeafSlash.JumpHeight},
+		{"chikorita.leaf_slash.slash_step", c.Chikorita.LeafSlash.SlashStep},
+		{"chikorita.leaf_slash.damage", float64(c.Chikorita.LeafSlash.Damage)},
+		{"chikorita.leaf_slash.cooldown", c.Chikorita.LeafSlash.Cooldown},
 	} {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
@@ -373,6 +420,7 @@ func (c Config) validate() error {
 		"snorlax.hyper_beam":     c.Snorlax.HyperBeam.Reach,
 		"charizard.fire_breath":  c.Charizard.FireBreath.Reach,
 		"charizard.seismic_toss": c.Charizard.SeismicToss.Reach,
+		"chikorita.leaf_slash":   c.Chikorita.LeafSlash.Reach,
 	} {
 		if !(r.MinHeight >= 0 && r.MaxHeight >= r.MinHeight) { // also rejects NaN
 			return fmt.Errorf("%s: need 0 <= min_height <= max_height, got %v and %v", name, r.MinHeight, r.MaxHeight)
@@ -394,6 +442,8 @@ func (c Config) maxHPOf(kind int) int {
 		return c.Snorlax.MaxHP
 	case charizard:
 		return c.Charizard.MaxHP
+	case chikorita:
+		return c.Chikorita.MaxHP
 	}
 	return c.Pikachu.MaxHP
 }
@@ -404,6 +454,8 @@ func (c Config) walkSpeedOf(kind int) float64 {
 		return c.Snorlax.WalkSpeed
 	case charizard:
 		return c.Charizard.WalkSpeed
+	case chikorita:
+		return c.Chikorita.WalkSpeed
 	}
 	return c.Pikachu.WalkSpeed
 }
@@ -414,6 +466,8 @@ func (c Config) radiusOf(kind int) float64 {
 		return c.Snorlax.Radius
 	case charizard:
 		return c.Charizard.Radius
+	case chikorita:
+		return c.Chikorita.Radius
 	}
 	return c.Pikachu.Radius
 }

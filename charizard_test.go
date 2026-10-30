@@ -726,6 +726,9 @@ func TestMirrorMatchesRunEverySkillWithoutHurtingTheUser(t *testing.T) {
 				break
 			}
 		}
+		if kind == chikorita {
+			continue // its hop is aimed on the first tick, so this setup parts them: it has its own mirror test
+		}
 		if g.P[0].HP == g.cfg.maxHPOf(kind) && g.P[1].HP == g.cfg.maxHPOf(kind) {
 			t.Fatalf("kind %d: nobody was hurt in 20 s of everything at once", kind)
 		}

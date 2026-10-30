@@ -94,8 +94,8 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if arena, ok := hi["arena"].(map[string]any); !ok || arena["w"] != float64(2000) || arena["h"] != float64(1000) {
 		t.Fatalf("hi.arena = %v, want 2000x1000", hi["arena"])
 	}
-	if rd, ok := hi["radius"].([]any); !ok || len(rd) != 3 || rd[0] != float64(16) || rd[1] != float64(24) || rd[2] != float64(26) {
-		t.Fatalf("hi.radius = %v, want [16 24 26]: the client draws each body at its size, indexed by character", hi["radius"])
+	if rd, ok := hi["radius"].([]any); !ok || len(rd) != 4 || rd[0] != float64(16) || rd[1] != float64(24) || rd[2] != float64(26) || rd[3] != float64(18) {
+		t.Fatalf("hi.radius = %v, want [16 24 26 18]: the client draws each body at its size, indexed by character", hi["radius"])
 	}
 	if pu, ok := hi["punch"].(map[string]any); !ok || pu["charge"] != float64(0.4) || pu["radius"] != float64(40) || pu["freeze"] != float64(1.5) {
 		t.Fatalf("hi.punch = %v, want charge 0.4 / radius 40 / freeze 1.5", hi["punch"])
@@ -103,8 +103,8 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if cd, ok := hi["cooldown"].(map[string]any); !ok || cd["punch"] != float64(5) {
 		t.Fatalf("hi.cooldown.punch = %v, want 5", hi["cooldown"])
 	}
-	if mh, ok := hi["maxhp"].([]any); !ok || len(mh) != 3 || mh[0] != float64(100) || mh[1] != float64(100) || mh[2] != float64(120) {
-		t.Fatalf("hi.maxhp = %v, want [100 100 120]: the client scales the HP bars with it", hi["maxhp"])
+	if mh, ok := hi["maxhp"].([]any); !ok || len(mh) != 4 || mh[0] != float64(100) || mh[1] != float64(100) || mh[2] != float64(120) || mh[3] != float64(110) {
+		t.Fatalf("hi.maxhp = %v, want [100 100 120 110]: the client scales the HP bars with it", hi["maxhp"])
 	}
 	// The client draws the beam's warning line from these, not from hard-coded numbers.
 	if beam, ok := hi["beam"].(map[string]any); !ok || beam["len"] != float64(450) || beam["w"] != float64(50) || beam["charge"] != float64(0.6) || beam["angle"] != float64(30) {

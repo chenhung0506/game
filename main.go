@@ -199,9 +199,10 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	hb, th, fb, ts := cfg.Snorlax.HyperBeam, cfg.Pikachu.Thunder, cfg.Charizard.FireBreath, cfg.Charizard.SeismicToss // tunable, so the client takes them from here instead of hard-coding
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
-		// per character: pikachu, snorlax, charizard
-		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius},
-		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP},
+		// per character: pikachu, snorlax, charizard, chikorita
+		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius},
+		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP},
+		"leaf":    map[string]float64{"radius": cfg.Chikorita.LeafSlash.SlashRadius},
 		"punch":   map[string]float64{"charge": cfg.Snorlax.IcePunch.ChargeDuration, "radius": cfg.Snorlax.IcePunch.Radius, "freeze": cfg.Snorlax.IcePunch.FreezeDuration, "distance": cfg.Snorlax.IcePunch.Distance},
 		"ball":    map[string]float64{"radius": cfg.Pikachu.ElectroBall.Radius, "hp": float64(cfg.Pikachu.ElectroBall.HP), "charge": cfg.Pikachu.ElectroBall.ChargeTime},
 		"beam":    map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},
@@ -211,7 +212,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"fly":     map[string]float64{"height": cfg.Charizard.Fly.Height},
 		// full cooldowns, so the pad's buttons can show how much of each is left
 		"cooldown": map[string]float64{"dash": cfg.Pikachu.Dash.Cooldown, "thunder": th.Cooldown, "jump": cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown, "ball": cfg.Pikachu.ElectroBall.Cooldown, "punch": cfg.Snorlax.IcePunch.Cooldown,
-			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown},
+			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown},
 	})
 	c.send <- hi
 	r.broadcastLobby() // both players learn who joined

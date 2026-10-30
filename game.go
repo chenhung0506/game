@@ -27,7 +27,8 @@ const (
 	pikachu   = 0
 	snorlax   = 1
 	charizard = 2
-	kinds     = 3
+	chikorita = 3
+	kinds     = 4
 )
 
 // Input is the only thing a client controls: which keys are held. Skill is the
@@ -49,7 +50,7 @@ type Input struct {
 }
 
 type Player struct {
-	Kind int     `json:"k"` // which character this slot plays: pikachu, snorlax or charizard
+	Kind int     `json:"k"` // which character this slot plays: pikachu, snorlax, charizard or chikorita
 	X    float64 `json:"x"`
 	Y    float64 `json:"y"`
 	Z    float64 `json:"z"` // height above ground; the screen position is (X, Y-Z)
@@ -118,7 +119,26 @@ type Player struct {
 	TossDY    float64 `json:"gdy"`
 	TossCD    float64 `json:"gcd"` // counted from the moment the dash starts
 	Held      bool    `json:"hd"`  // caught in a Seismic Toss: cannot move or act until it lands
+
+	// Chikorita's Leaf Slash: LeafPhase is leafNone, leafHop or leafSlash; LeafT the seconds left in the hop or the
+	// current swing, LeafN the swings done so far, LeafK how far along the hop or the swing is (0..1), which the
+	// client draws the blade from.
+	LeafPhase int     `json:"lp"`
+	LeafT     float64 `json:"-"`
+	LeafN     int     `json:"ln"`
+	LeafK     float64 `json:"lk"`
+	LeafHit   bool    `json:"-"` // this swing has already struck
+	LeafDX    float64 `json:"-"` // the hop's unit direction
+	LeafDY    float64 `json:"-"`
+	LeafCD    float64 `json:"lcd"` // counted from the start of the hop
 }
+
+// Leaf Slash phases.
+const (
+	leafNone = iota
+	leafHop
+	leafSlash
+)
 
 // Seismic Toss phases.
 const (
@@ -152,7 +172,7 @@ type Ball struct {
 
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
-	T string  `json:"t"` // "slam" | "thunder" | "skybolt" | "explode" | "freeze"
+	T string  `json:"t"` // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze"
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 	R float64 `json:"r,omitempty"` // slam reach, so the effect can match it
@@ -313,6 +333,7 @@ func (g *Game) Step(dt float64) []Event {
 			in = Input{}
 			p.DashT, p.BallT, p.BreathT = 0, 0, 0 // a dash, a charge or a breath in progress is cut short
 			g.dropToss(i)                         // a Charizard caught mid-toss lets go
+			g.dropLeaf(i)                         // a Chikorita mid-hop or mid-slash is stopped
 		}
 		if in.DX != 0 || in.DY != 0 {
 			p.FX, p.FY = in.DX, in.DY
@@ -424,6 +445,11 @@ func (g *Game) Step(dt float64) []Event {
 		if p.Kind == charizard {
 			events = append(events, g.stepCharizard(i, in, dt)...)
 			casting = p.TossPhase != tossNone // rooted but for the dash itself, which moves it
+		}
+
+		if p.Kind == chikorita {
+			events = append(events, g.stepChikorita(i, in, dt)...)
+			casting = p.LeafPhase != leafNone // the hop and the advance move it themselves
 		}
 
 		// Pikachu's Thunder. Pikachu cannot move until the last bolt has struck, and a
@@ -800,6 +826,85 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 		other.Z = p.Z
 	}
 	return events
+}
+
+// stepChikorita runs Chikorita's Leaf Slash: a hop the way it walks (nothing happens when it lands), then
+// `slashes` swings of the leaf, alternating upper-left to lower-right and upper-right to lower-left. During a
+// swing it moves slash_step towards the opponent (stopping where the bodies touch), and at the middle of the swing
+// the blade hits anyone in reach within slash_radius.
+func (g *Game) stepChikorita(i int, in Input, dt float64) []Event {
+	var events []Event
+	p, other := &g.P[i], &g.P[1-i]
+	ls := g.cfg.Chikorita.LeafSlash
+	if p.LeafCD > 0 {
+		if p.LeafCD -= dt; p.LeafCD < 1e-9 {
+			p.LeafCD = 0
+		}
+	}
+	if in.Skill && p.LeafPhase == leafNone && p.LeafCD == 0 && p.FrozenT == 0 && !p.Held {
+		dx, dy := float64(in.DX), float64(in.DY)
+		if dx == 0 && dy == 0 {
+			dx, dy = float64(p.FX), float64(p.FY)
+		}
+		n := math.Hypot(dx, dy)
+		p.LeafDX, p.LeafDY = dx/n, dy/n
+		p.LeafPhase, p.LeafT, p.LeafK, p.LeafN, p.LeafCD = leafHop, ls.JumpDuration, 0, 0, ls.Cooldown
+	}
+	switch p.LeafPhase {
+	case leafHop:
+		step := math.Min(dt, p.LeafT) // the last step is clipped so the distance is exact
+		v := ls.JumpDistance / ls.JumpDuration
+		p.X = math.Min(math.Max(p.X+p.LeafDX*v*step, 0), g.court.Length)
+		p.Y = math.Min(math.Max(p.Y+p.LeafDY*v*step, 0), g.court.Width)
+		if p.LeafT -= step; p.LeafT < 1e-9 {
+			p.Z, p.LeafPhase, p.LeafT, p.LeafK, p.LeafHit = 0, leafSlash, ls.SlashInterval, 0, false
+			break
+		}
+		u := 1 - p.LeafT/ls.JumpDuration
+		p.LeafK, p.Z = u, 4*ls.JumpHeight*u*(1-u) // a parabola peaking at jump_height
+	case leafSlash:
+		if d := dist(p, other); d > 1e-9 {
+			// A swing's time carries over into the next tick, so only the very last tick is clipped: the swings add
+			// up to exactly slashes x slash_step.
+			used := dt
+			if p.LeafN == ls.Slashes-1 {
+				used = math.Min(dt, p.LeafT)
+			}
+			adv := math.Min(ls.SlashStep*used/ls.SlashInterval, math.Max(0, d-g.radius(i)-g.radius(1-i)))
+			p.X = math.Min(math.Max(p.X+(other.X-p.X)/d*adv, 0), g.court.Length)
+			p.Y = math.Min(math.Max(p.Y+(other.Y-p.Y)/d*adv, 0), g.court.Width)
+		}
+		p.LeafT -= dt
+		p.LeafK = math.Min(math.Max(1-p.LeafT/ls.SlashInterval, 0), 1)
+		if !p.LeafHit && p.LeafK >= 0.5 {
+			p.LeafHit = true
+			if ls.Reach.hits(other) && dist(p, other) <= ls.SlashRadius+g.radius(1-i) {
+				g.hit(other, ls.Damage)
+				events = append(events, Event{T: "leaf", X: other.X, Y: other.Y})
+			}
+		}
+		if p.LeafT < 1e-9 {
+			if p.LeafN++; p.LeafN >= ls.Slashes {
+				p.LeafPhase, p.LeafK, p.LeafN = leafNone, 0, 0
+			} else {
+				p.LeafT += ls.SlashInterval
+				p.LeafHit = false
+			}
+		}
+	}
+	return events
+}
+
+// dropLeaf stops a Leaf Slash in progress (Chikorita was frozen or caught): it comes straight down.
+func (g *Game) dropLeaf(i int) {
+	p := &g.P[i]
+	if p.LeafPhase == leafNone {
+		return
+	}
+	if p.LeafPhase == leafHop {
+		p.Z = 0
+	}
+	p.LeafPhase, p.LeafK, p.LeafN = leafNone, 0, 0
 }
 
 // dropToss lets go of a caught opponent: Charizard was frozen (or caught itself) mid-toss. The opponent falls
