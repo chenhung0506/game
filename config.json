@@ -28,8 +28,8 @@
       "damage": 15,
       "strikes": 3,
       "interval": 0.8,
-      "follow_speed": 85,
-      "cooldown": 4
+      "follow_speed": 75,
+      "cooldown": 5
     },
     "electro_ball": {
       "min_height": 0,
