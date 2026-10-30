@@ -334,6 +334,7 @@ type Config struct {
 			SpinDuration     float64 `json:"spin_duration"`
 			Cooldown         float64 `json:"cooldown"` // counted from the start of the charge
 			Mass             float64 `json:"mass"`     // see hyper_beam.mass: a heavier beam or punch pushes the tornado (and whoever it holds) by the difference
+			Scale            float64 `json:"scale"`    // how many times bigger the funnel is drawn than `radius` (what it hits within); looks only
 		} `json:"tornado"`
 	} `json:"rowlet"`
 }
@@ -528,6 +529,7 @@ func DefaultConfig() Config {
 	c.Rowlet.Tornado.SpinDuration = 3
 	c.Rowlet.Tornado.Cooldown = 12
 	c.Rowlet.Tornado.Mass = 100
+	c.Rowlet.Tornado.Scale = 1
 	return c
 }
 
@@ -641,6 +643,7 @@ func (c Config) validate() error {
 		{"rowlet.arrows.radius", c.Rowlet.Arrows.Radius, 0},
 		{"rowlet.arrows.hp", float64(c.Rowlet.Arrows.HP), 0},
 		{"rowlet.arrows.scale", c.Rowlet.Arrows.Scale, 0},
+		{"rowlet.tornado.scale", c.Rowlet.Tornado.Scale, 0},
 		{"rowlet.arrows.count", float64(c.Rowlet.Arrows.Count), 0},
 		{"rowlet.tornado.hp", float64(c.Rowlet.Tornado.HP), 0},
 		{"rowlet.tornado.speed", c.Rowlet.Tornado.Speed, 0},

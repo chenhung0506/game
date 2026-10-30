@@ -208,7 +208,7 @@
       "control_duration": 4,
       "length": 500,
       "pillar_radius": 30,
-      "pillar_hp": 30,
+      "pillar_hp": 20,
       "pillar_duration": 10
     }
   },
@@ -255,7 +255,8 @@
       "lift_height": 300,
       "spin_duration": 3,
       "cooldown": 12,
-      "mass": 100
+      "mass": 100,
+      "scale": 1
     }
   }
 }

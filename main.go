@@ -384,7 +384,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"flyhigh": cfg.Rowlet.FlyHigh,
 		"drift":   map[string]float64{"radius": cfg.Rowlet.CrescentDrift.Radius, "speed": cfg.Rowlet.CrescentDrift.Speed, "duration": cfg.Rowlet.CrescentDrift.Duration},
 		"arrow":   map[string]float64{"radius": cfg.Rowlet.Arrows.Radius, "hp": float64(cfg.Rowlet.Arrows.HP), "slow": cfg.Rowlet.Arrows.SlowDuration, "count": float64(cfg.Rowlet.Arrows.Count), "angle": cfg.Rowlet.Arrows.Angle, "charge": cfg.Rowlet.Arrows.ChargeDuration, "scale": cfg.Rowlet.Arrows.Scale},
-		"tornado": map[string]float64{"radius": cfg.Rowlet.Tornado.Radius, "hp": float64(cfg.Rowlet.Tornado.HP), "charge": cfg.Rowlet.Tornado.ChargeDuration, "lift": cfg.Rowlet.Tornado.LiftHeight},
+		"tornado": map[string]float64{"radius": cfg.Rowlet.Tornado.Radius, "hp": float64(cfg.Rowlet.Tornado.HP), "charge": cfg.Rowlet.Tornado.ChargeDuration, "lift": cfg.Rowlet.Tornado.LiftHeight, "scale": cfg.Rowlet.Tornado.Scale},
 		"leaf":    map[string]float64{"radius": cfg.Chikorita.LeafSlash.SlashRadius, "scale": cfg.Chikorita.LeafSlash.LeafScale},
 		"razor":   map[string]float64{"radius": cfg.Chikorita.RazorLeaf.Radius, "scale": cfg.Chikorita.RazorLeaf.LeafScale, "hp": float64(cfg.Chikorita.RazorLeaf.LeafHP)},
 		"vine":    map[string]float64{"len": cfg.Chikorita.VineWhip.Length, "w": cfg.Chikorita.VineWhip.Width, "angle": cfg.Chikorita.VineWhip.SweepAngle, "duration": cfg.Chikorita.VineWhip.SweepDuration, "charge": cfg.Chikorita.VineWhip.ChargeDuration, "recharge": cfg.Chikorita.VineWhip.RechargeDuration},

@@ -92,7 +92,7 @@ const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let voltCfg = { radius: 16, uses: 3, window: 2 }; // Volt Tackle, from 'hi'
 let frostCfg = { radius: 160, patch: 50, duration: 6, spray: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8 }; // Vulpix's, from 'hi'
-let arrowCfg = { radius: 8, hp: 2, slow: 2, count: 5, angle: 12, charge: 0.5, scale: 1 }, tornadoCfg = { radius: 50, hp: 40, charge: 0.4, lift: 200 }; // Rowlet's, from 'hi'
+let arrowCfg = { radius: 8, hp: 2, slow: 2, count: 5, angle: 12, charge: 0.5, scale: 1 }, tornadoCfg = { radius: 50, hp: 40, charge: 0.4, lift: 200, scale: 1 }; // Rowlet's, from 'hi'
 const stormLook = [{ x: null, y: 0 }, { x: null, y: 0 }], fbLook = [{ x: null, y: 0 }, { x: null, y: 0 }]; // per slot: the smoothed storm position and beam end
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
@@ -1380,10 +1380,10 @@ function drawArrowAims() {
 // round and up in it. The dashed circle on the ground is what it catches within. Leaves behind the funnel are drawn
 // first and the ones in front over it. It leans a little as it travels; a bar shows its HP.
 function drawTornado(b) {
-  const R = tornadoCfg.radius, H = R * 2.8, t = performance.now() / 1000, held = !!b.cg, w = (u) => R * (0.16 + 0.84 * u), lean = (u) => Math.sin(t * 2.6 + u * 3.2) * R * 0.12 * u;
+  const hit = tornadoCfg.radius, R = hit * (tornadoCfg.scale || 1), H = R * 2.8, t = performance.now() / 1000, held = !!b.cg, w = (u) => R * (0.16 + 0.84 * u), lean = (u) => Math.sin(t * 2.6 + u * 3.2) * R * 0.12 * u;
   ctx.save();
   ctx.strokeStyle = held ? 'rgba(150,235,120,.6)' : 'rgba(150,230,120,.4)'; ctx.lineWidth = 2; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -t * 40;
-  ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(b.x, b.y, hit, 0, 7); ctx.stroke(); // the real reach, whatever size it is drawn at
   ctx.restore();
   const leaf = (u, a, k, front) => { // one leaf at height u and angle a round the funnel
     const sn = Math.sin(a);

@@ -558,6 +558,7 @@ func TestRowletConfigIsChecked(t *testing.T) {
 		"negative landing":  func(c *Config) { c.Rowlet.Tornado.LandingDamage = -1 },
 		"no tornado hp":     func(c *Config) { c.Rowlet.Tornado.HP = 0 },
 		"no arrow scale":    func(c *Config) { c.Rowlet.Arrows.Scale = 0 },
+		"no tornado scale":  func(c *Config) { c.Rowlet.Tornado.Scale = 0 },
 		"negative aim":      func(c *Config) { c.Rowlet.Arrows.ChargeDuration = -1 },
 		"no spin duration":  func(c *Config) { c.Rowlet.Tornado.SpinDuration = 0 },
 		"negative cooldown": func(c *Config) { c.Rowlet.Arrows.Cooldown = -1 },
