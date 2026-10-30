@@ -16,10 +16,11 @@ func rowletConfig() Config {
 	dr.Radius, dr.Speed, dr.Duration, dr.Cooldown = 120, 600, 0.5, 4
 	ar.Reach = anyHeight
 	ar.Speed, ar.Radius, ar.HP, ar.Damage, ar.Count, ar.Angle, ar.SlowDuration, ar.Slow, ar.Cooldown, ar.Mass = 500, 8, 2, 6, 5, 12, 2, 0.4, 6, 20
+	ar.ChargeDuration, ar.Scale = 0, 1
 	tn.Reach = anyHeight
 	tn.HP, tn.Speed, tn.Radius, tn.Duration, tn.Distance = 40, 90, 50, 8, 500
 	tn.ChargeDuration, tn.RechargeDuration, tn.SpinInterval, tn.SpinDamage, tn.LandingDamage = 0.4, 0.4, 0.5, 4, 20
-	tn.LiftHeight, tn.SpinDuration, tn.Cooldown = 200, 3.2, 12
+	tn.LiftHeight, tn.SpinDuration, tn.Cooldown, tn.Mass = 200, 3.2, 12, 100
 	return cfg
 }
 
@@ -530,7 +531,7 @@ func TestARoundStartedOverClearsTheTwirlAndTheSlow(t *testing.T) {
 func TestRowletSnapshotKeys(t *testing.T) {
 	g := rg(rowletConfig())
 	raw, _ := json.Marshal(g.P[0])
-	for _, k := range []string{`"mt":`, `"mcd":`, `"acd":`, `"sl":`, `"qt":`, `"qr":`, `"qcd":`, `"tw":`} {
+	for _, k := range []string{`"mt":`, `"mcd":`, `"acd":`, `"at":`, `"sl":`, `"qt":`, `"qr":`, `"qcd":`, `"tw":`} {
 		if !strings.Contains(string(raw), k) {
 			t.Errorf("player json lacks %s: %s", k, raw)
 		}
@@ -556,6 +557,8 @@ func TestRowletConfigIsChecked(t *testing.T) {
 		"inverted arrow":    func(c *Config) { c.Rowlet.Arrows.Reach = Reach{10, 5} },
 		"negative landing":  func(c *Config) { c.Rowlet.Tornado.LandingDamage = -1 },
 		"no tornado hp":     func(c *Config) { c.Rowlet.Tornado.HP = 0 },
+		"no arrow scale":    func(c *Config) { c.Rowlet.Arrows.Scale = 0 },
+		"negative aim":      func(c *Config) { c.Rowlet.Arrows.ChargeDuration = -1 },
 		"no spin duration":  func(c *Config) { c.Rowlet.Tornado.SpinDuration = 0 },
 		"negative cooldown": func(c *Config) { c.Rowlet.Arrows.Cooldown = -1 },
 	} {
@@ -603,5 +606,105 @@ func TestTornadoStopsOnTheOpponentInsteadOfOvershooting(t *testing.T) {
 	steps(g, 3)
 	if b := ballsOfKind(g, ballTornado); len(b) != 1 || b[0].X != 500 || b[0].Y != 250 {
 		t.Fatalf("tornado %+v, want it sitting exactly on the opponent at 500,250", b)
+	}
+}
+
+func TestArrowsAimForTheChargeThenLeaveFromWhereRowletAndTheOpponentAre(t *testing.T) {
+	cfg := rowletConfig()
+	cfg.Rowlet.Arrows.ChargeDuration = 0.5
+	g := rg(cfg)
+	g.P[0].In = Input{Arrow: true, DX: 1}
+	g.Step(dt)
+	if g.P[0].ArrowT <= 0 || len(ballsOfKind(g, ballArrow)) != 0 {
+		t.Fatalf("ArrowT=%v and %d arrows after the first tick, want it aiming", g.P[0].ArrowT, len(ballsOfKind(g, ballArrow)))
+	}
+	x := g.P[0].X
+	g.P[0].In = Input{DX: 1} // free to walk while aiming
+	steps(g, 5)
+	if g.P[0].X <= x || len(ballsOfKind(g, ballArrow)) != 0 {
+		t.Fatalf("x %v -> %v with %d arrows: want it walking and still aiming", x, g.P[0].X, len(ballsOfKind(g, ballArrow)))
+	}
+	g.P[0].In = Input{Skill: true, DX: 1} // and free to drift
+	g.Step(dt)
+	if g.P[0].DriftT == 0 || g.P[0].ArrowT == 0 {
+		t.Fatalf("drift %v, aim %v: a drift must not stop the aiming", g.P[0].DriftT, g.P[0].ArrowT)
+	}
+	g.P[1].Y = 450 // the opponent moves: the volley goes where it is when it leaves
+	g.P[0].In = Input{}
+	for n := 0; n < 30 && len(ballsOfKind(g, ballArrow)) == 0; n++ {
+		g.Step(dt)
+	}
+	arrows := ballsOfKind(g, ballArrow)
+	if len(arrows) != cfg.Rowlet.Arrows.Count {
+		t.Fatalf("%d arrows after the charge, want %d", len(arrows), cfg.Rowlet.Arrows.Count)
+	}
+	mid := arrows[cfg.Rowlet.Arrows.Count/2]
+	if want := math.Atan2(g.P[1].Y-mid.Y, g.P[1].X-mid.X); math.Abs(math.Atan2(mid.DY, mid.DX)-want) > 0.05 {
+		t.Fatalf("middle arrow goes %v rad, want about %v at the opponent", math.Atan2(mid.DY, mid.DX), want)
+	}
+}
+
+func TestFreezingCancelsTheArrowAim(t *testing.T) {
+	cfg := rowletConfig()
+	cfg.Rowlet.Arrows.ChargeDuration = 0.5
+	g := rg(cfg)
+	g.P[0].In.Arrow = true
+	g.Step(dt)
+	g.P[0].In = Input{}
+	g.P[0].FrozenT = 2
+	steps(g, 30)
+	if g.P[0].ArrowT != 0 || len(ballsOfKind(g, ballArrow)) != 0 {
+		t.Fatalf("ArrowT=%v, %d arrows: a frozen Rowlet should lose the volley", g.P[0].ArrowT, len(ballsOfKind(g, ballArrow)))
+	}
+}
+
+func TestAHeavierPunchPushesTheTornadoByTheMassDifferenceAndALighterOneDoesNot(t *testing.T) {
+	for _, tc := range []struct {
+		mass    float64
+		pushed  bool
+		comment string
+	}{{100, true, "punch 150 over tornado 100: pushed 50"}, {150, false, "equal mass: not pushed"}} {
+		cfg := rowletConfig()
+		cfg.Rowlet.Tornado.Mass = tc.mass
+		cfg.Rowlet.Tornado.Speed = 1
+		g := duel(cfg, snorlax, rowlet)
+		g.Balls = append(g.Balls, Ball{K: ballTornado, Owner: 1, X: 400, Y: 250, HP: cfg.Rowlet.Tornado.HP, Left: 500, Life: 8})
+		g.P[0].In = Input{Punch: true, DX: 1}
+		steps(g, 40)
+		x := ballsOfKind(g, ballTornado)[0].X
+		if tc.pushed != (x > 440) {
+			t.Fatalf("%s: tornado at x=%v", tc.comment, x)
+		}
+	}
+}
+
+func TestATornadoWearsDownTheOpponentsPillarsItTouchesEverySpinInterval(t *testing.T) {
+	cfg := rowletConfig()
+	cfg.Rowlet.Tornado.Speed = 1
+	tn := cfg.Rowlet.Tornado
+	g := duel(cfg, rowlet, vulpix)
+	g.Balls = append(g.Balls,
+		Ball{K: ballTornado, Owner: 0, X: 500, Y: 250, HP: tn.HP, Left: 500, Life: 8},
+		Ball{K: ballPillar, Owner: 1, X: 520, Y: 250, HP: 100, Life: 20},
+		Ball{K: ballPillar, Owner: 0, X: 480, Y: 250, HP: 100, Life: 20}, // its own: left alone
+		Ball{K: ballPillar, Owner: 1, X: 900, Y: 250, HP: 100, Life: 20}) // too far
+	g.Step(dt)
+	hp := func() (near, own, far int) {
+		ps := ballsOfKind(g, ballPillar)
+		return ps[0].HP, ps[1].HP, ps[2].HP
+	}
+	if near, own, far := hp(); near != 100-tn.SpinDamage || own != 100 || far != 100 {
+		t.Fatalf("pillar HP %d / %d / %d after touching, want %d / 100 / 100", near, own, far, 100-tn.SpinDamage)
+	}
+	steps(g, int(tn.SpinInterval*tickRate)-2)
+	if near, _, _ := hp(); near != 100-tn.SpinDamage {
+		t.Fatalf("pillar HP %d inside the interval, want it not hurt again yet", near)
+	}
+	steps(g, 3)
+	if near, _, _ := hp(); near != 100-2*tn.SpinDamage {
+		t.Fatalf("pillar HP %d after one interval, want %d", near, 100-2*tn.SpinDamage)
+	}
+	if tor := ballsOfKind(g, ballTornado); len(tor) != 1 || tor[0].HP != tn.HP {
+		t.Fatalf("tornado %+v, want it unhurt by the pillar", tor)
 	}
 }

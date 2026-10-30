@@ -229,30 +229,33 @@
       "speed": 800,
       "radius": 8,
       "hp": 2,
-      "damage": 6,
+      "damage": 20,
       "count": 5,
-      "angle": 12,
-      "slow_duration": 2,
-      "slow": 0.4,
+      "angle": 14,
+      "slow_duration": 5,
+      "slow": 0.8,
       "cooldown": 6,
-      "mass": 20
+      "mass": 20,
+      "charge_duration": 0.5,
+      "scale": 1
     },
     "tornado": {
       "min_height": 0,
       "max_height": 1000,
-      "hp": 200,
+      "hp": 100,
       "speed": 90,
       "radius": 100,
       "duration": 8,
       "distance": 800,
-      "charge_duration": 0.4,
+      "charge_duration": 0.8,
       "recharge_duration": 0.6,
       "spin_interval": 0.5,
       "spin_damage": 4,
       "landing_damage": 20,
-      "lift_height": 350,
+      "lift_height": 300,
       "spin_duration": 3,
-      "cooldown": 12
+      "cooldown": 12,
+      "mass": 100
     }
   }
 }

@@ -26,8 +26,8 @@ func rotate(x, y, a float64) (float64, float64) {
 // held (else the way it faces) and curving to the side the opponent is on, a half-moon that ends in a skid. How
 // much of the circle it covers is speed x duration / radius.
 //
-// Arrows: `count` arrows fan out, `angle` degrees apart and centred on the opponent. An arrow that touches the
-// opponent hurts and slows it.
+// Arrows: after `charge_duration` of aiming (it can walk and drift meanwhile) `count` arrows fan out, `angle`
+// degrees apart and centred on where the opponent stands then. An arrow that touches the opponent hurts and slows it.
 //
 // Tornado: it charges, rooted; the tornado appears in front of it, then it recovers, rooted. The tornado is a
 // projectile that chases the opponent (see stepBalls) and carries it up (see stepTwirl).
@@ -79,9 +79,8 @@ func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 		}
 	}
 
-	// ---- Arrows ----
-	if in.Arrow && p.ArrowCD == 0 && !(p.TwistT > 0 || p.TwistRecT > 0) {
-		p.ArrowCD = ar.Cooldown
+	// ---- Arrows: aim for charge_duration (free to walk and drift), then the volley leaves ----
+	fire := func() {
 		dx, dy := other.X-p.X, other.Y-p.Y
 		if math.Hypot(dx, dy) < 1e-9 { // standing on the opponent: no direction, so use the facing
 			dx, dy = float64(p.FX), float64(p.FY)
@@ -98,6 +97,12 @@ func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 			})
 		}
 	}
+	if in.Arrow && p.ArrowCD == 0 && p.ArrowT == 0 && !twisting {
+		p.ArrowCD, p.ArrowT = ar.Cooldown, ar.ChargeDuration
+		if p.ArrowT == 0 {
+			fire()
+		}
+	}
 
 	rooted := p.DriftT > 0 || p.TwistT > 0 || p.TwistRecT > 0 // through the tick a skill ends in, free from the next
 
@@ -111,6 +116,12 @@ func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 		p.DriftX, p.DriftY = rotate(p.DriftX, p.DriftY, turn)
 		if p.DriftT -= step; p.DriftT < 1e-9 {
 			p.DriftT = 0
+		}
+	}
+	if p.ArrowT > 0 {
+		if p.ArrowT -= dt; p.ArrowT < 1e-9 {
+			p.ArrowT = 0
+			fire()
 		}
 	}
 	if p.TwistT > 0 {
@@ -165,4 +176,23 @@ func (g *Game) stepTwirl(dt float64) []Event {
 		}
 	}
 	return events
+}
+
+// grindPillars lets each tornado wear down the other player's ice pillars it touches: spin_damage the moment it
+// touches one, then again every spin_interval while it stays. The tornado itself is not hurt by a pillar.
+func (g *Game) grindPillars() {
+	tn := g.cfg.Rowlet.Tornado
+	for i := range g.Balls {
+		t := &g.Balls[i]
+		if t.K != ballTornado || t.HP <= 0 {
+			continue
+		}
+		for j := range g.Balls {
+			if p := &g.Balls[j]; p.K == ballPillar && p.Owner != t.Owner && p.HP > 0 && p.GrindCD == 0 &&
+				math.Hypot(p.X-t.X, p.Y-t.Y) <= tn.Radius+g.ballRadius(p) {
+				p.HP -= tn.SpinDamage
+				p.GrindCD = tn.SpinInterval
+			}
+		}
+	}
 }

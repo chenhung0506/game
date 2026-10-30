@@ -305,6 +305,11 @@ type Config struct {
 			Slow         float64 `json:"slow"`
 			Cooldown     float64 `json:"cooldown"` // counted from the cast
 			Mass         float64 `json:"mass"`     // see hyper_beam.mass
+			// ChargeDuration is how long the volley is aimed before it leaves: Rowlet may walk and drift meanwhile, and the
+			// arrows go from where it is at the end, at where the opponent then stands. Scale is how many times bigger an
+			// arrow is drawn than its radius suggests; looks only.
+			ChargeDuration float64 `json:"charge_duration"`
+			Scale          float64 `json:"scale"`
 		} `json:"arrows"`
 		// Tornado: Rowlet charges (`charge_duration`, rooted), the tornado appears in front of it and Rowlet recovers
 		// (`recharge_duration`, rooted). The tornado chases the opponent at `speed` for at most `distance` of travel or
@@ -328,6 +333,7 @@ type Config struct {
 			LiftHeight       float64 `json:"lift_height"`
 			SpinDuration     float64 `json:"spin_duration"`
 			Cooldown         float64 `json:"cooldown"` // counted from the start of the charge
+			Mass             float64 `json:"mass"`     // see hyper_beam.mass: a heavier beam or punch pushes the tornado (and whoever it holds) by the difference
 		} `json:"tornado"`
 	} `json:"rowlet"`
 }
@@ -505,6 +511,8 @@ func DefaultConfig() Config {
 	c.Rowlet.Arrows.Slow = 0.4
 	c.Rowlet.Arrows.Cooldown = 6
 	c.Rowlet.Arrows.Mass = 20
+	c.Rowlet.Arrows.ChargeDuration = 0.5
+	c.Rowlet.Arrows.Scale = 1
 	c.Rowlet.Tornado.Reach = anyHeight
 	c.Rowlet.Tornado.HP = 40
 	c.Rowlet.Tornado.Speed = 90
@@ -519,6 +527,7 @@ func DefaultConfig() Config {
 	c.Rowlet.Tornado.LiftHeight = 200
 	c.Rowlet.Tornado.SpinDuration = 3
 	c.Rowlet.Tornado.Cooldown = 12
+	c.Rowlet.Tornado.Mass = 100
 	return c
 }
 
@@ -631,6 +640,7 @@ func (c Config) validate() error {
 		{"rowlet.arrows.speed", c.Rowlet.Arrows.Speed, 0},
 		{"rowlet.arrows.radius", c.Rowlet.Arrows.Radius, 0},
 		{"rowlet.arrows.hp", float64(c.Rowlet.Arrows.HP), 0},
+		{"rowlet.arrows.scale", c.Rowlet.Arrows.Scale, 0},
 		{"rowlet.arrows.count", float64(c.Rowlet.Arrows.Count), 0},
 		{"rowlet.tornado.hp", float64(c.Rowlet.Tornado.HP), 0},
 		{"rowlet.tornado.speed", c.Rowlet.Tornado.Speed, 0},
@@ -728,11 +738,13 @@ func (c Config) validate() error {
 		{"rowlet.arrows.slow_duration", c.Rowlet.Arrows.SlowDuration},
 		{"rowlet.arrows.cooldown", c.Rowlet.Arrows.Cooldown},
 		{"rowlet.arrows.mass", c.Rowlet.Arrows.Mass},
+		{"rowlet.arrows.charge_duration", c.Rowlet.Arrows.ChargeDuration},
 		{"rowlet.tornado.charge_duration", c.Rowlet.Tornado.ChargeDuration},
 		{"rowlet.tornado.recharge_duration", c.Rowlet.Tornado.RechargeDuration},
 		{"rowlet.tornado.spin_damage", float64(c.Rowlet.Tornado.SpinDamage)},
 		{"rowlet.tornado.landing_damage", float64(c.Rowlet.Tornado.LandingDamage)},
 		{"rowlet.tornado.cooldown", c.Rowlet.Tornado.Cooldown},
+		{"rowlet.tornado.mass", c.Rowlet.Tornado.Mass},
 	} {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)

@@ -182,6 +182,7 @@ type Player struct {
 	DriftCD float64 `json:"mcd"`
 	// Arrows: the cooldown. SlowT is the seconds left slowed by an arrow (any player can be).
 	ArrowCD float64 `json:"acd"`
+	ArrowT  float64 `json:"at"` // seconds of aiming left before the volley leaves (0 = not aiming)
 	SlowT   float64 `json:"sl"`
 	// Tornado: seconds of charge left, seconds of recovery left after it is let go, the cooldown.
 	TwistT    float64 `json:"qt"`
@@ -238,6 +239,7 @@ type Ball struct {
 	X0, Y0    float64 `json:"-"`            // where it was at the start of this step, for the projectile clash
 	Life      float64 `json:"lf,omitempty"` // pillar: seconds before it melts; tornado: seconds before it is gone (once it holds someone, the spin time left)
 	Caught    bool    `json:"cg,omitempty"` // tornado: it holds the opponent
+	GrindCD   float64 `json:"-"`            // pillar: until a tornado may wear it down again (spin_interval)
 }
 
 // Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
@@ -352,8 +354,10 @@ func (g *Game) ballMass(b *Ball) float64 {
 		return g.cfg.Charizard.FireBreath.Mass
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Mass
-	case ballPillar, ballTornado:
+	case ballPillar:
 		return pillarMass // a beam or a punch does not push it
+	case ballTornado:
+		return g.cfg.Rowlet.Tornado.Mass
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Mass
 	}
@@ -449,8 +453,8 @@ func (g *Game) Step(dt float64) []Event {
 			g.dropToss(i)                         // a Charizard caught mid-toss lets go
 			g.dropLeaf(i)                         // a Chikorita mid-hop or mid-slash is stopped
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
-			p.FrostT, p.FBeamT = 0, 0                 // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
-			p.DriftT, p.TwistT, p.TwistRecT = 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
+			p.FrostT, p.FBeamT = 0, 0                              // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
+			p.DriftT, p.TwistT, p.TwistRecT, p.ArrowT = 0, 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
 		}
 		// Bound by a vine or paralyzed by a Volt Tackle: no walking and no movement skill (the others still work).
 		if p.BoundT > 0 || p.ParalyzeT > 0 {
@@ -810,6 +814,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 		b.X0, b.Y0 = b.X, b.Y
 		if b.K == ballPillar {
 			if b.HP > 0 {
+				b.GrindCD = math.Max(0, b.GrindCD-dt)
 				if b.Life -= dt; b.Life > 1e-9 {
 					kept = append(kept, b)
 				}
@@ -943,6 +948,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 	}
 	g.Balls = kept
 	g.clashBalls()
+	g.grindPillars()
 	// The blast burns the fire balls near it; they are gone on the next step.
 	for _, e := range blasts {
 		for j := range g.Balls {
