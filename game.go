@@ -191,6 +191,7 @@ type Ball struct {
 	LastSweep int     `json:"-"` // the Hyper Beam sweep that last hit it
 	HitCD     float64 `json:"-"` // until the beam may hit it again (hyper_beam.hit_interval)
 	LastPunch int     `json:"-"` // the Ice Punch that last hit it
+	X0, Y0    float64 `json:"-"` // where it was at the start of this step, for the projectile clash
 }
 
 // Event is a one-shot effect the client plays (ring, screen shake).
@@ -715,6 +716,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 	kept := g.Balls[:0]
 	for _, b := range g.Balls {
 		foe := &g.P[1-b.Owner]
+		b.X0, b.Y0 = b.X, b.Y
 		if b.K == ballFire {
 			if b.HP > 0 {
 				x0, y0 := b.X, b.Y
@@ -793,6 +795,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 		}
 	}
 	g.Balls = kept
+	g.clashBalls()
 	// The blast burns the fire balls near it; they are gone on the next step.
 	for _, e := range blasts {
 		for j := range g.Balls {
@@ -802,6 +805,54 @@ func (g *Game) stepBalls(dt float64) []Event {
 		}
 	}
 	return events
+}
+
+// ballDamage is what a projectile takes off another projectile it runs into: the damage it would do to a body.
+func (g *Game) ballDamage(b *Ball) int {
+	switch b.K {
+	case ballFire:
+		return g.cfg.Charizard.FireBreath.Damage
+	case ballLeaf:
+		return g.cfg.Chikorita.RazorLeaf.Damage
+	}
+	return g.cfg.Pikachu.ElectroBall.ContactDamage
+}
+
+// clashBalls makes projectiles of opposite owners hurt each other: each takes the other's damage off its HP. A
+// fire ball or leaf that runs out of HP is gone at once; an Electro Ball that does explodes on the next step, like
+// when a skill shoots it down. The check follows each pair's relative motion over the whole step, so two fast
+// projectiles cannot pass through each other between two ticks, and every pair is judged on the HP they had when
+// the step began, so the result does not depend on their order in the list. A leaf still hanging around
+// Chikorita has not been shot yet and clashes with nothing.
+func (g *Game) clashBalls() {
+	hurt := make([]int, len(g.Balls))
+	for i := range g.Balls {
+		a := &g.Balls[i]
+		if a.HP <= 0 || a.Wait {
+			continue
+		}
+		for j := i + 1; j < len(g.Balls); j++ {
+			b := &g.Balls[j]
+			if b.HP <= 0 || b.Wait || a.Owner == b.Owner {
+				continue
+			}
+			// b stands still at its start; a moves by the difference of their moves.
+			rx, ry := (a.X-a.X0)-(b.X-b.X0), (a.Y-a.Y0)-(b.Y-b.Y0)
+			if segDist(b.X0, b.Y0, a.X0, a.Y0, a.X0+rx, a.Y0+ry) <= g.ballRadius(a)+g.ballRadius(b) {
+				hurt[i] += g.ballDamage(b)
+				hurt[j] += g.ballDamage(a)
+			}
+		}
+	}
+	kept := g.Balls[:0]
+	for i, b := range g.Balls {
+		b.HP -= hurt[i]
+		if b.HP <= 0 && b.K != ballElectro && hurt[i] > 0 {
+			continue
+		}
+		kept = append(kept, b)
+	}
+	g.Balls = kept
 }
 
 // stepCharizard runs Charizard's three skills.
