@@ -277,7 +277,7 @@ func TestDashCoversConfiguredDistanceInConfiguredTime(t *testing.T) {
 		{220, 0.2}, {120, 0.35}, {300, 0.1}, // 0.35 and 0.1 are not multiples of a tick
 	} {
 		cfg := DefaultConfig()
-		cfg.Pikachu.Dash.Distance, cfg.Pikachu.Dash.Duration = tc.distance, tc.duration
+		cfg.Pikachu.VoltTackle.Distance, cfg.Pikachu.VoltTackle.Duration = tc.distance, tc.duration
 		g := NewGame(cfg)
 		g.P[pikachu].X = 100
 		g.P[pikachu].In = Input{DX: 1, Skill: true}
@@ -334,8 +334,8 @@ func TestDashDirection(t *testing.T) {
 			if sign(dx) != tc.wantDX || sign(dy) != tc.wantDY {
 				t.Fatalf("moved (%.1f, %.1f), want direction (%v, %v)", dx, dy, tc.wantDX, tc.wantDY)
 			}
-			if d := math.Hypot(dx, dy); math.Abs(d-DefaultConfig().Pikachu.Dash.Distance) > 0.01 {
-				t.Fatalf("diagonal dash covered %.2f, want %v (no diagonal bonus)", d, DefaultConfig().Pikachu.Dash.Distance)
+			if d := math.Hypot(dx, dy); math.Abs(d-DefaultConfig().Pikachu.VoltTackle.Distance) > 0.01 {
+				t.Fatalf("diagonal dash covered %.2f, want %v (no diagonal bonus)", d, DefaultConfig().Pikachu.VoltTackle.Distance)
 			}
 		})
 	}
@@ -371,7 +371,8 @@ func TestDashStopsAtArenaWall(t *testing.T) {
 }
 
 func TestDashCooldownBlocksChainDashing(t *testing.T) {
-	cfg := DefaultConfig() // 0.2s dash, 0.6s cooldown
+	cfg := DefaultConfig()             // 0.2s dash, 0.6s cooldown
+	cfg.Pikachu.VoltTackle.MaxUses = 1 // a single use: the cooldown follows it at once
 	g := NewGame(cfg)
 	g.P[pikachu].X = 50
 	g.P[pikachu].In = Input{DX: 1, Skill: true} // space held the whole time
@@ -381,14 +382,14 @@ func TestDashCooldownBlocksChainDashing(t *testing.T) {
 		g.Step(dt)
 		g.P[pikachu].In.DX = 0 // stop walking so only dashes move it
 	}
-	if got := g.P[pikachu].X - 50; math.Abs(got-cfg.Pikachu.Dash.Distance) > 0.01 {
-		t.Fatalf("moved %.2f in 0.5s, want exactly one dash (%v)", got, cfg.Pikachu.Dash.Distance)
+	if got := g.P[pikachu].X - 50; math.Abs(got-cfg.Pikachu.VoltTackle.Distance) > 0.01 {
+		t.Fatalf("moved %.2f in 0.5s, want exactly one dash (%v)", got, cfg.Pikachu.VoltTackle.Distance)
 	}
 	// Once the cooldown has passed, the held key dashes again.
 	for i := 0; i < tickRate/2; i++ {
 		g.Step(dt)
 	}
-	if got := g.P[pikachu].X - 50; got < 2*cfg.Pikachu.Dash.Distance-0.01 {
+	if got := g.P[pikachu].X - 50; got < 2*cfg.Pikachu.VoltTackle.Distance-0.01 {
 		t.Fatalf("moved %.2f after the cooldown, want a second dash", got)
 	}
 }

@@ -18,7 +18,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 
 | 檔案 | 內容 |
 |---|---|
-| `game.go` | 全部遊戲規則：`Step()` 每個 tick 推進一次，各技能（衝刺、打雷、電球、跳躍落地、死光、急凍拳）都在這裡 |
+| `game.go` | 全部遊戲規則：`Step()` 每個 tick 推進一次，各技能（伏特攻擊、打雷、電球、跳躍落地、死光、急凍拳）都在這裡 |
 | `config.go` | `Config` 結構、預設值、驗證。設定檔的欄位名稱和註解以這裡為準 |
 | `config.json` | **實際在跑的數值**（會被打包進映像、也掛載到容器）。改這個調手感 |
 | `main.go` | 房間、WebSocket、30 Hz 迴圈、`/health`、靜態檔；`hi` 訊息（連線時送給客戶端的設定） |
@@ -46,7 +46,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 
 | 角色 | 按鍵 / 手機按鈕 | 技能 |
 |---|---|---|
-| 皮卡丘 | 空白鍵 / 主按鈕 | 衝刺（朝按住的方向） |
+| 皮卡丘 | 空白鍵 / 主按鈕 | 伏特攻擊：全身纏電朝按住的方向衝 `distance`／`duration` 秒，可連用 `max_uses` 次；第一次起 `use_window` 秒內沒用完，或用完最後一次，就進冷卻（`cooldown`）。撞到敵人（受 min/max_height 限制）受 `damage`、麻痺 `paralyze_duration` 秒（`Player.ParalyzeT`：和藤鞭一樣不能走、不能用位移技能，其他技能照用），一次衝刺只打一下；按鈕上顯示剩餘次數 |
 | 皮卡丘 | L / 小按鈕「打雷」 | 敵人頭上出現會跟隨的陰影，之後連續落雷；施放時定身 |
 | 皮卡丘 | K / 小按鈕「電球」 | 蓄力（定身）後朝敵人所在方向丟出電球（蓄力時瞄準線追著敵人），碰到敵人、牆、或血量歸零就爆炸並擊退 |
 | 卡比獸 | 空白鍵 / 主按鈕 | 跳躍，落地有震波（半徑 `jump.slam_radius`） |
@@ -68,7 +68,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 
 ## 設定檔 `config.json`
 
-結構：`court.{mobile,web}`、`pikachu.{max_hp,walk_speed,radius,dash,thunder,electro_ball}`、
+結構：`court.{mobile,web}`、`pikachu.{max_hp,walk_speed,radius,volt_tackle,thunder,electro_ball}`、
 `snorlax.{max_hp,walk_speed,radius,ice_punch,jump,hyper_beam}`、`charizard.{max_hp,walk_speed,radius,fly,fire_breath,seismic_toss}`、`chikorita.{max_hp,walk_speed,radius,leaf_slash,razor_leaf,vine_whip}`。每個欄位的意思看 `config.go` 的註解。
 
 - 每個攻擊技能區塊都有 `min_height` / `max_height`（需 0 ≤ min ≤ max），沒寫就用 `DefaultConfig()` 的值。
@@ -120,3 +120,10 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 - 新增技能的清單：`config.go`（欄位、預設、驗證）→ `game.go` → `main.go` 的 `hi` 與冷卻表 →
   `static/index.html`（按鍵、手機按鈕 `PAD`、冷卻圈 `CD`、繪圖）→ 測試 → `config.json`。
 - 手機版沒有在真機上完整測過（只用滑鼠模擬）；改 UI 位置時要考慮窄螢幕（約 360px）。
+
+## 衝撞技的 mass（對撞規則）
+
+伏特攻擊、急凍拳、地球上投的衝刺階段各有 `mass`（預設與 config.json：急凍拳 150 > 地球上投 100 > 伏特攻擊 60）。
+兩者**同時在衝刺**且碰到時（`runningMass` / `contact` / `land` / `cut`，game.go）：mass 大的照常生效，小的被打斷、沒效果
+（急凍拳贏地球上投＝噴火龍被冰凍、不會抓人；地球上投贏伏特攻擊＝皮卡丘被抓、不會麻痺）；mass 相同則兩邊都被打斷。
+對手沒在衝刺時不比較，照常命中。順序無關（兩個 slot 互換結果相同，volt_test.go 兩種都測）。

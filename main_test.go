@@ -123,6 +123,9 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if cd := hi["cooldown"].(map[string]any); cd["fly"] != float64(8) || cd["fire"] != float64(8) || cd["toss"] != float64(10) {
 		t.Fatalf("hi.cooldown = %v, want Charizard's fly 8 / fire 8 / toss 10", cd)
 	}
+	if v, ok := hi["volt"].(map[string]any); !ok || v["uses"] != float64(3) || v["window"] != float64(2) {
+		t.Fatalf("hi.volt = %v, want 3 uses in a 2s window: the button shows the uses left", hi["volt"])
+	}
 	if l := next(t, a, "lobby"); l["here"].([]any)[1] != false {
 		t.Fatalf("lobby = %v, want the opponent absent", l)
 	}

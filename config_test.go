@@ -23,13 +23,13 @@ func TestMissingFileUsesDefaults(t *testing.T) {
 }
 
 func TestPartialFileOverridesOnlyWhatItSets(t *testing.T) {
-	p := writeConfig(t, `{"pikachu":{"dash":{"distance":300}},"snorlax":{"jump":{"height":100}}}`)
+	p := writeConfig(t, `{"pikachu":{"volt_tackle":{"distance":300}},"snorlax":{"jump":{"height":100}}}`)
 	cfg, err := LoadConfig(p)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := DefaultConfig()
-	want.Pikachu.Dash.Distance, want.Snorlax.Jump.Height = 300, 100
+	want.Pikachu.VoltTackle.Distance, want.Snorlax.Jump.Height = 300, 100
 	if cfg != want {
 		t.Fatalf("cfg = %+v, want %+v", cfg, want)
 	}
@@ -37,12 +37,12 @@ func TestPartialFileOverridesOnlyWhatItSets(t *testing.T) {
 
 func TestInvalidConfigIsRejected(t *testing.T) {
 	for name, body := range map[string]string{
-		"misspelt key":                                 `{"pikachu":{"dash":{"distence":300}}}`,
-		"zero distance":                                `{"pikachu":{"dash":{"distance":0}}}`,
-		"negative duration":                            `{"pikachu":{"dash":{"duration":-0.1}}}`,
+		"misspelt key":                                 `{"pikachu":{"volt_tackle":{"distence":300}}}`,
+		"zero distance":                                `{"pikachu":{"volt_tackle":{"distance":0}}}`,
+		"negative duration":                            `{"pikachu":{"volt_tackle":{"duration":-0.1}}}`,
 		"zero height":                                  `{"snorlax":{"jump":{"height":0}}}`,
 		"zero jump time":                               `{"snorlax":{"jump":{"duration":0}}}`,
-		"negative cooldown":                            `{"pikachu":{"dash":{"cooldown":-1}}}`,
+		"negative cooldown":                            `{"pikachu":{"volt_tackle":{"cooldown":-1}}}`,
 		"zero charge time":                             `{"snorlax":{"hyper_beam":{"charge_duration":0}}}`,
 		"negative recharge":                            `{"snorlax":{"hyper_beam":{"recharge_duration":-1}}}`,
 		"zero beam damage":                             `{"snorlax":{"hyper_beam":{"damage":0}}}`,
@@ -72,6 +72,14 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 		"misspelt ball key":                            `{"pikachu":{"electro_ball":{"explosion_radious":5}}}`,
 		"negative beam mass":                           `{"snorlax":{"hyper_beam":{"mass":-1}}}`,
 		"negative ball mass":                           `{"pikachu":{"electro_ball":{"mass":-1}}}`,
+		"zero volt uses":                               `{"pikachu":{"volt_tackle":{"max_uses":0}}}`,
+		"zero volt window":                             `{"pikachu":{"volt_tackle":{"use_window":0}}}`,
+		"negative paralysis":                           `{"pikachu":{"volt_tackle":{"paralyze_duration":-1}}}`,
+		"negative volt damage":                         `{"pikachu":{"volt_tackle":{"damage":-1}}}`,
+		"negative volt mass":                           `{"pikachu":{"volt_tackle":{"mass":-1}}}`,
+		"negative toss mass":                           `{"charizard":{"seismic_toss":{"mass":-1}}}`,
+		"volt band upside down":                        `{"pikachu":{"volt_tackle":{"min_height":50,"max_height":10}}}`,
+		"old dash key":                                 `{"pikachu":{"dash":{"distance":100}}}`,
 		"zero punch charge":                            `{"snorlax":{"ice_punch":{"charge_duration":0}}}`,
 		"zero punch speed":                             `{"snorlax":{"ice_punch":{"speed":0}}}`,
 		"zero punch distance":                          `{"snorlax":{"ice_punch":{"distance":0}}}`,
@@ -135,7 +143,7 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 		"misspelt charizard key":                       `{"charizard":{"fire_breath":{"qantity":5}}}`,
 		"misspelt fly key":                             `{"charizard":{"fly":{"durration":5}}}`,
 		"not json":                                     `dash_distance = 3`,
-		"wrong type":                                   `{"pikachu":{"dash":{"distance":"far"}}}`,
+		"wrong type":                                   `{"pikachu":{"volt_tackle":{"distance":"far"}}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := LoadConfig(writeConfig(t, body)); err == nil {
@@ -147,7 +155,7 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 
 func TestZeroCooldownAndRechargeAreAllowed(t *testing.T) {
 	for _, body := range []string{
-		`{"pikachu":{"dash":{"cooldown":0}}}`,
+		`{"pikachu":{"volt_tackle":{"cooldown":0}}}`,
 		`{"snorlax":{"hyper_beam":{"recharge_duration":0}}}`,
 		`{"pikachu":{"thunder":{"cooldown":0}}}`,
 		`{"charizard":{"fire_breath":{"random_offset_angle":0,"cooldown":0,"damage":0,"mass":0}}}`, // dead-straight, free, harmless fire
@@ -164,6 +172,8 @@ func TestZeroCooldownAndRechargeAreAllowed(t *testing.T) {
 		`{"snorlax":{"ice_punch":{"cooldown":0}}}`,
 		`{"snorlax":{"ice_punch":{"damage":0}}}`, // a pure freeze
 		`{"snorlax":{"ice_punch":{"mass":0}}}`,
+		`{"pikachu":{"volt_tackle":{"paralyze_duration":0,"damage":0,"mass":0}}}`, // a harmless, weightless tackle
+		`{"charizard":{"seismic_toss":{"mass":0}}}`,
 		`{"snorlax":{"hyper_beam":{"knockback":0}}}`,     // no push
 		`{"snorlax":{"hyper_beam":{"hit_interval":0}}}`,  // one hit per sweep
 		`{"pikachu":{"thunder":{"interval":0}}}`,         // all bolts at once

@@ -64,9 +64,13 @@ type Player struct {
 	FY           int     `json:"fy"`
 	AimX         float64 `json:"ax"` // unit vector the Electro Ball and the Ice Punch go along: the stick's, else the last direction held
 	AimY         float64 `json:"ay"`
-	DashT        float64 `json:"-"`   // seconds of dash left
+	DashT        float64 `json:"vd"`  // Volt Tackle: seconds of the dash left
 	DashX, DashY float64 `json:"-"`   // unit dash direction
 	DashCD       float64 `json:"dcd"` // cooldowns are sent so the client can draw their countdown
+	VoltLeft     int     `json:"vn"`  // uses left in the running chain (0 = no chain: the next press starts one)
+	VoltT        float64 `json:"vw"`  // seconds left to spend them before the cooldown starts anyway
+	VoltHit      bool    `json:"-"`   // this dash has already struck
+	ParalyzeT    float64 `json:"pz"`  // seconds left paralyzed by a Volt Tackle: cannot walk or use a movement skill
 
 	// Hyper Beam: charge (BeamT) -> sweep (SweepT) -> recharge (RechargeT).
 	// The client draws the warning fan, the rotating beam and "must recharge" from these.
@@ -191,7 +195,7 @@ type Ball struct {
 
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
-	T string  `json:"t"` // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze"
+	T string  `json:"t"` // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze" | "paralyze"
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 	R float64 `json:"r,omitempty"` // slam reach, so the effect can match it
@@ -361,11 +365,16 @@ func (g *Game) Step(dt float64) []Event {
 			g.dropLeaf(i)                         // a Chikorita mid-hop or mid-slash is stopped
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
 		}
-		if p.BoundT > 0 { // bound by a vine: no walking and no movement skill (the others still work)
-			if p.BoundT -= dt; p.BoundT < 1e-9 {
-				p.BoundT = 0
-			}
+		// Bound by a vine or paralyzed by a Volt Tackle: no walking and no movement skill (the others still work).
+		if p.BoundT > 0 || p.ParalyzeT > 0 {
 			in.DX, in.DY, in.Skill, in.Punch, in.Toss = 0, 0, false, false, false
+		}
+		for _, t := range []*float64{&p.BoundT, &p.ParalyzeT} {
+			if *t > 0 {
+				if *t -= dt; *t < 1e-9 {
+					*t = 0
+				}
+			}
 		}
 		if in.DX != 0 || in.DY != 0 {
 			p.FX, p.FY = in.DX, in.DY
@@ -381,16 +390,28 @@ func (g *Game) Step(dt float64) []Event {
 			p.DashCD = math.Max(0, p.DashCD-dt)
 		}
 
-		// Pikachu's skill: dash toward the held direction (or where it faces).
-		if p.Kind == pikachu && in.Skill && p.DashT == 0 && p.DashCD == 0 && p.ThunderLeft == 0 && p.BallT == 0 {
+		// Pikachu's skill, Volt Tackle: dash toward the held direction (or where it faces). A chain of max_uses
+		// starts with the first press; the cooldown starts when the last one is spent or use_window runs out.
+		vt := g.cfg.Pikachu.VoltTackle
+		if p.VoltLeft > 0 {
+			if p.VoltT -= dt; p.VoltT < 1e-9 {
+				p.VoltLeft, p.VoltT, p.DashCD = 0, 0, vt.Cooldown
+			}
+		}
+		if p.Kind == pikachu && in.Skill && p.DashT == 0 && (p.VoltLeft > 0 || p.DashCD == 0) && p.ThunderLeft == 0 && p.BallT == 0 {
 			dx, dy := float64(in.DX), float64(in.DY)
 			if dx == 0 && dy == 0 {
 				dx, dy = float64(p.FX), float64(p.FY)
 			}
 			n := math.Hypot(dx, dy)
 			p.DashX, p.DashY = dx/n, dy/n
-			p.DashT = g.cfg.Pikachu.Dash.Duration
-			p.DashCD = g.cfg.Pikachu.Dash.Cooldown // counted from the start of the dash
+			p.DashT, p.VoltHit = vt.Duration, false
+			if p.VoltLeft == 0 {
+				p.VoltLeft, p.VoltT = vt.MaxUses, vt.UseWindow
+			}
+			if p.VoltLeft--; p.VoltLeft == 0 {
+				p.VoltT, p.DashCD = 0, vt.Cooldown
+			}
 		}
 
 		// Snorlax's Hyper Beam: charge -> sweep -> recharge. It is rooted through all
@@ -552,11 +573,15 @@ func (g *Game) Step(dt float64) []Event {
 			// Steering is locked while dashing. The last step is clipped so the
 			// total distance is exact whatever the tick length.
 			step := math.Min(dt, p.DashT)
-			v := g.cfg.Pikachu.Dash.Distance / g.cfg.Pikachu.Dash.Duration
-			p.X += p.DashX * v * step
-			p.Y += p.DashY * v * step
+			v := vt.Distance / vt.Duration
+			x0, y0 := p.X, p.Y
+			p.X = math.Min(math.Max(p.X+p.DashX*v*step, 0), g.court.Length)
+			p.Y = math.Min(math.Max(p.Y+p.DashY*v*step, 0), g.court.Width)
 			if p.DashT -= step; p.DashT < 1e-9 {
 				p.DashT = 0
+			}
+			if !p.VoltHit && vt.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= g.radius(i)+g.radius(1-i) {
+				events = append(events, g.contact(i, vt.Mass)...)
 			}
 		} else if n := math.Hypot(float64(in.DX), float64(in.DY)); !busy && !casting && n > 0 {
 			// Normalise diagonals so they are not faster. Snorlax steers at its own speeds in
@@ -643,10 +668,7 @@ func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 		// Like the other ground attacks it misses an airborne opponent. Tested along the whole step so a
 		// fast fist cannot jump over a body between two ticks.
 		if !p.PunchHit && ip.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.radius(1-i) {
-			p.PunchHit = true
-			g.hit(other, ip.Damage)
-			other.FrozenT = math.Max(other.FrozenT, ip.FreezeDuration)
-			events = append(events, Event{T: "freeze", X: other.X, Y: other.Y})
+			events = append(events, g.contact(i, ip.Mass)...)
 		}
 		for j := range g.Balls {
 			b := &g.Balls[j]
@@ -859,10 +881,9 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 		p.TossLeft -= step
 		// A ground attack like the punch: it misses an opponent who is in the air. Tested along the whole step.
 		if ts.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ts.Radius+g.radius(1-i) {
-			other.Held = true
-			other.VZ = 0
-			p.TossPhase = tossRise
-		} else if p.TossLeft < 1e-9 {
+			events = append(events, g.contact(i, ts.Mass)...)
+		}
+		if p.TossPhase == tossDash && p.TossLeft < 1e-9 {
 			p.TossPhase = tossNone // missed
 		}
 	case tossRise:
@@ -1060,6 +1081,78 @@ func (g *Game) dropToss(i int) {
 		}
 	}
 	p.TossPhase = tossNone
+}
+
+// runningMass is the mass of the attack player j is in the middle of running into things (Volt Tackle, Ice Punch
+// or Seismic Toss dash), if any.
+func (g *Game) runningMass(j int) (float64, bool) {
+	p := &g.P[j]
+	switch {
+	case p.Kind == pikachu && p.DashT > 0:
+		return g.cfg.Pikachu.VoltTackle.Mass, true
+	case p.Kind == snorlax && p.PunchLeft > 0:
+		return g.cfg.Snorlax.IcePunch.Mass, true
+	case p.Kind == charizard && p.TossPhase == tossDash:
+		return g.cfg.Charizard.SeismicToss.Mass, true
+	}
+	return 0, false
+}
+
+// contact resolves player i's running attack (of this mass) touching the opponent. If the opponent is running
+// an attack of its own, the heavier mass wins: it lands, and the lighter attack is cut short and does nothing.
+// Equal masses cancel each other.
+func (g *Game) contact(i int, mass float64) []Event {
+	j := 1 - i
+	mj, clash := g.runningMass(j)
+	switch {
+	case !clash:
+		return g.land(i, j)
+	case mj > mass:
+		g.cut(i)
+		return g.land(j, i)
+	case mj < mass:
+		g.cut(j)
+		return g.land(i, j)
+	}
+	g.cut(i)
+	g.cut(j)
+	return nil
+}
+
+// cut stops the running attack of player i.
+func (g *Game) cut(i int) {
+	p := &g.P[i]
+	switch p.Kind {
+	case pikachu:
+		p.DashT = 0
+	case snorlax:
+		p.PunchLeft, p.PunchRecover = 0, g.cfg.Snorlax.IcePunch.RechargeDuration
+	case charizard:
+		p.TossPhase, p.TossLeft = tossNone, 0 // in the air it comes down through the fly code
+	}
+}
+
+// land applies the effect of player w's running attack on victim v: a paralyzing hit, a freezing hit or a catch.
+func (g *Game) land(w, v int) []Event {
+	p, victim := &g.P[w], &g.P[v]
+	switch p.Kind {
+	case pikachu:
+		vt := g.cfg.Pikachu.VoltTackle
+		p.VoltHit = true
+		g.hit(victim, vt.Damage)
+		victim.ParalyzeT = math.Max(victim.ParalyzeT, vt.ParalyzeDuration)
+		return []Event{{T: "paralyze", X: victim.X, Y: victim.Y}}
+	case snorlax:
+		ip := g.cfg.Snorlax.IcePunch
+		p.PunchHit = true
+		g.hit(victim, ip.Damage)
+		victim.FrozenT = math.Max(victim.FrozenT, ip.FreezeDuration)
+		return []Event{{T: "freeze", X: victim.X, Y: victim.Y}}
+	case charizard:
+		victim.Held, victim.VZ = true, 0
+		p.TossPhase = tossRise
+	}
+	return nil
 }
 
 // closestOnSegment is the point of the segment (x0, y0)-(x1, y1) nearest to (px, py).

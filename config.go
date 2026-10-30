@@ -39,11 +39,22 @@ type Config struct {
 		MaxHP     int     `json:"max_hp"`
 		WalkSpeed float64 `json:"walk_speed"`
 		Radius    float64 `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
-		Dash      struct {
-			Distance float64 `json:"distance"`
-			Duration float64 `json:"duration"`
-			Cooldown float64 `json:"cooldown"`
-		} `json:"dash"`
+		// Volt Tackle (the main button): Pikachu, wrapped in lightning, dashes `distance` in `duration` along the
+		// direction held. It can be used `max_uses` times in a row; if they are not all spent within `use_window`
+		// seconds of the first, the cooldown starts anyway. Touching the opponent hurts and paralyzes it (no
+		// walking, no movement skills) for `paralyze_duration`, once per dash. `mass` decides clashes with another
+		// skill that is running at the same time: the heavier one wins and the lighter one is cut short.
+		VoltTackle struct {
+			Reach
+			Distance         float64 `json:"distance"`
+			Duration         float64 `json:"duration"`
+			MaxUses          int     `json:"max_uses"`
+			UseWindow        float64 `json:"use_window"`
+			Cooldown         float64 `json:"cooldown"` // starts when the last use is spent or the window runs out
+			ParalyzeDuration float64 `json:"paralyze_duration"`
+			Damage           int     `json:"damage"`
+			Mass             float64 `json:"mass"`
+		} `json:"volt_tackle"`
 		Thunder struct {
 			Reach
 			Delay       float64 `json:"delay"`        // shadow appears -> first bolt
@@ -154,6 +165,7 @@ type Config struct {
 			Cooldown float64 `json:"cooldown"` // counted from the start of the run
 			Length   float64 `json:"length"`
 			High     float64 `json:"high"`
+			Mass     float64 `json:"mass"` // against another skill running at the same time, see pikachu.volt_tackle.mass
 		} `json:"seismic_toss"`
 	} `json:"charizard"`
 	Chikorita struct {
@@ -223,9 +235,15 @@ func DefaultConfig() Config {
 	c.Pikachu.MaxHP = maxHP
 	c.Pikachu.WalkSpeed = speed
 	c.Pikachu.Radius = pikachuRadius
-	c.Pikachu.Dash.Distance = 220
-	c.Pikachu.Dash.Duration = 0.2
-	c.Pikachu.Dash.Cooldown = 0.6
+	c.Pikachu.VoltTackle.Reach = groundReach
+	c.Pikachu.VoltTackle.Distance = 220
+	c.Pikachu.VoltTackle.Duration = 0.2
+	c.Pikachu.VoltTackle.MaxUses = 3
+	c.Pikachu.VoltTackle.UseWindow = 2
+	c.Pikachu.VoltTackle.Cooldown = 0.6
+	c.Pikachu.VoltTackle.ParalyzeDuration = 1.5
+	c.Pikachu.VoltTackle.Damage = 5
+	c.Pikachu.VoltTackle.Mass = 60
 	c.Pikachu.Thunder.Reach = anyHeight
 	c.Pikachu.ElectroBall.Reach = groundReach
 	c.Snorlax.Jump.Reach = groundReach
@@ -297,6 +315,7 @@ func DefaultConfig() Config {
 	c.Charizard.SeismicToss.Cooldown = 10
 	c.Charizard.SeismicToss.Length = 300
 	c.Charizard.SeismicToss.High = 180
+	c.Charizard.SeismicToss.Mass = 100
 	c.Chikorita.MaxHP = 110
 	c.Chikorita.WalkSpeed = 170
 	c.Chikorita.Radius = 18
@@ -371,8 +390,10 @@ func (c Config) validate() error {
 		{"snorlax.radius", c.Snorlax.Radius, 0},
 		{"pikachu.max_hp", float64(c.Pikachu.MaxHP), 0},
 		{"pikachu.walk_speed", c.Pikachu.WalkSpeed, 0},
-		{"pikachu.dash.distance", c.Pikachu.Dash.Distance, 0},
-		{"pikachu.dash.duration", c.Pikachu.Dash.Duration, 0},
+		{"pikachu.volt_tackle.distance", c.Pikachu.VoltTackle.Distance, 0},
+		{"pikachu.volt_tackle.duration", c.Pikachu.VoltTackle.Duration, 0},
+		{"pikachu.volt_tackle.max_uses", float64(c.Pikachu.VoltTackle.MaxUses), 0},
+		{"pikachu.volt_tackle.use_window", c.Pikachu.VoltTackle.UseWindow, 0},
 		{"pikachu.thunder.delay", c.Pikachu.Thunder.Delay, 0},
 		{"pikachu.thunder.radius", c.Pikachu.Thunder.Radius, 0},
 		{"pikachu.thunder.damage", float64(c.Pikachu.Thunder.Damage), 0},
@@ -446,7 +467,11 @@ func (c Config) validate() error {
 		name string
 		v    float64
 	}{
-		{"pikachu.dash.cooldown", c.Pikachu.Dash.Cooldown},
+		{"pikachu.volt_tackle.cooldown", c.Pikachu.VoltTackle.Cooldown},
+		{"pikachu.volt_tackle.paralyze_duration", c.Pikachu.VoltTackle.ParalyzeDuration},
+		{"pikachu.volt_tackle.damage", float64(c.Pikachu.VoltTackle.Damage)},
+		{"pikachu.volt_tackle.mass", c.Pikachu.VoltTackle.Mass},
+		{"charizard.seismic_toss.mass", c.Charizard.SeismicToss.Mass},
 		{"pikachu.thunder.interval", c.Pikachu.Thunder.Interval},
 		{"pikachu.thunder.cooldown", c.Pikachu.Thunder.Cooldown},
 		{"pikachu.thunder.follow_speed", c.Pikachu.Thunder.FollowSpeed},
@@ -491,6 +516,7 @@ func (c Config) validate() error {
 		}
 	}
 	for name, r := range map[string]Reach{
+		"pikachu.volt_tackle":    c.Pikachu.VoltTackle.Reach,
 		"pikachu.thunder":        c.Pikachu.Thunder.Reach,
 		"pikachu.electro_ball":   c.Pikachu.ElectroBall.Reach,
 		"snorlax.jump":           c.Snorlax.Jump.Reach,

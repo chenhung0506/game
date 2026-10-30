@@ -33,6 +33,8 @@
   .card small { display: block; margin-top: 4px; opacity: .75; line-height: 1.5; text-align: left; font-size: 12px; }
   .card.mine { border-color: #6fd36f; background: #243026; }
   #pickmsg { margin-top: 14px; text-align: center; line-height: 1.7; }
+  .uses { position: absolute; top: -4px; right: -4px; min-width: 28px; padding: 2px 5px; border-radius: 14px; background: #f7cf3a; color: #222; font-size: 14px; text-align: center; pointer-events: none; }
+  .uses.out { background: #888; color: #eee; }
   .cd { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: conic-gradient(#000000b0 var(--cd, 0deg), transparent 0); }
 </style>
 </head>
@@ -53,9 +55,9 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Each player picks a character in the lobby; a snapshot's p[i].k says who is who (0 Pikachu, 1 Snorlax, 2 Charizard, 3 Chikorita).
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉'];
-const BLURB = ['衝刺・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭'];
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭'];
 const HELP = [
-  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
+  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
   '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　J＝急凍拳（蓄力時按方向鍵決定方向，朝該方向衝拳，打到的敵人被冰凍）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
   '你是噴火龍　移動 WASD / 方向鍵　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　K＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　J＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
   '你是菊草葉　移動 WASD / 方向鍵　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　K＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　J＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）',
@@ -74,9 +76,11 @@ let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
+let voltCfg = { uses: 3, window: 2 }; // Volt Tackle, from 'hi'
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
+let usesBadge = null; // Pikachu's main button: how many Volt Tackles are left
 const shadow = [{ x: null, y: null }, { x: null, y: null }]; // per slot: the smoothed thunder shadow position
 const smoke = []; // puffs rising off Snorlax while it recharges
 const flames = []; // fading flames Charizard leaves while it runs with a catch
@@ -102,7 +106,7 @@ let picks = [-1, -1], here = [true, false], padKind = -1;
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
     picks = m.picks; here = m.here; waiting = !(here[0] && here[1]); snap = null; padKind = -1;
@@ -128,6 +132,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'explode') shake = 14;
       if (ev.t === 'leaf') shake = 6;
       if (ev.t === 'freeze') shake = 10;
+      if (ev.t === 'paralyze') shake = 8;
     }
   }
 };
@@ -257,14 +262,14 @@ if (PORTRAIT) {
 // The pad: a stick bottom-left, and bottom-right a big main button with small ones around it.
 // A small slot that is null is reserved and not drawn.
 const PAD = [
-  { main: ['衝刺', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball']] }, // Pikachu
+  { main: ['伏特攻擊', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball']] }, // Pikachu
   { main: ['跳躍', 'skill'], small: [['死光', 'beam'], ['冰拳', 'punch']] }, // Snorlax
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
   { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine']] }, // Chikorita
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
-  cdBtns.length = 0;
+  cdBtns.length = 0; usesBadge = null;
   const el = (cls) => { const d = document.createElement('div'); d.className = cls; document.body.append(d); return d; };
 
   const base = el('stick'), knob = document.createElement('div'); knob.className = 'knob'; base.append(knob);
@@ -291,6 +296,7 @@ function buildPad() {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
     cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1] });
+    if (padKind === 0 && name === 'skill') { usesBadge = document.createElement('div'); usesBadge.className = 'uses'; b.append(usesBadge); }
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (id !== null) return; id = e.pointerId; b.setPointerCapture(id); touch[name] = true; b.classList.add('on'); sendInput(); });
     const up = (e) => { if (e.pointerId !== id) return; id = null; touch[name] = false; b.classList.remove('on'); sendInput(); };
     for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(t, up);
@@ -798,6 +804,74 @@ function drawFist(p, d) {
   ctx.restore();
 }
 
+// Volt Tackle: while it dashes Pikachu is wrapped in a flickering glow with lightning crackling round it; during
+// a chain a row of pips under it shows the uses left, and a bar the time left to spend them.
+function zig(x0, y0, x1, y1, n, jit) { // a jagged line between two points
+  ctx.beginPath(); ctx.moveTo(x0, y0);
+  for (let s = 1; s < n; s++) { const k = s / n; ctx.lineTo(x0 + (x1 - x0) * k + (Math.random() - 0.5) * jit, y0 + (y1 - y0) * k + (Math.random() - 0.5) * jit); }
+  ctx.lineTo(x1, y1); ctx.stroke();
+}
+function drawVolt() {
+  for (const i of slotsOf(0)) {
+    const p = snap.p[i], d = disp[i], bs = radius[0] / REF[0];
+    upright(d.x, d.y, () => {
+      const cy = -d.z - 4 * bs;
+      if (p.vd > 0) {
+        const R = 30 * bs, g = ctx.createRadialGradient(0, cy, 0, 0, cy, R * 1.5);
+        g.addColorStop(0, 'rgba(255,245,150,0.75)'); g.addColorStop(1, 'rgba(255,220,40,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, cy, R * 1.5, 0, 7); ctx.fill();
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        for (let s = 0; s < 9; s++) {
+          const a = Math.random() * 6.283, r0 = R * (0.5 + Math.random() * 0.4), r1 = R * (1.3 + Math.random() * 0.6);
+          ctx.strokeStyle = 'rgba(255,250,200,0.95)'; ctx.lineWidth = 2.4;
+          zig(Math.cos(a) * r0, cy + Math.sin(a) * r0, Math.cos(a) * r1, cy + Math.sin(a) * r1, 4, 10 * bs);
+          ctx.strokeStyle = 'rgba(255,215,40,0.9)'; ctx.lineWidth = 1.2;
+          zig(Math.cos(a) * r0, cy + Math.sin(a) * r0, Math.cos(a) * r1, cy + Math.sin(a) * r1, 4, 10 * bs);
+        }
+      }
+      if (p.vn > 0) {
+        const N = voltCfg.uses, gap = 11, x0 = -(N - 1) * gap / 2, y = 22 * bs;
+        for (let s = 0; s < N; s++) {
+          ctx.fillStyle = s < p.vn ? '#ffd83a' : 'rgba(255,255,255,0.25)'; ctx.strokeStyle = 'rgba(60,40,0,.7)'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(x0 + s * gap, y, 4, 0, 7); ctx.fill(); ctx.stroke();
+        }
+        const w = Math.max(N * gap, 24), k = Math.min(1, Math.max(0, p.vw / voltCfg.window));
+        ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(-w / 2, y + 8, w, 3);
+        ctx.fillStyle = '#ffd83a'; ctx.fillRect(-w / 2, y + 8, w * k, 3);
+      }
+    });
+  }
+}
+
+// Paralyzed by a Volt Tackle: sparks crackle round the body, and a label, while it cannot walk or use a movement skill.
+function drawParalyzed(d, p) {
+  const bs = radius[p.k] / REF[p.k], R = 20 * bs;
+  upright(d.x, d.y, () => {
+    const cy = -d.z - 4 * bs, fade = p.pz < 0.4 ? p.pz / 0.4 : 1;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (let s = 0; s < 4; s++) {
+      const a = Math.random() * 6.283, r0 = R * (0.7 + Math.random() * 0.3), r1 = R * (1.1 + Math.random() * 0.5);
+      ctx.strokeStyle = `rgba(255,240,120,${0.9 * fade})`; ctx.lineWidth = 2;
+      zig(Math.cos(a) * r0, cy + Math.sin(a) * r0, Math.cos(a) * r1, cy + Math.sin(a) * r1, 3, 8 * bs);
+    }
+    ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(255,224,70,${fade})`;
+    ctx.fillText('麻痺！', 0, cy - 36 * bs);
+  });
+}
+
+// The moment of the shock: a yellow flash and bolts flying out.
+function drawParalyzeBurst(f) {
+  const k = f.age / 0.35, a = 1 - k;
+  ctx.save();
+  ctx.fillStyle = `rgba(255,240,120,${0.6 * a * a})`; ctx.beginPath(); ctx.arc(f.x, f.y, 24 + 40 * k, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,236,90,${a})`; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let s = 0; s < 8; s++) {
+    const ang = s * 0.785 + 0.2, r0 = 12 + 20 * k, r1 = 30 + 45 * k;
+    zig(f.x + Math.cos(ang) * r0, f.y + Math.sin(ang) * r0, f.x + Math.cos(ang) * r1, f.y + Math.sin(ang) * r1, 3, 9);
+  }
+  ctx.restore();
+}
+
 // A frozen player sits inside an iceberg; in its last half second the ice flickers and cracks.
 function drawFrozen(p, i, d) {
   if (!(p.fz > 0)) return;
@@ -1097,6 +1171,7 @@ function drawPlayer(i, p) {
   drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
   if (p.bd > 0) drawBound(d, p);
+  if (p.pz > 0) drawParalyzed(d, p);
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.
   const top = -d.z;
   upright(d.x, d.y, () => {
@@ -1133,6 +1208,9 @@ function drawPlayer(i, p) {
   });
 }
 
+// Volt Tackles left: the running chain's, else all of them once the cooldown is over, else none.
+const voltUses = (p) => (p.vn > 0 ? p.vn : p.dcd > 0 ? 0 : voltCfg.uses);
+
 // Each button's dark pie is the share of its cooldown still to wait.
 function drawCooldowns() {
   if (!snap) return;
@@ -1140,6 +1218,7 @@ function drawCooldowns() {
     const total = cdCfg[c.total], left = snap.p[you][c.field];
     c.span.style.setProperty('--cd', (total > 0 ? Math.min(Math.max(left / total, 0), 1) * 360 : 0) + 'deg');
   }
+  if (usesBadge) { const n = voltUses(snap.p[you]); usesBadge.textContent = '×' + n; usesBadge.classList.toggle('out', n === 0); }
 }
 
 function frame() {
@@ -1165,12 +1244,14 @@ function frame() {
     [0, 1].sort((a, b) => screenY(snap.p[a].x, snap.p[a].y) - screenY(snap.p[b].x, snap.p[b].y)).forEach((i) => drawPlayer(i, snap.p[i]));
     drawLeafSlashes(); // over the bodies: the blade is the thing to see
     drawVines();
+    drawVolt();
     fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' ? 0.6 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
       else if (f.t === 'explode') drawExplosion(f);
       else if (f.t === 'freeze') drawFreezeBurst(f);
+      else if (f.t === 'paralyze') drawParalyzeBurst(f);
       else if (f.t === 'leaf') drawLeafSpark(f);
       else drawQuake(f); // 'slam'
     }
