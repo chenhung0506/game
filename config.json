@@ -104,7 +104,7 @@
       "max_height": 40,
       "speed": 250,
       "radius": 10,
-      "hp": 5,
+      "hp": 4,
       "damage": 3,
       "cooldown": 8,
       "mass": 20,
