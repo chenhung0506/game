@@ -43,6 +43,8 @@ type Input struct {
 	Punch   bool `json:"punch"`   // Snorlax only: Ice Punch
 	Fire    bool `json:"fire"`    // Charizard only: Fire Breath
 	Toss    bool `json:"toss"`    // Charizard only: Seismic Toss
+	Razor   bool `json:"razor"`   // Chikorita only: Razor Leaf
+	Vine    bool `json:"vine"`    // Chikorita only: Vine Whip
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
@@ -131,6 +133,17 @@ type Player struct {
 	LeafDX    float64 `json:"-"` // the hop's unit direction
 	LeafDY    float64 `json:"-"`
 	LeafCD    float64 `json:"lcd"` // counted from the start of the hop
+
+	// Razor Leaf cooldown; Vine Whip: seconds of swing left, the angle each vine is at now (degrees off the aim,
+	// they swing in from sweep_angle to 0), the locked aim, whether it has struck, and the cooldown.
+	RazorCD float64 `json:"rcd"`
+	VineT   float64 `json:"vt"`
+	VineA   float64 `json:"va"`
+	VineX   float64 `json:"vx"`
+	VineY   float64 `json:"vy"`
+	VineHit bool    `json:"-"`
+	VineCD  float64 `json:"vcd"`
+	BoundT  float64 `json:"bd"` // seconds left bound by a vine: cannot walk or use a movement skill
 }
 
 // Leaf Slash phases.
@@ -153,17 +166,21 @@ const (
 const (
 	ballElectro = 0
 	ballFire    = 1
+	ballLeaf    = 2 // Chikorita's Razor Leaf
 )
 
 // Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
 // touches the opponent, runs out of range or HP, or reaches a wall.
 type Ball struct {
-	K         int     `json:"k,omitempty"` // ballElectro | ballFire
+	K         int     `json:"k,omitempty"` // ballElectro | ballFire | ballLeaf
 	Owner     int     `json:"-"`           // the slot that threw it; the other slot is its target
 	Left      float64 `json:"-"`           // fire ball: range left
 	X         float64 `json:"x"`
 	Y         float64 `json:"y"`
-	DX, DY    float64 `json:"-"` // unit direction
+	DX        float64 `json:"dx,omitempty"` // unit direction
+	DY        float64 `json:"dy,omitempty"`
+	Delay     float64 `json:"-"`           // leaf: seconds before it shoots
+	Wait      bool    `json:"w,omitempty"` // leaf: still hanging around Chikorita
 	HP        int     `json:"hp"`
 	LastSweep int     `json:"-"` // the Hyper Beam sweep that last hit it
 	HitCD     float64 `json:"-"` // until the beam may hit it again (hyper_beam.hit_interval)
@@ -233,15 +250,21 @@ func (g *Game) radius(i int) float64 { return g.cfg.radiusOf(g.P[i].Kind) }
 
 // ballRadius and ballMass are the size and weight of a projectile, which depend on whose it is.
 func (g *Game) ballRadius(b *Ball) float64 {
-	if b.K == ballFire {
+	switch b.K {
+	case ballFire:
 		return g.cfg.Charizard.FireBreath.Radius
+	case ballLeaf:
+		return g.cfg.Chikorita.RazorLeaf.Radius
 	}
 	return g.cfg.Pikachu.ElectroBall.Radius
 }
 
 func (g *Game) ballMass(b *Ball) float64 {
-	if b.K == ballFire {
+	switch b.K {
+	case ballFire:
 		return g.cfg.Charizard.FireBreath.Mass
+	case ballLeaf:
+		return g.cfg.Chikorita.RazorLeaf.Mass
 	}
 	return g.cfg.Pikachu.ElectroBall.Mass
 }
@@ -334,6 +357,13 @@ func (g *Game) Step(dt float64) []Event {
 			p.DashT, p.BallT, p.BreathT = 0, 0, 0 // a dash, a charge or a breath in progress is cut short
 			g.dropToss(i)                         // a Charizard caught mid-toss lets go
 			g.dropLeaf(i)                         // a Chikorita mid-hop or mid-slash is stopped
+			p.VineT = 0
+		}
+		if p.BoundT > 0 { // bound by a vine: no walking and no movement skill (the others still work)
+			if p.BoundT -= dt; p.BoundT < 1e-9 {
+				p.BoundT = 0
+			}
+			in.DX, in.DY, in.Skill, in.Punch, in.Toss = 0, 0, false, false, false
 		}
 		if in.DX != 0 || in.DY != 0 {
 			p.FX, p.FY = in.DX, in.DY
@@ -449,7 +479,7 @@ func (g *Game) Step(dt float64) []Event {
 
 		if p.Kind == chikorita {
 			events = append(events, g.stepChikorita(i, in, dt)...)
-			casting = p.LeafPhase != leafNone // the hop and the advance move it themselves
+			casting = p.LeafPhase != leafNone || p.VineT > 0 // the hop and the advance move it themselves; the vines root it
 		}
 
 		// Pikachu's Thunder. Pikachu cannot move until the last bolt has struck, and a
@@ -635,11 +665,12 @@ func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 }
 
 // stepBalls flies the projectiles. An Electro Ball blows up when it touches the opponent, reaches a wall or
-// runs out of HP, and the blast also burns fire balls caught in it. A fire ball is spent when it touches the
+// runs out of HP, and the blast also burns the fire balls and leaves caught in it. A Razor Leaf hangs where it was
+// scattered until its delay is up, then shoots at the opponent and is spent when it touches it, reaches a wall or runs out of HP. A fire ball is spent when it touches the
 // opponent (hurting it), reaches a wall, runs out of range or runs out of HP.
 func (g *Game) stepBalls(dt float64) []Event {
 	var events []Event
-	bc, fb := g.cfg.Pikachu.ElectroBall, g.cfg.Charizard.FireBreath
+	bc, fb, rl := g.cfg.Pikachu.ElectroBall, g.cfg.Charizard.FireBreath, g.cfg.Chikorita.RazorLeaf
 	type blast struct{ x, y float64 }
 	var blasts []blast
 	kept := g.Balls[:0]
@@ -659,6 +690,35 @@ func (g *Game) stepBalls(dt float64) []Event {
 				}
 				inside := b.X > 0 && b.X < g.court.Length && b.Y > 0 && b.Y < g.court.Width
 				if inside && b.Left > 1e-9 {
+					kept = append(kept, b)
+				}
+			}
+			continue
+		}
+		if b.K == ballLeaf {
+			if b.HP > 0 {
+				if b.Wait { // hanging around Chikorita until its delay is up, then it picks its target
+					if b.Delay -= dt; b.Delay <= 1e-9 {
+						dx, dy := foe.X-b.X, foe.Y-b.Y
+						if n := math.Hypot(dx, dy); n > 1e-9 {
+							b.DX, b.DY, b.Wait = dx/n, dy/n, false
+						} else {
+							b.DX, b.DY, b.Wait = float64(g.P[b.Owner].FX), float64(g.P[b.Owner].FY), false
+							b.DX, b.DY = b.DX/math.Hypot(b.DX, b.DY), b.DY/math.Hypot(b.DX, b.DY)
+						}
+					}
+					kept = append(kept, b)
+					continue
+				}
+				x0, y0 := b.X, b.Y
+				b.X += b.DX * rl.Speed * dt
+				b.Y += b.DY * rl.Speed * dt
+				if rl.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= rl.Radius+g.radius(1-b.Owner) {
+					g.hit(foe, rl.Damage)
+					events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
+					continue
+				}
+				if b.X > 0 && b.X < g.court.Length && b.Y > 0 && b.Y < g.court.Width {
 					kept = append(kept, b)
 				}
 			}
@@ -697,7 +757,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 	// The blast burns the fire balls near it; they are gone on the next step.
 	for _, e := range blasts {
 		for j := range g.Balls {
-			if b := &g.Balls[j]; b.K == ballFire && math.Hypot(b.X-e.x, b.Y-e.y) <= bc.ExplosionRadius+fb.Radius {
+			if b := &g.Balls[j]; b.K != ballElectro && math.Hypot(b.X-e.x, b.Y-e.y) <= bc.ExplosionRadius+g.ballRadius(b) {
 				b.HP -= bc.ExplosionDamage
 			}
 		}
@@ -841,7 +901,7 @@ func (g *Game) stepChikorita(i int, in Input, dt float64) []Event {
 			p.LeafCD = 0
 		}
 	}
-	if in.Skill && p.LeafPhase == leafNone && p.LeafCD == 0 && p.FrozenT == 0 && !p.Held {
+	if in.Skill && p.LeafPhase == leafNone && p.VineT == 0 && p.LeafCD == 0 && p.FrozenT == 0 && !p.Held {
 		dx, dy := float64(in.DX), float64(in.DY)
 		if dx == 0 && dy == 0 {
 			dx, dy = float64(p.FX), float64(p.FY)
@@ -890,6 +950,62 @@ func (g *Game) stepChikorita(i int, in Input, dt float64) []Event {
 				p.LeafT += ls.SlashInterval
 				p.LeafHit = false
 			}
+		}
+	}
+	events = append(events, g.stepChikoritaVines(i, in, dt)...)
+	return events
+}
+
+// stepChikoritaVines runs Chikorita's two small skills: the Razor Leaf cast and the Vine Whip swing.
+func (g *Game) stepChikoritaVines(i int, in Input, dt float64) []Event {
+	var events []Event
+	p, other := &g.P[i], &g.P[1-i]
+	rl, vw := g.cfg.Chikorita.RazorLeaf, g.cfg.Chikorita.VineWhip
+	ready := p.LeafPhase == leafNone && p.VineT == 0 && p.Z == 0 && p.FrozenT == 0 && !p.Held
+	for _, cd := range []*float64{&p.RazorCD, &p.VineCD} {
+		if *cd > 0 {
+			if *cd -= dt; *cd < 1e-9 {
+				*cd = 0
+			}
+		}
+	}
+
+	// ---- Razor Leaf: the leaves are scattered at once and wait for their own delay ----
+	if in.Razor && ready && p.RazorCD == 0 {
+		p.RazorCD = rl.Cooldown
+		near := g.radius(i) + rl.Radius // not inside the body
+		for n := 0; n < rl.Count; n++ {
+			a := g.rng.Float64() * 2 * math.Pi
+			d := near + g.rng.Float64()*math.Max(rl.ScatterRadius-near, 0)
+			g.Balls = append(g.Balls, Ball{
+				K: ballLeaf, Owner: i, Wait: true, HP: rl.LeafHP,
+				X:     math.Min(math.Max(p.X+math.Cos(a)*d, 0), g.court.Length),
+				Y:     math.Min(math.Max(p.Y+math.Sin(a)*d, 0), g.court.Width),
+				Delay: rl.MinDelay + g.rng.Float64()*(rl.MaxDelay-rl.MinDelay),
+			})
+		}
+	}
+
+	// ---- Vine Whip: two vines swing in from either side of the aim and meet on it ----
+	if in.Vine && ready && p.VineCD == 0 {
+		p.VineX, p.VineY = p.AimX, p.AimY
+		p.VineT, p.VineA, p.VineHit, p.VineCD = vw.SweepDuration, vw.SweepAngle, false, vw.Cooldown
+	}
+	if p.VineT > 0 {
+		prev := p.VineA
+		if p.VineT -= dt; p.VineT < 1e-9 {
+			p.VineT = 0
+		}
+		p.VineA = vw.SweepAngle * p.VineT / vw.SweepDuration
+		// The vines are mirror images, so one test along the swept angles of each covers both. Whichever touches
+		// first hurts and binds; a second touch in the same swing does not.
+		reach, w := vw.Length+g.radius(1-i), vw.Width+2*g.radius(1-i)
+		if !p.VineHit && vw.Reach.hits(other) &&
+			(sweepHits(p, other, p.VineX, p.VineY, prev, p.VineA, reach, w) || sweepHits(p, other, p.VineX, p.VineY, -p.VineA, -prev, reach, w)) {
+			p.VineHit = true
+			g.hit(other, vw.Damage)
+			other.BoundT = math.Max(other.BoundT, vw.BindDuration)
+			events = append(events, Event{T: "leaf", X: other.X, Y: other.Y})
 		}
 	}
 	return events

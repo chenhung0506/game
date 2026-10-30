@@ -178,6 +178,38 @@ type Config struct {
 			Damage        int     `json:"damage"`     // per swing that lands
 			Cooldown      float64 `json:"cooldown"`   // counted from the start of the hop
 		} `json:"leaf_slash"`
+		// Razor Leaf: Chikorita scatters `count` leaves around itself, each at a random distance from its body out to
+		// `scatter_radius`. After a random delay between `min_delay` and `max_delay` seconds a leaf shoots at where the
+		// opponent stands at that moment, at `speed`, and hurts it (`damage`) if it touches it. A leaf has `leaf_hp`
+		// that the opponent's skills can wear down, and goes at a wall or when the opponent is hit.
+		RazorLeaf struct {
+			Reach
+			Count         int     `json:"count"`
+			ScatterRadius float64 `json:"scatter_radius"`
+			MinDelay      float64 `json:"min_delay"`
+			MaxDelay      float64 `json:"max_delay"`
+			LeafHP        int     `json:"leaf_hp"`
+			Speed         float64 `json:"speed"`
+			Radius        float64 `json:"radius"` // size of a leaf: it touches the opponent when the bodies overlap
+			Damage        int     `json:"damage"`
+			Mass          float64 `json:"mass"`     // see hyper_beam.mass
+			Cooldown      float64 `json:"cooldown"` // counted from the cast
+		} `json:"razor_leaf"`
+		// Vine Whip: two vines swing out of Chikorita along the direction it aims. One starts `sweep_angle` degrees to
+		// the left of that line, the other as far to the right, and both swing to it in `sweep_duration` seconds, meeting
+		// on the line where the attack ends. A vine is `length` long and `width` wide. The first vine to touch the
+		// opponent hurts it and binds it for `bind_duration` seconds: it cannot walk or use a movement skill
+		// (dash, jump, fly, Ice Punch, Seismic Toss, Leaf Slash). Chikorita is rooted while it swings.
+		VineWhip struct {
+			Reach
+			Length        float64 `json:"length"`
+			Width         float64 `json:"width"`
+			SweepAngle    float64 `json:"sweep_angle"`
+			SweepDuration float64 `json:"sweep_duration"`
+			Damage        int     `json:"damage"`
+			BindDuration  float64 `json:"bind_duration"`
+			Cooldown      float64 `json:"cooldown"` // counted from the start of the swing
+		} `json:"vine_whip"`
 	} `json:"chikorita"`
 }
 
@@ -276,6 +308,25 @@ func DefaultConfig() Config {
 	c.Chikorita.LeafSlash.LeafScale = 2.5
 	c.Chikorita.LeafSlash.Damage = 12
 	c.Chikorita.LeafSlash.Cooldown = 6
+	c.Chikorita.RazorLeaf.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	c.Chikorita.RazorLeaf.Count = 8
+	c.Chikorita.RazorLeaf.ScatterRadius = 120
+	c.Chikorita.RazorLeaf.MinDelay = 0.2
+	c.Chikorita.RazorLeaf.MaxDelay = 1.0
+	c.Chikorita.RazorLeaf.LeafHP = 5
+	c.Chikorita.RazorLeaf.Speed = 600
+	c.Chikorita.RazorLeaf.Radius = 10
+	c.Chikorita.RazorLeaf.Damage = 8
+	c.Chikorita.RazorLeaf.Mass = 20
+	c.Chikorita.RazorLeaf.Cooldown = 8
+	c.Chikorita.VineWhip.Reach = groundReach
+	c.Chikorita.VineWhip.Length = 160
+	c.Chikorita.VineWhip.Width = 24
+	c.Chikorita.VineWhip.SweepAngle = 70
+	c.Chikorita.VineWhip.SweepDuration = 0.35
+	c.Chikorita.VineWhip.Damage = 10
+	c.Chikorita.VineWhip.BindDuration = 2
+	c.Chikorita.VineWhip.Cooldown = 5
 	return c
 }
 
@@ -366,6 +417,14 @@ func (c Config) validate() error {
 		{"chikorita.leaf_slash.slash_interval", c.Chikorita.LeafSlash.SlashInterval, 0},
 		{"chikorita.leaf_slash.slash_radius", c.Chikorita.LeafSlash.SlashRadius, 0},
 		{"chikorita.leaf_slash.leaf_scale", c.Chikorita.LeafSlash.LeafScale, 0},
+		{"chikorita.razor_leaf.count", float64(c.Chikorita.RazorLeaf.Count), 0},
+		{"chikorita.razor_leaf.scatter_radius", c.Chikorita.RazorLeaf.ScatterRadius, 0},
+		{"chikorita.razor_leaf.leaf_hp", float64(c.Chikorita.RazorLeaf.LeafHP), 0},
+		{"chikorita.razor_leaf.speed", c.Chikorita.RazorLeaf.Speed, 0},
+		{"chikorita.razor_leaf.radius", c.Chikorita.RazorLeaf.Radius, 0},
+		{"chikorita.vine_whip.length", c.Chikorita.VineWhip.Length, 0},
+		{"chikorita.vine_whip.width", c.Chikorita.VineWhip.Width, 0},
+		{"chikorita.vine_whip.sweep_duration", c.Chikorita.VineWhip.SweepDuration, 0},
 	} {
 		if !(f.v > f.min) { // also rejects NaN
 			return fmt.Errorf("%s must be > %v, got %v", f.name, f.min, f.v)
@@ -410,6 +469,13 @@ func (c Config) validate() error {
 		{"chikorita.leaf_slash.slash_step", c.Chikorita.LeafSlash.SlashStep},
 		{"chikorita.leaf_slash.damage", float64(c.Chikorita.LeafSlash.Damage)},
 		{"chikorita.leaf_slash.cooldown", c.Chikorita.LeafSlash.Cooldown},
+		{"chikorita.razor_leaf.min_delay", c.Chikorita.RazorLeaf.MinDelay},
+		{"chikorita.razor_leaf.damage", float64(c.Chikorita.RazorLeaf.Damage)},
+		{"chikorita.razor_leaf.mass", c.Chikorita.RazorLeaf.Mass},
+		{"chikorita.razor_leaf.cooldown", c.Chikorita.RazorLeaf.Cooldown},
+		{"chikorita.vine_whip.damage", float64(c.Chikorita.VineWhip.Damage)},
+		{"chikorita.vine_whip.bind_duration", c.Chikorita.VineWhip.BindDuration},
+		{"chikorita.vine_whip.cooldown", c.Chikorita.VineWhip.Cooldown},
 	} {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
@@ -424,6 +490,8 @@ func (c Config) validate() error {
 		"charizard.fire_breath":  c.Charizard.FireBreath.Reach,
 		"charizard.seismic_toss": c.Charizard.SeismicToss.Reach,
 		"chikorita.leaf_slash":   c.Chikorita.LeafSlash.Reach,
+		"chikorita.razor_leaf":   c.Chikorita.RazorLeaf.Reach,
+		"chikorita.vine_whip":    c.Chikorita.VineWhip.Reach,
 	} {
 		if !(r.MinHeight >= 0 && r.MaxHeight >= r.MinHeight) { // also rejects NaN
 			return fmt.Errorf("%s: need 0 <= min_height <= max_height, got %v and %v", name, r.MinHeight, r.MaxHeight)
@@ -431,6 +499,14 @@ func (c Config) validate() error {
 	}
 	if a := c.Snorlax.HyperBeam.SweepAngle; !(a >= 0 && a <= 180) { // 0 = a fixed beam, 180 = a full circle
 		return fmt.Errorf("snorlax.hyper_beam.sweep_angle must be between 0 and 180, got %v", a)
+	}
+	if rl := c.Chikorita.RazorLeaf; rl.Count > 200 {
+		return fmt.Errorf("chikorita.razor_leaf.count must be at most 200, got %d", rl.Count)
+	} else if !(rl.MaxDelay >= rl.MinDelay) {
+		return fmt.Errorf("chikorita.razor_leaf.max_delay must be >= min_delay, got %v and %v", rl.MaxDelay, rl.MinDelay)
+	}
+	if a := c.Chikorita.VineWhip.SweepAngle; !(a > 0 && a <= 180) {
+		return fmt.Errorf("chikorita.vine_whip.sweep_angle must be between 0 (exclusive) and 180, got %v", a)
 	}
 	if a := c.Charizard.FireBreath.RandomOffsetAngle; !(a >= 0 && a <= 90) { // 0 = every fire ball flies straight at the target
 		return fmt.Errorf("charizard.fire_breath.random_offset_angle must be between 0 and 90, got %v", a)

@@ -29,7 +29,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 
 ## 架構重點
 
-- **伺服器說了算**：客戶端只送「按住了哪些鍵」`{dx,dy,skill,punch,beam,ball,thunder,ax,ay}`，
+- **伺服器說了算**：客戶端只送「按住了哪些鍵」`{dx,dy,skill,razor,vine,punch,beam,ball,thunder,ax,ay}`，
   伺服器每 1/30 秒算一次，把所有狀態廣播給兩人。所以所有時間類參數實際上都以 tick（0.033 秒）為單位。
 - **選角**：先進房的是 slot 0、後進的 slot 1，第三個收到 `full`；角色由玩家選，存在 `Player.Kind`（0 皮卡丘、1 卡比獸、2 噴火龍、3 菊草葉），快照每人帶 `k`。連線後伺服器送 `hi`（設定，`radius`/`maxhp` 依角色編號）與 `lobby`（`picks`、`here`）；客戶端送 `{"pick":k}`，兩人都選好才開打（`room.choose`）。不存在的角色、或比賽中選都會被拒絕，有人離開就回到選角畫面（另一人的選擇保留）。技能與判定看 `p.Kind`，不要看 slot；`NewGame` 的預設是 slot 0 皮卡丘、slot 1 卡比獸，所以大部分舊測試照舊。
 - **場地依開房者的版本決定**：頁面連線時帶 `mode=mobile|web`，只有第一個進房的人有效，兩種場地大小在
@@ -55,6 +55,8 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 | 噴火龍 | 空白鍵 / 主按鈕 | 飛行 `fly.duration` 秒：只是移動變快；打不打得到它看各技能的高度範圍（見下）對上 `fly.height`；冷卻從降落才開始 |
 | 噴火龍 | K / 小按鈕「噴火」 | 在 `duration` 秒內噴出 `quantity` 團小火球，每團朝噴出當下敵人位置、再隨機偏 ±`random_offset_angle` 度；可邊走邊噴；火球有 HP，會被死光、落地震波、急凍拳、電球爆炸打掉；打到人就消失，不分高度 |
 | 菊草葉 | 空白鍵 / 主按鈕「葉刃」 | 葉刃連斬：朝按住的方向跳 `jump_distance`（空中 `jump_duration` 秒、最高 `jump_height`，落地不傷人），接著甩葉子 `slashes` 下（每下 `slash_interval` 秒；第一下左上→右下、第二下右上→左下，輪流），每下朝敵人前進 `slash_step`（碰到身體就停），每下在揮到一半時打中半徑 `slash_radius` 內的人 `damage`；技能期間頭上的葉子放大 `leaf_scale` 倍（只影響畫面），並真的被甩過去當刀，原本的刀光留作淡淡的殘影；冷卻從起跳算；被冰凍或抓住會中斷 |
+| 菊草葉 | K / 小按鈕「飛葉」 | 飛葉快刀：在身邊 `scatter_radius` 內隨機距離灑出 `count` 片樹葉（`Game.Balls` 裡 `K=ballLeaf`，`Wait` 時掛在原地）；各自隨機等 `min_delay`～`max_delay` 秒後朝當時敵人的位置以 `speed` 衝出，碰到就 `damage` 並消失；樹葉有 `leaf_hp`，會被死光、落地震波、急凍拳、電球爆炸打掉 |
+| 菊草葉 | J / 小按鈕「藤鞭」 | 藤鞭：朝瞄準方向同時揮出左右兩條藤鞭，各從 ±`sweep_angle` 度在 `sweep_duration` 秒內掃向 0 度會合；長 `length`、寬 `width`；一次揮擊只打一下，被打中的敵人 `bind_duration` 秒內不能走路、不能用位移技能（衝刺、跳躍、飛行、急凍拳、地球上投、葉刃連斬），其他技能照用（`Player.BoundT`）；揮擊時菊草葉自己定身 |
 | 噴火龍 | J / 小按鈕「上投」 | 地球上投：朝瞄準方向衝 `length`，碰到（地面上的）敵人就抓住（`Held`，不能動不能用技能）、飛到 `high` 再摔下，落地受 `damage` 並播落地震波特效；噴火龍中途被冰凍會鬆手 |
 
 技能判定都是「技能範圍 + 對方身體半徑 `radius`」，另外每個攻擊技能都有自己的**高度範圍**
@@ -67,7 +69,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 ## 設定檔 `config.json`
 
 結構：`court.{mobile,web}`、`pikachu.{max_hp,walk_speed,radius,dash,thunder,electro_ball}`、
-`snorlax.{max_hp,walk_speed,radius,ice_punch,jump,hyper_beam}`、`charizard.{max_hp,walk_speed,radius,fly,fire_breath,seismic_toss}`、`chikorita.{max_hp,walk_speed,radius,leaf_slash}`。每個欄位的意思看 `config.go` 的註解。
+`snorlax.{max_hp,walk_speed,radius,ice_punch,jump,hyper_beam}`、`charizard.{max_hp,walk_speed,radius,fly,fire_breath,seismic_toss}`、`chikorita.{max_hp,walk_speed,radius,leaf_slash,razor_leaf,vine_whip}`。每個欄位的意思看 `config.go` 的註解。
 
 - 每個攻擊技能區塊都有 `min_height` / `max_height`（需 0 ≤ min ≤ max），沒寫就用 `DefaultConfig()` 的值。
 - 讀檔時**不認識的欄位或不合理的值會讓伺服器拒絕啟動**（刻意的，避免打錯字默默吃不到設定）。

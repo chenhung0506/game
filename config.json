@@ -133,6 +133,31 @@
       "leaf_scale": 2.5,
       "damage": 12,
       "cooldown": 6
+    },
+    "razor_leaf": {
+      "min_height": 0,
+      "max_height": 60,
+      "count": 8,
+      "scatter_radius": 120,
+      "min_delay": 0.2,
+      "max_delay": 1,
+      "leaf_hp": 5,
+      "speed": 600,
+      "radius": 10,
+      "damage": 8,
+      "mass": 20,
+      "cooldown": 8
+    },
+    "vine_whip": {
+      "min_height": 0,
+      "max_height": 12,
+      "length": 160,
+      "width": 24,
+      "sweep_angle": 70,
+      "sweep_duration": 0.35,
+      "damage": 10,
+      "bind_duration": 2,
+      "cooldown": 5
     }
   }
 }

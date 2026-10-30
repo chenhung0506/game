@@ -53,12 +53,12 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Each player picks a character in the lobby; a snapshot's p[i].k says who is who (0 Pikachu, 1 Snorlax, 2 Charizard, 3 Chikorita).
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉'];
-const BLURB = ['衝刺・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '跳躍・葉刃連斬'];
+const BLURB = ['衝刺・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭'];
 const HELP = [
   '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
   '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　J＝急凍拳（蓄力時按方向鍵決定方向，朝該方向衝拳，打到的敵人被冰凍）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
   '你是噴火龍　移動 WASD / 方向鍵　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　K＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　J＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
-  '你是菊草葉　移動 WASD / 方向鍵　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）',
+  '你是菊草葉　移動 WASD / 方向鍵　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　K＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　J＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）',
 ];
 const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
@@ -73,7 +73,7 @@ let maxHp = [100, 100, 120, 110]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
-let leafCfg = { radius: 90, scale: 2.5 }; // Chikorita's Leaf Slash reach, from 'hi'
+let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35 }; // Chikorita's Leaf Slash reach, from 'hi'
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
@@ -102,7 +102,7 @@ let picks = [-1, -1], here = [true, false], padKind = -1;
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; leafCfg = m.leaf; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
     picks = m.picks; here = m.here; waiting = !(here[0] && here[1]); snap = null; padKind = -1;
@@ -197,7 +197,7 @@ function drawCards() {
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false }; // the pad's buttons
+const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -216,6 +216,7 @@ function sendInput() {
     skill: k(' ') || touch.skill, punch: k('j') || touch.punch, beam: k('k') || touch.beam, ball: k('k') || touch.ball, thunder: k('l') || touch.thunder,
     // the keys are shared between the characters (J and K each do whatever the one you play has); the server uses the ones that fit
     fire: k('k') || touch.fire, toss: k('j') || touch.toss,
+    razor: k('k') || touch.razor, vine: k('j') || touch.vine,
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
@@ -259,7 +260,7 @@ const PAD = [
   { main: ['衝刺', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball']] }, // Pikachu
   { main: ['跳躍', 'skill'], small: [['死光', 'beam'], ['冰拳', 'punch']] }, // Snorlax
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
-  { main: ['葉刃', 'skill'], small: [] }, // Chikorita
+  { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine']] }, // Chikorita
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
@@ -285,7 +286,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }];
   const hold = (b, label, name) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -476,7 +477,7 @@ function artSnorlax(c, x, y, t, pose) {
 // the legs swing. The leaf sways at rest and whips about while it runs.
 function chLeaf(c, bx, by, rot, back, bend = 12, k = 1) {
   // The leaf is bent: its midrib curves to one side (bend, in px at the tip) and the tip droops a little.
-  const H = 43, W = 18, N = 14, mid = (u) => [bend * u * u, -H * u + 6 * u * u * u];
+  const H = 54, W = 10.5, N = 14, mid = (u) => [bend * u * u, -H * u + 6 * u * u * u];
   c.save(); c.translate(bx, by); c.rotate(rot); c.scale(k, k);
   const L = [], R = [], V = [];
   for (let i = 0; i <= N; i++) {
@@ -673,6 +674,7 @@ function drawBallCharge(p, d) {
 }
 function drawBall(b) {
   if (b.k === 1) { drawFireBall(b); return; }
+  if (b.k === 2) { drawRazorLeaf(b); return; }
   {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
@@ -966,6 +968,71 @@ function drawLeafSpark(f) {
   });
 }
 
+// Razor Leaf: a sharp leaf pointing the way it flies. While it hangs around Chikorita it turns slowly and bobs; a bar
+// shows its HP once the opponent's skills have worn it down.
+function drawRazorLeaf(b) {
+  const r = razorCfg.radius, t = performance.now() / 1000, ang = b.w ? t * 2 + b.x * 0.05 : Math.atan2(b.dy || 0, b.dx || 0);
+  const bob = b.w ? Math.sin(t * 4 + b.y * 0.1) * 2 : 0, L = r * 2.3, Wd = r * 0.75;
+  ctx.save(); ctx.translate(b.x, b.y + bob); ctx.rotate(ang);
+  if (!b.w) { // streaking
+    const gr = ctx.createLinearGradient(-L * 3, 0, -L, 0); gr.addColorStop(0, 'rgba(150,235,110,0)'); gr.addColorStop(1, 'rgba(150,235,110,.5)');
+    ctx.fillStyle = gr; ctx.fillRect(-L * 3, -Wd * 0.6, L * 2, Wd * 1.2);
+  }
+  ctx.beginPath(); ctx.moveTo(-L, 0); ctx.bezierCurveTo(-L * 0.4, -Wd * 1.3, L * 0.4, -Wd * 1.1, L, 0); ctx.bezierCurveTo(L * 0.4, Wd * 1.1, -L * 0.4, Wd * 1.3, -L, 0);
+  ctx.fillStyle = b.w ? '#4fb64a' : '#7fe070'; ctx.fill(); ctx.strokeStyle = '#1f6a2c'; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.strokeStyle = '#2f8a3a'; ctx.beginPath(); ctx.moveTo(-L * 0.9, 0); ctx.lineTo(L * 0.9, 0); ctx.stroke();
+  ctx.restore();
+  if (b.hp < razorCfg.hp) {
+    upright(b.x, b.y, () => {
+      ctx.fillStyle = '#000a'; ctx.fillRect(-9, -r - 12, 18, 3);
+      ctx.fillStyle = '#7fe070'; ctx.fillRect(-9, -r - 12, 18 * Math.max(b.hp, 0) / razorCfg.hp, 3);
+    });
+  }
+}
+
+// Vine Whip: two vines swing in from either side of the aim and meet on it. A vine lags behind its own swing,
+// so it bends away from the aim until the two come together.
+function drawVines() { for (const si of slotsOf(3)) drawVine(snap.p[si], disp[si]); }
+function drawVine(p, d) {
+  if (!(p.vt > 0)) return;
+  const [ax, ay] = rv(p.vx, p.vy), base = Math.atan2(ay, ax), L = vineCfg.len, bs = radius[3] / REF[3];
+  const k = 1 - p.vt / vineCfg.duration, grow = Math.min(1, k * 6 + 0.4); // they lash out almost at once
+  upright(d.x, d.y, () => {
+    ctx.translate(0, -d.z - 8 * bs);
+    for (const side of [-1, 1]) {
+      const a = base + side * p.va * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), len = L * grow;
+      const bend = side * 0.2 * len * (p.va / vineCfg.angle), nx = -uy, ny = ux; // outward, away from the aim
+      const cx = ux * len * 0.5 + nx * bend, cy = uy * len * 0.5 + ny * bend, ex = ux * len, ey = uy * len;
+      const pts = [], n = 14;
+      for (let i = 0; i <= n; i++) {
+        const t = i / n, x = 2 * (1 - t) * t * cx + t * t * ex, y = 2 * (1 - t) * t * cy + t * t * ey;
+        const tx = 2 * (1 - t) * cx + 2 * t * (ex - cx), ty = 2 * (1 - t) * cy + 2 * t * (ey - cy), tl = Math.hypot(tx, ty) || 1;
+        pts.push([x, y, -ty / tl, tx / tl, vineCfg.w * 0.32 * (1 - 0.7 * t)]);
+      }
+      ctx.beginPath();
+      pts.forEach(([x, y, px, py, w], i) => (i ? ctx.lineTo(x + px * w, y + py * w) : ctx.moveTo(x + px * w, y + py * w)));
+      for (let i = n; i >= 0; i--) { const [x, y, px, py, w] = pts[i]; ctx.lineTo(x - px * w, y - py * w); }
+      ctx.closePath(); ctx.fillStyle = '#4aa83e'; ctx.fill(); ctx.strokeStyle = '#1f6a2c'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.stroke();
+      ctx.strokeStyle = 'rgba(200,255,170,.55)'; ctx.lineWidth = 1.5; ctx.beginPath(); // a highlight along the vine
+      pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+      ctx.fillStyle = '#7fe070'; ctx.beginPath(); ctx.arc(ex, ey, 4.5, 0, 7); ctx.fill(); ctx.stroke(); // the tip
+    }
+  });
+}
+
+// Bound by a vine: green coils round the feet and a label, while it cannot walk or use a movement skill.
+function drawBound(d, p) {
+  const bs = radius[p.k] / REF[p.k];
+  upright(d.x, d.y, () => {
+    ctx.strokeStyle = '#3f9a3a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath(); ctx.ellipse(0, 12 * bs - i * 4 * bs - d.z, 17 * bs, 5 * bs, 0, 0, 7); ctx.stroke();
+    }
+    ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#9be37b';
+    ctx.fillText('被纏住！', 0, -d.z - 44 * bs);
+  });
+}
+
 // Smoke over Snorlax's head while it cannot move (recharging after Hyper Beam).
 function drawSmoke() {
   const resting = slotsOf(1).filter((i) => snap.p[i].rt > 0);
@@ -1016,6 +1083,7 @@ function drawPlayer(i, p) {
   });
   drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
+  if (p.bd > 0) drawBound(d, p);
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.
   const top = -d.z;
   upright(d.x, d.y, () => {
@@ -1083,6 +1151,7 @@ function frame() {
     // Draw lower players first so the one nearer the camera overlaps correctly.
     [0, 1].sort((a, b) => screenY(snap.p[a].x, snap.p[a].y) - screenY(snap.p[b].x, snap.p[b].y)).forEach((i) => drawPlayer(i, snap.p[i]));
     drawLeafSlashes(); // over the bodies: the blade is the thing to see
+    drawVines();
     fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' ? 0.6 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
