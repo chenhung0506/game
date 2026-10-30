@@ -73,7 +73,7 @@ let maxHp = [100, 100, 120, 110]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
-let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35 }; // Chikorita's Leaf Slash reach, from 'hi'
+let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35 }; // Chikorita's Leaf Slash reach, from 'hi'
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
@@ -971,7 +971,7 @@ function drawLeafSpark(f) {
 // Razor Leaf: a sharp leaf pointing the way it flies. While it hangs around Chikorita it turns slowly and bobs; a bar
 // shows its HP once the opponent's skills have worn it down.
 function drawRazorLeaf(b) {
-  const r = razorCfg.radius, t = performance.now() / 1000, ang = b.w ? t * 2 + b.x * 0.05 : Math.atan2(b.dy || 0, b.dx || 0);
+  const r = razorCfg.radius * razorCfg.scale, t = performance.now() / 1000, ang = b.w ? t * 2 + b.x * 0.05 : Math.atan2(b.dy || 0, b.dx || 0);
   const bob = b.w ? Math.sin(t * 4 + b.y * 0.1) * 2 : 0, L = r * 2.3, Wd = r * 0.75;
   ctx.save(); ctx.translate(b.x, b.y + bob); ctx.rotate(ang);
   if (!b.w) { // streaking
@@ -1007,15 +1007,15 @@ function drawVine(p, d) {
       for (let i = 0; i <= n; i++) {
         const t = i / n, x = 2 * (1 - t) * t * cx + t * t * ex, y = 2 * (1 - t) * t * cy + t * t * ey;
         const tx = 2 * (1 - t) * cx + 2 * t * (ex - cx), ty = 2 * (1 - t) * cy + 2 * t * (ey - cy), tl = Math.hypot(tx, ty) || 1;
-        pts.push([x, y, -ty / tl, tx / tl, vineCfg.w * 0.32 * (1 - 0.7 * t)]);
+        pts.push([x, y, -ty / tl, tx / tl, vineCfg.w * 0.26]); // the same width from root to tip
       }
       ctx.beginPath();
       pts.forEach(([x, y, px, py, w], i) => (i ? ctx.lineTo(x + px * w, y + py * w) : ctx.moveTo(x + px * w, y + py * w)));
       for (let i = n; i >= 0; i--) { const [x, y, px, py, w] = pts[i]; ctx.lineTo(x - px * w, y - py * w); }
-      ctx.closePath(); ctx.fillStyle = '#4aa83e'; ctx.fill(); ctx.strokeStyle = '#1f6a2c'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.stroke();
-      ctx.strokeStyle = 'rgba(200,255,170,.55)'; ctx.lineWidth = 1.5; ctx.beginPath(); // a highlight along the vine
+      ctx.closePath(); ctx.fillStyle = '#2b6e2f'; ctx.fill(); ctx.strokeStyle = '#123d19'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.stroke();
+      ctx.strokeStyle = 'rgba(150,215,120,.4)'; ctx.lineWidth = 1.5; ctx.beginPath(); // a highlight along the vine
       pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
-      ctx.fillStyle = '#7fe070'; ctx.beginPath(); ctx.arc(ex, ey, 4.5, 0, 7); ctx.fill(); ctx.stroke(); // the tip
+      ctx.fillStyle = '#3c8f3a'; ctx.beginPath(); ctx.arc(ex, ey, vineCfg.w * 0.26, 0, 7); ctx.fill(); ctx.stroke(); // a rounded tip
     }
   });
 }

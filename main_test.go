@@ -109,6 +109,9 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if lf, ok := hi["leaf"].(map[string]any); !ok || lf["radius"] != float64(90) || lf["scale"] != float64(2.5) {
 		t.Fatalf("hi.leaf = %v, want the Leaf Slash radius 90 and leaf scale 2.5", hi["leaf"])
 	}
+	if rz, ok := hi["razor"].(map[string]any); !ok || rz["radius"] != float64(10) || rz["scale"] != float64(1) || rz["hp"] != float64(5) {
+		t.Fatalf("hi.razor = %v, want radius 10, scale 1, hp 5", hi["razor"])
+	}
 	// The client draws the beam's warning line from these, not from hard-coded numbers.
 	if beam, ok := hi["beam"].(map[string]any); !ok || beam["len"] != float64(450) || beam["w"] != float64(50) || beam["charge"] != float64(0.6) || beam["angle"] != float64(30) {
 		t.Fatalf("hi.beam = %v, want the configured length/width/charge", hi["beam"])

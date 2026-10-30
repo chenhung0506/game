@@ -625,12 +625,12 @@ func TestChikoritaSnapshotCarriesVineAndRazorState(t *testing.T) {
 }
 
 func TestNewChikoritaSkillConfigLoadsAndRefusesBadValues(t *testing.T) {
-	c, err := loadJSON(t, `{"chikorita":{"razor_leaf":{"count":12,"scatter_radius":200,"min_delay":0.1,"max_delay":0.4,"leaf_hp":9,"max_height":80},
+	c, err := loadJSON(t, `{"chikorita":{"razor_leaf":{"count":12,"scatter_radius":200,"min_delay":0.1,"max_delay":0.4,"leaf_hp":9,"leaf_scale":2.5,"max_height":80},
 		"vine_whip":{"length":200,"sweep_angle":80,"sweep_duration":0.5,"bind_duration":3}}}`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := c.Chikorita.RazorLeaf; r.Count != 12 || r.ScatterRadius != 200 || r.MinDelay != 0.1 || r.MaxDelay != 0.4 || r.LeafHP != 9 || r.MaxHeight != 80 {
+	if r := c.Chikorita.RazorLeaf; r.Count != 12 || r.ScatterRadius != 200 || r.MinDelay != 0.1 || r.MaxDelay != 0.4 || r.LeafHP != 9 || r.LeafScale != 2.5 || r.MaxHeight != 80 {
 		t.Fatalf("razor_leaf = %+v", r)
 	}
 	if v := c.Chikorita.VineWhip; v.Length != 200 || v.SweepAngle != 80 || v.SweepDuration != 0.5 || v.BindDuration != 3 {
@@ -640,6 +640,7 @@ func TestNewChikoritaSkillConfigLoadsAndRefusesBadValues(t *testing.T) {
 		"no leaves":       `{"chikorita":{"razor_leaf":{"count":0}}}`,
 		"too many":        `{"chikorita":{"razor_leaf":{"count":201}}}`,
 		"delays reversed": `{"chikorita":{"razor_leaf":{"min_delay":2,"max_delay":1}}}`,
+		"zero leaf scale": `{"chikorita":{"razor_leaf":{"leaf_scale":0}}}`,
 		"no leaf hp":      `{"chikorita":{"razor_leaf":{"leaf_hp":0}}}`,
 		"zero scatter":    `{"chikorita":{"razor_leaf":{"scatter_radius":0}}}`,
 		"zero length":     `{"chikorita":{"vine_whip":{"length":0}}}`,

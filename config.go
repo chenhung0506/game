@@ -190,7 +190,8 @@ type Config struct {
 			MaxDelay      float64 `json:"max_delay"`
 			LeafHP        int     `json:"leaf_hp"`
 			Speed         float64 `json:"speed"`
-			Radius        float64 `json:"radius"` // size of a leaf: it touches the opponent when the bodies overlap
+			Radius        float64 `json:"radius"`     // size of a leaf: it touches the opponent when the bodies overlap
+			LeafScale     float64 `json:"leaf_scale"` // how many times bigger a leaf is drawn than its radius suggests; looks only
 			Damage        int     `json:"damage"`
 			Mass          float64 `json:"mass"`     // see hyper_beam.mass
 			Cooldown      float64 `json:"cooldown"` // counted from the cast
@@ -316,6 +317,7 @@ func DefaultConfig() Config {
 	c.Chikorita.RazorLeaf.LeafHP = 5
 	c.Chikorita.RazorLeaf.Speed = 600
 	c.Chikorita.RazorLeaf.Radius = 10
+	c.Chikorita.RazorLeaf.LeafScale = 1
 	c.Chikorita.RazorLeaf.Damage = 8
 	c.Chikorita.RazorLeaf.Mass = 20
 	c.Chikorita.RazorLeaf.Cooldown = 8
@@ -422,6 +424,7 @@ func (c Config) validate() error {
 		{"chikorita.razor_leaf.leaf_hp", float64(c.Chikorita.RazorLeaf.LeafHP), 0},
 		{"chikorita.razor_leaf.speed", c.Chikorita.RazorLeaf.Speed, 0},
 		{"chikorita.razor_leaf.radius", c.Chikorita.RazorLeaf.Radius, 0},
+		{"chikorita.razor_leaf.leaf_scale", c.Chikorita.RazorLeaf.LeafScale, 0},
 		{"chikorita.vine_whip.length", c.Chikorita.VineWhip.Length, 0},
 		{"chikorita.vine_whip.width", c.Chikorita.VineWhip.Width, 0},
 		{"chikorita.vine_whip.sweep_duration", c.Chikorita.VineWhip.SweepDuration, 0},

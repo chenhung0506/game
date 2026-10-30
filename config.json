@@ -5,7 +5,7 @@
   },
   "pikachu": {
     "max_hp": 100,
-    "walk_speed": 165,
+    "walk_speed": 170,
     "radius": 8,
     "dash": {
       "distance": 150,
@@ -40,7 +40,7 @@
   },
   "snorlax": {
     "max_hp": 140,
-    "walk_speed": 140,
+    "walk_speed": 120,
     "radius": 30,
     "ice_punch": {
       "min_height": 0,
@@ -83,7 +83,7 @@
   },
   "charizard": {
     "max_hp": 120,
-    "walk_speed": 150,
+    "walk_speed": 140,
     "radius": 30,
     "fly": {
       "duration": 6,
@@ -118,8 +118,8 @@
   },
   "chikorita": {
     "max_hp": 110,
-    "walk_speed": 170,
-    "radius": 20,
+    "walk_speed": 150,
+    "radius": 10,
     "leaf_slash": {
       "min_height": 0,
       "max_height": 12,
@@ -144,6 +144,7 @@
       "leaf_hp": 5,
       "speed": 600,
       "radius": 10,
+      "leaf_scale": 1,
       "damage": 8,
       "mass": 20,
       "cooldown": 8
@@ -151,7 +152,7 @@
     "vine_whip": {
       "min_height": 0,
       "max_height": 12,
-      "length": 160,
+      "length": 200,
       "width": 24,
       "sweep_angle": 70,
       "sweep_duration": 0.35,
