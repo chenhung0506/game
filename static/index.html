@@ -343,7 +343,8 @@ function artPikachu(c, x, y, t, pose) {
   const twitch = Math.sin(t * 3) * 0.06;
   c.save(); c.translate(x, y + bob);
   if (dir === 2) c.scale(-1, 1);
-  if (dir === 0 || dir === 1) {
+  if (mv > 0.2) pikaCrawl(c, dir, sw, wag, twitch); // running: down on all fours
+  else if (dir === 0 || dir === 1) {
     const back = dir === 1;
     if (!back) pikaTail(c, 8, 10, 0.5 + wag);
     ov(c, -6, 15 - Math.max(0, sw) * 3, 4.5, 3, Y); ov(c, 6, 15 - Math.max(0, -sw) * 3, 4.5, 3, Y);
@@ -375,6 +376,57 @@ function artPikachu(c, x, y, t, pose) {
     ov(c, 3 + sw * 2, 6, 3, 5, Y, 0.1);
   }
   c.restore();
+}
+
+// Running Pikachu goes down on all fours: hands and feet both hit the ground, in turn (sw is the stride, -1..1).
+// Seen from the side the diagonal pairs move together; seen from the front or the back the hands and feet
+// come and go alternately, the near pair drawn bigger.
+function pikaLimb(c, x0, y0, len, ang, w, fill) { // a leg or arm hanging at angle ang from (x0, y0), with a paw
+  const cx = x0 + Math.sin(ang) * len / 2, cy = y0 + Math.cos(ang) * len / 2;
+  ov(c, cx, cy, w, len / 2 + 1, fill, -ang);
+  ov(c, x0 + Math.sin(ang) * len, y0 + Math.cos(ang) * len, w + 0.8, w * 0.8, fill, -ang);
+}
+function pikaCrawl(c, dir, sw, wag, twitch) {
+  const Y = '#f7cf3a', YD = '#d9b030', RED = '#e8362f', BR = '#7a4a1e';
+  const up = (v) => Math.max(0, v); // how far a paw is lifted off the ground
+  if (dir === 2 || dir === 3) { // side view, running to the right (a left run is this one mirrored)
+    const a = sw * 0.9;
+    pikaTail(c, -12, 4, -0.9 + wag * 0.7);
+    pikaLimb(c, 6, 9, 8, -a + 0.2, 2.6, YD); pikaLimb(c, -8, 10, 8, a - 0.1, 2.6, YD); // the far pair
+    ov(c, -1, 6, 12.5, 7.5, Y, -0.05);
+    ov(c, -4, 0, 5.5, 1.1, BR, 0.1, null); ov(c, -9, 1.5, 4, 1.1, BR, 0.1, null);
+    for (const o of [0, 3]) { // two ears swept back
+      const rot = -1 - o * 0.06 + twitch, ex = 5 + o, ey = -7, ry = 8;
+      ov(c, ex, ey, 3, ry, Y, rot); ov(c, ex + Math.sin(rot) * ry * 0.85, ey - Math.cos(rot) * ry * 0.85, 2.8, 3.2, '#222', rot, null);
+    }
+    ov(c, 11, 2, 10, 8.5, Y);
+    eye(c, 15, 0, 1.9, 2.4); ov(c, 20.4, 2.6, 0.9, 0.8, '#222', 0, null);
+    c.strokeStyle = '#222'; c.lineWidth = 0.9; c.beginPath(); c.arc(17.5, 4.5, 2, 0.1 * Math.PI, 0.7 * Math.PI); c.stroke();
+    ov(c, 12.5, 5.5, 2.7, 2.4, RED, 0, null);
+    pikaLimb(c, 7, 9, 8, a + 0.2, 2.8, Y); pikaLimb(c, -8, 10, 8, -a - 0.1, 2.8, Y); // the near pair
+    return;
+  }
+  const back = dir === 1;
+  if (!back) { // coming towards you
+    pikaTail(c, 6, 4, 0.6 + wag);
+    ov(c, -8, 13 - up(sw) * 3, 4, 2.6, YD); ov(c, 8, 13 - up(-sw) * 3, 4, 2.6, YD);
+    ov(c, 0, 5, 10, 8, Y);
+    for (const m of [-1, 1]) { ov(c, m * 10, -12, 3.4, 8, Y, m * 0.8 + twitch * m); ov(c, m * 14.4, -17, 3, 3.3, '#222', m * 0.8 + twitch * m, null); }
+    ov(c, 0, -1, 12.5, 10, Y);
+    eye(c, -5, -3, 2.2, 2.8); eye(c, 5, -3, 2.2, 2.8);
+    ov(c, 0, 0.5, 1, 0.7, '#222', 0, null);
+    c.strokeStyle = '#222'; c.lineWidth = 0.9; c.beginPath(); c.arc(0, 1.2, 2.4, 0.2 * Math.PI, 0.8 * Math.PI); c.stroke();
+    ov(c, -9.5, 3.2, 3, 2.7, RED, 0, null); ov(c, 9.5, 3.2, 3, 2.7, RED, 0, null);
+    ov(c, -9, 11 + sw * 3, 3.4 + up(sw) * 1.2, 3.1, Y); ov(c, 9, 11 - sw * 3, 3.4 + up(-sw) * 1.2, 3.1, Y);
+  } else { // running away
+    for (const m of [-1, 1]) { ov(c, m * 9, -12, 3.2, 7.5, Y, m * 0.7 + twitch * m); ov(c, m * 12.8, -16.5, 2.8, 3.1, '#222', m * 0.7 + twitch * m, null); }
+    ov(c, 0, -4, 11, 9, Y);
+    ov(c, -9, -2 + sw * 2.5, 3, 2.8, YD); ov(c, 9, -2 - sw * 2.5, 3, 2.8, YD);
+    ov(c, 0, 6, 10.5, 8.5, Y);
+    ov(c, 0, 3, 6.5, 1.3, BR, 0, null); ov(c, 0, 7, 6.5, 1.3, BR, 0, null);
+    ov(c, -8, 14 - up(sw) * 3, 5, 3.3, Y); ov(c, 8, 14 - up(-sw) * 3, 5, 3.3, Y);
+    pikaTail(c, 1, 10, wag * 0.8, 0.85);
+  }
 }
 
 function artSnorlax(c, x, y, t, pose) {

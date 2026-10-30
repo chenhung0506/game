@@ -59,11 +59,11 @@
       "min_height": 0,
       "max_height": 12,
       "height": 100,
-      "duration": 1.7,
+      "duration": 1.5,
       "cooldown": 2,
       "slam_radius": 100,
-      "air_speed_first_half": 320,
-      "air_speed_second_half": 160
+      "air_speed_first_half": 300,
+      "air_speed_second_half": 180
     },
     "hyper_beam": {
       "min_height": 0,

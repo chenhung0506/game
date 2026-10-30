@@ -111,6 +111,7 @@ type Player struct {
 	BreathCD   float64 `json:"hcd"` // counted from the moment the breath starts
 	BreathLeft float64 `json:"-"`   // the full duration, to tell how far along the breath is
 	// Seismic Toss: TossPhase is tossNone, tossDash (running at the target), tossRise (carrying it up) or tossFall.
+	TossAir   bool    `json:"-"` // the toss began in flight
 	TossPhase int     `json:"gp"`
 	TossLeft  float64 `json:"-"` // dash distance left
 	TossDX    float64 `json:"gdx"`
@@ -753,7 +754,10 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 
 	// ---- Seismic Toss ----
 	ts := cz.SeismicToss
-	if in.Toss && p.TossPhase == tossNone && p.TossCD == 0 && p.FlyT == 0 && p.Z == 0 && !stunned {
+	if in.Toss && p.TossPhase == tossNone && p.TossCD == 0 && !stunned {
+		// It may start in the air: the flight ends there and the run goes on at that height; the flight cooldown
+		// starts when Charizard is back on the ground.
+		p.TossAir, p.FlyT = p.Z > 0, 0
 		p.TossPhase, p.TossLeft, p.TossCD = tossDash, ts.Length, ts.Cooldown
 		p.TossDX, p.TossDY = p.AimX, p.AimY
 		p.BreathT = 0 // it is all fire on the run: the breath stops
@@ -781,6 +785,9 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 	case tossFall:
 		if p.Z -= ts.Speed * dt; p.Z <= 1e-9 {
 			p.Z, p.TossPhase = 0, tossNone
+			if p.TossAir {
+				p.FlyCD = cz.Fly.Cooldown
+			}
 			g.hit(other, ts.Damage)
 			other.Held, other.Z = false, 0
 			events = append(events, Event{T: "slam", X: other.X, Y: other.Y, R: ts.Radius}) // the same shock as Snorlax's landing
@@ -807,6 +814,9 @@ func (g *Game) dropToss(i int) {
 	}
 	if p.TossPhase != tossDash {
 		p.Z = 0
+		if p.TossAir {
+			p.FlyCD = g.cfg.Charizard.Fly.Cooldown
+		}
 	}
 	p.TossPhase = tossNone
 }

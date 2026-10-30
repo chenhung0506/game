@@ -587,7 +587,7 @@ func TestSeismicTossGoesAlongTheAimAndStopsAtWalls(t *testing.T) {
 	}
 }
 
-func TestSeismicTossMissesAJumpingOpponentAndNeedsTheGround(t *testing.T) {
+func TestSeismicTossMissesAJumpingOpponent(t *testing.T) {
 	g := tossGame(DefaultConfig())
 	g.P[1].Z, g.P[1].VZ = 60, 0 // in the air
 	startToss(g)
@@ -598,14 +598,55 @@ func TestSeismicTossMissesAJumpingOpponentAndNeedsTheGround(t *testing.T) {
 	if g.P[1].Held || g.P[1].HP != DefaultConfig().Snorlax.MaxHP {
 		t.Fatal("a jumping opponent was caught by a ground run")
 	}
-	// not while flying
-	g = tossGame(DefaultConfig())
+}
+
+// Charizard may toss from the air: the flight ends there, the run goes on at that height, the catch is
+// carried up and slammed, and the flight cooldown starts once Charizard is back on the ground.
+func TestSeismicTossWorksWhileFlying(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Charizard.Fly.Height = 30
+	g := tossGame(cfg)
 	g.P[0].In.Skill = true
 	g.Step(dt)
-	g.P[0].In = Input{Toss: true}
+	g.P[0].In = Input{}
+	steps(g, 10)
+	if g.P[0].Z != 30 || g.P[0].FlyT <= 0 {
+		t.Fatalf("setup: Z = %v, FlyT = %v, want it flying", g.P[0].Z, g.P[0].FlyT)
+	}
+	startToss(g)
+	if g.P[0].TossPhase != tossDash || g.P[0].FlyT != 0 {
+		t.Fatalf("phase %d, FlyT %v: the toss should have started and ended the flight", g.P[0].TossPhase, g.P[0].FlyT)
+	}
+	if g.P[0].Z != 30 {
+		t.Fatalf("Z = %v, the run goes on at the flying height", g.P[0].Z)
+	}
+	caught := false
+	for i := 0; i < 400 && g.P[0].TossPhase != tossNone; i++ {
+		g.Step(dt)
+		caught = caught || g.P[1].Held
+	}
+	if !caught || g.P[1].HP != cfg.Snorlax.MaxHP-cfg.Charizard.SeismicToss.Damage {
+		t.Fatalf("caught = %v, HP = %d: the opponent should have been caught and slammed", caught, g.P[1].HP)
+	}
+	if g.P[0].Z != 0 || g.P[0].FlyCD != cfg.Charizard.Fly.Cooldown {
+		t.Fatalf("Z = %v, FlyCD = %v, want it landed with the flight cooldown running", g.P[0].Z, g.P[0].FlyCD)
+	}
+}
+
+// A toss from the air that catches nobody: Charizard comes down by itself and the cooldown starts on landing.
+func TestMissedTossFromTheAirComesDown(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Charizard.SeismicToss.Length = 50 // far short of the opponent
+	g := tossGame(cfg)
+	g.P[1].X = 900
+	g.P[0].In.Skill = true
 	g.Step(dt)
-	if g.P[0].TossPhase != tossNone {
-		t.Fatal("tossed while flying")
+	g.P[0].In = Input{}
+	steps(g, 10)
+	startToss(g)
+	steps(g, 60)
+	if g.P[0].Z != 0 || g.P[0].FlyCD <= 0 || g.P[0].FlyT != 0 {
+		t.Fatalf("Z = %v, FlyCD = %v, FlyT = %v: want it on the ground with the cooldown running", g.P[0].Z, g.P[0].FlyCD, g.P[0].FlyT)
 	}
 }
 
@@ -669,8 +710,8 @@ func TestSeismicTossStopsTheBreath(t *testing.T) {
 func TestMirrorMatchesRunEverySkillWithoutHurtingTheUser(t *testing.T) {
 	for kind := 0; kind < kinds; kind++ {
 		g := duel(DefaultConfig(), kind, kind)
-		g.P[1].X = 500 // close enough for every skill to reach
-		all := Input{Skill: true, Beam: true, Thunder: true, Ball: true, Punch: true, Fire: true, Toss: true, DX: 1}
+		g.P[1].X = 500                                                                                                            // close enough for every skill to reach
+		all := Input{Skill: true, Beam: true, Thunder: true, Ball: true, Punch: true, Fire: true, Toss: kind != charizard, DX: 1} // a toss pre-empts Charizard's breath and flight, so it has its own tests
 		for tick := 0; tick < 20*tickRate; tick++ {
 			g.P[0].In, g.P[1].In = all, all
 			g.P[tick%2].In.DX = -1 // they do not stand still
