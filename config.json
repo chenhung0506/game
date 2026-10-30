@@ -92,7 +92,7 @@
   "charizard": {
     "max_hp": 120,
     "walk_speed": 140,
-    "radius": 30,
+    "radius": 20,
     "fly": {
       "duration": 6,
       "cooldown": 6,
@@ -131,15 +131,15 @@
     "radius": 10,
     "leaf_slash": {
       "min_height": 0,
-      "max_height": 12,
+      "max_height": 20,
       "jump_distance": 220,
       "jump_duration": 0.35,
       "jump_height": 40,
       "slashes": 5,
-      "slash_interval": 0.25,
+      "slash_interval": 0.3,
       "slash_step": 40,
-      "slash_radius": 90,
-      "leaf_scale": 2.5,
+      "slash_radius": 100,
+      "leaf_scale": 2.7,
       "damage": 8,
       "cooldown": 6
     },
