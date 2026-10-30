@@ -37,7 +37,7 @@
       "charge_time": 0.5,
       "speed": 400,
       "radius": 50,
-      "hp": 15,
+      "hp": 30,
       "explosion_radius": 180,
       "contact_damage": 10,
       "explosion_damage": 25,
