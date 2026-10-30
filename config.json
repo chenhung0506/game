@@ -10,6 +10,7 @@
     "volt_tackle": {
       "min_height": 0,
       "max_height": 60,
+      "radius": 30,
       "distance": 150,
       "duration": 0.2,
       "max_uses": 3,

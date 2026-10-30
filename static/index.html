@@ -76,7 +76,7 @@ let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
-let voltCfg = { uses: 3, window: 2 }; // Volt Tackle, from 'hi'
+let voltCfg = { radius: 16, uses: 3, window: 2 }; // Volt Tackle, from 'hi'
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
@@ -115,7 +115,7 @@ ws.onmessage = (e) => {
   }
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
-    if (!snap) { ghosts.length = iceTrail.length = smoke.length = flames.length = 0; fx = []; for (const b of beamLook) b.ang = b.tail = null; for (const sh of shadow) sh.x = null; for (const d of disp) d.x = null; for (const l of look) l.dir = null; } // a new match starts clean
+    if (!snap) { ghosts.length = iceTrail.length = voltTrail.length = smoke.length = flames.length = 0; fx = []; for (const b of beamLook) b.ang = b.tail = null; for (const sh of shadow) sh.x = null; for (const d of disp) d.x = null; for (const l of look) l.dir = null; } // a new match starts clean
     const old = snap;
     waiting = false; snap = m;
     document.getElementById('pick').style.display = 'none';
@@ -811,23 +811,51 @@ function zig(x0, y0, x1, y1, n, jit) { // a jagged line between two points
   for (let s = 1; s < n; s++) { const k = s / n; ctx.lineTo(x0 + (x1 - x0) * k + (Math.random() - 0.5) * jit, y0 + (y1 - y0) * k + (Math.random() - 0.5) * jit); }
   ctx.lineTo(x1, y1); ctx.stroke();
 }
+const voltTrail = []; // rings of lightning the tackle leaves along its path
+let zigRand = 0;
+function zigSeed(x0, y0, x1, y1, n, jit, seed) { // zig() whose random jitter is the same for the three strokes of one bolt in a frame
+  const sv = Math.random; let h = (seed * 9301 + zigRand * 49297) % 233280;
+  Math.random = () => { h = (h * 9301 + 49297) % 233280; return h / 233280; };
+  zig(x0, y0, x1, y1, n, jit); Math.random = sv;
+}
 function drawVolt() {
+  zigRand = (zigRand + 1) % 997;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const t of voltTrail) { // fading rings and sparks along the path
+    const k = t.age / 0.45; t.age += 1 / 60;
+    if (k >= 1) continue;
+    ctx.strokeStyle = `rgba(255,230,80,${0.7 * (1 - k)})`; ctx.lineWidth = 3 * (1 - k) + 1;
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.R * (0.6 + 0.9 * k), 0, 7); ctx.stroke();
+    ctx.fillStyle = `rgba(255,255,200,${0.5 * (1 - k)})`; ctx.beginPath(); ctx.arc(t.x, t.y, t.R * 0.5 * (1 - k), 0, 7); ctx.fill();
+  }
+  ctx.restore();
+  while (voltTrail.length && voltTrail[0].age >= 0.45) voltTrail.shift();
   for (const i of slotsOf(0)) {
     const p = snap.p[i], d = disp[i], bs = radius[0] / REF[0];
     upright(d.x, d.y, () => {
       const cy = -d.z - 4 * bs;
       if (p.vd > 0) {
-        const R = 30 * bs, g = ctx.createRadialGradient(0, cy, 0, 0, cy, R * 1.5);
-        g.addColorStop(0, 'rgba(255,245,150,0.75)'); g.addColorStop(1, 'rgba(255,220,40,0)');
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, cy, R * 1.5, 0, 7); ctx.fill();
-        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        for (let s = 0; s < 9; s++) {
-          const a = Math.random() * 6.283, r0 = R * (0.5 + Math.random() * 0.4), r1 = R * (1.3 + Math.random() * 0.6);
-          ctx.strokeStyle = 'rgba(255,250,200,0.95)'; ctx.lineWidth = 2.4;
-          zig(Math.cos(a) * r0, cy + Math.sin(a) * r0, Math.cos(a) * r1, cy + Math.sin(a) * r1, 4, 10 * bs);
-          ctx.strokeStyle = 'rgba(255,215,40,0.9)'; ctx.lineWidth = 1.2;
-          zig(Math.cos(a) * r0, cy + Math.sin(a) * r0, Math.cos(a) * r1, cy + Math.sin(a) * r1, 4, 10 * bs);
+        const R = voltCfg.radius * 1.6, pulse = 1 + 0.12 * Math.sin(performance.now() / 35);
+        shake = Math.max(shake, 5);
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; // glows add up: the more lightning, the whiter it gets
+        const g = ctx.createRadialGradient(0, cy, 0, 0, cy, R * 2.3 * pulse);
+        g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.25, 'rgba(255,240,120,0.7)'); g.addColorStop(0.6, 'rgba(255,170,30,0.28)'); g.addColorStop(1, 'rgba(255,120,0,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, cy, R * 2.3 * pulse, 0, 7); ctx.fill();
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.shadowColor = 'rgba(255,230,60,1)'; ctx.shadowBlur = 14;
+        for (let s = 0; s < 18; s++) { // bolts, each with a branch, in a blue halo, a yellow body and a white core
+          const a = Math.random() * 6.283, r0 = R * (0.4 + Math.random() * 0.4), r1 = R * (1.5 + Math.random() * 1.1);
+          const x0 = Math.cos(a) * r0, y0 = cy + Math.sin(a) * r0, x1 = Math.cos(a) * r1, y1 = cy + Math.sin(a) * r1;
+          const bx = x0 + (x1 - x0) * 0.55, by = y0 + (y1 - y0) * 0.55, ba = a + (Math.random() - 0.5) * 1.6;
+          for (const [col, w] of [['rgba(120,170,255,0.55)', 6], ['rgba(255,225,50,0.95)', 3.4], ['rgba(255,255,255,1)', 1.4]]) {
+            ctx.strokeStyle = col; ctx.lineWidth = w;
+            zigSeed(x0, y0, x1, y1, 5, R * 0.3, s);
+            zigSeed(bx, by, bx + Math.cos(ba) * R * 0.7, by + Math.sin(ba) * R * 0.7, 3, R * 0.2, s + 50);
+          }
         }
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(255,250,170,0.7)'; ctx.lineWidth = 2; // a ring that spins round the body
+        for (let s = 0; s < 3; s++) { const a0 = performance.now() / 90 + s * 2.1; ctx.beginPath(); ctx.arc(0, cy, R * 1.1, a0, a0 + 1.2); ctx.stroke(); }
+        voltTrail.push({ x: d.x, y: d.y, R, age: 0 }); // the afterimage of the charge, left behind
       }
       if (p.vn > 0) {
         const N = voltCfg.uses, gap = 11, x0 = -(N - 1) * gap / 2, y = 22 * bs;
@@ -861,13 +889,17 @@ function drawParalyzed(d, p) {
 
 // The moment of the shock: a yellow flash and bolts flying out.
 function drawParalyzeBurst(f) {
-  const k = f.age / 0.35, a = 1 - k;
-  ctx.save();
-  ctx.fillStyle = `rgba(255,240,120,${0.6 * a * a})`; ctx.beginPath(); ctx.arc(f.x, f.y, 24 + 40 * k, 0, 7); ctx.fill();
-  ctx.strokeStyle = `rgba(255,236,90,${a})`; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (let s = 0; s < 8; s++) {
-    const ang = s * 0.785 + 0.2, r0 = 12 + 20 * k, r1 = 30 + 45 * k;
-    zig(f.x + Math.cos(ang) * r0, f.y + Math.sin(ang) * r0, f.x + Math.cos(ang) * r1, f.y + Math.sin(ang) * r1, 3, 9);
+  const k = f.age / 0.35, a = 1 - k, sc = (f.r || 16) / 16;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = `rgba(255,245,160,${0.8 * a * a})`; ctx.beginPath(); ctx.arc(f.x, f.y, (30 + 60 * k) * sc, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 4 * a + 1; ctx.beginPath(); ctx.arc(f.x, f.y, (20 + 120 * k) * sc, 0, 7); ctx.stroke();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.shadowColor = 'rgba(255,230,60,1)'; ctx.shadowBlur = 12;
+  for (let s = 0; s < 14; s++) {
+    const ang = s * 0.4488 + 0.2, r0 = (14 + 25 * k) * sc, r1 = (40 + 95 * k) * sc;
+    ctx.strokeStyle = `rgba(255,225,60,${a})`; ctx.lineWidth = 3.5;
+    zigSeed(f.x + Math.cos(ang) * r0, f.y + Math.sin(ang) * r0, f.x + Math.cos(ang) * r1, f.y + Math.sin(ang) * r1, 4, 12 * sc, s + 7);
+    ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 1.4;
+    zigSeed(f.x + Math.cos(ang) * r0, f.y + Math.sin(ang) * r0, f.x + Math.cos(ang) * r1, f.y + Math.sin(ang) * r1, 4, 12 * sc, s + 7);
   }
   ctx.restore();
 }

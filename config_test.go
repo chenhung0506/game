@@ -72,6 +72,7 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 		"misspelt ball key":                            `{"pikachu":{"electro_ball":{"explosion_radious":5}}}`,
 		"negative beam mass":                           `{"snorlax":{"hyper_beam":{"mass":-1}}}`,
 		"negative ball mass":                           `{"pikachu":{"electro_ball":{"mass":-1}}}`,
+		"zero volt radius":                             `{"pikachu":{"volt_tackle":{"radius":0}}}`,
 		"zero volt uses":                               `{"pikachu":{"volt_tackle":{"max_uses":0}}}`,
 		"zero volt window":                             `{"pikachu":{"volt_tackle":{"use_window":0}}}`,
 		"negative paralysis":                           `{"pikachu":{"volt_tackle":{"paralyze_duration":-1}}}`,

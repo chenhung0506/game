@@ -33,7 +33,7 @@ func dashStarts(g *Game, n int) []int {
 
 func TestVoltTackleChainsMaxUsesThenCoolsDown(t *testing.T) {
 	g := voltGame(DefaultConfig()) // 3 uses, a 0.2s dash (6 ticks), a 0.6s cooldown (18 ticks)
-	got := dashStarts(g, 35) // the second chain's first dash is the fourth
+	got := dashStarts(g, 35)       // the second chain's first dash is the fourth
 	if len(got) != 4 || got[0] != 1 || got[1] != 7 || got[2] != 13 || got[3] < 31 || got[3] > 32 {
 		t.Fatalf("dashes began on ticks %v, want 1, 7, 13 back to back, then the cooldown (0.6s from the third) until ~31", got)
 	}
@@ -111,6 +111,23 @@ func TestVoltTackleHitsOncePerDashAndParalyzes(t *testing.T) {
 	g.Step(dt)
 	if g.P[1].X <= x {
 		t.Fatal("Snorlax should walk again once the paralysis is over")
+	}
+}
+
+func TestVoltTackleReachFollowsItsRadius(t *testing.T) {
+	for _, tc := range []struct {
+		radius float64
+		hit    bool
+	}{{10, false}, {40, true}} {
+		cfg := DefaultConfig()
+		cfg.Pikachu.VoltTackle.Radius = tc.radius
+		g := voltGame(cfg)
+		g.P[1].Y = 250 + 20 + cfg.Snorlax.Radius // passes 20 + Snorlax's body off the dash line: 10 is short of it, 40 is not
+		g.P[0].In = Input{DX: 1, Skill: true}
+		steps(g, 8)
+		if hit := g.P[1].ParalyzeT > 0; hit != tc.hit {
+			t.Errorf("radius %v: paralyzed=%v, want %v", tc.radius, hit, tc.hit)
+		}
 	}
 }
 

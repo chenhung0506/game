@@ -580,7 +580,7 @@ func (g *Game) Step(dt float64) []Event {
 			if p.DashT -= step; p.DashT < 1e-9 {
 				p.DashT = 0
 			}
-			if !p.VoltHit && vt.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= g.radius(i)+g.radius(1-i) {
+			if !p.VoltHit && vt.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= vt.Radius+g.radius(1-i) {
 				events = append(events, g.contact(i, vt.Mass)...)
 			}
 		} else if n := math.Hypot(float64(in.DX), float64(in.DY)); !busy && !casting && n > 0 {
@@ -1141,7 +1141,7 @@ func (g *Game) land(w, v int) []Event {
 		p.VoltHit = true
 		g.hit(victim, vt.Damage)
 		victim.ParalyzeT = math.Max(victim.ParalyzeT, vt.ParalyzeDuration)
-		return []Event{{T: "paralyze", X: victim.X, Y: victim.Y}}
+		return []Event{{T: "paralyze", X: victim.X, Y: victim.Y, R: vt.Radius}}
 	case snorlax:
 		ip := g.cfg.Snorlax.IcePunch
 		p.PunchHit = true

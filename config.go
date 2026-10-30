@@ -46,6 +46,7 @@ type Config struct {
 		// skill that is running at the same time: the heavier one wins and the lighter one is cut short.
 		VoltTackle struct {
 			Reach
+			Radius           float64 `json:"radius"` // size of the lightning: it touches a body when the two overlap along the dash; drawn at this size
 			Distance         float64 `json:"distance"`
 			Duration         float64 `json:"duration"`
 			MaxUses          int     `json:"max_uses"`
@@ -236,6 +237,7 @@ func DefaultConfig() Config {
 	c.Pikachu.WalkSpeed = speed
 	c.Pikachu.Radius = pikachuRadius
 	c.Pikachu.VoltTackle.Reach = groundReach
+	c.Pikachu.VoltTackle.Radius = pikachuRadius
 	c.Pikachu.VoltTackle.Distance = 220
 	c.Pikachu.VoltTackle.Duration = 0.2
 	c.Pikachu.VoltTackle.MaxUses = 3
@@ -390,6 +392,7 @@ func (c Config) validate() error {
 		{"snorlax.radius", c.Snorlax.Radius, 0},
 		{"pikachu.max_hp", float64(c.Pikachu.MaxHP), 0},
 		{"pikachu.walk_speed", c.Pikachu.WalkSpeed, 0},
+		{"pikachu.volt_tackle.radius", c.Pikachu.VoltTackle.Radius, 0},
 		{"pikachu.volt_tackle.distance", c.Pikachu.VoltTackle.Distance, 0},
 		{"pikachu.volt_tackle.duration", c.Pikachu.VoltTackle.Duration, 0},
 		{"pikachu.volt_tackle.max_uses", float64(c.Pikachu.VoltTackle.MaxUses), 0},

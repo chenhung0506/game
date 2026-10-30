@@ -212,7 +212,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"fire":    map[string]float64{"radius": fb.Radius, "hp": float64(fb.HP)},
 		"toss":    map[string]float64{"radius": ts.Radius, "high": ts.High},
 		"fly":     map[string]float64{"height": cfg.Charizard.Fly.Height},
-		"volt":    map[string]float64{"uses": float64(cfg.Pikachu.VoltTackle.MaxUses), "window": cfg.Pikachu.VoltTackle.UseWindow},
+		"volt":    map[string]float64{"radius": cfg.Pikachu.VoltTackle.Radius, "uses": float64(cfg.Pikachu.VoltTackle.MaxUses), "window": cfg.Pikachu.VoltTackle.UseWindow},
 		// full cooldowns, so the pad's buttons can show how much of each is left
 		"cooldown": map[string]float64{"dash": cfg.Pikachu.VoltTackle.Cooldown, "thunder": th.Cooldown, "jump": cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown, "ball": cfg.Pikachu.ElectroBall.Cooldown, "punch": cfg.Snorlax.IcePunch.Cooldown,
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown},
