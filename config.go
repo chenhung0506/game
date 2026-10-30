@@ -15,6 +15,18 @@ type CourtSize struct {
 	Length float64 `json:"length"`
 }
 
+// Reach is the band of heights in which a skill can hurt its target: a target whose height Z is between
+// min_height and max_height (both included) is hit, anyone above or below it is not. Every attack has one;
+// it is read as part of the skill's own block. Height 0 is the ground; the numbers are the same units as
+// fly.height and jump.height.
+type Reach struct {
+	MinHeight float64 `json:"min_height"`
+	MaxHeight float64 `json:"max_height"`
+}
+
+// hits is whether the skill can hurt p at the height it is at now.
+func (r Reach) hits(p *Player) bool { return p.Z >= r.MinHeight && p.Z <= r.MaxHeight }
+
 // Config holds the tuning values. Distances are in game units and times are in seconds.
 type Config struct {
 	// Length runs between the two players (left-right on the web page, up-down on a phone), width
@@ -33,6 +45,7 @@ type Config struct {
 			Cooldown float64 `json:"cooldown"`
 		} `json:"dash"`
 		Thunder struct {
+			Reach
 			Delay       float64 `json:"delay"`        // shadow appears -> first bolt
 			Radius      float64 `json:"radius"`       // strike area
 			Damage      int     `json:"damage"`       // per bolt
@@ -44,9 +57,11 @@ type Config struct {
 		// Electro Ball: Pikachu charges, then throws a ball straight at the opponent (the aim follows it). It explodes when it touches
 		// the opponent, when it reaches a wall, or when its HP runs out (the opponent's skills hit it).
 		ElectroBall struct {
+			Reach                   // the body and the blast hit anyone within these heights; above or below, the ball flies past
 			ChargeTime      float64 `json:"charge_time"`      // rooted while charging
 			Speed           float64 `json:"speed"`            // of the ball
 			Radius          float64 `json:"radius"`           // size of the ball; it touches the opponent when the bodies overlap
+			ContactDamage   int     `json:"contact_damage"`   // taken by the opponent the ball flies into, on top of the blast that follows
 			HP              int     `json:"hp"`               // opponent skills that hit the ball take this off; at 0 it explodes
 			ExplosionRadius float64 `json:"explosion_radius"` // reach of the blast, from the ball's centre
 			ExplosionDamage int     `json:"explosion_damage"`
@@ -60,6 +75,7 @@ type Config struct {
 		WalkSpeed float64 `json:"walk_speed"`
 		Radius    float64 `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
 		Jump      struct {
+			Reach              // the landing shock: who it hurts, by height
 			Height     float64 `json:"height"`
 			Duration   float64 `json:"duration"`
 			Cooldown   float64 `json:"cooldown"`    // before the next jump; counted from take-off
@@ -72,6 +88,7 @@ type Config struct {
 		// Ice Punch: charge (rooted, the aim follows the direction held), dash `distance` at `speed`, then
 		// recharge (rooted). The opponent it touches is frozen solid for freeze_duration.
 		IcePunch struct {
+			Reach
 			ChargeDuration   float64 `json:"charge_duration"`
 			RechargeDuration float64 `json:"recharge_duration"`
 			Cooldown         float64 `json:"cooldown"`        // before the next punch; counted from the start of the charge
@@ -83,6 +100,7 @@ type Config struct {
 			Mass             float64 `json:"mass"`            // against an Electro Ball: it is pushed mass - electro_ball.mass along the dash (nothing if lighter)
 		} `json:"ice_punch"`
 		HyperBeam struct {
+			Reach
 			ChargeDuration   float64 `json:"charge_duration"`   // rooted and aim locked on the opponent; the warning fan shows
 			SweepAngle       float64 `json:"sweep_angle"`       // degrees each side of the facing; the beam goes +angle -> -angle
 			SweepDuration    float64 `json:"sweep_duration"`    // seconds the beam takes to cross that arc
@@ -100,9 +118,8 @@ type Config struct {
 		MaxHP     int     `json:"max_hp"`
 		WalkSpeed float64 `json:"walk_speed"`
 		Radius    float64 `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
-		// Fly: the main button lifts Charizard for `duration` seconds. It only moves faster; the Electro Ball and
-		// the Ice Punch still hit it, though ground attacks that miss anyone airborne (earthquake, landing shock,
-		// Hyper Beam, Seismic Toss) do not.
+		// Fly: the main button lifts Charizard for `duration` seconds. It only moves faster. Whether a skill still
+		// hits it is up to that skill's min_height / max_height against `height`.
 		Fly struct {
 			Duration float64 `json:"duration"`
 			Cooldown float64 `json:"cooldown"` // starts when it has landed
@@ -114,6 +131,7 @@ type Config struct {
 		// It can walk or fly while breathing. A fire ball hurts the first thing it touches and is gone; the
 		// opponent's skills wear its HP down, and it ends at `length` or at a wall.
 		FireBreath struct {
+			Reach
 			Speed             float64 `json:"speed"`
 			Radius            float64 `json:"radius"`
 			HP                int     `json:"hp"`
@@ -129,6 +147,7 @@ type Config struct {
 		// `radius`) is caught and cannot move or act: Charizard flies up `high` with it, then slams it down for
 		// `damage`, with the same shock as Snorlax's landing (drawn `radius` wide). The rise and the fall go at `speed`.
 		SeismicToss struct {
+			Reach            // who the run can catch, by height
 			Speed    float64 `json:"speed"`
 			Radius   float64 `json:"radius"`
 			Damage   int     `json:"damage"`
@@ -149,6 +168,13 @@ func DefaultConfig() Config {
 	c.Pikachu.Dash.Distance = 220
 	c.Pikachu.Dash.Duration = 0.2
 	c.Pikachu.Dash.Cooldown = 0.6
+	c.Pikachu.Thunder.Reach = anyHeight
+	c.Pikachu.ElectroBall.Reach = groundReach
+	c.Snorlax.Jump.Reach = groundReach
+	c.Snorlax.IcePunch.Reach = groundReach
+	c.Snorlax.HyperBeam.Reach = groundReach
+	c.Charizard.FireBreath.Reach = anyHeight
+	c.Charizard.SeismicToss.Reach = groundReach
 	c.Pikachu.Thunder.Delay = 1.0
 	c.Pikachu.Thunder.Radius = 60
 	c.Pikachu.Thunder.Damage = 15
@@ -312,6 +338,7 @@ func (c Config) validate() error {
 		{"pikachu.thunder.interval", c.Pikachu.Thunder.Interval},
 		{"pikachu.thunder.cooldown", c.Pikachu.Thunder.Cooldown},
 		{"pikachu.thunder.follow_speed", c.Pikachu.Thunder.FollowSpeed},
+		{"pikachu.electro_ball.contact_damage", float64(c.Pikachu.ElectroBall.ContactDamage)},
 		{"pikachu.electro_ball.knockback", c.Pikachu.ElectroBall.Knockback},
 		{"pikachu.electro_ball.cooldown", c.Pikachu.ElectroBall.Cooldown},
 		{"pikachu.electro_ball.mass", c.Pikachu.ElectroBall.Mass},
@@ -336,6 +363,19 @@ func (c Config) validate() error {
 	} {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
+		}
+	}
+	for name, r := range map[string]Reach{
+		"pikachu.thunder":        c.Pikachu.Thunder.Reach,
+		"pikachu.electro_ball":   c.Pikachu.ElectroBall.Reach,
+		"snorlax.jump":           c.Snorlax.Jump.Reach,
+		"snorlax.ice_punch":      c.Snorlax.IcePunch.Reach,
+		"snorlax.hyper_beam":     c.Snorlax.HyperBeam.Reach,
+		"charizard.fire_breath":  c.Charizard.FireBreath.Reach,
+		"charizard.seismic_toss": c.Charizard.SeismicToss.Reach,
+	} {
+		if !(r.MinHeight >= 0 && r.MaxHeight >= r.MinHeight) { // also rejects NaN
+			return fmt.Errorf("%s: need 0 <= min_height <= max_height, got %v and %v", name, r.MinHeight, r.MaxHeight)
 		}
 	}
 	if a := c.Snorlax.HyperBeam.SweepAngle; !(a >= 0 && a <= 180) { // 0 = a fixed beam, 180 = a full circle

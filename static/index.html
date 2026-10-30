@@ -47,15 +47,15 @@
 // address for the wide view, with the players left and right.
 const PORTRAIT = !new URLSearchParams(location.search).has('landscape');
 document.body.classList.toggle('portrait', PORTRAIT);
-const QUAKE_LIFE = 0.75; // seconds the earthquake effect stays on screen (it also plays on a landing)
+const QUAKE_LIFE = 0.75; // seconds the earthquake effect stays on screen (also on a landing)
 let ROT = 0;               // how far the arena is turned on screen (radians); 0 in landscape
 let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Each player picks a character in the lobby; a snapshot's p[i].k says who is who (0 Pikachu, 1 Snorlax, 2 Charizard).
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍'];
-const BLURB = ['衝刺・打雷・電球・地震', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投'];
+const BLURB = ['衝刺・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投'];
 const HELP = [
-  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　J＝地震　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
+  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝衝刺（朝按住的方向）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
   '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　J＝急凍拳（蓄力時按方向鍵決定方向，朝該方向衝拳，打到的敵人被冰凍）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
   '你是噴火龍　移動 WASD / 方向鍵　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　K＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　J＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
 ];
@@ -121,7 +121,6 @@ ws.onmessage = (e) => {
       fx.push({ ...ev, age: 0 });
       if (ev.t === 'slam') shake = 16;
       if (ev.t === 'thunder') shake = 10;
-      if (ev.t === 'quake') shake = 16;
       if (ev.t === 'explode') shake = 14;
       if (ev.t === 'freeze') shake = 10;
     }
@@ -209,7 +208,7 @@ function sendInput() {
     // the aim of the Electro Ball and the Ice Punch: the stick's exact direction (2 decimals is 0.6 degrees)
     ax: Math.round((stickAim.x * c + stickAim.y * s) * 100) / 100 || 0,
     ay: Math.round((-stickAim.x * s + stickAim.y * c) * 100) / 100 || 0,
-    skill: k(' ') || touch.skill, atk: k('j'), punch: k('j') || touch.punch, beam: k('k') || touch.beam, ball: k('k') || touch.ball, thunder: k('l') || touch.thunder,
+    skill: k(' ') || touch.skill, punch: k('j') || touch.punch, beam: k('k') || touch.beam, ball: k('k') || touch.ball, thunder: k('l') || touch.thunder,
     // the keys are shared between the characters (J and K each do whatever the one you play has); the server uses the ones that fit
     fire: k('k') || touch.fire, toss: k('j') || touch.toss,
   });
@@ -634,7 +633,7 @@ function drawThunderShadow(p, shadow) {
   ctx.restore();
 }
 
-// Earthquake, used for Pikachu's J and for Snorlax's landing. It shows the real reach (f.r, sent by the
+// The ground-shock effect, used for Snorlax's landing and Charizard's slam. It shows the real reach (f.r, sent by the
 // server) in a bright disc the moment it goes off, then a pair of shockwaves, cracks in the ground and flying dust. All circles are true
 // circles because the hit test is a distance in the ground plane.
 function drawQuake(f) {
@@ -813,13 +812,13 @@ function frame() {
     drawSmoke(); // under the players, so the labels and HP bars stay readable
     // Draw lower players first so the one nearer the camera overlaps correctly.
     [0, 1].sort((a, b) => screenY(snap.p[a].x, snap.p[a].y) - screenY(snap.p[b].x, snap.p[b].y)).forEach((i) => drawPlayer(i, snap.p[i]));
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'quake' || f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' ? 0.6 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' ? 0.6 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
       else if (f.t === 'explode') drawExplosion(f);
       else if (f.t === 'freeze') drawFreezeBurst(f);
-      else drawQuake(f); // 'quake' and 'slam'
+      else drawQuake(f); // 'slam'
     }
     ctx.restore();
     if (snap.w >= 0) {

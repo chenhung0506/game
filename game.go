@@ -18,9 +18,6 @@ const (
 	flyRiseTime   = 0.25  // seconds Charizard takes to climb to its flying height, and to come down
 	slamRadius    = 70.0  // the default of snorlax.slam_radius
 	slamDamage    = 20
-	quakeRadius   = 100.0
-	quakeDamage   = 10
-	quakeCooldown = 0.8
 	maxHP         = 100 // default
 )
 
@@ -39,7 +36,6 @@ type Input struct {
 	DX      int  `json:"dx"`
 	DY      int  `json:"dy"`
 	Skill   bool `json:"skill"`
-	Attack  bool `json:"atk"`     // Pikachu only: earthquake
 	Beam    bool `json:"beam"`    // Snorlax only: Hyper Beam
 	Thunder bool `json:"thunder"` // Pikachu only: Thunder
 	Ball    bool `json:"ball"`    // Pikachu only: Electro Ball
@@ -59,7 +55,6 @@ type Player struct {
 	Z    float64 `json:"z"` // height above ground; the screen position is (X, Y-Z)
 	VZ   float64 `json:"-"`
 	HP   int     `json:"hp"`
-	CD   float64 `json:"cd"`
 	In   Input   `json:"-"`
 
 	FX           int     `json:"fx"` // last non-zero direction held; a dash with no keys goes this way, and so does the ball
@@ -156,10 +151,10 @@ type Ball struct {
 
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
-	T string  `json:"t"` // "slam" | "quake" | "thunder" | "skybolt" | "explode" | "freeze"
+	T string  `json:"t"` // "slam" | "thunder" | "skybolt" | "explode" | "freeze"
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
-	R float64 `json:"r,omitempty"` // quake reach, so the effect can match it
+	R float64 `json:"r,omitempty"` // slam reach, so the effect can match it
 }
 
 // The view a room was opened from decides its court.
@@ -214,10 +209,6 @@ func (g *Game) Winner() int {
 
 // radius is how big a character's body is: a skill hits when its area touches the body.
 func (g *Game) radius(i int) float64 { return g.cfg.radiusOf(g.P[i].Kind) }
-
-// reachable is whether the ground-level skills that only the Electro Ball and the Ice Punch share still
-// touch p: they miss anyone airborne (Snorlax mid-jump), but not Charizard, who keeps flying within their reach.
-func reachable(p *Player) bool { return p.Z < groundZ || p.Kind == charizard }
 
 // ballRadius and ballMass are the size and weight of a projectile, which depend on whose it is.
 func (g *Game) ballRadius(b *Ball) float64 {
@@ -295,6 +286,13 @@ func (g *Game) hit(victim *Player, dmg int) {
 		victim.HP = 0
 	}
 }
+
+// groundReach is the default band of a ground-level skill (0 up to groundZ); anyHeight is for skills that
+// come from the sky or have no height limit.
+var (
+	groundReach = Reach{MinHeight: 0, MaxHeight: groundZ}
+	anyHeight   = Reach{MinHeight: 0, MaxHeight: 1e6}
+)
 
 // Step advances the simulation by dt seconds and returns the effects to show.
 func (g *Game) Step(dt float64) []Event {
@@ -392,10 +390,10 @@ func (g *Game) Step(dt float64) []Event {
 				}
 				p.BeamA = hb.SweepAngle * (2*p.SweepT/hb.SweepDuration - 1) // +angle -> -angle
 				p.BeamHitCD = hitCDTick(p.BeamHitCD, dt)
-				// Like the quake, the beam travels along the ground and misses airborne targets.
+				// Like the landing shock, the beam travels along the ground and misses airborne targets.
 				// It hits again every hit_interval for as long as the target stays in the beam (0 = once per sweep).
 				ready := p.BeamHitCD <= 1e-9 && (hb.HitInterval > 0 || !p.SweptHit)
-				if ready && other.Z < groundZ && sweepHits(p, other, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+g.radius(1-i), hb.Width+2*g.radius(1-i)) {
+				if ready && hb.Reach.hits(other) && sweepHits(p, other, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+g.radius(1-i), hb.Width+2*g.radius(1-i)) {
 					g.hit(other, hb.Damage)
 					p.SweptHit, p.BeamHitCD = true, hitCDNext(p.BeamHitCD, hb.HitInterval)
 					g.knockBack(p.X, p.Y, other, hb.Knockback, p.BeamX, p.BeamY)
@@ -454,7 +452,7 @@ func (g *Game) Step(dt float64) []Event {
 				p.ThunderIn -= dt
 				for p.ThunderLeft > 0 && p.ThunderIn < 1e-9 { // a loop so a tiny interval cannot lose bolts
 					events = append(events, Event{T: "skybolt", X: p.X, Y: p.Y}, Event{T: "thunder", X: p.ShadowX, Y: p.ShadowY})
-					if math.Hypot(other.X-p.ShadowX, other.Y-p.ShadowY) <= th.Radius+g.radius(1-i) {
+					if th.Reach.hits(other) && math.Hypot(other.X-p.ShadowX, other.Y-p.ShadowY) <= th.Radius+g.radius(1-i) {
 						g.hit(other, th.Damage)
 					}
 					p.ThunderLeft--
@@ -538,7 +536,7 @@ func (g *Game) Step(dt float64) []Event {
 		// The slam resolves on the landing frame, not while falling.
 		if landed {
 			events = append(events, Event{T: "slam", X: p.X, Y: p.Y, R: g.cfg.Snorlax.Jump.SlamRadius}) // the client draws the real reach
-			if dist(p, other) < g.cfg.Snorlax.Jump.SlamRadius+g.radius(1-i) && other.Z < groundZ {
+			if dist(p, other) < g.cfg.Snorlax.Jump.SlamRadius+g.radius(1-i) && g.cfg.Snorlax.Jump.Reach.hits(other) {
 				g.hit(other, slamDamage)
 			}
 			for j := range g.Balls { // the shock wave is a ground attack: it hits balls too
@@ -546,19 +544,6 @@ func (g *Game) Step(dt float64) []Event {
 				if math.Hypot(b.X-p.X, b.Y-p.Y) < g.cfg.Snorlax.Jump.SlamRadius+g.ballRadius(b) {
 					b.HP -= slamDamage
 				}
-			}
-		}
-
-		// Pikachu's earthquake: only from the ground, and it cannot reach airborne targets.
-		// Snorlax has none; its jump landing is its ground shock.
-		if p.CD > 0 {
-			p.CD = math.Max(0, p.CD-dt)
-		}
-		if p.Kind == pikachu && in.Attack && p.CD == 0 && p.Z == 0 && !busy {
-			p.CD = quakeCooldown
-			events = append(events, Event{T: "quake", X: p.X, Y: p.Y, R: quakeRadius}) // the client draws the real reach
-			if dist(p, other) < quakeRadius+g.radius(1-i) && other.Z < groundZ {
-				g.hit(other, quakeDamage)
 			}
 		}
 	}
@@ -598,7 +583,7 @@ func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 		}
 		// Like the other ground attacks it misses an airborne opponent. Tested along the whole step so a
 		// fast fist cannot jump over a body between two ticks.
-		if !p.PunchHit && reachable(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.radius(1-i) {
+		if !p.PunchHit && ip.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.radius(1-i) {
 			p.PunchHit = true
 			g.hit(other, ip.Damage)
 			other.FrozenT = math.Max(other.FrozenT, ip.FreezeDuration)
@@ -640,9 +625,8 @@ func (g *Game) stepBalls(dt float64) []Event {
 				b.X += b.DX * step
 				b.Y += b.DY * step
 				b.Left -= step
-				// Fire is breathed from above, so height gives no cover. Along the whole step, so a fast
-				// fire ball cannot jump over the opponent.
-				if segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= fb.Radius+g.radius(1-b.Owner) {
+				// Along the whole step, so a fast fire ball cannot jump over the opponent.
+				if fb.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= fb.Radius+g.radius(1-b.Owner) {
 					g.hit(foe, fb.Damage)
 					continue
 				}
@@ -664,9 +648,10 @@ func (g *Game) stepBalls(dt float64) []Event {
 				boom = true
 			}
 			// Along the whole step, so a fast ball cannot jump over the opponent between two ticks.
-			// Like the ground attacks it flies under an airborne opponent.
-			if reachable(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= bc.Radius+g.radius(1-b.Owner) {
+			// Outside the ball's heights it flies past the opponent.
+			if bc.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= bc.Radius+g.radius(1-b.Owner) {
 				b.X, b.Y = closestOnSegment(foe.X, foe.Y, x0, y0, b.X, b.Y) // it blows up where it met the opponent
+				g.hit(foe, bc.ContactDamage)                                // the ball itself hurts, then the blast does
 				boom = true
 			}
 		}
@@ -676,7 +661,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 		}
 		events = append(events, Event{T: "explode", X: b.X, Y: b.Y, R: bc.ExplosionRadius})
 		blasts = append(blasts, blast{b.X, b.Y})
-		if reachable(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= bc.ExplosionRadius+g.radius(1-b.Owner) {
+		if bc.Reach.hits(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= bc.ExplosionRadius+g.radius(1-b.Owner) {
 			g.hit(foe, bc.ExplosionDamage)
 			g.knockBack(b.X, b.Y, foe, bc.Knockback, b.DX, b.DY)
 		}
@@ -696,7 +681,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 // stepCharizard runs Charizard's three skills.
 //
 // Fly: the space bar lifts it to fly.height for fly.duration seconds; it only moves faster (fly.speed), and
-// the Electro Ball and the Ice Punch still reach it (see reachable). Its cooldown starts when it has landed.
+// each skill's min_height / max_height decide whether it still reaches it. Its cooldown starts when it has landed.
 //
 // Fire Breath: for `duration` seconds it breathes `quantity` fire balls, evenly spaced, each aimed at where
 // the opponent stands when it leaves the mouth, then turned by a random angle within +-random_offset_angle.
@@ -781,7 +766,7 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 		p.Y = math.Min(math.Max(p.Y+p.TossDY*step, 0), g.court.Width)
 		p.TossLeft -= step
 		// A ground attack like the punch: it misses an opponent who is in the air. Tested along the whole step.
-		if other.Z < groundZ && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ts.Radius+g.radius(1-i) {
+		if ts.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ts.Radius+g.radius(1-i) {
 			other.Held = true
 			other.VZ = 0
 			p.TossPhase = tossRise

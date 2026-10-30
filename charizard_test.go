@@ -139,10 +139,13 @@ func TestFlyingMovesAtTheFlySpeed(t *testing.T) {
 	}
 }
 
-// Flying is still within reach of the Electro Ball and the Ice Punch, but not of the ground attacks.
+// With their bands raised to cover the flight height, the Electro Ball and the Ice Punch reach a flying
+// Charizard; the ground attacks (default band 0..groundZ) still miss it.
 func TestFlyingCharizardIsHitByBallAndPunchButNotByGroundAttacks(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.ElectroBall.MaxHeight, cfg.Snorlax.IcePunch.MaxHeight = 100, 100 // above fly.height (90)
 	fly := func() *Game {
-		g := duel(DefaultConfig(), charizard, pikachu)
+		g := duel(cfg, charizard, pikachu)
 		g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 500, 250, 300, 250
 		g.P[0].In.Skill = true
 		g.Step(dt)
@@ -162,7 +165,7 @@ func TestFlyingCharizardIsHitByBallAndPunchButNotByGroundAttacks(t *testing.T) {
 		}
 	})
 	t.Run("an Ice Punch freezes it", func(t *testing.T) {
-		g := duel(DefaultConfig(), snorlax, charizard)
+		g := duel(cfg, snorlax, charizard)
 		g.P[0].X, g.P[1].X = 300, 450
 		g.P[1].In.Skill = true
 		g.Step(dt)
@@ -667,7 +670,7 @@ func TestMirrorMatchesRunEverySkillWithoutHurtingTheUser(t *testing.T) {
 	for kind := 0; kind < kinds; kind++ {
 		g := duel(DefaultConfig(), kind, kind)
 		g.P[1].X = 500 // close enough for every skill to reach
-		all := Input{Skill: true, Attack: true, Beam: true, Thunder: true, Ball: true, Punch: true, Fire: true, Toss: true, DX: 1}
+		all := Input{Skill: true, Beam: true, Thunder: true, Ball: true, Punch: true, Fire: true, Toss: true, DX: 1}
 		for tick := 0; tick < 20*tickRate; tick++ {
 			g.P[0].In, g.P[1].In = all, all
 			g.P[tick%2].In.DX = -1 // they do not stand still

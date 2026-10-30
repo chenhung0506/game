@@ -13,6 +13,8 @@
       "cooldown": 2
     },
     "thunder": {
+      "min_height": 0,
+      "max_height": 1000,
       "delay": 1.2,
       "radius": 100,
       "damage": 15,
@@ -22,11 +24,14 @@
       "cooldown": 4
     },
     "electro_ball": {
+      "min_height": 0,
+      "max_height": 60,
       "charge_time": 0.5,
       "speed": 400,
       "radius": 50,
       "hp": 30,
       "explosion_radius": 180,
+      "contact_damage": 10,
       "explosion_damage": 25,
       "knockback": 120,
       "cooldown": 3,
@@ -38,6 +43,8 @@
     "walk_speed": 140,
     "radius": 30,
     "ice_punch": {
+      "min_height": 0,
+      "max_height": 60,
       "charge_duration": 0.2,
       "recharge_duration": 0.5,
       "cooldown": 5,
@@ -49,6 +56,8 @@
       "mass": 150
     },
     "jump": {
+      "min_height": 0,
+      "max_height": 12,
       "height": 100,
       "duration": 1.7,
       "cooldown": 2,
@@ -57,16 +66,18 @@
       "air_speed_second_half": 160
     },
     "hyper_beam": {
-      "charge_duration": 0.4,
-      "sweep_angle": 35,
-      "sweep_duration": 1,
-      "recharge_duration": 2,
+      "min_height": 0,
+      "max_height": 40,
+      "charge_duration": 0.5,
+      "sweep_angle": 38,
+      "sweep_duration": 1.2,
+      "recharge_duration": 3,
       "cooldown": 5,
       "damage": 10,
       "knockback": 80,
       "hit_interval": 0.05,
       "mass": 130,
-      "length": 650,
+      "length": 600,
       "width": 50
     }
   },
@@ -81,6 +92,8 @@
       "height": 30
     },
     "fire_breath": {
+      "min_height": 0,
+      "max_height": 40,
       "speed": 250,
       "radius": 10,
       "hp": 5,
@@ -93,6 +106,8 @@
       "length": 500
     },
     "seismic_toss": {
+      "min_height": 0,
+      "max_height": 12,
       "speed": 700,
       "radius": 100,
       "damage": 40,

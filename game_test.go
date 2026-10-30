@@ -82,7 +82,7 @@ func TestJumpHeightAndDurationFollowConfig(t *testing.T) {
 	}
 }
 
-// ---- Snorlax: air speed, jump cooldown, earthquake reach ----
+// ---- Snorlax: air speed, jump cooldown ----
 
 // In the air Snorlax steers at air_speed_first_half while rising and air_speed_second_half while
 // falling; the moment it lands, at the walking speed.
@@ -208,50 +208,6 @@ func TestJumpCooldownCountsFromTakeoff(t *testing.T) {
 	}
 }
 
-// Snorlax has no earthquake any more: its landing is the ground shock.
-func TestSnorlaxHasNoEarthquake(t *testing.T) {
-	g := newTestGame()
-	g.P[snorlax].X, g.P[snorlax].Y = 800, 500
-	g.P[pikachu].X, g.P[pikachu].Y = 750, 500 // well inside the old reach
-	g.P[snorlax].In = Input{Attack: true}
-	for i := 0; i < tickRate; i++ {
-		for _, e := range g.Step(dt) {
-			if e.T == "quake" {
-				t.Fatal("Snorlax produced a quake event")
-			}
-		}
-	}
-	if g.P[pikachu].HP != maxHP || g.P[snorlax].CD != 0 {
-		t.Fatalf("Pikachu HP = %d, Snorlax CD = %v: the J key must do nothing for Snorlax", g.P[pikachu].HP, g.P[snorlax].CD)
-	}
-}
-
-// Pikachu keeps its earthquake, with the fixed reach.
-func TestPikachuQuakeKeepsItsFixedReach(t *testing.T) {
-	for _, tc := range []struct {
-		gap float64
-		hit bool
-	}{{120, true}, {130, false}} { // reach 100 plus Snorlax's body (24)
-		g := newTestGame()
-		g.P[pikachu].X, g.P[pikachu].Y = 800, 500
-		g.P[snorlax].X, g.P[snorlax].Y = 800+tc.gap, 500
-		g.P[pikachu].In = Input{Attack: true}
-		events := g.Step(dt)
-		if got := g.P[snorlax].HP < maxHP; got != tc.hit {
-			t.Fatalf("gap %v: hit = %v, want %v", tc.gap, got, tc.hit)
-		}
-		var r float64
-		for _, e := range events {
-			if e.T == "quake" {
-				r = e.R
-			}
-		}
-		if r != quakeRadius {
-			t.Fatalf("the quake event carries reach %v, want %v", r, quakeRadius)
-		}
-	}
-}
-
 // The landing's reach is slam_radius, and the event tells the client so the effect grows with it.
 func TestSlamReachFollowsConfig(t *testing.T) {
 	for _, tc := range []struct {
@@ -306,7 +262,7 @@ func TestSlamEventCarriesItsReachToTheClient(t *testing.T) {
 }
 
 func TestQuakeEventCarriesItsReachToTheClient(t *testing.T) {
-	b, _ := json.Marshal(Event{T: "quake", X: 1, Y: 2, R: 100})
+	b, _ := json.Marshal(Event{T: "slam", X: 1, Y: 2, R: 100})
 	var m map[string]any
 	json.Unmarshal(b, &m)
 	if m["r"] != float64(100) {
@@ -889,7 +845,7 @@ func TestPlayerSnapshotCarriesBeamState(t *testing.T) {
 	}
 	var m map[string]any
 	json.Unmarshal(b, &m)
-	for _, k := range []string{"x", "y", "z", "hp", "cd", "bt", "st", "rt", "bx", "by", "ba", "tn", "ti", "sx", "sy", "dcd", "bcd", "jcd", "tcd", "kt", "ecd", "fx", "fy", "ut", "ud", "ur", "udx", "udy", "pcd", "fz", "ax", "ay"} {
+	for _, k := range []string{"x", "y", "z", "hp", "bt", "st", "rt", "bx", "by", "ba", "tn", "ti", "sx", "sy", "dcd", "bcd", "jcd", "tcd", "kt", "ecd", "fx", "fy", "ut", "ud", "ur", "udx", "udy", "pcd", "fz", "ax", "ay"} {
 		if _, ok := m[k]; !ok {
 			t.Errorf("snapshot is missing %q: %s", k, b)
 		}
@@ -1075,20 +1031,15 @@ func TestThunderRootsPikachuUntilTheLastBolt(t *testing.T) {
 	}
 }
 
-// The root is only for the cast: the quake is not part of it, and Snorlax is never rooted by it.
-func TestThunderRootDoesNotStopQuakeOrSnorlax(t *testing.T) {
+// The root is only for Pikachu; Snorlax is never rooted by the cast.
+func TestThunderRootDoesNotStopSnorlax(t *testing.T) {
 	g := thunderGame(DefaultConfig())
-	g.P[snorlax].X, g.P[snorlax].Y = g.P[pikachu].X+50, g.P[pikachu].Y // in quake range
 	castThunder(g)
 	x := g.P[snorlax].X
 	g.P[snorlax].In = Input{DX: 1}
-	g.P[pikachu].In = Input{Attack: true}
 	g.Step(dt)
 	if g.P[snorlax].X <= x {
 		t.Fatal("Snorlax must keep moving while Pikachu casts")
-	}
-	if g.P[snorlax].HP != maxHP-quakeDamage {
-		t.Fatalf("Snorlax HP = %d: Pikachu should still be able to quake while casting", g.P[snorlax].HP)
 	}
 }
 
@@ -1208,42 +1159,6 @@ func TestThunderFollowsConfig(t *testing.T) {
 
 // ---- shared mechanics ----
 
-func TestQuakeCannotReachAirborneButHitsGrounded(t *testing.T) {
-	for _, tc := range []struct {
-		name  string
-		z     float64
-		wantH int
-	}{
-		{"airborne", 100, maxHP},
-		{"grounded", 0, maxHP - quakeDamage},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			g := newTestGame()
-			g.P[pikachu].X, g.P[snorlax].X = 300, 350
-			g.P[pikachu].Y, g.P[snorlax].Y = 250, 250
-			g.P[snorlax].Z, g.P[snorlax].VZ = tc.z, 0
-			g.P[pikachu].In.Attack = true
-			g.Step(dt)
-			if g.P[snorlax].HP != tc.wantH {
-				t.Fatalf("HP = %d, want %d", g.P[snorlax].HP, tc.wantH)
-			}
-		})
-	}
-}
-
-func TestQuakeCooldownLimitsHits(t *testing.T) {
-	g := newTestGame()
-	g.P[pikachu].X, g.P[snorlax].X = 300, 350
-	g.P[pikachu].Y, g.P[snorlax].Y = 250, 250
-	g.P[pikachu].In.Attack = true
-	for i := 0; i < 5; i++ { // 5 ticks = 0.17s, well inside the 0.8s cooldown
-		g.Step(dt)
-	}
-	if g.P[snorlax].HP != maxHP-quakeDamage {
-		t.Fatalf("HP = %d, want exactly one hit", g.P[snorlax].HP)
-	}
-}
-
 func TestDiagonalMoveIsNotFaster(t *testing.T) {
 	g := newTestGame()
 	x0, y0 := g.P[pikachu].X, g.P[pikachu].Y
@@ -1294,11 +1209,6 @@ func TestBodyRadiusWidensWhatEverySkillCanHit(t *testing.T) {
 			for i := 0; i < 2*tickRate; i++ {
 				g.Step(dt)
 			}
-			return g.P[snorlax].HP < maxHP
-		},
-		"earthquake": func(g *Game) bool {
-			g.P[pikachu].In = Input{Attack: true}
-			g.Step(dt)
 			return g.P[snorlax].HP < maxHP
 		},
 		"slam": func(g *Game) bool {
