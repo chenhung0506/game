@@ -174,7 +174,7 @@ type Player struct {
 	FBeamY  float64 `json:"zy"`
 	FBeamCD float64 `json:"zcd"`
 
-	// Rowlet. Crescent Drift: seconds of drift left, the unit heading it is on now, which way it turns (+1 or -1), the cooldown.
+	// Rowlet. Tailwind: seconds of drift left, the unit heading it is on now, which way it turns (+1 or -1), the cooldown.
 	DriftT  float64 `json:"mt"`
 	DriftX  float64 `json:"-"`
 	DriftY  float64 `json:"-"`
@@ -240,6 +240,8 @@ type Ball struct {
 	Life      float64 `json:"lf,omitempty"` // pillar: seconds before it melts; tornado: seconds before it is gone (once it holds someone, the spin time left)
 	Caught    bool    `json:"cg,omitempty"` // tornado: it holds the opponent
 	GrindCD   float64 `json:"-"`            // pillar: until a tornado may wear it down again (spin_interval)
+	Carried   bool    `json:"-"`            // pillar: a tornado holds it up
+	Z         float64 `json:"z,omitempty"`  // pillar: height above the ground while a tornado carries it
 }
 
 // Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
@@ -815,6 +817,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 		if b.K == ballPillar {
 			if b.HP > 0 {
 				b.GrindCD = math.Max(0, b.GrindCD-dt)
+				if !b.Carried && b.Z > 0 { // let go: it comes back down
+					b.Z = math.Max(0, b.Z-g.cfg.Rowlet.Tornado.LiftHeight/twirlFallTime*dt)
+				}
 				if b.Life -= dt; b.Life > 1e-9 {
 					kept = append(kept, b)
 				}
@@ -948,7 +953,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 	}
 	g.Balls = kept
 	g.clashBalls()
-	g.grindPillars()
+	g.grindPillars(dt)
 	// The blast burns the fire balls near it; they are gone on the next step.
 	for _, e := range blasts {
 		for j := range g.Balls {

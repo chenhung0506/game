@@ -208,7 +208,7 @@
       "control_duration": 4,
       "length": 500,
       "pillar_radius": 30,
-      "pillar_hp": 20,
+      "pillar_hp": 35,
       "pillar_duration": 10
     }
   },
@@ -217,7 +217,7 @@
     "walk_speed": 150,
     "radius": 13,
     "fly_high": 30,
-    "crescent_drift": {
+    "tailwind": {
       "radius": 120,
       "speed": 600,
       "duration": 0.5,

@@ -281,15 +281,15 @@ type Config struct {
 		WalkSpeed float64 `json:"walk_speed"`
 		Radius    float64 `json:"radius"`   // body size: drawn at this size, and it widens what skills can hit
 		FlyHigh   float64 `json:"fly_high"` // Rowlet is always this high in the air: only skills whose min_height..max_height take it in can hurt it
-		// Crescent Drift (the main button): Rowlet runs `speed` for `duration` seconds along a circle of `radius`, starting
+		// Tailwind (the main button): Rowlet runs `speed` for `duration` seconds along a circle of `radius`, starting
 		// along the direction held and curving towards the opponent's side, like a car skidding round. It covers
 		// speed x duration / radius of the circle. It hurts nobody.
-		CrescentDrift struct {
+		Tailwind struct {
 			Radius   float64 `json:"radius"`
 			Speed    float64 `json:"speed"`
 			Duration float64 `json:"duration"`
 			Cooldown float64 `json:"cooldown"` // counted from the start of the drift
-		} `json:"crescent_drift"`
+		} `json:"tailwind"`
 		// Arrows: `count` arrows fan out at once, `angle` degrees apart and centred on the opponent, at `speed`. An
 		// arrow that touches the opponent hurts it (`damage`) and slows it by the fraction `slow` (0..1) for
 		// `slow_duration` seconds, and is spent. An arrow has `hp` that the opponent's skills can wear down.
@@ -497,10 +497,10 @@ func DefaultConfig() Config {
 	c.Rowlet.WalkSpeed = 150
 	c.Rowlet.Radius = 13
 	c.Rowlet.FlyHigh = 50
-	c.Rowlet.CrescentDrift.Radius = 120
-	c.Rowlet.CrescentDrift.Speed = 600
-	c.Rowlet.CrescentDrift.Duration = 0.5
-	c.Rowlet.CrescentDrift.Cooldown = 4
+	c.Rowlet.Tailwind.Radius = 120
+	c.Rowlet.Tailwind.Speed = 600
+	c.Rowlet.Tailwind.Duration = 0.5
+	c.Rowlet.Tailwind.Cooldown = 4
 	c.Rowlet.Arrows.Reach = anyHeight
 	c.Rowlet.Arrows.Speed = 500
 	c.Rowlet.Arrows.Radius = 8
@@ -636,9 +636,9 @@ func (c Config) validate() error {
 		{"rowlet.walk_speed", c.Rowlet.WalkSpeed, 0},
 		{"rowlet.radius", c.Rowlet.Radius, 0},
 		{"rowlet.fly_high", c.Rowlet.FlyHigh, 0},
-		{"rowlet.crescent_drift.radius", c.Rowlet.CrescentDrift.Radius, 0},
-		{"rowlet.crescent_drift.speed", c.Rowlet.CrescentDrift.Speed, 0},
-		{"rowlet.crescent_drift.duration", c.Rowlet.CrescentDrift.Duration, 0},
+		{"rowlet.tailwind.radius", c.Rowlet.Tailwind.Radius, 0},
+		{"rowlet.tailwind.speed", c.Rowlet.Tailwind.Speed, 0},
+		{"rowlet.tailwind.duration", c.Rowlet.Tailwind.Duration, 0},
 		{"rowlet.arrows.speed", c.Rowlet.Arrows.Speed, 0},
 		{"rowlet.arrows.radius", c.Rowlet.Arrows.Radius, 0},
 		{"rowlet.arrows.hp", float64(c.Rowlet.Arrows.HP), 0},
@@ -735,7 +735,7 @@ func (c Config) validate() error {
 		{"vulpix.ice_storm.cooldown", c.Vulpix.IceStorm.Cooldown},
 		{"vulpix.ice_storm.freeze_duration", c.Vulpix.IceStorm.FreezeDuration},
 		{"vulpix.freeze_beam.cooldown", c.Vulpix.FreezeBeam.Cooldown},
-		{"rowlet.crescent_drift.cooldown", c.Rowlet.CrescentDrift.Cooldown},
+		{"rowlet.tailwind.cooldown", c.Rowlet.Tailwind.Cooldown},
 		{"rowlet.arrows.damage", float64(c.Rowlet.Arrows.Damage)},
 		{"rowlet.arrows.angle", c.Rowlet.Arrows.Angle},
 		{"rowlet.arrows.slow_duration", c.Rowlet.Arrows.SlowDuration},

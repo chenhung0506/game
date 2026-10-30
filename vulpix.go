@@ -187,7 +187,7 @@ func (g *Game) blockByPillars(i int) {
 	for pass := 0; pass < 2; pass++ {
 		for j := range g.Balls {
 			b := &g.Balls[j]
-			if b.K != ballPillar || b.Owner == i || b.HP <= 0 {
+			if b.K != ballPillar || b.Owner == i || b.HP <= 0 || b.Z > 0 { // one in the air (a tornado has it) blocks nothing
 				continue
 			}
 			if gap := g.radius(i) + fb.PillarRadius; math.Hypot(p.X-b.X, p.Y-b.Y) < gap {

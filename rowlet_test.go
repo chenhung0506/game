@@ -12,7 +12,7 @@ func rowletConfig() Config {
 	cfg := DefaultConfig()
 	rw := &cfg.Rowlet
 	rw.FlyHigh = 50
-	dr, ar, tn := &rw.CrescentDrift, &rw.Arrows, &rw.Tornado
+	dr, ar, tn := &rw.Tailwind, &rw.Arrows, &rw.Tornado
 	dr.Radius, dr.Speed, dr.Duration, dr.Cooldown = 120, 600, 0.5, 4
 	ar.Reach = anyHeight
 	ar.Speed, ar.Radius, ar.HP, ar.Damage, ar.Count, ar.Angle, ar.SlowDuration, ar.Slow, ar.Cooldown, ar.Mass = 500, 8, 2, 6, 5, 12, 2, 0.4, 6, 20
@@ -92,11 +92,11 @@ func TestSkillsBelowRowletsHeightMissItAndSkillsFromTheSkyHitIt(t *testing.T) {
 	}
 }
 
-// ---- Crescent Drift ----
+// ---- Tailwind ----
 
 func TestDriftRunsAnArcAroundACentreOnTheOpponentsSideAndEndsHeadingAround(t *testing.T) {
 	cfg := rowletConfig()
-	dr := cfg.Rowlet.CrescentDrift
+	dr := cfg.Rowlet.Tailwind
 	turn := dr.Speed * dr.Duration / dr.Radius // 2.5 rad
 	for _, tc := range []struct {
 		foeY, side float64
@@ -129,7 +129,7 @@ func TestDriftWithNoKeysGoesTheWayItFacesAndCooldownBlocksASecondOne(t *testing.
 	g := rg(cfg)
 	g.P[0].In.Skill = true
 	g.Step(dt)
-	if g.P[0].DriftX != math.Cos(cfg.Rowlet.CrescentDrift.Speed/cfg.Rowlet.CrescentDrift.Radius*dt) || g.P[0].X <= 300 {
+	if g.P[0].DriftX != math.Cos(cfg.Rowlet.Tailwind.Speed/cfg.Rowlet.Tailwind.Radius*dt) || g.P[0].X <= 300 {
 		t.Fatalf("drift heading %v,%v at x=%v, want it to start towards +x, the way slot 0 faces", g.P[0].DriftX, g.P[0].DriftY, g.P[0].X)
 	}
 	steps(g, 20) // over, and the key is still held
@@ -141,7 +141,7 @@ func TestDriftWithNoKeysGoesTheWayItFacesAndCooldownBlocksASecondOne(t *testing.
 	if g.P[0].X != x {
 		t.Fatal("it moved with no keys held")
 	}
-	steps(g, int(cfg.Rowlet.CrescentDrift.Cooldown*tickRate)-26-1) // the cooldown counts from the first tick: it ends at tick 121
+	steps(g, int(cfg.Rowlet.Tailwind.Cooldown*tickRate)-26-1) // the cooldown counts from the first tick: it ends at tick 121
 	if g.P[0].DriftT != 0 {
 		t.Fatalf("DriftT=%v a tick before the cooldown ends", g.P[0].DriftT)
 	}
@@ -550,7 +550,7 @@ func TestRowletConfigIsChecked(t *testing.T) {
 		"no arrows":         func(c *Config) { c.Rowlet.Arrows.Count = 0 },
 		"no spin interval":  func(c *Config) { c.Rowlet.Tornado.SpinInterval = 0 },
 		"no fly_high":       func(c *Config) { c.Rowlet.FlyHigh = 0 },
-		"no drift radius":   func(c *Config) { c.Rowlet.CrescentDrift.Radius = 0 },
+		"no drift radius":   func(c *Config) { c.Rowlet.Tailwind.Radius = 0 },
 		"no lift":           func(c *Config) { c.Rowlet.Tornado.LiftHeight = 0 },
 		"negative charge":   func(c *Config) { c.Rowlet.Tornado.ChargeDuration = -1 },
 		"inverted reach":    func(c *Config) { c.Rowlet.Tornado.Reach = Reach{10, 5} },
@@ -707,5 +707,50 @@ func TestATornadoWearsDownTheOpponentsPillarsItTouchesEverySpinInterval(t *testi
 	}
 	if tor := ballsOfKind(g, ballTornado); len(tor) != 1 || tor[0].HP != tn.HP {
 		t.Fatalf("tornado %+v, want it unhurt by the pillar", tor)
+	}
+}
+
+func TestATornadoCarriesPillarsUpWithItKeepsHurtingThemAndDropsThemWhenItIsGone(t *testing.T) {
+	cfg := rowletConfig()
+	cfg.Rowlet.Tornado.Speed = 60
+	cfg.Rowlet.Tornado.Reach = Reach{500, 600} // it never catches a body on the ground, so one can stand by the pillar
+	cfg.Vulpix.FreezeBeam.Reach = Reach{0, 80}
+	tn := cfg.Rowlet.Tornado
+	g := duel(cfg, rowlet, vulpix)
+	g.P[1].X, g.P[1].Y = 1500, 900 // out of the way
+	g.Balls = append(g.Balls,
+		Ball{K: ballTornado, Owner: 0, X: 500, Y: 250, HP: tn.HP, Left: 500, Life: 8},
+		Ball{K: ballPillar, Owner: 1, X: 520, Y: 250, HP: 100, Life: 40},
+		Ball{K: ballPillar, Owner: 0, X: 480, Y: 250, HP: 100, Life: 40}) // its own: left on the ground
+	g.P[0].X, g.P[0].Y = 100, 900
+	pil := func() (*Ball, *Ball) { ps := ballsOfKind(g, ballPillar); return ps[0], ps[1] }
+	steps(g, 3*tickRate/2)
+	foe, own := pil()
+	if foe.Z != tn.LiftHeight || own.Z != 0 || own.HP != 100 {
+		t.Fatalf("pillar z=%v (want %v), own z=%v hp=%d: the other player's is carried up, its own left alone", foe.Z, tn.LiftHeight, own.Z, own.HP)
+	}
+	if want := 100 - tn.SpinDamage*(1+int(1.5/tn.SpinInterval)); foe.HP > want+tn.SpinDamage || foe.HP < want-tn.SpinDamage {
+		t.Fatalf("pillar HP %d after 1.5 s in the tornado, want about %d: spin_damage every spin_interval", foe.HP, want)
+	}
+	tor := ballsOfKind(g, ballTornado)[0]
+	if math.Hypot(foe.X-tor.X, foe.Y-tor.Y) > tn.Radius || foe.X <= 520 {
+		t.Fatalf("pillar at %v,%v, tornado at %v,%v: it should travel with the tornado", foe.X, foe.Y, tor.X, tor.Y)
+	}
+	// carried, it blocks nothing
+	g.P[0].X, g.P[0].Y = foe.X-1, foe.Y // Rowlet, at 50, is inside the beam's 0..80 band
+	g.Step(dt)
+	if math.Hypot(g.P[0].X-foe.X, g.P[0].Y-foe.Y) > 5 {
+		t.Fatalf("body pushed to %v,%v by a pillar that is in the air", g.P[0].X, g.P[0].Y)
+	}
+	// the tornado goes: the pillar comes down
+	g.Balls = g.Balls[:0]
+	g.Balls = append(g.Balls, *foe)
+	steps(g, 3)
+	if p := ballsOfKind(g, ballPillar)[0]; p.Z <= 0 || p.Z >= tn.LiftHeight || p.Carried {
+		t.Fatalf("pillar z=%v carried=%v three ticks after the tornado went, want it coming down", p.Z, p.Carried)
+	}
+	steps(g, 15)
+	if p := ballsOfKind(g, ballPillar)[0]; p.Z != 0 {
+		t.Fatalf("pillar z=%v, want it back on the ground", p.Z)
 	}
 }

@@ -22,7 +22,7 @@ func rotate(x, y, a float64) (float64, float64) {
 // whose min_height..max_height take in that height can hurt it; if a tornado or a toss brings it down it climbs
 // back at the pace Charizard takes off.
 //
-// Crescent Drift: it runs `speed` for `duration` seconds along a circle of `radius`, starting along the direction
+// Tailwind: it runs `speed` for `duration` seconds along a circle of `radius`, starting along the direction
 // held (else the way it faces) and curving to the side the opponent is on, a half-moon that ends in a skid. How
 // much of the circle it covers is speed x duration / radius.
 //
@@ -35,7 +35,7 @@ func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
 	p, other := &g.P[i], &g.P[1-i]
 	rw := g.cfg.Rowlet
-	dr, ar, tn := rw.CrescentDrift, rw.Arrows, rw.Tornado
+	dr, ar, tn := rw.Tailwind, rw.Arrows, rw.Tornado
 	for _, cd := range []*float64{&p.DriftCD, &p.ArrowCD, &p.TwistCD} {
 		if *cd > 0 {
 			if *cd -= dt; *cd < 1e-9 {
@@ -57,7 +57,7 @@ func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 		p.TwistRecT = tn.RechargeDuration
 	}
 
-	// ---- Crescent Drift ----
+	// ---- Tailwind ----
 	if in.Skill && p.DriftT == 0 && p.DriftCD == 0 && !twisting {
 		dx, dy := float64(in.DX), float64(in.DY)
 		if dx == 0 && dy == 0 {
@@ -178,21 +178,44 @@ func (g *Game) stepTwirl(dt float64) []Event {
 	return events
 }
 
-// grindPillars lets each tornado wear down the other player's ice pillars it touches: spin_damage the moment it
-// touches one, then again every spin_interval while it stays. The tornado itself is not hurt by a pillar.
-func (g *Game) grindPillars() {
+// grindPillars is what a tornado does to the other player's ice pillars. One it touches is carried: it rises to
+// lift_height (as fast as a body falls), moves with the tornado and blocks nothing while it is up, and takes
+// spin_damage when first touched and again every spin_interval for as long as the tornado holds it. A pillar the
+// tornado no longer touches (it was broken, or it ran out) is let go and comes back down. The tornado itself is
+// not hurt by a pillar.
+func (g *Game) grindPillars(dt float64) {
 	tn := g.cfg.Rowlet.Tornado
-	for i := range g.Balls {
-		t := &g.Balls[i]
-		if t.K != ballTornado || t.HP <= 0 {
+	for j := range g.Balls {
+		p := &g.Balls[j]
+		if p.K != ballPillar || p.HP <= 0 {
 			continue
 		}
-		for j := range g.Balls {
-			if p := &g.Balls[j]; p.K == ballPillar && p.Owner != t.Owner && p.HP > 0 && p.GrindCD == 0 &&
-				math.Hypot(p.X-t.X, p.Y-t.Y) <= tn.Radius+g.ballRadius(p) {
-				p.HP -= tn.SpinDamage
-				p.GrindCD = tn.SpinInterval
+		var held *Ball
+		for i := range g.Balls {
+			t := &g.Balls[i]
+			if t.K != ballTornado || t.HP <= 0 || t.Owner == p.Owner {
+				continue
 			}
+			tx, ty := t.X, t.Y
+			if p.Carried {
+				tx, ty = t.X0, t.Y0 // it moves with the tornado, so it is judged against where the tornado was
+			}
+			if math.Hypot(p.X-tx, p.Y-ty) <= tn.Radius+g.ballRadius(p) {
+				held = t
+				break
+			}
+		}
+		if held == nil {
+			p.Carried = false
+			continue
+		}
+		p.Carried = true
+		p.X = math.Min(math.Max(p.X+held.X-held.X0, 0), g.court.Length)
+		p.Y = math.Min(math.Max(p.Y+held.Y-held.Y0, 0), g.court.Width)
+		p.Z = math.Min(p.Z+tn.LiftHeight/twirlFallTime*dt, tn.LiftHeight)
+		if p.GrindCD == 0 {
+			p.HP -= tn.SpinDamage
+			p.GrindCD = tn.SpinInterval
 		}
 	}
 }

@@ -382,7 +382,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"storm":   map[string]float64{"radius": cfg.Vulpix.IceStorm.Radius, "interval": cfg.Vulpix.IceStorm.Interval, "strikes": float64(cfg.Vulpix.IceStorm.Strikes)},
 		"fbeam":   map[string]float64{"len": cfg.Vulpix.FreezeBeam.Length, "control": cfg.Vulpix.FreezeBeam.ControlDuration, "pillar": cfg.Vulpix.FreezeBeam.PillarRadius, "hp": float64(cfg.Vulpix.FreezeBeam.PillarHP), "life": cfg.Vulpix.FreezeBeam.PillarDuration},
 		"flyhigh": cfg.Rowlet.FlyHigh,
-		"drift":   map[string]float64{"radius": cfg.Rowlet.CrescentDrift.Radius, "speed": cfg.Rowlet.CrescentDrift.Speed, "duration": cfg.Rowlet.CrescentDrift.Duration},
+		"drift":   map[string]float64{"radius": cfg.Rowlet.Tailwind.Radius, "speed": cfg.Rowlet.Tailwind.Speed, "duration": cfg.Rowlet.Tailwind.Duration},
 		"arrow":   map[string]float64{"radius": cfg.Rowlet.Arrows.Radius, "hp": float64(cfg.Rowlet.Arrows.HP), "slow": cfg.Rowlet.Arrows.SlowDuration, "count": float64(cfg.Rowlet.Arrows.Count), "angle": cfg.Rowlet.Arrows.Angle, "charge": cfg.Rowlet.Arrows.ChargeDuration, "scale": cfg.Rowlet.Arrows.Scale},
 		"tornado": map[string]float64{"radius": cfg.Rowlet.Tornado.Radius, "hp": float64(cfg.Rowlet.Tornado.HP), "charge": cfg.Rowlet.Tornado.ChargeDuration, "lift": cfg.Rowlet.Tornado.LiftHeight, "scale": cfg.Rowlet.Tornado.Scale},
 		"leaf":    map[string]float64{"radius": cfg.Chikorita.LeafSlash.SlashRadius, "scale": cfg.Chikorita.LeafSlash.LeafScale},
@@ -400,7 +400,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"cooldown": map[string]float64{"dash": cfg.Pikachu.VoltTackle.Cooldown, "thunder": th.Cooldown, "jump": cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown, "ball": cfg.Pikachu.ElectroBall.Cooldown, "punch": cfg.Snorlax.IcePunch.Cooldown,
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,
 			"frost": cfg.Vulpix.FrostField.Cooldown, "storm": cfg.Vulpix.IceStorm.Cooldown, "fbeam": cfg.Vulpix.FreezeBeam.Cooldown,
-			"drift": cfg.Rowlet.CrescentDrift.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown},
+			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown},
 	})
 	c.send <- hi
 	r.broadcastLobby() // both players learn who joined
