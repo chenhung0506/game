@@ -180,7 +180,7 @@
       "min_height": 0,
       "max_height": 15,
       "spray_duration": 1,
-      "duration": 8,
+      "duration": 16,
       "slow": 0.5,
       "boost": 1,
       "radius": 30,
@@ -203,7 +203,7 @@
     "freeze_beam": {
       "min_height": 0,
       "max_height": 80,
-      "speed": 300,
+      "speed": 400,
       "cooldown": 12,
       "control_duration": 4,
       "length": 500,
