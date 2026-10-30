@@ -136,7 +136,7 @@
       "jump_duration": 0.35,
       "jump_height": 40,
       "slashes": 5,
-      "slash_interval": 0.4,
+      "slash_interval": 0.3,
       "slash_step": 40,
       "slash_radius": 90,
       "leaf_scale": 2.8,
