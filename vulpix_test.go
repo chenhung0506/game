@@ -243,6 +243,43 @@ func TestIceStormDoesNotRootVulpixAndHasACooldown(t *testing.T) {
 	}
 }
 
+func TestIceStormStrikesWearDownTheOpponentsProjectilesInItsArea(t *testing.T) {
+	cfg := vulpixConfig()
+	cfg.Vulpix.IceStorm.FollowSpeed = 0 // the storm stays where it began
+	is := cfg.Vulpix.IceStorm
+	g := duel(cfg, vulpix, pikachu)
+	g.P[1].X, g.P[1].Y = 1800, 900           // far from the storm: no body is hit, the balls still are
+	ring := func(k int) (float64, float64) { // seven spots round the storm's middle, far enough apart not to clash with each other
+		a := float64(k) * 2 * math.Pi / 7
+		return g.P[0].X + math.Cos(a)*55, g.P[0].Y + math.Sin(a)*55
+	}
+	spot := func(k int, b Ball) Ball { b.X, b.Y = ring(k); return b }
+	g.Balls = []Ball{
+		spot(0, Ball{Owner: 1, HP: cfg.Pikachu.ElectroBall.HP}),                                // electro, inside
+		spot(1, Ball{K: ballFire, Owner: 1, HP: 50, Left: 400}),                                // fire, inside
+		spot(2, Ball{K: ballLeaf, Owner: 1, HP: 50}),                                           // leaf, inside
+		spot(3, Ball{K: ballLeaf, Owner: 1, HP: 50, Wait: true, Delay: 9}),                     // a leaf still waiting, inside
+		{Owner: 1, X: g.P[0].X + is.Radius + 200, Y: g.P[0].Y, HP: cfg.Pikachu.ElectroBall.HP}, // electro, outside
+		spot(5, Ball{K: ballFire, Owner: 0, HP: 50, Left: 400}),                                // the storm owner's own, inside
+		spot(6, Ball{K: ballPillar, Owner: 1, HP: 50, Life: 30}),                               // the other player's pillar, inside
+	}
+	g.P[0].In.Storm = true
+	steps(g, 1)
+	g.P[0].In = Input{}
+	for k := 0; k < int(is.Interval*tickRate)+2 && g.P[0].StormLeft == is.Strikes; k++ {
+		g.Step(dt) // up to the first strike
+	}
+	if g.P[0].StormLeft != is.Strikes-1 || len(g.Balls) != 7 {
+		t.Fatalf("StormLeft %d with %d balls: the first strike should just have landed and nothing else changed", g.P[0].StormLeft, len(g.Balls))
+	}
+	want := []int{cfg.Pikachu.ElectroBall.HP - is.Damage, 50 - is.Damage, 50 - is.Damage, 50 - is.Damage, cfg.Pikachu.ElectroBall.HP, 50, 50 - is.Damage}
+	for j, w := range want {
+		if got := g.Balls[j].HP; got != w {
+			t.Errorf("ball %d (%+v): HP %d, want %d", j, g.Balls[j], got, w)
+		}
+	}
+}
+
 // ---- Freeze Beam ----
 
 func TestFreezeBeamRootsVulpixAndTheStickMovesItsEndAtSpeed(t *testing.T) {

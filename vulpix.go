@@ -17,7 +17,8 @@ const (
 // Frost Field: for spray_duration seconds, `patches` patches are laid evenly, each at a random spot within `radius`
 // of where Vulpix is when it lays it.
 //
-// Ice Storm: the storm starts on Vulpix and chases the opponent, striking every `interval` seconds like Thunder.
+// Ice Storm: the storm starts on Vulpix and chases the opponent, striking every `interval` seconds like Thunder. Each
+// strike also takes `damage` off every projectile of the other player inside its area.
 //
 // Freeze Beam: the stick moves the end of the beam over the ground at `speed`, at most `length` from the body; the
 // beam hurts nobody, and an ice pillar rises wherever its end passes (not on top of another of Vulpix's).
@@ -70,6 +71,11 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 		p.StormIn -= dt
 		for p.StormLeft > 0 && p.StormIn < 1e-9 { // a loop so a tiny interval cannot lose strikes
 			events = append(events, Event{T: "storm", X: p.StormX, Y: p.StormY, R: is.Radius})
+			for j := range g.Balls { // the storm wears down the other player's projectiles (and pillars) caught in it, whether or not it hits a body
+				if b := &g.Balls[j]; b.Owner != i && math.Hypot(b.X-p.StormX, b.Y-p.StormY) <= is.Radius+g.ballRadius(b) {
+					b.HP -= is.Damage
+				}
+			}
 			if is.Reach.hits(other) && math.Hypot(other.X-p.StormX, other.Y-p.StormY) <= is.Radius+g.radius(1-i) {
 				g.hit(other, is.Damage)
 				if p.StormHits++; p.StormHits%is.FreezeHits == 0 {
