@@ -608,18 +608,21 @@ function artVulpix(c, x, y, t, pose) {
   const { dir, mv, ph } = pose, sw = Math.sin(ph) * mv, bob = -Math.abs(Math.sin(ph)) * 2 * mv;
   const W = '#f6fafd', WD = '#d3e2ee', BL = '#9ccdf2', BD = '#4f8fd0', NOSE = '#35557f', EYE = '#2f6fc0';
   const eye = (ex, ey, r) => { ov(c, ex, ey, r, r * 1.25, EYE, 0, null); ov(c, ex, ey + 0.3, r * 0.5, r * 0.8, '#10264a', 0, null); ov(c, ex + r * 0.3, ey - r * 0.5, r * 0.3, r * 0.3, '#fff', 0, null); };
-  // one tail from (bx, by), pointing a radians clockwise from straight up, curling outward, with a blue curl at the tip
+  // one tail from (bx, by), pointing a radians clockwise from straight up, curling outward; its last part droops
+  // down (screen down) and ends in a blue tip
   const tail = (bx, by, a, len, k) => {
     const aa = a + Math.sin(t * 2.4 + k * 0.9) * 0.1 + Math.sin(t * 9 + k) * 0.06 * mv, side = Math.sign(a) || 1;
     const tx = bx + Math.sin(aa) * len, ty = by - Math.cos(aa) * len, cx = bx + Math.sin(aa) * len * 0.35 + side * len * 0.28, cy = by - Math.cos(aa) * len * 0.75;
-    c.lineCap = 'round'; c.strokeStyle = OUTLINE; c.lineWidth = 6.4; c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(cx, cy, tx, ty); c.stroke();
-    c.strokeStyle = W; c.lineWidth = 5; c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(cx, cy, tx, ty); c.stroke();
-    ov(c, tx, ty, 3.4, 3.4, BL); ov(c, tx - side * 0.8, ty + 0.6, 1.6, 1.6, '#fff', 0, null);
+    const qx = tx + side * len * 0.07, qy = ty + len * 0.2; // where the drooping end hangs
+    const path = () => { c.beginPath(); c.moveTo(bx, by); c.bezierCurveTo(cx, cy, tx + side * len * 0.16, ty - len * 0.14, qx, qy); };
+    c.lineCap = 'round'; c.strokeStyle = OUTLINE; c.lineWidth = 6.4; path(); c.stroke();
+    c.strokeStyle = W; c.lineWidth = 5; path(); c.stroke();
+    ov(c, qx, qy, 3.2, 3.6, BL); ov(c, qx - side * 0.8, qy + 0.4, 1.5, 1.5, '#fff', 0, null);
   };
   c.save(); c.translate(x, y + bob + 2 * mv);
   if (dir === 2) c.scale(-1, 1);
   if (dir === 0 || dir === 1) {
-    const back = dir === 1, fan = () => [-1.2, -0.72, -0.24, 0.24, 0.72, 1.2].forEach((a, k) => tail(0, 9, a, 23 - Math.abs(a) * 5, k));
+    const back = dir === 1, fan = () => [-0.98, -0.6, -0.2, 0.2, 0.6, 0.98].forEach((a, k) => tail(0, 9, a, 24 - Math.abs(a) * 4, k));
     if (!back) fan();
     ov(c, -6, 17, 3.4, 3, WD); ov(c, 6, 17, 3.4, 3, WD);
     ov(c, 0, 8, 10.5, 9, W);
@@ -637,7 +640,7 @@ function artVulpix(c, x, y, t, pose) {
     if (back) fan();
   } else { // side view, facing right
     const a = sw * 0.85;
-    [-1.0, -1.38, -1.76, -2.14, -2.52, -2.9].forEach((ang, k) => tail(-9, 5, ang, 21 - k * 0.6, k));
+    [-0.7, -1.0, -1.3, -1.6, -1.9, -2.2].forEach((ang, k) => tail(-9, 5, ang, 21 - k * 0.5, k));
     pikaLimb(c, 6, 12, 6, -a, 3, WD); pikaLimb(c, -8, 12, 6, a, 3, WD); // the far legs
     ov(c, -2, 7, 13, 7.5 + 0.8 * mv, W, -0.04 * mv); ov(c, 3, 11, 7, 3.4, '#fff', 0, null);
     poly(c, [[5, -7], [3, -22], [12, -11]], WD); // far ear
@@ -1245,23 +1248,32 @@ function drawFBeams() {
   }
 }
 
-// An ice pillar: a six-sided crystal column that rises when the beam reaches it, cracks as its HP goes and shrinks away in its last second.
+// An ice pillar, drawn as a small iceberg: a wide jagged base with a tall peak and a lower one, light on the left faces and darker on
+// the right. It rises when the beam reaches it, cracks as its HP goes and shrinks away in its last second.
+// (x in units of the pillar's radius, y in units of its height, up is negative)
+const BERG = [[-1.05, 0], [-0.95, -0.3], [-0.62, -0.42], [-0.5, -0.78], [-0.18, -1], [0.02, -0.72], [0.24, -0.88], [0.52, -0.5], [0.9, -0.38], [1.05, 0]];
 function drawPillar(b) {
   const r = fbeamCfg.pillar, age = fbeamCfg.life - b.lf, rise = Math.min(1, age / 0.2), melt = Math.min(1, b.lf / 1), hpk = Math.max(0, b.hp) / fbeamCfg.hp;
-  const h = r * 2.7 * rise * (2 - rise) * (0.6 + 0.4 * melt), a = 0.35 + 0.55 * melt;
+  const h = r * 2.5 * rise * (2 - rise) * (0.6 + 0.4 * melt), a = 0.35 + 0.55 * melt;
   if (h < 1) return;
+  const path = (pts) => { ctx.beginPath(); pts.forEach(([x, y], n) => (n ? ctx.lineTo(x * r, y * h) : ctx.moveTo(x * r, y * h))); ctx.closePath(); };
   upright(b.x, b.y, () => {
-    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, 0, r * 1.15, r * 0.5, 0, 0, 7); ctx.fill();
-    const g = ctx.createLinearGradient(-r, 0, r, 0);
-    g.addColorStop(0, `rgba(120,190,240,${a})`); g.addColorStop(0.35, `rgba(235,250,255,${a})`); g.addColorStop(1, `rgba(110,170,230,${a})`);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, 0, r * 1.25, r * 0.5, 0, 0, 7); ctx.fill();
+    const g = ctx.createLinearGradient(0, -h, 0, 0);
+    g.addColorStop(0, `rgba(245,252,255,${a})`); g.addColorStop(1, `rgba(120,190,240,${a})`);
     ctx.fillStyle = g; ctx.strokeStyle = `rgba(255,255,255,${Math.min(1, a + 0.2)})`; ctx.lineWidth = 1.8; ctx.lineJoin = 'round';
-    ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(-r, -h * 0.82); ctx.lineTo(-r * 0.45, -h); ctx.lineTo(r * 0.45, -h * 0.96); ctx.lineTo(r, -h * 0.8); ctx.lineTo(r, 0);
-    ctx.quadraticCurveTo(0, r * 0.45, -r, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = `rgba(255,255,255,${a * 0.9})`; ctx.lineWidth = 1.2; // facets
-    ctx.beginPath(); ctx.moveTo(-r * 0.3, -h * 0.97); ctx.lineTo(-r * 0.15, 0); ctx.moveTo(r * 0.45, -h * 0.96); ctx.lineTo(r * 0.25, -h * 0.1); ctx.stroke();
+    path(BERG); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = `rgba(40,100,170,${0.28 * a})`; // the faces turned away from the light
+    path([[-0.18, -1], [0.02, -0.72], [0.1, 0], [-0.12, 0]]); ctx.fill();
+    path([[0.24, -0.88], [0.52, -0.5], [0.9, -0.38], [1.05, 0], [0.3, 0]]); ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${0.7 * a})`; // snow on the peaks
+    path([[-0.5, -0.78], [-0.18, -1], [-0.07, -0.82], [-0.3, -0.7]]); ctx.fill();
+    path([[0.2, -0.82], [0.24, -0.88], [0.36, -0.7], [0.26, -0.68]]); ctx.fill();
+    ctx.strokeStyle = `rgba(255,255,255,${a * 0.8})`; ctx.lineWidth = 1.2; // edges between the faces
+    ctx.beginPath(); ctx.moveTo(-0.5 * r, -0.78 * h); ctx.lineTo(-0.35 * r, 0); ctx.moveTo(0.52 * r, -0.5 * h); ctx.lineTo(0.3 * r, 0); ctx.stroke();
     ctx.strokeStyle = `rgba(30,70,120,${0.8 * a})`; ctx.lineWidth = 1.3; // cracks come with the damage
-    if (hpk < 0.7) { ctx.beginPath(); ctx.moveTo(-r * 0.7, -h * 0.55); ctx.lineTo(-r * 0.2, -h * 0.45); ctx.lineTo(-r * 0.35, -h * 0.25); ctx.stroke(); }
-    if (hpk < 0.35) { ctx.beginPath(); ctx.moveTo(r * 0.6, -h * 0.7); ctx.lineTo(r * 0.1, -h * 0.55); ctx.lineTo(r * 0.4, -h * 0.3); ctx.lineTo(0, -h * 0.12); ctx.stroke(); }
+    if (hpk < 0.7) { ctx.beginPath(); ctx.moveTo(-0.7 * r, -0.36 * h); ctx.lineTo(-0.3 * r, -0.5 * h); ctx.lineTo(-0.45 * r, -0.2 * h); ctx.stroke(); }
+    if (hpk < 0.35) { ctx.beginPath(); ctx.moveTo(0.6 * r, -0.42 * h); ctx.lineTo(0.1 * r, -0.55 * h); ctx.lineTo(0.4 * r, -0.25 * h); ctx.lineTo(0, -0.1 * h); ctx.stroke(); }
   });
 }
 
