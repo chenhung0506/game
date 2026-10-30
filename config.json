@@ -126,10 +126,11 @@
       "jump_distance": 220,
       "jump_duration": 0.35,
       "jump_height": 40,
-      "slashes": 4,
+      "slashes": 5,
       "slash_interval": 0.25,
       "slash_step": 40,
       "slash_radius": 90,
+      "leaf_scale": 2.5,
       "damage": 12,
       "cooldown": 6
     }

@@ -273,22 +273,23 @@ func TestChikoritaMirrorMatchSlashesOnlyTheOpponent(t *testing.T) {
 }
 
 func TestChikoritaConfigLoadsAndRefusesBadValues(t *testing.T) {
-	c, err := loadJSON(t, `{"chikorita":{"leaf_slash":{"slashes":6,"jump_distance":300,"slash_step":10,"slash_radius":120,"max_height":30}}}`)
+	c, err := loadJSON(t, `{"chikorita":{"leaf_slash":{"slashes":6,"jump_distance":300,"slash_step":10,"slash_radius":120,"leaf_scale":4,"max_height":30}}}`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l := c.Chikorita.LeafSlash; l.Slashes != 6 || l.JumpDistance != 300 || l.SlashStep != 10 || l.SlashRadius != 120 || l.MaxHeight != 30 {
+	if l := c.Chikorita.LeafSlash; l.Slashes != 6 || l.JumpDistance != 300 || l.SlashStep != 10 || l.SlashRadius != 120 || l.LeafScale != 4 || l.MaxHeight != 30 {
 		t.Fatalf("loaded %+v", l)
 	}
 	for name, body := range map[string]string{
-		"no slashes":    `{"chikorita":{"leaf_slash":{"slashes":0}}}`,
-		"zero interval": `{"chikorita":{"leaf_slash":{"slash_interval":0}}}`,
-		"zero distance": `{"chikorita":{"leaf_slash":{"jump_distance":0}}}`,
-		"negative step": `{"chikorita":{"leaf_slash":{"slash_step":-1}}}`,
-		"zero radius":   `{"chikorita":{"leaf_slash":{"slash_radius":0}}}`,
-		"band reversed": `{"chikorita":{"leaf_slash":{"min_height":9,"max_height":3}}}`,
-		"zero body":     `{"chikorita":{"radius":0}}`,
-		"unknown field": `{"chikorita":{"leaf_slash":{"sweeps":3}}}`,
+		"no slashes":      `{"chikorita":{"leaf_slash":{"slashes":0}}}`,
+		"zero interval":   `{"chikorita":{"leaf_slash":{"slash_interval":0}}}`,
+		"zero distance":   `{"chikorita":{"leaf_slash":{"jump_distance":0}}}`,
+		"negative step":   `{"chikorita":{"leaf_slash":{"slash_step":-1}}}`,
+		"zero radius":     `{"chikorita":{"leaf_slash":{"slash_radius":0}}}`,
+		"band reversed":   `{"chikorita":{"leaf_slash":{"min_height":9,"max_height":3}}}`,
+		"zero leaf scale": `{"chikorita":{"leaf_slash":{"leaf_scale":0}}}`,
+		"zero body":       `{"chikorita":{"radius":0}}`,
+		"unknown field":   `{"chikorita":{"leaf_slash":{"sweeps":3}}}`,
 	} {
 		if _, err := loadJSON(t, body); err == nil {
 			t.Errorf("%s: accepted", name)

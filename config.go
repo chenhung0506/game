@@ -174,8 +174,9 @@ type Config struct {
 			SlashInterval float64 `json:"slash_interval"`
 			SlashStep     float64 `json:"slash_step"`
 			SlashRadius   float64 `json:"slash_radius"`
-			Damage        int     `json:"damage"`   // per swing that lands
-			Cooldown      float64 `json:"cooldown"` // counted from the start of the hop
+			LeafScale     float64 `json:"leaf_scale"` // how many times bigger the leaf on its head is drawn during the skill; looks only
+			Damage        int     `json:"damage"`     // per swing that lands
+			Cooldown      float64 `json:"cooldown"`   // counted from the start of the hop
 		} `json:"leaf_slash"`
 	} `json:"chikorita"`
 }
@@ -272,6 +273,7 @@ func DefaultConfig() Config {
 	c.Chikorita.LeafSlash.SlashInterval = 0.25
 	c.Chikorita.LeafSlash.SlashStep = 40
 	c.Chikorita.LeafSlash.SlashRadius = 90
+	c.Chikorita.LeafSlash.LeafScale = 2.5
 	c.Chikorita.LeafSlash.Damage = 12
 	c.Chikorita.LeafSlash.Cooldown = 6
 	return c
@@ -363,6 +365,7 @@ func (c Config) validate() error {
 		{"chikorita.leaf_slash.slashes", float64(c.Chikorita.LeafSlash.Slashes), 0},
 		{"chikorita.leaf_slash.slash_interval", c.Chikorita.LeafSlash.SlashInterval, 0},
 		{"chikorita.leaf_slash.slash_radius", c.Chikorita.LeafSlash.SlashRadius, 0},
+		{"chikorita.leaf_slash.leaf_scale", c.Chikorita.LeafSlash.LeafScale, 0},
 	} {
 		if !(f.v > f.min) { // also rejects NaN
 			return fmt.Errorf("%s must be > %v, got %v", f.name, f.min, f.v)

@@ -73,7 +73,7 @@ let maxHp = [100, 100, 120, 110]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
-let leafCfg = { radius: 90 }; // Chikorita's Leaf Slash reach, from 'hi'
+let leafCfg = { radius: 90, scale: 2.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
@@ -93,7 +93,7 @@ let arena = { w: 2000, h: 1000 }; // replaced by the server's values in 'hi'
 if (PORTRAIT) { cv.width = arena.h; cv.height = arena.w; }
 let you = -1, snap = null, waiting = true, status = '連線中…';
 // Which way each character faces on screen and how it is running (see art); set from how its display position moves.
-const look = [{ dir: null, vx: 0, vy: 0, mv: 0, ph: 0 }, { dir: null, vx: 0, vy: 0, mv: 0, ph: 0 }];
+const look = [{ dir: null, vx: 0, vy: 0, mv: 0, ph: 0, ls: 1, la: 0 }, { dir: null, vx: 0, vy: 0, mv: 0, ph: 0, ls: 1, la: 0 }]; // ls, la: the size and angle of Chikorita's leaf
 const disp = [{ x: null, y: 0, z: 0 }, { x: null, y: 0, z: 0 }]; // smoothed positions; set from the first snapshot
 let fx = [], shake = 0;
 
@@ -474,10 +474,10 @@ function artSnorlax(c, x, y, t, pose) {
 // Chikorita: a green quadruped with a big leaf on its head (the leaf is the point: it is drawn well out of
 // proportion) and a ring of buds round the neck. It always stands on four legs; running it stretches out and
 // the legs swing. The leaf sways at rest and whips about while it runs.
-function chLeaf(c, bx, by, rot, back, bend = 12) {
+function chLeaf(c, bx, by, rot, back, bend = 12, k = 1) {
   // The leaf is bent: its midrib curves to one side (bend, in px at the tip) and the tip droops a little.
   const H = 43, W = 18, N = 14, mid = (u) => [bend * u * u, -H * u + 6 * u * u * u];
-  c.save(); c.translate(bx, by); c.rotate(rot);
+  c.save(); c.translate(bx, by); c.rotate(rot); c.scale(k, k);
   const L = [], R = [], V = [];
   for (let i = 0; i <= N; i++) {
     const u = i / N, [mx, my] = mid(u), [nx2, ny2] = mid(Math.min(u + 0.02, 1)), [px, py] = mid(Math.max(u - 0.02, 0));
@@ -486,7 +486,7 @@ function chLeaf(c, bx, by, rot, back, bend = 12) {
     L.push([mx + ox * w, my + oy * w]); R.push([mx - ox * w, my - oy * w]); V.push([mx, my, ox, oy, w]);
   }
   c.beginPath(); L.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); R.reverse().forEach(([x, y]) => c.lineTo(x, y)); c.closePath();
-  c.fillStyle = back ? '#43a63f' : '#58c250'; c.fill(); c.strokeStyle = '#1f6a2c'; c.lineWidth = 1; c.lineJoin = 'round'; c.stroke();
+  c.fillStyle = back ? '#43a63f' : '#58c250'; c.fill(); c.strokeStyle = '#1f6a2c'; c.lineWidth = 1 / Math.sqrt(k); c.lineJoin = 'round'; c.stroke();
   c.strokeStyle = back ? '#2f7f33' : '#3a9a40'; c.lineWidth = 1.3;
   c.beginPath(); V.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke();
   c.lineWidth = 0.8; c.beginPath();
@@ -499,6 +499,7 @@ function chLeaf(c, bx, by, rot, back, bend = 12) {
 }
 function artChikorita(c, x, y, t, pose) {
   const { dir, mv, ph } = pose, sw = Math.sin(ph) * mv, bob = -Math.abs(Math.sin(ph)) * 2 * mv;
+  const lf = pose.leaf || { s: 1, a: 0, bend: 0 }; // during the Leaf Slash: how big the leaf is, which way it points (radians, clockwise from up) and how it flexes
   const G = '#9bd467', GD = '#74b04c', CR = '#e8f3b8', BUD = '#f3d85c', RED = '#d23a3a';
   const sway = Math.sin(t * 2.2) * 0.07 + Math.sin(t * 11) * 0.1 * mv; // the leaf: lazy at rest, whipping when it runs
   const up = (v) => Math.max(0, v);
@@ -519,13 +520,13 @@ function artChikorita(c, x, y, t, pose) {
       c.strokeStyle = '#2a4a20'; c.lineWidth = 0.9; c.beginPath(); c.arc(0, 0.6, 2.8, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
     }
     for (const k of [-1.5, -0.5, 0.5, 1.5]) ov(c, k * 4.6, 5.6 - (1.5 - Math.abs(k)) * 0.7, 1.9, 1.9, BUD); // the ring of four buds
-    chLeaf(c, 0, -13, sway, back, 12 + sway * 70);
+    chLeaf(c, 0, -13, sway + lf.a, back, 12 + sway * 70 + lf.bend, lf.s);
   } else { // side view, facing right
     const a = sw * 0.85;
     pikaLimb(c, 7, 12, 6, -a, 3, GD); pikaLimb(c, -9, 12, 6, a, 3, GD); // the far legs
     ov(c, -17, 6, 3.2, 2.2, GD, 0.5); // tail
     ov(c, -2, 7, 14.5 + 1.5 * mv, 8, G, -0.04 * mv); ov(c, 1, 10, 9, 4, CR, 0, null);
-    chLeaf(c, 7, -9, -0.15 + sway, false, -14 + sway * 70); // bends back over its head
+    chLeaf(c, 7, -9, -0.15 + sway + (dir === 2 ? -lf.a : lf.a), false, -14 + sway * 70 + (dir === 2 ? -lf.bend : lf.bend), lf.s); // bends back over its head; a left-facing one is drawn mirrored
     ov(c, 10, -1 + 1.5 * mv, 10.5, 9.5, G);
     ov(c, 18, 1 + 1.5 * mv, 3.4, 2.7, G);
     eye(13.8, -3 + 1.5 * mv, 2.2); ov(c, 20, 0.2 + 1.5 * mv, 0.6, 0.6, '#2a4a20', 0, null);
@@ -937,7 +938,7 @@ function drawLeafSlash(p, d) {
   const P0 = [-sgn * 0.707 * R, -0.707 * R], P1 = [sgn * 0.707 * R, 0.707 * R];
   const dx = P1[0] - P0[0], dy = P1[1] - P0[1], len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len;
   const pos = (v) => [P0[0] + dx * v + nx * 0.22 * R * Math.sin(Math.PI * v), P0[1] + dy * v + ny * 0.22 * R * Math.sin(Math.PI * v)];
-  const v0 = Math.max(0, k - 0.75), n = 16, W = 10 + 0.14 * R, alpha = k > 0.88 ? (1 - k) / 0.12 : 1;
+  const v0 = Math.max(0, k - 0.75), n = 16, W = 10 + 0.14 * R, alpha = 0.55 * (k > 0.88 ? (1 - k) / 0.12 : 1); // only an afterimage now: the leaf itself is the blade
   upright(d.x, d.y, () => {
     ctx.translate(0, -d.z - 12 * bs);
     const A = [], B = [];
@@ -999,6 +1000,13 @@ function drawPlayer(i, p) {
   if (running && Math.hypot(lk.vx, lk.vy) > 0.3) lk.dir = faceOf(lk.vx, lk.vy);
   lk.mv += ((running ? 1 : 0) - lk.mv) * 0.25; lk.ph += 0.2 * lk.mv;
   const pose = { dir: lk.dir, mv: lk.mv, ph: lk.ph };
+  if (p.k === 3) { // the leaf grows for the Leaf Slash and is swung by it, upper left to lower right on the first, the other way on the next
+    const sgn = p.ln % 2 === 0 ? 1 : -1, e = p.lk * p.lk * (3 - 2 * p.lk); // eased: the swing gathers speed and slows at the end
+    lk.ls += ((p.lp > 0 ? leafCfg.scale : 1) - lk.ls) * 0.3;
+    if (p.lp === 2) { lk.la = sgn * (-0.9 + 3.1 * e) * 1; lk.lb = -sgn * 26 * Math.sin(Math.PI * p.lk); } // about -50 to +130 degrees
+    else { lk.la += (0 - lk.la) * 0.25; lk.lb = (lk.lb || 0) * 0.7; }
+    pose.leaf = { s: lk.ls, a: lk.la, bend: lk.lb || 0 };
+  }
   if (Math.hypot(d.x - px, d.y - py) > 8) ghosts.push({ k: p.k, x: d.x, y: d.y, z: d.z, a: 0.5, pose });
   const lift = Math.min(d.z, 200) / 200, bs = radius[p.k] / REF[p.k]; // bs: how much bigger than the reference art
   // Shadow stays on the ground and shrinks/fades as the player rises.
