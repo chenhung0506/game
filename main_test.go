@@ -281,3 +281,28 @@ func TestBothPlayersMayPickTheSameCharacter(t *testing.T) {
 	}
 	_ = b
 }
+
+func TestTeamMatchOverTheWire(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	a, b := dial(t, srv, "team1"), dial(t, srv, "team1")
+	a.WriteMessage(websocket.TextMessage, []byte(`{"team":true}`))
+	for deadline := time.Now().Add(2 * time.Second); ; {
+		if next(t, a, "lobby")["team"] == true {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the lobby never said team")
+		}
+	}
+	a.WriteMessage(websocket.TextMessage, []byte(`{"order":[1,0,2,3]}`))
+	b.WriteMessage(websocket.TextMessage, []byte(`{"order":[0,1,2,3]}`))
+	s := next(t, a, "s")
+	tm, ok := s["tm"].(map[string]any)
+	if !ok || tm["o"] != false {
+		t.Fatalf("snapshot %v, want a team section", s)
+	}
+	if k := s["p"].([]any)[0].(map[string]any)["k"]; k != float64(1) {
+		t.Fatalf("slot 0 plays %v, want its first in order: 1", k)
+	}
+}

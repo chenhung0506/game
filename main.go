@@ -14,8 +14,9 @@ import (
 
 const (
 	tickRate   = 30
-	maxRooms   = 1000 // rooms live in memory and anyone can open one
-	roundReset = 2 * time.Second
+	maxRooms   = 1000            // rooms live in memory and anyone can open one
+	roundReset = 2 * time.Second // between two bouts of a team match
+	resultHold = 6 * time.Second // how long the result stays up before the next match starts by itself; the repick button works meanwhile
 	pongWait   = 60 * time.Second
 	pingEvery  = 20 * time.Second
 )
@@ -38,6 +39,14 @@ type room struct {
 	running bool
 	overAt  time.Time // zero while a round is in progress
 	winner  int
+
+	// Team match: both players send the order they field all `kinds` characters in; when one is knocked out the
+	// next in order steps in, and the match is over when a side has run out. A survivor keeps its HP.
+	team        bool
+	order       [2][kinds]int
+	cur         [2]int // index into order of the character each side is fielding
+	matchOver   bool
+	matchWinner int
 }
 
 type hub struct {
@@ -82,6 +91,7 @@ func (h *hub) leave(id string, r *room, idx int) {
 		r.c[idx] = nil
 	}
 	r.pick[idx] = -1
+	r.matchOver = false
 	if r.c[0] == nil && r.c[1] == nil {
 		delete(h.rooms, id)
 		return
@@ -99,25 +109,131 @@ func (r *room) playing() bool {
 // choose records slot idx's pick and starts the match once both players have one. It reports whether the
 // pick was taken: an unknown character is refused, and so is any pick while a match is on. Both players may play the same one. Must be called with r.mu held.
 func (r *room) choose(idx, kind int) bool {
-	if r.playing() || kind < 0 || kind >= kinds {
+	if r.playing() || r.team || kind < 0 || kind >= kinds {
 		return false
 	}
 	r.pick[idx] = kind
+	r.startIfReady()
+	return true
+}
+
+// setOrder records the order slot idx fields its characters in (a team match); the first one is its pick. It is
+// refused unless the room is in team mode, no match is on, and the order has every character exactly once.
+// Must be called with r.mu held.
+func (r *room) setOrder(idx int, order []int) bool {
+	if r.playing() || !r.team || len(order) != kinds {
+		return false
+	}
+	var seen [kinds]bool
+	for _, k := range order {
+		if k < 0 || k >= kinds || seen[k] {
+			return false
+		}
+		seen[k] = true
+	}
+	copy(r.order[idx][:], order)
+	r.pick[idx] = order[0]
+	r.startIfReady()
+	return true
+}
+
+// setTeam switches the room between single matches and team matches. Everyone has to choose again. It is refused
+// while a match is on. Must be called with r.mu held.
+func (r *room) setTeam(team bool) bool {
 	if r.playing() {
+		return false
+	}
+	r.team, r.pick = team, [2]int{-1, -1}
+	return true
+}
+
+// repick sends both players back to the lobby, to choose again. It is only allowed once the result of a match is
+// showing. Must be called with r.mu held.
+func (r *room) repick() bool {
+	if r.overAt.IsZero() || !r.matchEnded() {
+		return false
+	}
+	r.pick = [2]int{-1, -1}
+	r.overAt, r.winner, r.matchOver = time.Time{}, -1, false
+	return true
+}
+
+// matchEnded is whether the bout that just finished ends the match: always for a single match.
+func (r *room) matchEnded() bool { return !r.team || r.matchOver }
+
+// startIfReady starts the match once both players have chosen. Must be called with r.mu held.
+func (r *room) startIfReady() {
+	if !r.playing() {
+		return
+	}
+	r.cur, r.matchOver = [2]int{}, false
+	if r.team {
+		r.g.SetKinds(r.order[0][0], r.order[1][0])
+	} else {
 		r.g.SetKinds(r.pick[0], r.pick[1])
-		r.overAt, r.winner = time.Time{}, -1
-		if !r.running {
-			r.running = true
-			go r.loop()
+	}
+	r.overAt, r.winner = time.Time{}, -1
+	if !r.running {
+		r.running = true
+		go r.loop()
+	}
+}
+
+// boutOver is called when a bout ends: whoever was knocked out is replaced by the next character in its order,
+// and the match is over when a side has none left. Must be called with r.mu held.
+func (r *room) boutOver() {
+	for i := range r.g.P {
+		if r.g.P[i].HP <= 0 {
+			r.cur[i]++
 		}
 	}
-	return true
+	if r.cur[0] >= kinds || r.cur[1] >= kinds {
+		r.matchOver = true
+		switch {
+		case r.cur[0] >= kinds && r.cur[1] >= kinds:
+			r.matchWinner = r.winner // the last two knocked out together: slot 0, like a single match
+		case r.cur[0] >= kinds:
+			r.matchWinner = 1
+		default:
+			r.matchWinner = 0
+		}
+	}
+}
+
+// nextRound starts the next bout, or the next match once the result has been up long enough. In a team match
+// a character that won keeps the HP it has left. Must be called with r.mu held.
+func (r *room) nextRound() {
+	switch {
+	case !r.team:
+		r.g.Reset()
+	case r.matchOver:
+		r.cur, r.matchOver = [2]int{}, false
+		r.g.SetKinds(r.order[0][0], r.order[1][0])
+	default:
+		hp := [2]int{r.g.P[0].HP, r.g.P[1].HP}
+		r.g.SetKinds(r.order[0][r.cur[0]], r.order[1][r.cur[1]])
+		for i, h := range hp {
+			if h > 0 {
+				r.g.P[i].HP = h
+			}
+		}
+	}
+	r.overAt, r.winner = time.Time{}, -1
+}
+
+// teamInfo is what a snapshot says about a team match. Who is next is each side's secret, so only the characters
+// that have fallen are named.
+type teamInfo struct {
+	Cur    [2]int   `json:"c"`
+	Fallen [2][]int `json:"f"`
+	Over   bool     `json:"o"`
+	Winner int      `json:"mw"`
 }
 
 // broadcastLobby tells both players who is here and what they picked; the page shows its character
 // choice until snapshots start. Must be called with r.mu held.
 func (r *room) broadcastLobby() {
-	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.c[0] != nil, r.c[1] != nil}})
+	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.c[0] != nil, r.c[1] != nil}, "team": r.team})
 	r.broadcast(msg)
 }
 
@@ -145,26 +261,48 @@ func (r *room) loop() {
 			r.mu.Unlock()
 			return
 		}
-		var events []Event
-		if r.overAt.IsZero() {
-			events = r.g.Step(1.0 / tickRate)
-			if w := r.g.Winner(); w >= 0 {
-				r.overAt, r.winner = time.Now(), w
-			}
-		} else if time.Since(r.overAt) > roundReset {
-			r.g.Reset()
-			r.overAt, r.winner = time.Time{}, -1
-		}
-		msg, _ := json.Marshal(struct {
-			T string    `json:"t"`
-			P [2]Player `json:"p"`
-			E []Event   `json:"e,omitempty"`
-			B []Ball    `json:"b,omitempty"`
-			W int       `json:"w"`
-		}{"s", r.g.P, events, r.g.Balls, r.winner})
-		r.broadcast(msg)
+		r.broadcast(r.step(time.Now()))
 		r.mu.Unlock()
 	}
+}
+
+// step advances the match by one tick at the given time and returns the snapshot to send. Must be called with
+// r.mu held while a match is on.
+func (r *room) step(now time.Time) []byte {
+	var events []Event
+	if r.overAt.IsZero() {
+		events = r.g.Step(1.0 / tickRate)
+		if w := r.g.Winner(); w >= 0 {
+			r.overAt, r.winner = now, w
+			if r.team {
+				r.boutOver()
+			}
+		}
+	} else {
+		hold := roundReset
+		if r.matchEnded() {
+			hold = resultHold
+		}
+		if now.Sub(r.overAt) > hold {
+			r.nextRound()
+		}
+	}
+	var tm *teamInfo
+	if r.team {
+		tm = &teamInfo{Cur: r.cur, Over: r.matchOver, Winner: r.matchWinner}
+		for i := range tm.Fallen {
+			tm.Fallen[i] = append([]int{}, r.order[i][:min(r.cur[i], kinds)]...)
+		}
+	}
+	msg, _ := json.Marshal(struct {
+		T  string    `json:"t"`
+		P  [2]Player `json:"p"`
+		E  []Event   `json:"e,omitempty"`
+		B  []Ball    `json:"b,omitempty"`
+		W  int       `json:"w"`
+		TM *teamInfo `json:"tm,omitempty"`
+	}{"s", r.g.P, events, r.g.Balls, r.winner, tm})
+	return msg
 }
 
 func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
@@ -232,17 +370,30 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			return
 		}
-		// The one other message from the page is the character choice {"pick":2}; the rest is held keys.
+		// The other messages from the page are the lobby's: the character choice {"pick":2}, the match type
+		// {"team":true}, the team's order {"order":[2,0,3,1]} and {"repick":true} after a result; the rest is held keys.
 		var m struct {
-			Pick *int `json:"pick"`
+			Pick   *int  `json:"pick"`
+			Team   *bool `json:"team"`
+			Order  []int `json:"order"`
+			Repick bool  `json:"repick"`
 			Input
 		}
 		if json.Unmarshal(data, &m) != nil {
 			continue
 		}
 		r.mu.Lock()
-		if m.Pick != nil {
-			r.choose(idx, *m.Pick)
+		if m.Pick != nil || m.Team != nil || m.Order != nil || m.Repick {
+			switch {
+			case m.Pick != nil:
+				r.choose(idx, *m.Pick)
+			case m.Team != nil:
+				r.setTeam(*m.Team)
+			case m.Order != nil:
+				r.setOrder(idx, m.Order)
+			default:
+				r.repick()
+			}
 			r.broadcastLobby() // also when refused, so the page learns what is taken
 			r.mu.Unlock()
 			continue
