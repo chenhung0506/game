@@ -68,16 +68,16 @@
     "hyper_beam": {
       "min_height": 0,
       "max_height": 40,
-      "charge_duration": 0.5,
+      "charge_duration": 0.6,
       "sweep_angle": 38,
       "sweep_duration": 1.2,
-      "recharge_duration": 3,
+      "recharge_duration": 2,
       "cooldown": 5,
       "damage": 10,
       "knockback": 80,
       "hit_interval": 0.05,
       "mass": 130,
-      "length": 600,
+      "length": 650,
       "width": 50
     }
   },
@@ -95,7 +95,7 @@
       "min_height": 0,
       "max_height": 40,
       "speed": 250,
-      "radius": 15,
+      "radius": 10,
       "hp": 5,
       "damage": 3,
       "cooldown": 8,

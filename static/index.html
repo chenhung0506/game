@@ -90,6 +90,8 @@ const ctx = cv.getContext('2d');
 let arena = { w: 2000, h: 1000 }; // replaced by the server's values in 'hi'
 if (PORTRAIT) { cv.width = arena.h; cv.height = arena.w; }
 let you = -1, snap = null, waiting = true, status = '連線中…';
+// Which way each character faces on screen and how it is running (see art); set from how its display position moves.
+const look = [{ dir: null, vx: 0, vy: 0, mv: 0, ph: 0 }, { dir: null, vx: 0, vy: 0, mv: 0, ph: 0 }];
 const disp = [{ x: null, y: 0, z: 0 }, { x: null, y: 0, z: 0 }]; // smoothed positions; set from the first snapshot
 let fx = [], shake = 0;
 
@@ -107,7 +109,7 @@ ws.onmessage = (e) => {
   }
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
-    if (!snap) { ghosts.length = iceTrail.length = smoke.length = flames.length = 0; fx = []; for (const b of beamLook) b.ang = b.tail = null; for (const sh of shadow) sh.x = null; for (const d of disp) d.x = null; } // a new match starts clean
+    if (!snap) { ghosts.length = iceTrail.length = smoke.length = flames.length = 0; fx = []; for (const b of beamLook) b.ang = b.tail = null; for (const sh of shadow) sh.x = null; for (const d of disp) d.x = null; for (const l of look) l.dir = null; } // a new match starts clean
     const old = snap;
     waiting = false; snap = m;
     document.getElementById('pick').style.display = 'none';
@@ -305,19 +307,111 @@ function buildPad() {
 // art() draws one character (0 Pikachu, 1 Snorlax, 2 Charizard) in an upright frame on any context; the
 // arena and the character cards both use it. flap (Charizard only) is 1 while it flies, to beat the wings hard.
 function el(c, x, y, rx, ry, fill, rot = 0) { c.fillStyle = fill; c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, 7); c.fill(); }
-function art(c, kind, x, y, t, flap) {
-  if (kind === 0) { // Pikachu
-    c.fillStyle = '#f5c542'; c.fillRect(x - 14, y - 14, 28, 28);
-    c.fillRect(x - 12, y - 26, 6, 12); c.fillRect(x + 6, y - 26, 6, 12);
-    c.fillStyle = '#222'; c.fillRect(x - 12, y - 26, 6, 4); c.fillRect(x + 6, y - 26, 6, 4);
-    c.fillRect(x - 8, y - 6, 4, 4); c.fillRect(x + 4, y - 6, 4, 4);
-    c.fillStyle = '#e34'; c.fillRect(x - 13, y + 2, 5, 5); c.fillRect(x + 8, y + 2, 5, 5);
-  } else if (kind === 1) { // Snorlax
-    c.fillStyle = '#3f6f86'; c.fillRect(x - 22, y - 18, 44, 36);
-    c.fillRect(x - 18, y - 26, 8, 8); c.fillRect(x + 10, y - 26, 8, 8);
-    c.fillStyle = '#e8dcc0'; c.beginPath(); c.ellipse(x, y + 5, 15, 11, 0, 0, 7); c.fill();
-    c.fillStyle = '#222'; c.fillRect(x - 10, y - 8, 7, 2); c.fillRect(x + 3, y - 8, 7, 2);
-  } else { artCharizard(c, x, y, t, flap); }
+function art(c, kind, x, y, t, flap, pose = IDLE) {
+  if (kind === 0) artPikachu(c, x, y, t, pose);
+  else if (kind === 1) artSnorlax(c, x, y, t, pose);
+  else artCharizard(c, x, y, t, flap);
+}
+
+// ---- Pikachu and Snorlax: one drawing per view ----
+// pose.dir is the way the character faces on screen (0 down = towards you, 1 up = its back, 2 left, 3 right),
+// pose.mv is 0..1 while it is running and pose.ph the stride phase that drives the legs, arms and bounce.
+const IDLE = { dir: 0, mv: 0, ph: 0 };
+const OUTLINE = 'rgba(40,25,5,.55)';
+function ov(c, x, y, rx, ry, fill, rot = 0, line = OUTLINE) { // an outlined ellipse
+  c.fillStyle = fill; c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, 7); c.fill();
+  if (line) { c.strokeStyle = line; c.lineWidth = 0.8; c.stroke(); }
+}
+function poly(c, pts, fill, line = OUTLINE) {
+  c.fillStyle = fill; c.beginPath(); pts.forEach(([px, py], i) => (i ? c.lineTo(px, py) : c.moveTo(px, py))); c.closePath(); c.fill();
+  if (line) { c.strokeStyle = line; c.lineWidth = 0.8; c.lineJoin = 'round'; c.stroke(); }
+}
+function eye(c, x, y, rx, ry) { ov(c, x, y, rx, ry, '#1d1d1d', 0, null); ov(c, x + rx * 0.3, y - ry * 0.35, rx * 0.4, rx * 0.4, '#fff', 0, null); }
+
+// Pikachu's lightning-bolt tail, rooted at (bx, by) and leaning rot radians; the root is brown.
+function pikaTail(c, bx, by, rot, k = 1) {
+  c.save(); c.translate(bx, by); c.rotate(rot); c.scale(k, k);
+  poly(c, [[-3, 0], [-5, -8], [1, -9], [-3, -17], [3, -18], [-1, -27], [14, -33], [11, -22], [16, -21], [7, -11], [11, -10], [4, 0]], '#f7cf3a');
+  poly(c, [[-3, 0], [4, 0], [5, -4], [-4, -4]], '#7a4a1e');
+  c.restore();
+}
+
+function artPikachu(c, x, y, t, pose) {
+  const { dir, mv, ph } = pose, sw = Math.sin(ph) * mv, bob = -Math.abs(Math.sin(ph)) * 2.2 * mv;
+  const Y = '#f7cf3a', RED = '#e8362f', BR = '#7a4a1e';
+  const wag = Math.sin(t * (6 + 8 * mv)) * 0.3; // the tail wags all the time, quicker when running
+  const twitch = Math.sin(t * 3) * 0.06;
+  c.save(); c.translate(x, y + bob);
+  if (dir === 2) c.scale(-1, 1);
+  if (dir === 0 || dir === 1) {
+    const back = dir === 1;
+    if (!back) pikaTail(c, 8, 10, 0.5 + wag);
+    ov(c, -6, 15 - Math.max(0, sw) * 3, 4.5, 3, Y); ov(c, 6, 15 - Math.max(0, -sw) * 3, 4.5, 3, Y);
+    ov(c, 0, 6, 10, 9.5, Y);
+    if (back) { ov(c, 0, 3, 6.5, 1.3, BR, 0, null); ov(c, 0, 7, 6.5, 1.3, BR, 0, null); }
+    ov(c, -10.5, 6 + sw * 2, 3, 4.8, Y, 0.2); ov(c, 10.5, 6 - sw * 2, 3, 4.8, Y, -0.2);
+    for (const m of [-1, 1]) { // ears behind the head, black tips
+      ov(c, m * 10, -20, 3.6, 9, Y, m * 0.35 + twitch * m); ov(c, m * 12.6, -27, 3.2, 3.6, '#222', m * 0.35 + twitch * m, null);
+    }
+    ov(c, 0, -6, 13, 11, Y);
+    if (!back) {
+      eye(c, -5, -8, 2.2, 2.8); eye(c, 5, -8, 2.2, 2.8);
+      ov(c, 0, -4.8, 1, 0.7, '#222', 0, null);
+      c.strokeStyle = '#222'; c.lineWidth = 0.9; c.beginPath(); c.arc(0, -4, 2.4, 0.2 * Math.PI, 0.8 * Math.PI); c.stroke();
+      ov(c, -9.5, -2, 3, 2.7, RED, 0, null); ov(c, 9.5, -2, 3, 2.7, RED, 0, null);
+    }
+    if (back) pikaTail(c, 1, 12, wag * 0.8, 0.8);
+  } else { // side view, facing right
+    pikaTail(c, -8, 10, -0.5 + wag);
+    ov(c, -5 + sw * 5, 15 - Math.max(0, sw) * 2, 4.5, 3, Y); ov(c, 5 - sw * 5, 15 - Math.max(0, -sw) * 2, 4.5, 3, Y);
+    ov(c, -1, 6, 9, 9.5, Y);
+    ov(c, -3, -20, 3.4, 8.5, Y, -0.5 + twitch); ov(c, -5.6, -27, 3, 3.4, '#222', -0.5 + twitch, null);
+    ov(c, 2, -20, 3.4, 8.5, Y, -0.25 + twitch); ov(c, 0.6, -27.5, 3, 3.4, '#222', -0.25 + twitch, null);
+    ov(c, 2, -6, 12, 10.5, Y);
+    eye(c, 7.5, -8, 2, 2.6);
+    ov(c, 13.6, -5.5, 0.9, 0.8, '#222', 0, null);
+    c.strokeStyle = '#222'; c.lineWidth = 0.9; c.beginPath(); c.arc(11, -3.5, 2, 0.1 * Math.PI, 0.7 * Math.PI); c.stroke();
+    ov(c, 5.5, -1.5, 3, 2.7, RED, 0, null);
+    ov(c, 3 + sw * 2, 6, 3, 5, Y, 0.1);
+  }
+  c.restore();
+}
+
+function artSnorlax(c, x, y, t, pose) {
+  const { dir, mv, ph } = pose, sw = Math.sin(ph) * mv;
+  const bob = -Math.abs(Math.sin(ph)) * 2 * mv + Math.sin(t * 2) * 0.5; // a waddle when running, slow breathing at rest
+  const D = '#34667c', DD = '#27505f', C = '#efe3c4', K = '#1d2a30';
+  c.save(); c.translate(x, y + bob); c.rotate(sw * 0.05);
+  if (dir === 2) c.scale(-1, 1);
+  if (dir === 0 || dir === 1) {
+    const back = dir === 1;
+    ov(c, -11, 17 - Math.max(0, sw) * 3, 7, 4.3, C); ov(c, 11, 17 - Math.max(0, -sw) * 3, 7, 4.3, C);
+    ov(c, 0, 3, 22, 18, D);
+    if (back) ov(c, 0, 3, 14, 11, DD, 0, null); else ov(c, 0, 6, 15, 12, C, 0, null);
+    ov(c, -21, 4 + sw * 2, 6, 10, D, 0.25); ov(c, 21, 4 - sw * 2, 6, 10, D, -0.25);
+    if (!back) { ov(c, -22.5, 12 + sw * 2, 4, 3, C, 0, null); ov(c, 22.5, 12 - sw * 2, 4, 3, C, 0, null); }
+    poly(c, [[-15, -20], [-13, -31], [-6, -24]], D); poly(c, [[15, -20], [13, -31], [6, -24]], D);
+    ov(c, 0, -13, 16, 12.5, D);
+    if (!back) {
+      ov(c, 0, -10, 11.5, 8, C, 0, null);
+      c.strokeStyle = K; c.lineWidth = 1.5; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(-8, -12); c.lineTo(-3, -12); c.moveTo(3, -12); c.lineTo(8, -12); c.stroke();
+      ov(c, -1.6, -8.6, 0.6, 0.6, K, 0, null); ov(c, 1.6, -8.6, 0.6, 0.6, K, 0, null);
+      c.lineWidth = 1; c.beginPath(); c.arc(0, -7.2, 3.2, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
+      ov(c, 0, -22, 5, 1.2, DD, 0, null);
+    }
+  } else { // side view, facing right
+    ov(c, -6 + sw * 4, 17 - Math.max(0, sw) * 2, 7, 4.3, C); ov(c, 6 - sw * 4, 17 - Math.max(0, -sw) * 2, 7, 4.3, C);
+    ov(c, -1, 3, 20, 18, D); ov(c, 9, 6, 9, 12, C, 0, null);
+    poly(c, [[-4, -20], [-3, -31], [4, -24]], D); poly(c, [[3, -21], [5, -31], [11, -24]], D);
+    ov(c, 5, -13, 15, 12.5, D);
+    ov(c, 10, -10, 8.5, 7.5, C, 0, null);
+    c.strokeStyle = K; c.lineWidth = 1.5; c.lineCap = 'round'; c.beginPath(); c.moveTo(9, -12.5); c.lineTo(14, -12.5); c.stroke();
+    ov(c, 16, -9.5, 0.6, 0.6, K, 0, null);
+    c.lineWidth = 1; c.beginPath(); c.arc(12.5, -7.5, 2.8, 0.1 * Math.PI, 0.75 * Math.PI); c.stroke();
+    ov(c, 0 + sw * 3, 5, 5.5, 9, DD, 0.1); ov(c, 0.5 + sw * 3, 12, 3.8, 3, C, 0, null);
+  }
+  c.restore();
 }
 
 // Charizard: orange body and cream belly, a flame at the tail tip and two big teal wings. The wings beat all
@@ -364,12 +458,12 @@ function artCharizard(c, x, y, t, flap) {
 }
 
 // (x, y) is a ground point in the world and lift is the height above it, which is up on screen.
-function drawBody(kind, X, Y, alpha, lift = 0, flap = 0) {
+function drawBody(kind, X, Y, alpha, lift = 0, flap = 0, pose = IDLE) {
   const bs = radius[kind] / REF[kind];
   ctx.save(); ctx.translate(X, Y); ctx.rotate(-ROT); // upright whatever the view
   ctx.scale(bs, bs);
   ctx.globalAlpha = alpha;
-  art(ctx, kind, 0, -lift / bs, performance.now() / 1000, flap); // lift is a height in world units, so it is not scaled
+  art(ctx, kind, 0, -lift / bs, performance.now() / 1000, flap, pose); // lift is a height in world units, so it is not scaled
   ctx.restore();
 }
 
@@ -737,14 +831,22 @@ function drawPlayer(i, p) {
   // Snapshots arrive at 30/s; ease toward them so 60fps motion looks smooth.
   d.x += (p.x - d.x) * 0.4; d.y += (p.y - d.y) * 0.4; d.z += (p.z - d.z) * 0.5;
   // Only a dash moves this fast along the ground (walking is ~3px/frame): leave an afterimage.
-  if (Math.hypot(d.x - px, d.y - py) > 8) ghosts.push({ k: p.k, x: d.x, y: d.y, z: d.z, a: 0.5 });
+  const lk = look[i], [sx, sy] = rv(d.x - px, d.y - py), sp = Math.hypot(sx, sy); // moved this frame, as seen on screen
+  const faceOf = (vx, vy) => (Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 2 : 3) : (vy < 0 ? 1 : 0));
+  if (lk.dir === null) { const o = disp[1 - i]; lk.dir = o.x === null ? 0 : faceOf(...rv(o.x - d.x, o.y - d.y)); } // starts facing the opponent
+  lk.vx += (sx - lk.vx) * 0.3; lk.vy += (sy - lk.vy) * 0.3;
+  const running = sp > 0.35;
+  if (running && Math.hypot(lk.vx, lk.vy) > 0.3) lk.dir = faceOf(lk.vx, lk.vy);
+  lk.mv += ((running ? 1 : 0) - lk.mv) * 0.25; lk.ph += 0.2 * lk.mv;
+  const pose = { dir: lk.dir, mv: lk.mv, ph: lk.ph };
+  if (Math.hypot(d.x - px, d.y - py) > 8) ghosts.push({ k: p.k, x: d.x, y: d.y, z: d.z, a: 0.5, pose });
   const lift = Math.min(d.z, 200) / 200, bs = radius[p.k] / REF[p.k]; // bs: how much bigger than the reference art
   // Shadow stays on the ground and shrinks/fades as the player rises.
   upright(d.x, d.y, () => {
     ctx.fillStyle = `rgba(0,0,0,${0.35 - 0.2 * lift})`;
     ctx.beginPath(); ctx.ellipse(0, 14 * bs, 18 * bs * (1 - 0.4 * lift), 7 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.fill();
   });
-  drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0); // the body floats d.z above the ground; Charizard beats its wings hard in flight
+  drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.
   const top = -d.z;
@@ -801,7 +903,7 @@ function frame() {
   if (snap) {
     ctx.save();
     ctx.transform(...VIEW); // from here on, coordinates are the world's
-    for (const g of ghosts) { drawBody(g.k, g.x, g.y, Math.max(g.a, 0), g.z); g.a -= 0.04; }
+    for (const g of ghosts) { drawBody(g.k, g.x, g.y, Math.max(g.a, 0), g.z, 0, g.pose); g.a -= 0.04; }
     while (ghosts.length && ghosts[0].a <= 0) ghosts.shift();
     drawTelegraph();
     drawShadow();
