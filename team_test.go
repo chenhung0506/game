@@ -19,6 +19,7 @@ func snapOf(t *testing.T, msg []byte) (m struct {
 	W  int       `json:"w"`
 	TM *teamInfo `json:"tm"`
 	P  [2]Player `json:"p"`
+	EZ [2]int    `json:"ez"`
 }) {
 	t.Helper()
 	if err := json.Unmarshal(msg, &m); err != nil {

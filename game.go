@@ -213,7 +213,21 @@ type Game struct {
 	P     [2]Player
 	Balls []Ball
 	rng   *rand.Rand // the fire's random spread; tests replace it
+	// Ease is each player's handicap in percent (a multiple of easeStep, at most easeMax): its HP and its
+	// walking speed are cut by that much. It survives Reset.
+	Ease [2]int
 }
+
+const (
+	easeStep = 10
+	easeMax  = 90 // 100 would leave nothing to fight with
+)
+
+// validEase is whether pct is a handicap a player may choose.
+func validEase(pct int) bool { return pct >= 0 && pct <= easeMax && pct%easeStep == 0 }
+
+// maxHP is slot i's full HP, handicap included (at least 1).
+func (g *Game) maxHP(i int) int { return max(1, g.cfg.maxHPOf(g.P[i].Kind)*(100-g.Ease[i])/100) }
 
 func NewGame(cfg Config) *Game { return NewGameFor(cfg, modeWeb) }
 
@@ -233,8 +247,8 @@ func (g *Game) SetKinds(a, b int) {
 // Reset starts a round over with the same characters: 400 apart, centred in the arena.
 func (g *Game) Reset() {
 	c := g.court
-	g.P[0] = Player{Kind: g.P[0].Kind, X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.cfg.maxHPOf(g.P[0].Kind), FX: 1, AimX: 1}
-	g.P[1] = Player{Kind: g.P[1].Kind, X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.cfg.maxHPOf(g.P[1].Kind), FX: -1, AimX: -1}
+	g.P[0] = Player{Kind: g.P[0].Kind, X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(0), FX: 1, AimX: 1}
+	g.P[1] = Player{Kind: g.P[1].Kind, X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(1), FX: -1, AimX: -1}
 	g.Balls = nil
 }
 
@@ -596,6 +610,7 @@ func (g *Game) Step(dt float64) []Event {
 					v = g.cfg.Snorlax.Jump.AirSpeedFirstHalf
 				}
 			}
+			v *= float64(100-g.Ease[i]) / 100 // the handicap slows every way of walking, flying and steering in the air
 			p.X += float64(in.DX) / n * v * dt
 			p.Y += float64(in.DY) / n * v * dt
 		}

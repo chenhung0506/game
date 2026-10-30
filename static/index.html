@@ -32,6 +32,9 @@
   .card b { display: block; margin-top: 6px; font-size: 16px; }
   .card small { display: block; margin-top: 4px; opacity: .75; line-height: 1.5; text-align: left; font-size: 12px; }
   .card.mine { border-color: #6fd36f; background: #243026; }
+  #easebox { margin: 0 0 12px; text-align: center; line-height: 1.6; }
+  #easebox input { width: 220px; vertical-align: middle; }
+  #easemsg { font-size: 12px; opacity: .75; }
   #modes, #teambar { display: flex; gap: 10px; margin: 0 0 12px; }
   #teambar { margin: 12px 0 0; }
   #pick button, #repick { font: bold 15px system-ui; padding: 9px 16px; border-radius: 10px; border: 2px solid #3d4a40; background: #1b1f27; color: #eee; cursor: pointer; }
@@ -48,7 +51,7 @@
 </head>
 <body>
 <div id="bar"></div>
-<div id="pick"><h2>選擇你的寶可夢</h2><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">輪流戰（4 隻依序上場）</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">輪流戰（4 隻依序上場）</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
@@ -112,6 +115,7 @@ let fx = [], shake = 0;
 
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // the first player's view picks the court
 let picks = [-1, -1], here = [true, false], padKind = -1;
+let ease = [0, 0]; // each slot's handicap in percent, from the lobby
 let teamMode = false, myOrder = [], sentOrder = ''; // the lobby's match type; the order I field my characters in, and the one the server has
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
@@ -121,6 +125,7 @@ ws.onmessage = (e) => {
     if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
     if (teamMode !== !!m.team) { teamMode = !!m.team; myOrder = []; sentOrder = ''; } // another match type: choose again
     if (sentOrder && m.picks[you] < 0) { myOrder = []; sentOrder = ''; } // sent back to choose again
+    ease = m.ease || [0, 0];
     picks = m.picks; here = m.here; waiting = !(here[0] && here[1]); snap = null; padKind = -1;
     document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
     showPick();
@@ -198,6 +203,8 @@ function showPick() {
     ord.style.display = teamMode && n >= 0 ? 'block' : 'none';
     ord.textContent = n + 1;
   });
+  if (document.activeElement !== easeEl) { easeEl.value = ease[you]; document.getElementById('easeval').textContent = ease[you] + '%'; }
+  document.getElementById('easemsg').textContent = `你的血量和移動速度減少 ${ease[you]}%` + (ease[1 - you] ? `　對手放水 ${ease[1 - you]}%` : '') + '（開打前設定）';
   document.getElementById('mSingle').classList.toggle('on', !teamMode);
   document.getElementById('mTeam').classList.toggle('on', teamMode);
   document.getElementById('teambar').style.display = teamMode ? 'flex' : 'none';
@@ -222,6 +229,9 @@ function showPick() {
   document.getElementById('pickmsg').innerHTML = lines.join('<br>');
 }
 const send = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
+const easeEl = document.getElementById('ease');
+easeEl.oninput = () => { document.getElementById('easeval').textContent = easeEl.value + '%'; };
+easeEl.onchange = () => send({ ease: +easeEl.value });
 document.getElementById('mSingle').onclick = () => send({ team: false });
 document.getElementById('mTeam').onclick = () => send({ team: true });
 document.getElementById('tClear').onclick = () => { myOrder = []; showPick(); };
@@ -234,7 +244,7 @@ function drawCards() {
   cardEls.forEach(({ cvs }, k) => {
     const c = cvs.getContext('2d');
     c.clearRect(0, 0, cvs.width, cvs.height);
-    c.save(); c.translate(cvs.width / 2, cvs.height / 2 + 6); c.scale(2.4, 2.4);
+    c.save(); c.translate(cvs.width / 2, cvs.height / 2 + (k === 2 ? 22 : 6)); c.scale(k === 2 ? 1.6 : 2.4, k === 2 ? 1.6 : 2.4); // the big wings need room
     art(c, k, 0, 0, t, k === 2 && Math.sin(t * 0.8) > 0.2 ? 1 : 0); // Charizard now and then beats its wings hard
     c.restore();
   });
@@ -598,15 +608,15 @@ function artCharizard(c, x, y, t, flap) {
   const fk = 1 + 0.22 * Math.sin(t * 31) + 0.12 * Math.sin(t * 47), tx = x + 29, ty = y - 5;
   c.fillStyle = '#ff7a1a'; c.beginPath(); c.moveTo(tx - 5, ty + 2); c.quadraticCurveTo(tx - 6, ty - 8 * fk, tx + 1, ty - 17 * fk); c.quadraticCurveTo(tx + 7, ty - 8 * fk, tx + 5, ty + 2); c.closePath(); c.fill();
   c.fillStyle = '#ffd84a'; c.beginPath(); c.moveTo(tx - 2.5, ty + 1); c.quadraticCurveTo(tx - 3, ty - 5 * fk, tx + 1, ty - 10 * fk); c.quadraticCurveTo(tx + 4, ty - 5 * fk, tx + 2.5, ty + 1); c.closePath(); c.fill();
-  // wings, behind the body: a bone along the front edge, a teal membrane with a scalloped back edge
+  // wings, behind the body: a bone along the front edge, a teal membrane with a scalloped back edge, narrow at the body and wide at the tip
   for (const sd of [-1, 1]) {
     c.save(); c.translate(x + sd * 8, y - 9); c.scale(sd, 1); c.rotate(-0.75 - ang);
     c.fillStyle = '#2e9aa8'; c.strokeStyle = '#17606b'; c.lineWidth = 1.4;
-    c.beginPath(); c.moveTo(0, 0); c.lineTo(38, -4); c.lineTo(33, 6); c.lineTo(27, 3); c.lineTo(24, 14); c.lineTo(17, 9); c.lineTo(12, 19); c.lineTo(6, 11); c.lineTo(0, 14); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.lineTo(52, 27); c.lineTo(46, 18); c.lineTo(39, 30); c.lineTo(33, 18); c.lineTo(26, 24); c.lineTo(19, 12); c.lineTo(12, 15); c.lineTo(6, 8); c.lineTo(0, 7); c.closePath(); c.fill(); c.stroke();
     c.strokeStyle = '#17606b'; c.lineWidth = 1;
-    c.beginPath(); c.moveTo(38, -4); c.lineTo(24, 14); c.moveTo(38, -4); c.lineTo(12, 19); c.moveTo(38, -4); c.lineTo(0, 14); c.stroke();
-    c.strokeStyle = '#e8762a'; c.lineWidth = 3.2; c.beginPath(); c.moveTo(0, 0); c.lineTo(38, -4); c.stroke(); // the leading bone
-    el(c, 39, -4, 2.2, 2.2, '#f6d58a'); // the claw at the wing's tip
+    c.beginPath(); c.moveTo(54, -8); c.lineTo(52, 27); c.moveTo(54, -8); c.lineTo(39, 30); c.moveTo(54, -8); c.lineTo(26, 24); c.moveTo(54, -8); c.lineTo(12, 15); c.stroke();
+    c.strokeStyle = '#e8762a'; c.lineWidth = 3.2; c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.stroke(); // the leading bone
+    el(c, 55.5, -8.5, 2.6, 2.6, '#f6d58a'); // the claw at the wing's tip
     c.restore();
   }
   // feet, body, belly, arms
@@ -1275,6 +1285,7 @@ function drawPlayer(i, p) {
     }
     if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, top - 54 * bs); }
     if (i === you) { ctx.fillStyle = '#fff'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 你', 0, top - 40 * bs); }
+    if (snap.ez && snap.ez[i] > 0) { ctx.fillStyle = '#ffd36a'; ctx.font = '11px system-ui'; ctx.textAlign = 'left'; ctx.fillText('放水' + snap.ez[i] + '%', 24, top - 36 * bs + 6); }
     // HP bar follows the body.
     ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 36 * bs, 40, 6);
     ctx.fillStyle = p.hp > 0.3 * maxHp[p.k] ? '#6fd36f' : '#e55'; ctx.fillRect(-20, top - 36 * bs, 40 * p.hp / maxHp[p.k], 6);

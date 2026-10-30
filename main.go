@@ -44,6 +44,7 @@ type room struct {
 	// next in order steps in, and the match is over when a side has run out. A survivor keeps its HP.
 	team        bool
 	order       [2][kinds]int
+	ease        [2]int // each slot's handicap in percent, chosen in the lobby
 	cur         [2]int // index into order of the character each side is fielding
 	matchOver   bool
 	matchWinner int
@@ -75,6 +76,7 @@ func (h *hub) join(id, mode string, c *client) (r *room, idx int, ok bool) {
 		if r.c[i] == nil {
 			r.c[i] = c
 			r.pick[i] = -1
+			r.ease[i] = 0
 			return r, i, true
 		}
 	}
@@ -147,6 +149,16 @@ func (r *room) setTeam(team bool) bool {
 	return true
 }
 
+// setEase records slot idx's handicap, which counts from the next match. It is refused unless it is a multiple of
+// easeStep up to easeMax, and while a match is on. Must be called with r.mu held.
+func (r *room) setEase(idx, pct int) bool {
+	if r.playing() || !validEase(pct) {
+		return false
+	}
+	r.ease[idx] = pct
+	return true
+}
+
 // repick sends both players back to the lobby, to choose again. It is only allowed once the result of a match is
 // showing. Must be called with r.mu held.
 func (r *room) repick() bool {
@@ -167,6 +179,7 @@ func (r *room) startIfReady() {
 		return
 	}
 	r.cur, r.matchOver = [2]int{}, false
+	r.g.Ease = r.ease
 	if r.team {
 		r.g.SetKinds(r.order[0][0], r.order[1][0])
 	} else {
@@ -233,7 +246,7 @@ type teamInfo struct {
 // broadcastLobby tells both players who is here and what they picked; the page shows its character
 // choice until snapshots start. Must be called with r.mu held.
 func (r *room) broadcastLobby() {
-	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.c[0] != nil, r.c[1] != nil}, "team": r.team})
+	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.c[0] != nil, r.c[1] != nil}, "team": r.team, "ease": r.ease})
 	r.broadcast(msg)
 }
 
@@ -301,7 +314,8 @@ func (r *room) step(now time.Time) []byte {
 		B  []Ball    `json:"b,omitempty"`
 		W  int       `json:"w"`
 		TM *teamInfo `json:"tm,omitempty"`
-	}{"s", r.g.P, events, r.g.Balls, r.winner, tm})
+		EZ [2]int    `json:"ez"`
+	}{"s", r.g.P, events, r.g.Balls, r.winner, tm, r.g.Ease})
 	return msg
 }
 
@@ -371,19 +385,20 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		// The other messages from the page are the lobby's: the character choice {"pick":2}, the match type
-		// {"team":true}, the team's order {"order":[2,0,3,1]} and {"repick":true} after a result; the rest is held keys.
+		// {"team":true}, the team's order {"order":[2,0,3,1]} and {"repick":true} after a result, the handicap {"ease":30}; the rest is held keys.
 		var m struct {
 			Pick   *int  `json:"pick"`
 			Team   *bool `json:"team"`
 			Order  []int `json:"order"`
 			Repick bool  `json:"repick"`
+			Ease   *int  `json:"ease"`
 			Input
 		}
 		if json.Unmarshal(data, &m) != nil {
 			continue
 		}
 		r.mu.Lock()
-		if m.Pick != nil || m.Team != nil || m.Order != nil || m.Repick {
+		if m.Pick != nil || m.Team != nil || m.Order != nil || m.Repick || m.Ease != nil {
 			switch {
 			case m.Pick != nil:
 				r.choose(idx, *m.Pick)
@@ -391,6 +406,8 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 				r.setTeam(*m.Team)
 			case m.Order != nil:
 				r.setOrder(idx, m.Order)
+			case m.Ease != nil:
+				r.setEase(idx, *m.Ease)
 			default:
 				r.repick()
 			}
