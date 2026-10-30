@@ -180,13 +180,13 @@
       "min_height": 0,
       "max_height": 15,
       "spray_duration": 3,
-      "duration": 16,
+      "duration": 12,
       "slow": 0.5,
       "boost": 1,
       "radius": 30,
-      "patch_radius": 50,
+      "patch_radius": 60,
       "patches": 30,
-      "cooldown": 10
+      "cooldown": 8
     },
     "ice_storm": {
       "min_height": 0,
@@ -203,12 +203,12 @@
     "freeze_beam": {
       "min_height": 0,
       "max_height": 80,
-      "speed": 400,
+      "speed": 600,
       "cooldown": 12,
       "control_duration": 4,
       "length": 500,
-      "pillar_radius": 26,
-      "pillar_hp": 25,
+      "pillar_radius": 30,
+      "pillar_hp": 30,
       "pillar_duration": 10
     }
   }
