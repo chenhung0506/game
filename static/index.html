@@ -51,7 +51,7 @@
 </head>
 <body>
 <div id="bar"></div>
-<div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（4 隻依序上場）</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="sz6">6 隻</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
@@ -121,13 +121,14 @@ let fx = [], shake = 0;
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // the first player's view picks the court
 let picks = [-1, -1], here = [true, false], padKind = -1;
 let ease = [0, 0]; // each slot's handicap in percent, from the lobby
-let teamMode = false, myOrder = [], sentOrder = ''; // the lobby's match type; the order I field my characters in, and the one the server has
+let teamMode = false, teamSize = 6, myOrder = [], sentOrder = ''; // the lobby's match type; the order I field my characters in, and the one the server has
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
   if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
+    if (teamSize !== (m.size || 6)) { teamSize = m.size || 6; myOrder = []; sentOrder = ''; } // another team size: choose again
     if (teamMode !== !!m.team) { teamMode = !!m.team; myOrder = []; sentOrder = ''; } // another match type: choose again
     if (sentOrder && m.picks[you] < 0) { myOrder = []; sentOrder = ''; } // sent back to choose again
     ease = m.ease || [0, 0];
@@ -194,7 +195,7 @@ function buildCards() {
     el.addEventListener('click', () => {
       if (teamMode) { // click to line the characters up, click a numbered one to take it out
         const n = myOrder.indexOf(k);
-        if (n >= 0) myOrder.splice(n, 1); else if (myOrder.length < NAMES.length) myOrder.push(k);
+        if (n >= 0) myOrder.splice(n, 1); else if (myOrder.length < teamSize) myOrder.push(k);
         showPick();
       } else if (ws.readyState === 1) ws.send(JSON.stringify({ pick: k }));
     });
@@ -214,7 +215,8 @@ function showPick() {
   document.getElementById('mSingle').classList.toggle('on', !teamMode);
   document.getElementById('mTeam').classList.toggle('on', teamMode);
   document.getElementById('teambar').style.display = teamMode ? 'flex' : 'none';
-  document.getElementById('tOk').disabled = myOrder.length !== NAMES.length || myOrder.join() === sentOrder;
+  for (const n of [3, 6]) { const b = document.getElementById('sz' + n); b.style.display = teamMode ? '' : 'none'; b.classList.toggle('on', teamSize === n); }
+  document.getElementById('tOk').disabled = myOrder.length !== teamSize || myOrder.join() === sentOrder;
   document.getElementById('tClear').disabled = !myOrder.length;
   const link = location.origin + location.pathname + '?room=' + room;
   const mine = picks[you], theirs = picks[1 - you];
@@ -222,8 +224,8 @@ function showPick() {
   if (teamMode) {
     if (!here[1 - you]) lines.push(`等待對手加入… 把這個連結傳給對方：<br><code>${link}</code>`);
     if (sentOrder) lines.push(`你的出場順序：${sentOrder.split(',').map((k) => NAMES[k]).join(' → ')}${picks[1 - you] >= 0 ? '' : '（等對手排好順序…）'}`);
-    else lines.push(`依序點選 ${NAMES.length} 隻，決定出場順序（點已排的可以取消）；${here[1 - you] && picks[1 - you] >= 0 ? '對手已經排好了' : '雙方都確認後開打'}`);
-    lines.push('一隻被打倒就換下一隻上場，活著的角色保留剩下的血量，一方四隻都倒下就輸了');
+    else lines.push(`依序點選 ${teamSize} 隻，決定出場順序（點已排的可以取消）；${here[1 - you] && picks[1 - you] >= 0 ? '對手已經排好了' : '雙方都確認後開打'}`);
+    lines.push('一隻被打倒就換下一隻上場，活著的角色保留剩下的血量，一方的隊伍全部倒下就輸了');
     document.getElementById('pickmsg').innerHTML = lines.join('<br>');
     return;
   }
@@ -240,6 +242,8 @@ easeEl.oninput = () => { document.getElementById('easeval').textContent = easeEl
 easeEl.onchange = () => send({ ease: +easeEl.value });
 document.getElementById('mSingle').onclick = () => send({ team: false });
 document.getElementById('mTeam').onclick = () => send({ team: true });
+document.getElementById('sz3').onclick = () => send({ size: 3 });
+document.getElementById('sz6').onclick = () => send({ size: 6 });
 document.getElementById('tClear').onclick = () => { myOrder = []; showPick(); };
 document.getElementById('tOk').onclick = () => { send({ order: myOrder }); sentOrder = myOrder.join(); showPick(); };
 document.getElementById('repick').onclick = () => send({ repick: true });
@@ -1636,7 +1640,7 @@ function drawCooldowns() {
   if (usesBadge) { const n = voltUses(snap.p[you]); usesBadge.textContent = '×' + n; usesBadge.classList.toggle('out', n === 0); }
 }
 
-// Team match: a row of four tokens per side along the top, the opponent's above mine. A fallen character is
+// Team match: a row of tokens per side along the top, the opponent's above mine. A fallen character is
 // crossed out, the one fighting is lit, and the ones still to come are my own letters and the opponent's "?".
 function drawTeamHud() {
   const tm = snap.tm;
@@ -1645,7 +1649,7 @@ function drawTeamHud() {
   [1 - you, you].forEach((s, row) => {
     const y = 20 + row * 38;
     ctx.fillStyle = '#fffc'; ctx.textAlign = 'left'; ctx.fillText(s === you ? '你' : '對手', 8, y); ctx.textAlign = 'center';
-    for (let n = 0; n < NAMES.length; n++) {
+    for (let n = 0; n < tm.n; n++) {
       const x = 82 + n * 38, fallen = n < tm.c[s], now = n === tm.c[s] && !tm.o;
       const k = fallen ? tm.f[s][n] : now ? snap.p[s].k : s === you ? +(myOrder[n] ?? -1) : -1;
       ctx.beginPath(); ctx.arc(x, y, 15, 0, 7);

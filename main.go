@@ -40,9 +40,10 @@ type room struct {
 	overAt  time.Time // zero while a round is in progress
 	winner  int
 
-	// Team match: both players send the order they field all `kinds` characters in; when one is knocked out the
+	// Team match: both players send the order they field `teamN()` characters in (3, or all `kinds`); when one is knocked out the
 	// next in order steps in, and the match is over when a side has run out. A survivor keeps its HP.
 	team        bool
+	size        int // characters per side in a team match: teamSize3 or kinds; 0 is kinds
 	order       [2][kinds]int
 	ease        [2]int // each slot's handicap in percent, chosen in the lobby
 	cur         [2]int // index into order of the character each side is fielding
@@ -119,11 +120,32 @@ func (r *room) choose(idx, kind int) bool {
 	return true
 }
 
+// teamSize3 is the small team match; the other is all `kinds` characters.
+const teamSize3 = 3
+
+// teamN is how many characters each side fields in a team match.
+func (r *room) teamN() int {
+	if r.size == 0 {
+		return kinds
+	}
+	return r.size
+}
+
+// setSize chooses the team match's size (3 or all `kinds`). Everyone has to choose again; it is refused while a
+// match is on. Must be called with r.mu held.
+func (r *room) setSize(n int) bool {
+	if r.playing() || (n != teamSize3 && n != kinds) {
+		return false
+	}
+	r.size, r.pick = n, [2]int{-1, -1}
+	return true
+}
+
 // setOrder records the order slot idx fields its characters in (a team match); the first one is its pick. It is
-// refused unless the room is in team mode, no match is on, and the order has every character exactly once.
+// refused unless the room is in team mode, no match is on, and the order is teamN() different characters.
 // Must be called with r.mu held.
 func (r *room) setOrder(idx int, order []int) bool {
-	if r.playing() || !r.team || len(order) != kinds {
+	if r.playing() || !r.team || len(order) != r.teamN() {
 		return false
 	}
 	var seen [kinds]bool
@@ -200,12 +222,12 @@ func (r *room) boutOver() {
 			r.cur[i]++
 		}
 	}
-	if r.cur[0] >= kinds || r.cur[1] >= kinds {
+	if n := r.teamN(); r.cur[0] >= n || r.cur[1] >= n {
 		r.matchOver = true
 		switch {
-		case r.cur[0] >= kinds && r.cur[1] >= kinds:
+		case r.cur[0] >= n && r.cur[1] >= n:
 			r.matchWinner = r.winner // the last two knocked out together: slot 0, like a single match
-		case r.cur[0] >= kinds:
+		case r.cur[0] >= n:
 			r.matchWinner = 1
 		default:
 			r.matchWinner = 0
@@ -241,12 +263,13 @@ type teamInfo struct {
 	Fallen [2][]int `json:"f"`
 	Over   bool     `json:"o"`
 	Winner int      `json:"mw"`
+	N      int      `json:"n"` // characters per side
 }
 
 // broadcastLobby tells both players who is here and what they picked; the page shows its character
 // choice until snapshots start. Must be called with r.mu held.
 func (r *room) broadcastLobby() {
-	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.c[0] != nil, r.c[1] != nil}, "team": r.team, "ease": r.ease})
+	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.c[0] != nil, r.c[1] != nil}, "team": r.team, "size": r.teamN(), "ease": r.ease})
 	r.broadcast(msg)
 }
 
@@ -302,9 +325,9 @@ func (r *room) step(now time.Time) []byte {
 	}
 	var tm *teamInfo
 	if r.team {
-		tm = &teamInfo{Cur: r.cur, Over: r.matchOver, Winner: r.matchWinner}
+		tm = &teamInfo{Cur: r.cur, Over: r.matchOver, Winner: r.matchWinner, N: r.teamN()}
 		for i := range tm.Fallen {
-			tm.Fallen[i] = append([]int{}, r.order[i][:min(r.cur[i], kinds)]...)
+			tm.Fallen[i] = append([]int{}, r.order[i][:min(r.cur[i], r.teamN())]...)
 		}
 	}
 	msg, _ := json.Marshal(struct {
@@ -399,6 +422,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		var m struct {
 			Pick   *int  `json:"pick"`
 			Team   *bool `json:"team"`
+			Size   *int  `json:"size"`
 			Order  []int `json:"order"`
 			Repick bool  `json:"repick"`
 			Ease   *int  `json:"ease"`
@@ -408,12 +432,14 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			continue
 		}
 		r.mu.Lock()
-		if m.Pick != nil || m.Team != nil || m.Order != nil || m.Repick || m.Ease != nil {
+		if m.Pick != nil || m.Team != nil || m.Size != nil || m.Order != nil || m.Repick || m.Ease != nil {
 			switch {
 			case m.Pick != nil:
 				r.choose(idx, *m.Pick)
 			case m.Team != nil:
 				r.setTeam(*m.Team)
+			case m.Size != nil:
+				r.setSize(*m.Size)
 			case m.Order != nil:
 				r.setOrder(idx, m.Order)
 			case m.Ease != nil:

@@ -226,7 +226,7 @@
     "arrows": {
       "min_height": 0,
       "max_height": 60,
-      "speed": 800,
+      "speed": 400,
       "radius": 8,
       "hp": 2,
       "damage": 20,
@@ -236,7 +236,7 @@
       "slow": 0.8,
       "cooldown": 6,
       "mass": 20,
-      "charge_duration": 0.5,
+      "charge_duration": 2.5,
       "scale": 1
     },
     "tornado": {

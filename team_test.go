@@ -208,3 +208,52 @@ func TestRunningOutOnSlotZeroGivesTheMatchToSlotOne(t *testing.T) {
 		t.Fatalf("team %+v winner %d, want slot 1 to win", m.TM, m.W)
 	}
 }
+
+func TestTeamSizeIsThreeOrAllAndChangingItMakesEveryoneChooseAgain(t *testing.T) {
+	r := teamRoom()
+	r.setTeam(true)
+	if r.teamN() != kinds {
+		t.Fatalf("default size %d, want all %d", r.teamN(), kinds)
+	}
+	for _, bad := range []int{0, 1, 2, 4, 5, 7, -3} {
+		if r.setSize(bad) {
+			t.Errorf("size %d was taken", bad)
+		}
+	}
+	r.setOrder(0, []int{0, 1, 2, 3, 4, 5})
+	if !r.setSize(3) || r.teamN() != 3 || r.pick != [2]int{-1, -1} {
+		t.Fatalf("size %d, picks %v after choosing 3: want everyone to choose again", r.teamN(), r.pick)
+	}
+	if r.setOrder(0, []int{0, 1, 2, 3, 4, 5}) || r.setOrder(0, []int{0, 1}) || r.setOrder(0, []int{0, 1, 1}) || r.setOrder(0, []int{0, 1, 6}) {
+		t.Fatal("a bad order for a team of 3 was taken")
+	}
+	if !r.setOrder(0, []int{5, 0, 3}) || r.pick[0] != 5 {
+		t.Fatalf("a good team of 3 was refused, or its first is not the pick (%v)", r.pick)
+	}
+	r.setOrder(1, []int{1, 2, 4})
+	r.step(time.Now())
+	if r.setSize(6) {
+		t.Fatal("the size changed during a match")
+	}
+}
+
+func TestATeamOfThreeEndsAfterThreeKnockOutsAndReportsItsSize(t *testing.T) {
+	r := teamRoom()
+	r.setTeam(true)
+	r.setSize(3)
+	r.setOrder(0, []int{0, 1, 2})
+	r.setOrder(1, []int{3, 4, 5})
+	now := time.Now()
+	r.step(now)
+	for n := 0; n < 2; n++ {
+		if m := snapOf(t, knockOut(r, 1, now)); m.TM.Over || m.TM.N != 3 {
+			t.Fatalf("after %d knock-outs: team %+v, want it going on with n=3", n+1, m.TM)
+		}
+		now = now.Add(roundReset + time.Millisecond)
+		r.step(now)
+	}
+	m := snapOf(t, knockOut(r, 1, now))
+	if !m.TM.Over || m.TM.Winner != 0 || len(m.TM.Fallen[1]) != 3 {
+		t.Fatalf("team %+v, want the match over after 3 knock-outs, won by slot 0", m.TM)
+	}
+}
