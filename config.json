@@ -180,36 +180,36 @@
       "min_height": 0,
       "max_height": 15,
       "spray_duration": 1,
-      "duration": 6,
+      "duration": 8,
       "slow": 0.5,
       "boost": 1,
       "radius": 30,
       "patch_radius": 50,
-      "patches": 24,
+      "patches": 40,
       "cooldown": 10
     },
     "ice_storm": {
       "min_height": 0,
       "max_height": 60,
-      "radius": 80,
-      "interval": 0.7,
+      "radius": 120,
+      "interval": 0.5,
       "damage": 8,
-      "strikes": 6,
-      "follow_speed": 70,
+      "strikes": 10,
+      "follow_speed": 80,
       "cooldown": 9,
-      "freeze_hits": 3,
-      "freeze_duration": 1.5
+      "freeze_hits": 5,
+      "freeze_duration": 3
     },
     "freeze_beam": {
       "min_height": 0,
-      "max_height": 60,
-      "speed": 250,
+      "max_height": 80,
+      "speed": 300,
       "cooldown": 12,
-      "control_duration": 3,
-      "length": 450,
-      "pillar_radius": 24,
+      "control_duration": 4,
+      "length": 500,
+      "pillar_radius": 26,
       "pillar_hp": 25,
-      "pillar_duration": 8
+      "pillar_duration": 10
     }
   }
 }
