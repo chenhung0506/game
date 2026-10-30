@@ -227,6 +227,55 @@ type Config struct {
 			Cooldown         float64 `json:"cooldown"` // counted from the start of the swing
 		} `json:"vine_whip"`
 	} `json:"chikorita"`
+	Vulpix struct {
+		MaxHP     int     `json:"max_hp"`
+		WalkSpeed float64 `json:"walk_speed"`
+		Radius    float64 `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
+		// Frost Field (the main button): for `spray_duration` seconds Vulpix lays `patches` patches of frost, each
+		// `patch_radius` wide, at random spots within `radius` of where it stands as it lays them. A patch stays
+		// `duration` seconds. A body whose centre is on a patch (at a height inside min_height..max_height) walks
+		// `boost` faster on its owner's frost and `slow` slower (a fraction, 0..1) on the other player's.
+		FrostField struct {
+			Reach
+			SprayDuration float64 `json:"spray_duration"`
+			Duration      float64 `json:"duration"`
+			Slow          float64 `json:"slow"`
+			Boost         float64 `json:"boost"`
+			Radius        float64 `json:"radius"`
+			PatchRadius   float64 `json:"patch_radius"`
+			Patches       int     `json:"patches"`
+			Cooldown      float64 `json:"cooldown"` // counted from the start of the spray
+		} `json:"frost_field"`
+		// Ice Storm: a storm appears where Vulpix stands and chases the opponent at `follow_speed`, like Thunder's
+		// shadow. Every `interval` seconds, `strikes` times, it hits anyone within `radius` (plus their body) for
+		// `damage`; every `freeze_hits`-th hit of the cast freezes the target for `freeze_duration`.
+		IceStorm struct {
+			Reach
+			Radius         float64 `json:"radius"`
+			Interval       float64 `json:"interval"`
+			Damage         int     `json:"damage"`
+			Strikes        int     `json:"strikes"`
+			FollowSpeed    float64 `json:"follow_speed"`
+			Cooldown       float64 `json:"cooldown"` // counted from the cast
+			FreezeHits     int     `json:"freeze_hits"`
+			FreezeDuration float64 `json:"freeze_duration"`
+		} `json:"ice_storm"`
+		// Freeze Beam: for `control_duration` seconds Vulpix stands still and breathes a beam from its mouth to a
+		// spot on the ground that the stick moves at `speed`, never farther than `length` from the mouth. The beam
+		// hurts nobody; where the spot passes, ice pillars rise (`pillar_radius` wide, `pillar_hp`, gone after
+		// `pillar_duration`). The other player cannot walk through a pillar while at a height inside
+		// min_height..max_height. Pillars are hurt by what already hurts a projectile.
+		FreezeBeam struct {
+			Reach
+			Speed           float64 `json:"speed"`
+			Cooldown        float64 `json:"cooldown"` // counted from the start of the beam
+			ControlDuration float64 `json:"control_duration"`
+			Length          float64 `json:"length"`
+			PillarRadius    float64 `json:"pillar_radius"`
+			PillarHP        int     `json:"pillar_hp"`
+			PillarDuration  float64 `json:"pillar_duration"`
+		} `json:"freeze_beam"`
+	} `json:"vulpix"`
 }
 
 func DefaultConfig() Config {
@@ -354,6 +403,35 @@ func DefaultConfig() Config {
 	c.Chikorita.VineWhip.Damage = 10
 	c.Chikorita.VineWhip.BindDuration = 2
 	c.Chikorita.VineWhip.Cooldown = 5
+	c.Vulpix.MaxHP = 100
+	c.Vulpix.WalkSpeed = 160
+	c.Vulpix.Radius = 14
+	c.Vulpix.FrostField.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	c.Vulpix.FrostField.SprayDuration = 2
+	c.Vulpix.FrostField.Duration = 6
+	c.Vulpix.FrostField.Slow = 0.5
+	c.Vulpix.FrostField.Boost = 0.5
+	c.Vulpix.FrostField.Radius = 160
+	c.Vulpix.FrostField.PatchRadius = 50
+	c.Vulpix.FrostField.Patches = 12
+	c.Vulpix.FrostField.Cooldown = 10
+	c.Vulpix.IceStorm.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	c.Vulpix.IceStorm.Radius = 80
+	c.Vulpix.IceStorm.Interval = 0.7
+	c.Vulpix.IceStorm.Damage = 8
+	c.Vulpix.IceStorm.Strikes = 6
+	c.Vulpix.IceStorm.FollowSpeed = 70
+	c.Vulpix.IceStorm.Cooldown = 9
+	c.Vulpix.IceStorm.FreezeHits = 3
+	c.Vulpix.IceStorm.FreezeDuration = 1.5
+	c.Vulpix.FreezeBeam.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	c.Vulpix.FreezeBeam.Speed = 250
+	c.Vulpix.FreezeBeam.Cooldown = 12
+	c.Vulpix.FreezeBeam.ControlDuration = 3
+	c.Vulpix.FreezeBeam.Length = 450
+	c.Vulpix.FreezeBeam.PillarRadius = 24
+	c.Vulpix.FreezeBeam.PillarHP = 25
+	c.Vulpix.FreezeBeam.PillarDuration = 8
 	return c
 }
 
@@ -439,6 +517,23 @@ func (c Config) validate() error {
 		{"charizard.seismic_toss.length", c.Charizard.SeismicToss.Length, 0},
 		{"charizard.seismic_toss.high", c.Charizard.SeismicToss.High, 0},
 		{"chikorita.max_hp", float64(c.Chikorita.MaxHP), 0},
+		{"vulpix.max_hp", float64(c.Vulpix.MaxHP), 0},
+		{"vulpix.walk_speed", c.Vulpix.WalkSpeed, 0},
+		{"vulpix.radius", c.Vulpix.Radius, 0},
+		{"vulpix.frost_field.spray_duration", c.Vulpix.FrostField.SprayDuration, 0},
+		{"vulpix.frost_field.duration", c.Vulpix.FrostField.Duration, 0},
+		{"vulpix.frost_field.radius", c.Vulpix.FrostField.Radius, 0},
+		{"vulpix.frost_field.patch_radius", c.Vulpix.FrostField.PatchRadius, 0},
+		{"vulpix.frost_field.patches", float64(c.Vulpix.FrostField.Patches), 0},
+		{"vulpix.ice_storm.radius", c.Vulpix.IceStorm.Radius, 0},
+		{"vulpix.ice_storm.strikes", float64(c.Vulpix.IceStorm.Strikes), 0},
+		{"vulpix.ice_storm.freeze_hits", float64(c.Vulpix.IceStorm.FreezeHits), 0},
+		{"vulpix.freeze_beam.speed", c.Vulpix.FreezeBeam.Speed, 0},
+		{"vulpix.freeze_beam.control_duration", c.Vulpix.FreezeBeam.ControlDuration, 0},
+		{"vulpix.freeze_beam.length", c.Vulpix.FreezeBeam.Length, 0},
+		{"vulpix.freeze_beam.pillar_radius", c.Vulpix.FreezeBeam.PillarRadius, 0},
+		{"vulpix.freeze_beam.pillar_hp", float64(c.Vulpix.FreezeBeam.PillarHP), 0},
+		{"vulpix.freeze_beam.pillar_duration", c.Vulpix.FreezeBeam.PillarDuration, 0},
 		{"chikorita.walk_speed", c.Chikorita.WalkSpeed, 0},
 		{"chikorita.radius", c.Chikorita.Radius, 0},
 		{"chikorita.leaf_slash.jump_distance", c.Chikorita.LeafSlash.JumpDistance, 0},
@@ -513,6 +608,14 @@ func (c Config) validate() error {
 		{"chikorita.vine_whip.damage", float64(c.Chikorita.VineWhip.Damage)},
 		{"chikorita.vine_whip.bind_duration", c.Chikorita.VineWhip.BindDuration},
 		{"chikorita.vine_whip.cooldown", c.Chikorita.VineWhip.Cooldown},
+		{"vulpix.frost_field.boost", c.Vulpix.FrostField.Boost},
+		{"vulpix.frost_field.cooldown", c.Vulpix.FrostField.Cooldown},
+		{"vulpix.ice_storm.interval", c.Vulpix.IceStorm.Interval},
+		{"vulpix.ice_storm.damage", float64(c.Vulpix.IceStorm.Damage)},
+		{"vulpix.ice_storm.follow_speed", c.Vulpix.IceStorm.FollowSpeed},
+		{"vulpix.ice_storm.cooldown", c.Vulpix.IceStorm.Cooldown},
+		{"vulpix.ice_storm.freeze_duration", c.Vulpix.IceStorm.FreezeDuration},
+		{"vulpix.freeze_beam.cooldown", c.Vulpix.FreezeBeam.Cooldown},
 	} {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
@@ -530,6 +633,9 @@ func (c Config) validate() error {
 		"chikorita.leaf_slash":   c.Chikorita.LeafSlash.Reach,
 		"chikorita.razor_leaf":   c.Chikorita.RazorLeaf.Reach,
 		"chikorita.vine_whip":    c.Chikorita.VineWhip.Reach,
+		"vulpix.frost_field":     c.Vulpix.FrostField.Reach,
+		"vulpix.ice_storm":       c.Vulpix.IceStorm.Reach,
+		"vulpix.freeze_beam":     c.Vulpix.FreezeBeam.Reach,
 	} {
 		if !(r.MinHeight >= 0 && r.MaxHeight >= r.MinHeight) { // also rejects NaN
 			return fmt.Errorf("%s: need 0 <= min_height <= max_height, got %v and %v", name, r.MinHeight, r.MaxHeight)
@@ -546,6 +652,12 @@ func (c Config) validate() error {
 	if a := c.Chikorita.VineWhip.SweepAngle; !(a > 0 && a <= 180) {
 		return fmt.Errorf("chikorita.vine_whip.sweep_angle must be between 0 (exclusive) and 180, got %v", a)
 	}
+	if n := c.Vulpix.FrostField.Patches; n > 200 {
+		return fmt.Errorf("vulpix.frost_field.patches must be at most 200, got %d", n)
+	}
+	if v := c.Vulpix.FrostField.Slow; !(v >= 0 && v <= 1) { // 1 = a body on the frost cannot move at all
+		return fmt.Errorf("vulpix.frost_field.slow must be between 0 and 1, got %v", v)
+	}
 	if a := c.Charizard.FireBreath.RandomOffsetAngle; !(a >= 0 && a <= 90) { // 0 = every fire ball flies straight at the target
 		return fmt.Errorf("charizard.fire_breath.random_offset_angle must be between 0 and 90, got %v", a)
 	}
@@ -561,6 +673,8 @@ func (c Config) maxHPOf(kind int) int {
 		return c.Charizard.MaxHP
 	case chikorita:
 		return c.Chikorita.MaxHP
+	case vulpix:
+		return c.Vulpix.MaxHP
 	}
 	return c.Pikachu.MaxHP
 }
@@ -573,6 +687,8 @@ func (c Config) walkSpeedOf(kind int) float64 {
 		return c.Charizard.WalkSpeed
 	case chikorita:
 		return c.Chikorita.WalkSpeed
+	case vulpix:
+		return c.Vulpix.WalkSpeed
 	}
 	return c.Pikachu.WalkSpeed
 }
@@ -585,6 +701,8 @@ func (c Config) radiusOf(kind int) float64 {
 		return c.Charizard.Radius
 	case chikorita:
 		return c.Chikorita.Radius
+	case vulpix:
+		return c.Vulpix.Radius
 	}
 	return c.Pikachu.Radius
 }

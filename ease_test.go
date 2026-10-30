@@ -46,7 +46,7 @@ func TestEaseSlowsWalkingFlyingAndAirSteering(t *testing.T) {
 		steps(g, 10)
 		return g.P[0].X - x
 	}
-	for _, kind := range []int{pikachu, snorlax, charizard, chikorita} {
+	for _, kind := range []int{pikachu, snorlax, charizard, chikorita, vulpix} {
 		full, half := walked(kind, 0, nil), walked(kind, 50, nil)
 		if full <= 0 || math.Abs(half-full/2) > 0.01 {
 			t.Errorf("kind %d: walked %.2f at 0%% and %.2f at 50%%, want half", kind, full, half)
@@ -97,8 +97,8 @@ func TestTeamBoutsKeepTheHandicap(t *testing.T) {
 	r := teamRoom()
 	r.setTeam(true)
 	r.setEase(1, 50)
-	r.setOrder(0, []int{0, 1, 2, 3})
-	r.setOrder(1, []int{0, 1, 2, 3})
+	r.setOrder(0, []int{0, 1, 2, 3, 4})
+	r.setOrder(1, []int{0, 1, 2, 3, 4})
 	now := time.Now()
 	r.step(now)
 	knockOut(r, 1, now)

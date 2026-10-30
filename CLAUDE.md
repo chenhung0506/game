@@ -1,6 +1,6 @@
 # game
 
-兩人即時對戰小遊戲：皮卡丘、卡比獸、噴火龍、菊草葉四選二（連線後在選角畫面選，兩人可以選同一隻；美術是用形狀畫的佔位圖）。Go 伺服器 + 單頁 Canvas 前端，
+兩人即時對戰小遊戲：皮卡丘、卡比獸、噴火龍、菊草葉、六尾五選二（連線後在選角畫面選，兩人可以選同一隻；美術是用形狀畫的佔位圖）。Go 伺服器 + 單頁 Canvas 前端，
 WebSocket 同步。上線網址 https://game.linch.uk/ 。
 
 ## 指令
@@ -31,7 +31,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 
 - **伺服器說了算**：客戶端只送「按住了哪些鍵」`{dx,dy,skill,razor,vine,punch,beam,ball,thunder,ax,ay}`，
   伺服器每 1/30 秒算一次，把所有狀態廣播給兩人。所以所有時間類參數實際上都以 tick（0.033 秒）為單位。
-- **選角**：先進房的是 slot 0、後進的 slot 1，第三個收到 `full`；角色由玩家選，存在 `Player.Kind`（0 皮卡丘、1 卡比獸、2 噴火龍、3 菊草葉），快照每人帶 `k`。連線後伺服器送 `hi`（設定，`radius`/`maxhp` 依角色編號）與 `lobby`（`picks`、`here`）；客戶端送 `{"pick":k}`，兩人都選好才開打（`room.choose`）。不存在的角色、或比賽中選都會被拒絕，有人離開就回到選角畫面（另一人的選擇保留）。技能與判定看 `p.Kind`，不要看 slot；`NewGame` 的預設是 slot 0 皮卡丘、slot 1 卡比獸，所以大部分舊測試照舊。
+- **選角**：先進房的是 slot 0、後進的 slot 1，第三個收到 `full`；角色由玩家選，存在 `Player.Kind`（0 皮卡丘、1 卡比獸、2 噴火龍、3 菊草葉、4 六尾），快照每人帶 `k`。連線後伺服器送 `hi`（設定，`radius`/`maxhp` 依角色編號）與 `lobby`（`picks`、`here`）；客戶端送 `{"pick":k}`，兩人都選好才開打（`room.choose`）。不存在的角色、或比賽中選都會被拒絕，有人離開就回到選角畫面（另一人的選擇保留）。技能與判定看 `p.Kind`，不要看 slot；`NewGame` 的預設是 slot 0 皮卡丘、slot 1 卡比獸，所以大部分舊測試照舊。
 - **場地依開房者的版本決定**：頁面連線時帶 `mode=mobile|web`，只有第一個進房的人有效，兩種場地大小在
   `config.json` 的 `court`。`length` 是兩個角色之間的方向（網頁橫向、手機直向）。
 - **手機直式 = 把場地轉 90 度**：皮卡丘逆時針、卡比獸順時針，所以自己永遠在畫面下方。方向鍵與搖桿
@@ -57,6 +57,9 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 | 菊草葉 | 空白鍵 / 主按鈕「葉刃」 | 葉刃連斬：朝按住的方向跳 `jump_distance`（空中 `jump_duration` 秒、最高 `jump_height`，落地不傷人），接著甩葉子 `slashes` 下（每下 `slash_interval` 秒；第一下左上→右下、第二下右上→左下，輪流），每下朝敵人前進 `slash_step`（碰到身體就停），每下在揮到一半時打中半徑 `slash_radius` 內的人 `damage`；技能期間頭上的葉子放大 `leaf_scale` 倍（只影響畫面），並真的被甩過去當刀，原本的刀光留作淡淡的殘影；冷卻從起跳算；被冰凍或抓住會中斷 |
 | 菊草葉 | K / 小按鈕「飛葉」 | 飛葉快刀：在身邊 `scatter_radius` 內隨機距離灑出 `count` 片樹葉（`Game.Balls` 裡 `K=ballLeaf`，`Wait` 時掛在原地）；各自隨機等 `min_delay`～`max_delay` 秒後朝當時敵人的位置以 `speed` 衝出，碰到就 `damage` 並消失；樹葉有 `leaf_hp`，會被死光、落地震波、急凍拳、電球爆炸打掉 |
 | 菊草葉 | J / 小按鈕「藤鞭」 | 藤鞭：先蓄力 `charge_duration` 秒（藤鞭伸出來，地上出現警示扇形，瞄準還跟著搖桿，期間定身），再朝瞄準方向（此時鎖定）同時揮出左右兩條藤鞭，各從 ±`sweep_angle` 度在 `sweep_duration` 秒內掃向 0 度會合；長 `length`、寬 `width`；一次揮擊只打一下，被打中的敵人 `bind_duration` 秒內不能走路、不能用位移技能（衝刺、跳躍、飛行、急凍拳、地球上投、葉刃連斬），其他技能照用（`Player.BoundT`）；揮擊後還要定身 `recharge_duration` 秒（藤鞭縮回）；冷卻從蓄力開始算 |
+| 六尾 | 空白鍵 / 主按鈕「冰霜」 | 冰霜場：`spray_duration` 秒內平均灑出 `patches` 片冰霜（`Game.Frost`），每片落在噴出當下六尾身邊 `radius` 內的隨機位置、半徑 `patch_radius`、存在 `duration` 秒（所以邊走邊噴會沿路鋪開）；身體中心站在冰霜上、高度在 `min_height`～`max_height` 內時，走路／飛行／空中操控速度：踩自己的冰霜 ×(1+`boost`)、踩對手的 ×(1−`slow`)，兩種都踩就相乘（`frostFactor`，和放水疊乘）；不影響衝刺類技能的位移；不定身，可以邊走邊噴；冷卻從噴出開始算 |
+| 六尾 | K / 小按鈕「冰風暴」 | 冰風暴：風暴從六尾所在位置出發，以 `follow_speed` 追著敵人（和打雷的陰影同一套），每 `interval` 秒一擊、共 `strikes` 擊，範圍 `radius`（含敵人身體）、`damage`；同一次施放裡每打中第 `freeze_hits` 次（3、6…）就冰住敵人 `freeze_duration` 秒（和急凍拳同一個冰凍狀態與特效）；高度不在帶內的敵人打不到，但那一擊照樣用掉；不定身；施放期間不能再放，冷卻從施放算 |
+| 六尾 | J / 小按鈕「冰光線」 | 急凍光線：施放後 `control_duration` 秒內六尾定身（`casting`），方向鍵／搖桿改成移動光線落點（地面上的一點，速度 `speed`，離身體最遠 `length`，初始在瞄準方向的 `length`/2 處）；光線不傷人。落點經過的地方長出冰柱（`Game.Balls` 裡 `K=ballPillar`，半徑 `pillar_radius`、HP `pillar_hp`、`pillar_duration` 秒後融化）：沿落點這一步走過的路徑細取樣，離自己任何一根活著的冰柱不到 1.5 倍半徑就不長（掃回頭不會疊）；全場最多 `maxPillars` 根。**只擋對手**（高度在 `freeze_beam` 的 `min_height`～`max_height` 內），主人自己穿得過；擋法是移動結束後把重疊的身體推出去（`blockByPillars`）。冰柱和投射物同一套：被死光、落地震波、急凍拳、電球爆炸打掉血量；對手的電球／火球／飛葉碰到會讓冰柱扣自己的傷害、投射物當場用掉（電球下一步爆炸）；自己的投射物和還沒射出的葉子穿過。被冰凍會中斷噴霜與光線，施放中的冰風暴照跑。光線的嘴巴位置只在畫面上畫（朝向是客戶端的事），伺服器以身體中心量長度 |
 | 噴火龍 | J / 小按鈕「上投」 | 地球上投：朝瞄準方向衝 `length`，碰到（地面上的）敵人就抓住（`Held`，不能動不能用技能）、飛到 `high` 再摔下，落地受 `damage` 並播落地震波特效；噴火龍中途被冰凍會鬆手 |
 
 技能判定都是「技能範圍 + 對方身體半徑 `radius`」，另外每個攻擊技能都有自己的**高度範圍**
@@ -70,7 +73,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 ## 設定檔 `config.json`
 
 結構：`court.{mobile,web}`、`pikachu.{max_hp,walk_speed,radius,volt_tackle,thunder,electro_ball}`、
-`snorlax.{max_hp,walk_speed,radius,ice_punch,jump,hyper_beam}`、`charizard.{max_hp,walk_speed,radius,fly,fire_breath,seismic_toss}`、`chikorita.{max_hp,walk_speed,radius,leaf_slash,razor_leaf,vine_whip}`。每個欄位的意思看 `config.go` 的註解。
+`snorlax.{max_hp,walk_speed,radius,ice_punch,jump,hyper_beam}`、`charizard.{max_hp,walk_speed,radius,fly,fire_breath,seismic_toss}`、`chikorita.{max_hp,walk_speed,radius,leaf_slash,razor_leaf,vine_whip}`、`vulpix.{max_hp,walk_speed,radius,frost_field,ice_storm,freeze_beam}`。每個欄位的意思看 `config.go` 的註解。
 
 - 每個攻擊技能區塊都有 `min_height` / `max_height`（需 0 ≤ min ≤ max），沒寫就用 `DefaultConfig()` 的值。
 - 讀檔時**不認識的欄位或不合理的值會讓伺服器拒絕啟動**（刻意的，避免打錯字默默吃不到設定）。
@@ -134,9 +137,9 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 - 結果出來後（單場，或死鬥整場結束）畫面上有「重選角色」按鈕，送 `{"repick":true}`：**雙方**都回大廳重選
   （`room.repick`；只在結果顯示中有效，所以另一人同時按也不會重複）。結果顯示 `resultHold`（6 秒）後仍會自動開下一場。
 - 大廳有「單場對戰 / 死鬥」切換（`{"team":true|false}`，房間層級，切換時雙方重選；對戰中拒絕）。
-- 死鬥：雙方各送一個四隻全上場的順序 `{"order":[2,0,3,1]}`（必須是 0..3 的排列），兩邊都送了就開打。
+- 死鬥：雙方各送一個全部角色上場的順序 `{"order":[2,0,3,1,4]}`（必須是 0..`kinds`-1 的排列），兩邊都送了就開打。
   一隻 HP 歸零就換順序中的下一隻（`room.boutOver` / `nextRound`，間隔 `roundReset` 2 秒），**活著的角色保留剩下的 HP**，
-  位置與技能狀態重置；一方四隻都倒下整場結束（兩邊同時倒下最後一隻 → slot 0，和單場同一個任意規則）。
+  位置與技能狀態重置；一方全部角色都倒下整場結束（兩邊同時倒下最後一隻 → slot 0，和單場同一個任意規則）。
 - 對手的後續順序是秘密：快照的 `tm`（`c` 目前第幾隻、`f` 已倒下的角色、`o` 整場結束、`mw` 勝者）只公開已倒下的，
   自己的順序由前端自己記著。測試用 `room.step(now)`，不必開 socket（team_test.go）。
 

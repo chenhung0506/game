@@ -64,15 +64,16 @@ document.body.classList.toggle('portrait', PORTRAIT);
 const QUAKE_LIFE = 0.75; // seconds the earthquake effect stays on screen (also on a landing)
 let ROT = 0;               // how far the arena is turned on screen (radians); 0 in landscape
 let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
-// Each player picks a character in the lobby; a snapshot's p[i].k says who is who (0 Pikachu, 1 Snorlax, 2 Charizard, 3 Chikorita).
+// Each player picks a character in the lobby; a snapshot's p[i].k says who is who (0 Pikachu, 1 Snorlax, 2 Charizard, 3 Chikorita, 4 Vulpix).
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
-const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉'];
-const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭'];
+const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾'];
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰霜場・冰風暴・急凍光線'];
 const HELP = [
   '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
   '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　J＝急凍拳（蓄力時按方向鍵決定方向，朝該方向衝拳，打到的敵人被冰凍）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
   '你是噴火龍　移動 WASD / 方向鍵　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　K＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　J＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
   '你是菊草葉　移動 WASD / 方向鍵　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　K＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　J＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）',
+  '你是六尾　移動 WASD / 方向鍵　空白鍵＝冰霜場（一邊走一邊在身邊的地面灑出冰霜，站在自己的冰霜上走得更快，敵人踩上去會變慢）　K＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　J＝急凍光線（站定不動，方向鍵或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
 ];
 const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
@@ -81,14 +82,16 @@ let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }; // replaced by the se
 let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewise
 // Body sizes from 'hi' (world units). The art below was drawn at REF, so it is scaled by radius / REF;
 // that is also the size the server hits with, and it does not depend on the court's size.
-let radius = [16, 24, 26, 18]; // indexed by character
-const REF = [16, 24, 26, 18];
-let maxHp = [100, 100, 120, 110]; // each character's full HP, from 'hi'
+let radius = [16, 24, 26, 18, 14]; // indexed by character
+const REF = [16, 24, 26, 18, 14];
+let maxHp = [100, 100, 120, 110, 100]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let voltCfg = { radius: 16, uses: 3, window: 2 }; // Volt Tackle, from 'hi'
+let frostCfg = { radius: 160, patch: 50, duration: 6, spray: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8 }; // Vulpix's, from 'hi'
+const stormLook = [{ x: null, y: 0 }, { x: null, y: 0 }], fbLook = [{ x: null, y: 0 }, { x: null, y: 0 }]; // per slot: the smoothed storm position and beam end
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
@@ -120,7 +123,7 @@ let teamMode = false, myOrder = [], sentOrder = ''; // the lobby's match type; t
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
     if (teamMode !== !!m.team) { teamMode = !!m.team; myOrder = []; sentOrder = ''; } // another match type: choose again
@@ -132,7 +135,7 @@ ws.onmessage = (e) => {
   }
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
-    if (!snap) { ghosts.length = iceTrail.length = voltTrail.length = smoke.length = flames.length = 0; fx = []; for (const b of beamLook) b.ang = b.tail = null; for (const sh of shadow) sh.x = null; for (const d of disp) d.x = null; for (const l of look) l.dir = null; } // a new match starts clean
+    if (!snap) { ghosts.length = iceTrail.length = voltTrail.length = smoke.length = flames.length = 0; fx = []; for (const b of beamLook) b.ang = b.tail = null; for (const sh of shadow) sh.x = null; for (const l of stormLook) l.x = null; for (const l of fbLook) l.x = null; for (const d of disp) d.x = null; for (const l of look) l.dir = null; } // a new match starts clean
     const old = snap;
     waiting = false; snap = m;
     document.getElementById('pick').style.display = 'none';
@@ -149,6 +152,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'explode') shake = 14;
       if (ev.t === 'leaf') shake = 6;
       if (ev.t === 'freeze') shake = 10;
+      if (ev.t === 'storm') shake = Math.max(shake, 5);
       if (ev.t === 'paralyze') shake = 8;
     }
   }
@@ -253,7 +257,7 @@ function drawCards() {
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false }; // the pad's buttons
+const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -273,6 +277,7 @@ function sendInput() {
     // the keys are shared between the characters (J and K each do whatever the one you play has); the server uses the ones that fit
     fire: k('k') || touch.fire, toss: k('j') || touch.toss,
     razor: k('k') || touch.razor, vine: k('j') || touch.vine,
+    storm: k('k') || touch.storm, freeze: k('j') || touch.freeze,
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
@@ -317,6 +322,7 @@ const PAD = [
   { main: ['跳躍', 'skill'], small: [['死光', 'beam'], ['冰拳', 'punch']] }, // Snorlax
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
   { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine']] }, // Chikorita
+  { main: ['冰霜', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
@@ -342,7 +348,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }];
   const hold = (b, label, name) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -373,7 +379,8 @@ function art(c, kind, x, y, t, flap, pose = IDLE) {
   if (kind === 0) artPikachu(c, x, y, t, pose);
   else if (kind === 1) artSnorlax(c, x, y, t, pose);
   else if (kind === 2) artCharizard(c, x, y, t, flap);
-  else artChikorita(c, x, y, t, pose);
+  else if (kind === 3) artChikorita(c, x, y, t, pose);
+  else artVulpix(c, x, y, t, pose);
 }
 
 // ---- Pikachu and Snorlax: one drawing per view ----
@@ -595,6 +602,56 @@ function artChikorita(c, x, y, t, pose) {
   c.restore();
 }
 
+// Vulpix (the six-tailed ice fox): white fur, pale blue ears and tail tips, six tails fanned out behind it that
+// sway all the time and stream when it runs.
+function artVulpix(c, x, y, t, pose) {
+  const { dir, mv, ph } = pose, sw = Math.sin(ph) * mv, bob = -Math.abs(Math.sin(ph)) * 2 * mv;
+  const W = '#f6fafd', WD = '#d3e2ee', BL = '#9ccdf2', BD = '#4f8fd0', NOSE = '#35557f', EYE = '#2f6fc0';
+  const eye = (ex, ey, r) => { ov(c, ex, ey, r, r * 1.25, EYE, 0, null); ov(c, ex, ey + 0.3, r * 0.5, r * 0.8, '#10264a', 0, null); ov(c, ex + r * 0.3, ey - r * 0.5, r * 0.3, r * 0.3, '#fff', 0, null); };
+  // one tail from (bx, by), pointing a radians clockwise from straight up, curling outward, with a blue curl at the tip
+  const tail = (bx, by, a, len, k) => {
+    const aa = a + Math.sin(t * 2.4 + k * 0.9) * 0.1 + Math.sin(t * 9 + k) * 0.06 * mv, side = Math.sign(a) || 1;
+    const tx = bx + Math.sin(aa) * len, ty = by - Math.cos(aa) * len, cx = bx + Math.sin(aa) * len * 0.35 + side * len * 0.28, cy = by - Math.cos(aa) * len * 0.75;
+    c.lineCap = 'round'; c.strokeStyle = OUTLINE; c.lineWidth = 6.4; c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(cx, cy, tx, ty); c.stroke();
+    c.strokeStyle = W; c.lineWidth = 5; c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(cx, cy, tx, ty); c.stroke();
+    ov(c, tx, ty, 3.4, 3.4, BL); ov(c, tx - side * 0.8, ty + 0.6, 1.6, 1.6, '#fff', 0, null);
+  };
+  c.save(); c.translate(x, y + bob + 2 * mv);
+  if (dir === 2) c.scale(-1, 1);
+  if (dir === 0 || dir === 1) {
+    const back = dir === 1, fan = () => [-1.2, -0.72, -0.24, 0.24, 0.72, 1.2].forEach((a, k) => tail(0, 9, a, 23 - Math.abs(a) * 5, k));
+    if (!back) fan();
+    ov(c, -6, 17, 3.4, 3, WD); ov(c, 6, 17, 3.4, 3, WD);
+    ov(c, 0, 8, 10.5, 9, W);
+    if (!back) { ov(c, 0, 11, 6, 5.5, '#fff', 0, null); poly(c, [[-4, 5], [0, 10], [4, 5], [0, 7.5]], BL, null); } // a blue chest tuft
+    ov(c, -7, 15 - Math.max(0, sw) * 3, 3.3, 3.9, W); ov(c, 7, 15 - Math.max(0, -sw) * 3, 3.3, 3.9, W);
+    poly(c, [[-9, -9], [-12, -26], [-2, -14]], W); poly(c, [[9, -9], [12, -26], [2, -14]], W); // ears
+    if (!back) { poly(c, [[-8.4, -11], [-10.6, -22], [-4, -14]], BL, null); poly(c, [[8.4, -11], [10.6, -22], [4, -14]], BL, null); }
+    ov(c, 0, -5, 11.5, 9.5, W);
+    if (!back) {
+      ov(c, -9.4, 0, 3, 3.6, WD, 0.6, null); ov(c, 9.4, 0, 3, 3.6, WD, 0.6, null); // cheek fur
+      eye(-4.6, -5.4, 2.2); eye(4.6, -5.4, 2.2);
+      ov(c, 0, -0.6, 2, 1.4, NOSE, 0, null);
+      c.strokeStyle = NOSE; c.lineWidth = 0.8; c.beginPath(); c.arc(0, 0.2, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); c.stroke();
+    } else poly(c, [[-5, -13], [0, -17], [5, -13], [0, -11]], BL, null); // the blue forelock seen from behind
+    if (back) fan();
+  } else { // side view, facing right
+    const a = sw * 0.85;
+    [-1.0, -1.38, -1.76, -2.14, -2.52, -2.9].forEach((ang, k) => tail(-9, 5, ang, 21 - k * 0.6, k));
+    pikaLimb(c, 6, 12, 6, -a, 3, WD); pikaLimb(c, -8, 12, 6, a, 3, WD); // the far legs
+    ov(c, -2, 7, 13, 7.5 + 0.8 * mv, W, -0.04 * mv); ov(c, 3, 11, 7, 3.4, '#fff', 0, null);
+    poly(c, [[5, -7], [3, -22], [12, -11]], WD); // far ear
+    ov(c, 10, -1 + 1.5 * mv, 9, 8.6, W);
+    poly(c, [[8, -8], [7, -25], [15, -10]], W); poly(c, [[9.4, -10], [8.6, -21], [13.4, -11]], BL, null); // near ear
+    ov(c, 17.5, 1.5 + 1.5 * mv, 4.6, 3.2, W);
+    ov(c, 21, 0.9 + 1.5 * mv, 1.4, 1.2, NOSE, 0, null);
+    ov(c, 6.5, 3.5 + 1.5 * mv, 3, 3.8, WD, 0.4, null); // cheek fur
+    eye(12.6, -3.4 + 1.5 * mv, 2.1);
+    pikaLimb(c, 6, 12, 6, a, 3.2, W); pikaLimb(c, -8, 12, 6, -a, 3.2, W); // the near legs
+  }
+  c.restore();
+}
+
 // Charizard: orange body and cream belly, a flame at the tail tip and two big teal wings. The wings beat all
 // the time, a lazy flutter standing and a hard fast beat in flight, with a small fast tremor on top.
 function artCharizard(c, x, y, t, flap) {
@@ -732,6 +789,7 @@ function drawBallCharge(p, d) {
 function drawBall(b) {
   if (b.k === 1) { drawFireBall(b); return; }
   if (b.k === 2) { drawRazorLeaf(b); return; }
+  if (b.k === 3) { drawPillar(b); return; }
   {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
@@ -1090,6 +1148,123 @@ function drawSkyBolt(f) {
 // Chikorita's leaf: while a swing runs, a bright crescent cuts across the body. Swing 0, 2, ... go from the upper
 // left to the lower right, swing 1, 3, ... from the upper right to the lower left. The blade reaches `radius`
 // from the body on each side, which is the reach the server hits with.
+// ---- Vulpix ----
+const seeded = (n) => { const v = Math.sin(n * 127.1) * 43758.5453; return v - Math.floor(v); }; // a stable 0..1 from a number, so a patch looks the same every frame
+
+// Frost Field: patches of ice on the ground. Cyan rim for the viewer's own frost (it speeds them up), violet for the other's (it slows).
+// A patch grows in over a quarter of a second and fades out over its last second and a half.
+function drawFrost() {
+  for (const f of snap.f || []) {
+    const age = frostCfg.duration - f.l, grow = Math.min(1, age / 0.25), a = Math.min(1, f.l / 1.5) * grow, R = frostCfg.patch * (0.5 + 0.5 * grow * (2 - grow));
+    const mine = f.o === you, rim = mine ? '120,225,255' : '190,160,255', sd = f.x * 0.37 + f.y * 0.91;
+    ctx.save();
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
+    g.addColorStop(0, `rgba(240,252,255,${0.8 * a})`); g.addColorStop(0.7, `rgba(165,222,250,${0.5 * a})`); g.addColorStop(1, `rgba(${rim},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(${rim},${0.85 * a})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(f.x, f.y, R * 0.94, 0, 7); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * a})`; ctx.lineWidth = 1.5; ctx.beginPath(); // six crystal spokes with a fork on each
+    for (let k = 0; k < 6; k++) {
+      const ang = k * Math.PI / 3 + seeded(sd + k) * 0.3, len = R * (0.55 + 0.35 * seeded(sd + k * 3)), ex = f.x + Math.cos(ang) * len, ey = f.y + Math.sin(ang) * len;
+      ctx.moveTo(f.x, f.y); ctx.lineTo(ex, ey);
+      for (const sgn of [-1, 1]) { ctx.moveTo(f.x + Math.cos(ang) * len * 0.6, f.y + Math.sin(ang) * len * 0.6); ctx.lineTo(f.x + Math.cos(ang + sgn * 0.6) * len * 0.85, f.y + Math.sin(ang + sgn * 0.6) * len * 0.85); }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// Ice Storm: a swirl of snow the size of the strike area that chases the opponent. Each strike (an event) rings out from it.
+function drawStorms() {
+  for (const si of slotsOf(4)) {
+    const p = snap.p[si], sl = stormLook[si];
+    if (!(p.wn > 0)) { sl.x = null; continue; }
+    if (sl.x === null) { sl.x = p.wx; sl.y = p.wy; }
+    sl.x += (p.wx - sl.x) * 0.4; sl.y += (p.wy - sl.y) * 0.4;
+    const R = stormCfg.radius, t = performance.now() / 1000;
+    ctx.save();
+    const g = ctx.createRadialGradient(sl.x, sl.y, R * 0.1, sl.x, sl.y, R);
+    g.addColorStop(0, 'rgba(235,248,255,.55)'); g.addColorStop(0.65, 'rgba(150,205,245,.35)'); g.addColorStop(1, 'rgba(110,170,235,.08)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sl.x, sl.y, R, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(210,240,255,.8)'; ctx.lineWidth = 2.5; ctx.setLineDash([14, 10]); ctx.lineDashOffset = -t * 40;
+    ctx.beginPath(); ctx.arc(sl.x, sl.y, R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.lineWidth = 3; ctx.lineCap = 'round'; // three arms of wind turning round the middle
+    for (let arm = 0; arm < 3; arm++) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.55 - arm * 0.08})`; ctx.beginPath();
+      for (let u = 0; u <= 1.001; u += 0.05) { const ang = t * 2.6 + arm * 2.094 + u * 2.4, rr = R * (0.12 + 0.82 * u); u ? ctx.lineTo(sl.x + Math.cos(ang) * rr, sl.y + Math.sin(ang) * rr) : ctx.moveTo(sl.x + Math.cos(ang) * rr, sl.y + Math.sin(ang) * rr); }
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#fff'; // snowflakes blown round it
+    for (let n = 0; n < 22; n++) {
+      const ang = t * (1.4 + seeded(n) * 1.2) + n * 2.4, rr = R * (0.2 + 0.78 * ((seeded(n * 7) + t * 0.15) % 1)), s = 1.6 + seeded(n * 3) * 2;
+      ctx.globalAlpha = 0.5 + 0.5 * seeded(n * 5); ctx.fillRect(sl.x + Math.cos(ang) * rr - s / 2, sl.y + Math.sin(ang) * rr - s / 2, s, s);
+    }
+    ctx.restore();
+  }
+}
+// One strike of the storm: a white flash, a ring running out to the edge, shards flying out.
+function drawStormStrike(f) {
+  const k = f.age / 0.4, a = 1 - k, R = f.r || stormCfg.radius;
+  ctx.save();
+  ctx.fillStyle = `rgba(225,246,255,${0.45 * a * a})`; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 4 * a + 1; ctx.beginPath(); ctx.arc(f.x, f.y, R * (0.3 + 0.7 * k), 0, 7); ctx.stroke();
+  ctx.fillStyle = `rgba(190,232,255,${a})`;
+  for (let s = 0; s < 14; s++) {
+    const ang = s * 0.449 + seeded(s) * 0.3, dd = R * (0.15 + 0.8 * k * (0.5 + 0.5 * seeded(s * 3))), sz = 5 + seeded(s * 5) * 6;
+    ctx.save(); ctx.translate(f.x + Math.cos(ang) * dd, f.y + Math.sin(ang) * dd); ctx.rotate(ang + k * 2);
+    ctx.beginPath(); ctx.moveTo(sz, 0); ctx.lineTo(0, sz * 0.35); ctx.lineTo(-sz * 0.6, 0); ctx.lineTo(0, -sz * 0.35); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// Freeze Beam: from the mouth to the spot on the ground the stick steers. The beam hurts nobody; a faint circle shows how far it can reach.
+function drawFBeams() {
+  for (const si of slotsOf(4)) {
+    const p = snap.p[si], d = disp[si], fl = fbLook[si];
+    if (!(p.zt > 0)) { fl.x = null; continue; }
+    if (fl.x === null) { fl.x = p.zx; fl.y = p.zy; }
+    fl.x += (p.zx - fl.x) * 0.5; fl.y += (p.zy - fl.y) * 0.5;
+    const bs = radius[4] / REF[4], dir = look[si].dir, t = performance.now() / 1000;
+    const [mx, my] = dir === 3 ? [11, -1] : dir === 2 ? [-11, -1] : dir === 1 ? [0, -7] : [0, 2]; // the mouth, upright and in body units
+    const [ex, ey] = rv(fl.x - d.x, fl.y - d.y);
+    upright(d.x, d.y, () => {
+      const x0 = mx * bs, y0 = -d.z + my * bs, len = Math.hypot(ex - x0, ey - y0) || 1, ux = (ex - x0) / len, uy = (ey - y0) / len;
+      ctx.lineCap = 'round';
+      for (const [w, col] of [[26, 'rgba(110,185,255,.30)'], [13, 'rgba(185,232,255,.80)'], [4.5, 'rgba(255,255,255,.95)']]) {
+        ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(ex, ey); ctx.stroke();
+      }
+      ctx.fillStyle = '#fff'; // sparkles streaming along it
+      for (let s = (t * 220) % 46; s < len; s += 46) { const o = Math.sin(s * 0.3 + t * 8) * 6; ctx.beginPath(); ctx.arc(x0 + ux * s - uy * o, y0 + uy * s + ux * o, 2.4, 0, 7); ctx.fill(); }
+      ctx.strokeStyle = 'rgba(200,238,255,.9)'; ctx.lineWidth = 2.5; // where it lands
+      ctx.beginPath(); ctx.ellipse(ex, ey, fbeamCfg.pillar * (0.8 + 0.12 * Math.sin(t * 10)), fbeamCfg.pillar * 0.8 * (0.8 + 0.12 * Math.sin(t * 10)), 0, 0, 7); ctx.stroke();
+    });
+    ctx.save(); // the beam's reach
+    ctx.strokeStyle = 'rgba(190,235,255,.28)'; ctx.lineWidth = 2; ctx.setLineDash([10, 12]);
+    ctx.beginPath(); ctx.arc(d.x, d.y, fbeamCfg.len, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// An ice pillar: a six-sided crystal column that rises when the beam reaches it, cracks as its HP goes and shrinks away in its last second.
+function drawPillar(b) {
+  const r = fbeamCfg.pillar, age = fbeamCfg.life - b.lf, rise = Math.min(1, age / 0.2), melt = Math.min(1, b.lf / 1), hpk = Math.max(0, b.hp) / fbeamCfg.hp;
+  const h = r * 2.7 * rise * (2 - rise) * (0.6 + 0.4 * melt), a = 0.35 + 0.55 * melt;
+  if (h < 1) return;
+  upright(b.x, b.y, () => {
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, 0, r * 1.15, r * 0.5, 0, 0, 7); ctx.fill();
+    const g = ctx.createLinearGradient(-r, 0, r, 0);
+    g.addColorStop(0, `rgba(120,190,240,${a})`); g.addColorStop(0.35, `rgba(235,250,255,${a})`); g.addColorStop(1, `rgba(110,170,230,${a})`);
+    ctx.fillStyle = g; ctx.strokeStyle = `rgba(255,255,255,${Math.min(1, a + 0.2)})`; ctx.lineWidth = 1.8; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(-r, -h * 0.82); ctx.lineTo(-r * 0.45, -h); ctx.lineTo(r * 0.45, -h * 0.96); ctx.lineTo(r, -h * 0.8); ctx.lineTo(r, 0);
+    ctx.quadraticCurveTo(0, r * 0.45, -r, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${a * 0.9})`; ctx.lineWidth = 1.2; // facets
+    ctx.beginPath(); ctx.moveTo(-r * 0.3, -h * 0.97); ctx.lineTo(-r * 0.15, 0); ctx.moveTo(r * 0.45, -h * 0.96); ctx.lineTo(r * 0.25, -h * 0.1); ctx.stroke();
+    ctx.strokeStyle = `rgba(30,70,120,${0.8 * a})`; ctx.lineWidth = 1.3; // cracks come with the damage
+    if (hpk < 0.7) { ctx.beginPath(); ctx.moveTo(-r * 0.7, -h * 0.55); ctx.lineTo(-r * 0.2, -h * 0.45); ctx.lineTo(-r * 0.35, -h * 0.25); ctx.stroke(); }
+    if (hpk < 0.35) { ctx.beginPath(); ctx.moveTo(r * 0.6, -h * 0.7); ctx.lineTo(r * 0.1, -h * 0.55); ctx.lineTo(r * 0.4, -h * 0.3); ctx.lineTo(0, -h * 0.12); ctx.stroke(); }
+  });
+}
+
 function drawLeafSlashes() { for (const si of slotsOf(3)) drawLeafSlash(snap.p[si], disp[si]); }
 function drawLeafSlash(p, d) {
   if (p.lp !== 2) return;
@@ -1283,6 +1458,7 @@ function drawPlayer(i, p) {
       gr.addColorStop(0, '#fff6c0'); gr.addColorStop(0.4, '#ffb030'); gr.addColorStop(1, 'rgba(255,70,10,0)');
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(mx, my, R, 0, 7); ctx.fill();
     }
+    if (p.k === 4 && p.zt > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#a8e0ff'; ctx.fillText(`急凍光線 ${p.zt.toFixed(1)}s`, 0, top - 54 * bs); }
     if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, top - 54 * bs); }
     if (i === you) { ctx.fillStyle = '#fff'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 你', 0, top - 40 * bs); }
     // HP bar follows the body.
@@ -1350,7 +1526,9 @@ function frame() {
     for (const g of ghosts) { drawBody(g.k, g.x, g.y, Math.max(g.a, 0), g.z, 0, g.pose); g.a -= 0.04; }
     while (ghosts.length && ghosts[0].a <= 0) ghosts.shift();
     drawTelegraph();
+    drawFrost();
     drawShadow();
+    drawStorms();
     drawBalls();
     drawToss();
     drawIcePunch();
@@ -1360,13 +1538,15 @@ function frame() {
     [0, 1].sort((a, b) => screenY(snap.p[a].x, snap.p[a].y) - screenY(snap.p[b].x, snap.p[b].y)).forEach((i) => drawPlayer(i, snap.p[i]));
     drawLeafSlashes(); // over the bodies: the blade is the thing to see
     drawVines();
+    drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' ? 0.6 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' ? 0.6 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
       else if (f.t === 'explode') drawExplosion(f);
       else if (f.t === 'freeze') drawFreezeBurst(f);
+      else if (f.t === 'storm') drawStormStrike(f);
       else if (f.t === 'paralyze') drawParalyzeBurst(f);
       else if (f.t === 'leaf') drawLeafSpark(f);
       else drawQuake(f); // 'slam'

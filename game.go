@@ -28,7 +28,8 @@ const (
 	snorlax   = 1
 	charizard = 2
 	chikorita = 3
-	kinds     = 4
+	vulpix    = 4
+	kinds     = 5
 )
 
 // Input is the only thing a client controls: which keys are held. Skill is the
@@ -45,6 +46,8 @@ type Input struct {
 	Toss    bool `json:"toss"`    // Charizard only: Seismic Toss
 	Razor   bool `json:"razor"`   // Chikorita only: Razor Leaf
 	Vine    bool `json:"vine"`    // Chikorita only: Vine Whip
+	Storm   bool `json:"storm"`   // Vulpix only: Ice Storm
+	Freeze  bool `json:"freeze"`  // Vulpix only: Freeze Beam
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
@@ -150,6 +153,23 @@ type Player struct {
 	VineHit     bool    `json:"-"`
 	VineCD      float64 `json:"vcd"`
 	BoundT      float64 `json:"bd"` // seconds left bound by a vine: cannot walk or use a movement skill
+
+	// Vulpix. Frost Field: seconds of spraying left, how many of the config's patches have been laid, the cooldown.
+	FrostT  float64 `json:"yt"`
+	FrostN  int     `json:"-"`
+	FrostCD float64 `json:"ycd"`
+	// Ice Storm: strikes still to come (0 = no storm), seconds to the next one, where the storm is, hits so far this cast.
+	StormLeft int     `json:"wn"`
+	StormIn   float64 `json:"-"`
+	StormX    float64 `json:"wx"`
+	StormY    float64 `json:"wy"`
+	StormHits int     `json:"-"`
+	StormCD   float64 `json:"wcd"`
+	// Freeze Beam: seconds of control left (0 = no beam), where the beam ends on the ground, the cooldown.
+	FBeamT  float64 `json:"zt"`
+	FBeamX  float64 `json:"zx"`
+	FBeamY  float64 `json:"zy"`
+	FBeamCD float64 `json:"zcd"`
 }
 
 // Leaf Slash phases.
@@ -173,6 +193,7 @@ const (
 	ballElectro = 0
 	ballFire    = 1
 	ballLeaf    = 2 // Chikorita's Razor Leaf
+	ballPillar  = 3 // Vulpix's ice pillar: it stands where it rose, blocks the other player and is worn down like a projectile
 )
 
 // Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
@@ -188,15 +209,24 @@ type Ball struct {
 	Delay     float64 `json:"-"`           // leaf: seconds before it shoots
 	Wait      bool    `json:"w,omitempty"` // leaf: still hanging around Chikorita
 	HP        int     `json:"hp"`
-	LastSweep int     `json:"-"` // the Hyper Beam sweep that last hit it
-	HitCD     float64 `json:"-"` // until the beam may hit it again (hyper_beam.hit_interval)
-	LastPunch int     `json:"-"` // the Ice Punch that last hit it
-	X0, Y0    float64 `json:"-"` // where it was at the start of this step, for the projectile clash
+	LastSweep int     `json:"-"`            // the Hyper Beam sweep that last hit it
+	HitCD     float64 `json:"-"`            // until the beam may hit it again (hyper_beam.hit_interval)
+	LastPunch int     `json:"-"`            // the Ice Punch that last hit it
+	X0, Y0    float64 `json:"-"`            // where it was at the start of this step, for the projectile clash
+	Life      float64 `json:"lf,omitempty"` // pillar: seconds before it melts
+}
+
+// Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
+type Frost struct {
+	Owner int     `json:"o"`
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	Left  float64 `json:"l"` // seconds before it melts
 }
 
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
-	T string  `json:"t"` // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze" | "paralyze"
+	T string  `json:"t"` // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze" | "paralyze" | "storm"
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 	R float64 `json:"r,omitempty"` // slam reach, so the effect can match it
@@ -213,6 +243,7 @@ type Game struct {
 	court CourtSize
 	P     [2]Player
 	Balls []Ball
+	Frost []Frost
 	rng   *rand.Rand // the fire's random spread; tests replace it
 	// Ease is each player's handicap in percent (a multiple of easeStep, at most easeMax): its HP and its
 	// walking speed are cut by that much. It survives Reset.
@@ -250,7 +281,7 @@ func (g *Game) Reset() {
 	c := g.court
 	g.P[0] = Player{Kind: g.P[0].Kind, X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(0), FX: 1, AimX: 1}
 	g.P[1] = Player{Kind: g.P[1].Kind, X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(1), FX: -1, AimX: -1}
-	g.Balls = nil
+	g.Balls, g.Frost = nil, nil
 }
 
 // Winner returns the index of the surviving player, or -1 while both are alive.
@@ -276,6 +307,8 @@ func (g *Game) ballRadius(b *Ball) float64 {
 		return g.cfg.Charizard.FireBreath.Radius
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Radius
+	case ballPillar:
+		return g.cfg.Vulpix.FreezeBeam.PillarRadius
 	}
 	return g.cfg.Pikachu.ElectroBall.Radius
 }
@@ -286,6 +319,8 @@ func (g *Game) ballMass(b *Ball) float64 {
 		return g.cfg.Charizard.FireBreath.Mass
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Mass
+	case ballPillar:
+		return pillarMass
 	}
 	return g.cfg.Pikachu.ElectroBall.Mass
 }
@@ -379,6 +414,7 @@ func (g *Game) Step(dt float64) []Event {
 			g.dropToss(i)                         // a Charizard caught mid-toss lets go
 			g.dropLeaf(i)                         // a Chikorita mid-hop or mid-slash is stopped
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
+			p.FrostT, p.FBeamT = 0, 0 // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
 		}
 		// Bound by a vine or paralyzed by a Volt Tackle: no walking and no movement skill (the others still work).
 		if p.BoundT > 0 || p.ParalyzeT > 0 {
@@ -520,6 +556,11 @@ func (g *Game) Step(dt float64) []Event {
 			casting = p.LeafPhase != leafNone || p.vineBusy() // the hop and the advance move it themselves; the vines root it
 		}
 
+		if p.Kind == vulpix {
+			events = append(events, g.stepVulpix(i, in, dt)...)
+			casting = p.FBeamT > 0 // the stick steers the beam, not the body
+		}
+
 		// Pikachu's Thunder. Pikachu cannot move until the last bolt has struck, and a
 		// new cast waits for the current one to finish. Bolts come from the sky, so
 		// height gives no cover. Each strike is also fired up into the sky from Pikachu.
@@ -612,11 +653,13 @@ func (g *Game) Step(dt float64) []Event {
 				}
 			}
 			v *= float64(100-g.Ease[i]) / 100 // the handicap slows every way of walking, flying and steering in the air
+			v *= g.frostFactor(i)             // so does Vulpix's frost, or speeds it up
 			p.X += float64(in.DX) / n * v * dt
 			p.Y += float64(in.DY) / n * v * dt
 		}
 		p.X = math.Min(math.Max(p.X, 0), g.court.Length)
 		p.Y = math.Min(math.Max(p.Y, 0), g.court.Width)
+		g.blockByPillars(i)
 
 		// Snorlax's skill: jump. Exact parabola so height and air time match the config.
 		if p.Kind == snorlax && in.Skill && p.Z == 0 && !busy && p.JumpCD == 0 {
@@ -647,6 +690,7 @@ func (g *Game) Step(dt float64) []Event {
 			}
 		}
 	}
+	g.tickFrost(dt)
 	return append(events, g.stepBalls(dt)...)
 }
 
@@ -717,6 +761,14 @@ func (g *Game) stepBalls(dt float64) []Event {
 	for _, b := range g.Balls {
 		foe := &g.P[1-b.Owner]
 		b.X0, b.Y0 = b.X, b.Y
+		if b.K == ballPillar {
+			if b.HP > 0 {
+				if b.Life -= dt; b.Life > 1e-9 {
+					kept = append(kept, b)
+				}
+			}
+			continue
+		}
 		if b.K == ballFire {
 			if b.HP > 0 {
 				x0, y0 := b.X, b.Y
@@ -814,6 +866,8 @@ func (g *Game) ballDamage(b *Ball) int {
 		return g.cfg.Charizard.FireBreath.Damage
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Damage
+	case ballPillar:
+		return pillarBlock
 	}
 	return g.cfg.Pikachu.ElectroBall.ContactDamage
 }
@@ -833,7 +887,7 @@ func (g *Game) clashBalls() {
 		}
 		for j := i + 1; j < len(g.Balls); j++ {
 			b := &g.Balls[j]
-			if b.HP <= 0 || b.Wait || a.Owner == b.Owner {
+			if b.HP <= 0 || b.Wait || a.Owner == b.Owner || (a.K == ballPillar && b.K == ballPillar) {
 				continue
 			}
 			// b stands still at its start; a moves by the difference of their moves.
