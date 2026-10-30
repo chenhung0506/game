@@ -179,13 +179,13 @@
     "frost_field": {
       "min_height": 0,
       "max_height": 15,
-      "spray_duration": 1,
+      "spray_duration": 3,
       "duration": 16,
       "slow": 0.5,
       "boost": 1,
       "radius": 30,
       "patch_radius": 50,
-      "patches": 40,
+      "patches": 30,
       "cooldown": 10
     },
     "ice_storm": {
