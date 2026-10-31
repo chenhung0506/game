@@ -760,14 +760,14 @@ function artGyarados(c, x, y, t, pose) {
   c.scale(1.3, 1.3); // it is the big one: the coil is drawn bigger than the body it hits with
   if (dir === 2) c.scale(-1, 1);
   // the body: a chain of rings from the tail up to the neck, each a little to one side of the one before it
-  const ring = [[-34, 24, 7.5], [-31, 12, 10], [-23, 4, 12.5], [-12, 2, 14], [-2, -8, 14.5], [5, -20, 14]];
+  const ring = [...(pose.whip ? [] : [[-34, 24, 7.5]]), [-31, 12, 10], [-23, 4, 12.5], [-12, 2, 14], [-2, -8, 14.5], [5, -20, 14]];
   ring.forEach(([rx, ry, rr], i) => {
     const sx = rx + sway * 1.6 * (i % 2 ? 1 : -1), sy = ry + Math.sin(t * 3 + i) * 1.2;
     ov(c, sx, sy, rr, rr * 0.92, R);
     ov(c, sx + 2, sy + rr * 0.45, rr * 0.7, rr * 0.4, CREAM, 0, null); // the belly stripes
     if (i > 1) poly(c, [[sx - 4, sy - rr * 0.8], [sx - 1, sy - rr * 1.5], [sx + 4, sy - rr * 0.8]], GOLD); // a fin on the back
   });
-  poly(c, [[-37, 27], [-48, 20], [-43, 30], [-50, 36], [-38, 32]], RD); // the tail fan
+  if (!pose.whip) poly(c, [[-37, 27], [-48, 20], [-43, 30], [-50, 36], [-38, 32]], RD); // the tail fan (it is out swinging during a whip)
   // the head: long, with the mouth open
   c.save(); c.translate(15, -27); c.rotate(-0.05 + sway * 0.03);
   poly(c, [[-12, -8], [-5, -23], [-1, -9]], GOLD); poly(c, [[-4, -9], [3, -22], [6, -8]], GOLD); // the crest
@@ -1253,17 +1253,52 @@ function drawWave(f) {
   ctx.restore();
 }
 
-// Gyarados's tail whip: the fan it hits, drawn as a sweep across it, with the tail's tip leaving a bright arc.
+// Gyarados's tail whip: the tail itself, a thick red limb that narrows to a fin, lashes across the fan from one edge to
+// the other (cocked back a little first, then fast and slowing), bent behind its tip the way a whip is, with a smear
+// of the sweep behind it. It pivots on Gyarados's middle; the body is drawn without its own tail meanwhile.
+const TAIL_SWING = 0.3; // seconds the tail takes to lash across
 function drawTailWhip(f) {
-  const k = Math.min(1, f.age / 0.3), a = 1 - k * k, half = tailCfg.angle / 2 * Math.PI / 180, base = Math.atan2(f.dy || 0, f.dx || 0), L = f.r; // a zero component is left out of the event, hence the || 0
-  ctx.save();
-  ctx.fillStyle = `rgba(255,170,80,${0.22 * a})`; ctx.strokeStyle = `rgba(255,220,150,${0.6 * a})`; ctx.lineWidth = 2;
+  const k = Math.min(1, f.age / TAIL_SWING), fade = f.age <= TAIL_SWING ? 1 : Math.max(0, 1 - (f.age - TAIL_SWING) / 0.15);
+  const half = tailCfg.angle / 2 * Math.PI / 180, base = Math.atan2(f.dy || 0, f.dx || 0), L = f.r; // a zero component is left out of the event, hence the || 0
+  const cock = 0.12, from = base - half; // the first part of the swing winds back a little
+  const s2 = k < cock ? 0 : (k - cock) / (1 - cock); // 0..1 over the lash itself
+  const tip = k < cock ? from - half * 0.15 * Math.sin(Math.PI * k / cock) : from + 2 * half * (1 - Math.pow(1 - s2, 2.2)); // fast, then slow
+  const mid = tip - 0.9 * (1 - s2) * (k < cock ? 0 : 1); // the middle of the tail trails behind the tip
+  const thick = Math.max(8, radius[7] * 0.5);
+  const pt = (t) => { // a point along the tail, t 0..1: a curve from the pivot, bent towards where the tail has just been
+    const c1 = [f.x + Math.cos(mid) * L * 0.55, f.y + Math.sin(mid) * L * 0.55], p2 = [f.x + Math.cos(tip) * L * 0.97, f.y + Math.sin(tip) * L * 0.97];
+    return [(1 - t) * (1 - t) * f.x + 2 * (1 - t) * t * c1[0] + t * t * p2[0], (1 - t) * (1 - t) * f.y + 2 * (1 - t) * t * c1[1] + t * t * p2[1]];
+  };
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  // where it can reach, and the smear the tail has left on the way
+  ctx.fillStyle = `rgba(255,170,80,${0.12 * fade})`; ctx.strokeStyle = `rgba(255,220,150,${0.35 * fade})`; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.arc(f.x, f.y, L, base - half, base + half); ctx.closePath(); ctx.fill(); ctx.stroke();
-  const tip = base - half + 2 * half * (1 - (1 - k) * (1 - k)); // the tail sweeps from one edge to the other, fast then slow
-  ctx.lineCap = 'round'; ctx.strokeStyle = `rgba(255,245,210,${a})`; ctx.lineWidth = 9 * (1 - k) + 2;
-  ctx.beginPath(); ctx.arc(f.x, f.y, L * 0.82, Math.max(base - half, tip - 0.6), tip); ctx.stroke();
-  ctx.strokeStyle = `rgba(210,40,40,${a})`; ctx.lineWidth = 5 * (1 - k) + 1;
-  ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x + Math.cos(tip) * L * 0.9, f.y + Math.sin(tip) * L * 0.9); ctx.stroke();
+  const sweep = ctx.createRadialGradient(f.x, f.y, L * 0.2, f.x, f.y, L);
+  sweep.addColorStop(0, `rgba(255,230,190,0)`); sweep.addColorStop(1, `rgba(255,236,200,${0.45 * fade})`);
+  ctx.fillStyle = sweep; ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.arc(f.x, f.y, L, from, Math.max(from, tip)); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = `rgba(255,250,230,${0.8 * fade})`; ctx.lineWidth = 5 * (1 - k) + 1; // the streak at the tip's end of the smear
+  ctx.beginPath(); ctx.arc(f.x, f.y, L * 0.95, Math.max(from, tip - 0.7), Math.max(from, tip)); ctx.stroke();
+  // the tail: sampled along its curve, drawn fat to thin, dark outline under red, with a pale belly line
+  const N = 16, pts = []; for (let i = 0; i <= N; i++) pts.push(pt(i / N));
+  const w = (i) => thick * (1 - 0.7 * i / N);
+  ctx.globalAlpha = fade;
+  for (const [col, extra] of [['#5c1014', 5], ['#d22a2a', 0]]) {
+    for (let i = 0; i < N; i++) { ctx.strokeStyle = col; ctx.lineWidth = w(i + 0.5) + extra; ctx.beginPath(); ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[i + 1][0], pts[i + 1][1]); ctx.stroke(); }
+  }
+  ctx.strokeStyle = '#f3e3ba'; ctx.lineWidth = Math.max(2, thick * 0.22); ctx.beginPath(); // the pale underside
+  pts.slice(0, N - 2).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+  const [tx, ty] = pts[N], [px, py] = pts[N - 2], ta = Math.atan2(ty - py, tx - px), fin = thick * 1.5; // the fin at its tip
+  ctx.save(); ctx.translate(tx, ty); ctx.rotate(ta);
+  ctx.fillStyle = '#9a1c22'; ctx.strokeStyle = '#5c1014'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-fin * 0.15, 0); // a fan of rays with a scallop between each
+  for (let q = 0; q <= 4; q++) { const ang = -1 + q * 0.5; ctx.lineTo(Math.cos(ang) * fin * 1.05, Math.sin(ang) * fin * 1.05); if (q < 4) ctx.lineTo(Math.cos(ang + 0.25) * fin * 0.65, Math.sin(ang + 0.25) * fin * 0.65); }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#f0c23a'; ctx.lineWidth = 2.5; ctx.beginPath(); // gold ribs along the rays
+  for (let q = 0; q <= 4; q++) { const ang = -1 + q * 0.5; ctx.moveTo(fin * 0.1, 0); ctx.lineTo(Math.cos(ang) * fin * 0.95, Math.sin(ang) * fin * 0.95); }
+  ctx.stroke();
+  ctx.restore();
+  // the crack of it: white flashes at the tip while it is going fast
+  if (k > cock && k < 0.7) { ctx.strokeStyle = `rgba(255,255,255,${0.9 * (1 - k)})`; ctx.lineWidth = 2; for (let q = -1; q <= 1; q++) { ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + Math.cos(ta + q * 0.9) * fin * 1.4, ty + Math.sin(ta + q * 0.9) * fin * 1.4); ctx.stroke(); } }
   ctx.restore();
 }
 
@@ -1765,7 +1800,7 @@ function drawPlayer(i, p) {
   const running = sp > 0.35;
   if (running && Math.hypot(lk.vx, lk.vy) > 0.3) lk.dir = faceOf(lk.vx, lk.vy);
   lk.mv += ((running ? 1 : 0) - lk.mv) * 0.25; lk.ph += 0.2 * lk.mv;
-  const pose = { dir: lk.dir, mv: lk.mv, ph: lk.ph };
+  const pose = { dir: lk.dir, mv: lk.mv, ph: lk.ph, whip: p.k === 7 && p.tlcd > cdCfg.tail - TAIL_SWING }; // whip: its tail is out swinging, so the body is drawn without it
   if (p.k === 3) { // the leaf grows for the Leaf Slash and is swung by it, upper left to lower right on the first, the other way on the next
     const sgn = p.ln % 2 === 0 ? 1 : -1, e = p.lk * p.lk * (3 - 2 * p.lk); // eased: the swing gathers speed and slows at the end
     lk.ls += ((p.lp > 0 ? leafCfg.scale : 1) - lk.ls) * 0.3;
@@ -1902,7 +1937,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? 0.35 : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
