@@ -61,7 +61,7 @@ type Input struct {
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
 	AimY float64 `json:"ay"`
-	// The direction a skill that is aimed before it is cast goes (the Tail whip, the Vine whip): the page lets the player drag the
+	// The direction a skill that is aimed before it is cast goes (the Tail whip, the Vine whip, the Electro Ball): the page lets the player drag the
 	// button's own stick while it is held and sends the cast when it is let go. (0,0) = no direction chosen: at the opponent.
 	CastX float64 `json:"tx"`
 	CastY float64 `json:"ty"`
@@ -122,8 +122,9 @@ type Player struct {
 	FrozenT      float64 `json:"fz"` // seconds left frozen: no moving, no skills
 
 	// Electro Ball: BallT is the charge time left (0 = not charging).
-	BallT  float64 `json:"kt"`
-	BallCD float64 `json:"ecd"` // counted from the moment the charge starts
+	BallT    float64 `json:"kt"`
+	BallLock bool    `json:"-"`   // the throw goes the way the player chose, not after the opponent
+	BallCD   float64 `json:"ecd"` // counted from the moment the charge starts
 
 	// Charizard. Fly: seconds of flight left (the height follows in Z) and the cooldown, which starts on landing.
 	FlyT  float64 `json:"ft"`
@@ -701,9 +702,9 @@ func (g *Game) Step(dt float64) []Event {
 			}
 		}
 
-		// Pikachu's Electro Ball: charge rooted, then throw it at the opponent. The aim follows the opponent
-		// while charging, so the ball goes where it stands when the charge ends. Only one charge or Thunder
-		// cast at a time.
+		// Pikachu's Electro Ball: charge rooted, then throw it. Cast with a direction the player chose (see Input.CastX)
+		// the ball goes that way; cast without, the aim follows the opponent while charging, so the ball goes where it
+		// stands when the charge ends. Only one charge or Thunder cast at a time.
 		if p.Kind == pikachu {
 			bc := g.cfg.Pikachu.ElectroBall
 			if p.BallCD > 0 {
@@ -714,10 +715,14 @@ func (g *Game) Step(dt float64) []Event {
 			if in.Ball && p.BallT == 0 && p.ThunderLeft == 0 && p.BallCD == 0 {
 				p.BallT, p.BallCD = bc.ChargeTime, bc.Cooldown
 				p.DashT = 0 // charging roots Pikachu at once
+				p.BallLock = false
+				if n := math.Hypot(in.CastX, in.CastY); n > 1e-9 && !math.IsInf(n, 0) {
+					p.AimX, p.AimY, p.BallLock = in.CastX/n, in.CastY/n, true
+				}
 			}
 			if p.BallT > 0 {
-				casting = true                                                     // rooted through the tick of the throw, free from the next
-				if dx, dy := other.X-p.X, other.Y-p.Y; math.Hypot(dx, dy) > 1e-9 { // on top of it there is no direction: the aim stays
+				casting = true                                                                    // rooted through the tick of the throw, free from the next
+				if dx, dy := other.X-p.X, other.Y-p.Y; !p.BallLock && math.Hypot(dx, dy) > 1e-9 { // on top of it there is no direction: the aim stays
 					n := math.Hypot(dx, dy)
 					p.AimX, p.AimY = dx/n, dy/n
 				}

@@ -2332,3 +2332,35 @@ func TestInputCarriesTheStickAimOverTheWire(t *testing.T) {
 		t.Fatalf("aim = (%v,%v), want (0.38,-0.92)", in.AimX, in.AimY)
 	}
 }
+
+func TestElectroBallGoesWhereTheCastSaysAndStopsTrackingTheOpponent(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	g.P[pikachu].X, g.P[pikachu].Y = 800, 500
+	g.P[snorlax].X, g.P[snorlax].Y = 1000, 500 // the opponent is to the right
+	g.P[pikachu].In = Input{Ball: true, CastX: 0, CastY: -30}
+	g.Step(dt)
+	g.P[pikachu].In = Input{}
+	g.P[snorlax].X, g.P[snorlax].Y = 1000, 700 // it moves while the ball charges
+	steps(g, 20)
+	if len(g.Balls) != 1 {
+		t.Fatalf("%d balls, want the one that was thrown", len(g.Balls))
+	}
+	if b := g.Balls[0]; b.DX != 0 || b.DY != -1 {
+		t.Fatalf("ball goes %v,%v, want 0,-1: the way it was cast, whatever the opponent does", b.DX, b.DY)
+	}
+}
+
+func TestElectroBallWithNoDirectionStillFollowsTheOpponentWhileCharging(t *testing.T) {
+	g := ballGame(DefaultConfig())
+	g.P[pikachu].X, g.P[pikachu].Y = 800, 500
+	g.P[snorlax].X, g.P[snorlax].Y = 1000, 500
+	pressBall(g)
+	g.P[snorlax].X, g.P[snorlax].Y = 800, 700 // now straight below
+	steps(g, 20)
+	if len(g.Balls) != 1 {
+		t.Fatalf("%d balls, want 1", len(g.Balls))
+	}
+	if b := g.Balls[0]; math.Abs(b.DX) > 1e-9 || math.Abs(b.DY-1) > 1e-9 {
+		t.Fatalf("ball goes %v,%v, want 0,1: at where the opponent stood when the charge ended", b.DX, b.DY)
+	}
+}

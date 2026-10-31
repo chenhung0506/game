@@ -314,12 +314,12 @@ const touch = { skill: false, thunder: false, beam: false, ball: false, punch: f
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
-// An aimed skill (the Tail whip and the Vine whip; more to come): holding its button shows the fan only to its player and turns the button
+// An aimed skill (the Tail whip, the Vine whip and the Electro Ball; more to come): holding its button shows the fan only to its player and turns the button
 // into a stick (or WASD, on the keyboard); letting go casts it that way, and a tap with no direction goes at the opponent.
 // `aiming` is the held one: { x, y } the direction on screen (0, 0 = none), kbd when it is the keyboard's. `cast` is the
 // direction sent with the cast, which lasts a moment (a few ticks) so the server cannot miss it.
 let aiming = null, cast = { x: 0, y: 0 };
-const AIMED = { 3: 'vine', 7: 'tail' }; // the aimed skill (K's) of each character; its button is `touch[name]`
+const AIMED = { 0: 'ball', 3: 'vine', 7: 'tail' }; // the aimed skill (K's) of each character; its button is `touch[name]`
 const CAST_PULSE = 120; // ms
 const toWorld = (x, y) => { const c = Math.cos(ROT), s = Math.sin(ROT); return { x: x * c + y * s, y: -x * s + y * c }; }; // a direction on screen, in the world
 function kbdAim() { return { x: (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0), y: (keys.has('s') ? 1 : 0) - (keys.has('w') ? 1 : 0) }; }
@@ -347,7 +347,7 @@ function sendInput() {
     ax: Math.round((stickAim.x * c + stickAim.y * s) * 100) / 100 || 0,
     ay: Math.round((-stickAim.x * s + stickAim.y * c) * 100) / 100 || 0,
     // J is the left of the two small buttons on the pad (the first of its two), K the right one
-    skill: k(' ') || touch.skill, thunder: k('j') || touch.thunder, ball: k('k') || touch.ball, beam: k('j') || touch.beam, punch: k('k') || touch.punch,
+    skill: k(' ') || touch.skill, thunder: k('j') || touch.thunder, ball: touch.ball, beam: k('j') || touch.beam, punch: k('k') || touch.punch,
     // the keys are shared between the characters (J and K each do whatever the one you play has); the server uses the ones that fit
     fire: k('j') || touch.fire, toss: k('k') || touch.toss,
     razor: k('j') || touch.razor, vine: touch.vine,
@@ -399,7 +399,7 @@ if (PORTRAIT) {
 // The pad: a stick bottom-left, and bottom-right a big main button with small ones around it.
 // A small slot that is null is reserved and not drawn.
 const PAD = [
-  { main: ['伏特攻擊', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball']] }, // Pikachu
+  { main: ['伏特攻擊', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball', true]] }, // Pikachu
   { main: ['跳躍', 'skill'], small: [['死光', 'beam'], ['冰拳', 'punch']] }, // Snorlax
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
   { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine', true]] }, // Chikorita
@@ -925,6 +925,14 @@ function drawTelegraph() {
 // real warning takes over. Without a direction it points at the opponent, which is where a tap would send it.
 function drawAimFan(p, d) {
   const o = disp[1 - you], n = Math.hypot(aiming.x, aiming.y), w = n ? toWorld(aiming.x / n, aiming.y / n) : { x: o.x - d.x, y: o.y - d.y };
+  if (aiming.name === 'ball') { // the ball flies straight: a line, and the ball where it starts
+    const base = Math.atan2(w.y, w.x);
+    ctx.save(); ctx.globalAlpha = p.ecd > 0 ? 0.4 : 1;
+    ctx.strokeStyle = 'rgba(255,235,120,0.85)'; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
+    ctx.beginPath(); ctx.moveTo(d.x + Math.cos(base) * 30, d.y + Math.sin(base) * 30); ctx.lineTo(d.x + Math.cos(base) * 420, d.y + Math.sin(base) * 420); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,225,74,0.9)'; ctx.beginPath(); ctx.arc(d.x + Math.cos(base) * (radius[0] + ballCfg.radius), d.y + Math.sin(base) * (radius[0] + ballCfg.radius), ballCfg.radius, 0, 7); ctx.stroke();
+    ctx.restore(); return;
+  }
   const vine = aiming.name === 'vine'; // the vines sweep in from +-angle, the tail covers its whole angle
   const half = (vine ? vineCfg.angle : tailCfg.angle / 2) * Math.PI / 180, base = Math.atan2(w.y, w.x), L = vine ? vineCfg.len : tailCfg.length, ready = !((vine ? p.vcd : p.tlcd) > 0);
   ctx.save(); ctx.globalAlpha = ready ? 1 : 0.4;
