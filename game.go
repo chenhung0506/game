@@ -61,6 +61,10 @@ type Input struct {
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
 	AimY float64 `json:"ay"`
+	// The direction a skill that is aimed before it is cast goes (the Tail whip): the page lets the player drag the
+	// button's own stick while it is held and sends the cast when it is let go. (0,0) = no direction chosen: at the opponent.
+	CastX float64 `json:"tx"`
+	CastY float64 `json:"ty"`
 }
 
 type Player struct {

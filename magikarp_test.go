@@ -322,12 +322,11 @@ func TestTailWhipKnocksBackAndStunsWhoeverIsInTheFanAlongTheAim(t *testing.T) {
 		{"just in reach", 0, tw.Length + cfg.Snorlax.Radius - 5, true},
 	} {
 		g := gya(cfg, snorlax)
-		g.P[0].AimX, g.P[0].AimY = 1, 0
 		ux, uy := deg(c.angle)
 		g.P[1].X, g.P[1].Y = 800+c.d*ux, 500+c.d*uy
 		g.P[0].X, g.P[0].Y = 800, 500
 		x0, y0 := g.P[1].X, g.P[1].Y
-		ev := press(g, 0, Input{Tail: true})
+		ev := press(g, 0, Input{Tail: true, CastX: 1}) // the player chose to the right
 		moved := math.Hypot(g.P[1].X-x0, g.P[1].Y-y0)
 		if c.hit {
 			if math.Abs(moved-tw.Knockback) > 1e-6 || math.Abs(g.P[1].StunT-tw.StunDuration) > dt+1e-9 {
@@ -342,15 +341,29 @@ func TestTailWhipKnocksBackAndStunsWhoeverIsInTheFanAlongTheAim(t *testing.T) {
 	}
 }
 
-func TestTailWhipFollowsTheAimNotTheOpponent(t *testing.T) {
+func TestTailWhipGoesWhereTheCastSaysAndAtTheOpponentWhenItSaysNothing(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Gyarados.TailWhip.ChargeDuration = 0 // these are about the whip itself: no wind-up
-	g := gya(cfg, snorlax)
-	g.P[0].AimX, g.P[0].AimY = 0, 1 // aimed at the floor of the court, the opponent is to the right
-	g.P[1].X, g.P[1].Y = 450, 250
-	press(g, 0, Input{Tail: true})
-	if g.P[1].StunT != 0 {
-		t.Fatal("it hit an opponent that is not where it aims")
+	for _, c := range []struct {
+		name   string
+		in     Input
+		hitsAt [2]float64 // where the opponent stands, 150 from Gyarados
+		hit    bool
+	}{
+		{"no direction: at an opponent to the right", Input{Tail: true}, [2]float64{1, 0}, true},
+		{"no direction: at an opponent above", Input{Tail: true}, [2]float64{0, -1}, true},
+		{"the stick and the walking direction do not aim it", Input{Tail: true, AimX: 0, AimY: 1, DX: -1}, [2]float64{1, 0}, true},
+		{"a chosen direction wins over the opponent", Input{Tail: true, CastX: 0, CastY: 1}, [2]float64{1, 0}, false},
+		{"a chosen direction is any length", Input{Tail: true, CastX: 0, CastY: 40}, [2]float64{0, 1}, true},
+		{"a direction nobody can send is none", Input{Tail: true, CastX: math.Inf(1)}, [2]float64{0, 1}, true},
+	} {
+		g := gya(cfg, snorlax)
+		g.P[0].X, g.P[0].Y = 800, 500
+		g.P[1].X, g.P[1].Y = 800+150*c.hitsAt[0], 500+150*c.hitsAt[1]
+		press(g, 0, c.in)
+		if got := g.P[1].StunT != 0; got != c.hit {
+			t.Errorf("%s: hit = %v, want %v", c.name, got, c.hit)
+		}
 	}
 }
 

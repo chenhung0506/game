@@ -116,14 +116,11 @@ func (g *Game) stepGyarados(i int, in Input, dt float64) ([]Event, bool) {
 	}
 
 	// ---- Tail whip: wind up with the fan shown, then hit what is in it ----
-	// The fan goes along the aim (the stick, else the last way it walked, like the Ice Punch) as it was when K was
-	// pressed, so the warning is exactly what gets hit. Gyarados is rooted while it winds up, and through the tick it hits in.
+	// The fan goes the way the player chose (the page's tail stick, see Input.CastX) as it was when the cast came in, or at the
+	// opponent when none was chosen, so the warning is exactly what gets hit. Gyarados is rooted while it winds up, and through the tick it hits in.
 	if in.Tail && p.TailCD == 0 && p.TailT == 0 && p.WaveT == 0 && !beamBusy {
 		p.TailCD = tw.Cooldown // counted from the press
-		p.TailX, p.TailY = p.AimX, p.AimY
-		if math.Hypot(p.TailX, p.TailY) < 1e-9 {
-			p.TailX, p.TailY = unit(float64(p.FX), float64(p.FY))
-		}
+		p.TailX, p.TailY = g.castDir(i, in)
 		p.TailT = tw.ChargeDuration
 		if p.TailT == 0 {
 			events = append(events, g.whip(i)...)
@@ -172,4 +169,17 @@ func (g *Game) stepWaves(dt float64) {
 		}
 	}
 	g.Waves = kept
+}
+
+// castDir is the unit direction slot i's aimed skill goes: the one the player chose, else straight at the opponent
+// (else the way it faces, when they are on the same spot).
+func (g *Game) castDir(i int, in Input) (float64, float64) {
+	if n := math.Hypot(in.CastX, in.CastY); n > 1e-9 && !math.IsInf(n, 0) {
+		return in.CastX / n, in.CastY / n
+	}
+	p, o := &g.P[i], &g.P[1-i]
+	if n := math.Hypot(o.X-p.X, o.Y-p.Y); n > 1e-9 {
+		return (o.X - p.X) / n, (o.Y - p.Y) / n
+	}
+	return unit(float64(p.FX), float64(p.FY))
 }

@@ -22,6 +22,10 @@
   .knob { position: absolute; left: 38px; top: 38px; width: 60px; height: 60px; border-radius: 50%; background: #ffffff88; pointer-events: none; }
   .btn { display: flex; align-items: center; justify-content: center; background: #ffffff2a; border: 2px solid #ffffff66; color: #fff; font-weight: bold; }
   .btn.on { background: #ffffff77; }
+  .aimring, .aimdot { position: absolute; left: 50%; top: 50%; border-radius: 50%; pointer-events: none; display: none; }
+  .aimring { width: 150px; height: 150px; margin: -75px 0 0 -75px; border: 2px dashed #ffffff88; }
+  .aimdot { width: 26px; height: 26px; margin: -13px 0 0 -13px; background: #ffd27acc; }
+  .btn.aim .aimring, .btn.aim .aimdot { display: block; }
   /* cooldown: a dark pie over the button, the part still to wait, shrinking clockwise from the top */
   /* character choice: shown from connecting until the match starts */
   #pick { position: fixed; inset: 0; z-index: 4; background: #14161c; display: none; flex-direction: column; align-items: center; padding: 56px 12px 12px; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; }
@@ -142,6 +146,7 @@ ws.onmessage = (e) => {
     if (teamSize !== (m.size || NAMES.length)) { teamSize = m.size || NAMES.length; myOrder = []; sentOrder = ''; } // another team size: choose again
     if (teamMode !== !!m.team) { teamMode = !!m.team; myOrder = []; sentOrder = ''; } // another match type: choose again
     if (sentOrder && m.picks[you] < 0) { myOrder = []; sentOrder = ''; } // sent back to choose again
+    endAim(false); // a match that ended while the tail was being aimed
     ease = m.ease || [0, 0];
     picks = m.picks; here = m.here; bots = m.bot || [-1, -1]; waiting = !(here[0] && here[1]); snap = null; padKind = -1;
     document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
@@ -309,11 +314,30 @@ const touch = { skill: false, thunder: false, beam: false, ball: false, punch: f
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
+// An aimed skill (the Tail whip; more to come): holding its button shows the fan only to its player and turns the button
+// into a stick (or WASD, on the keyboard); letting go casts it that way, and a tap with no direction goes at the opponent.
+// `aiming` is the held one: { x, y } the direction on screen (0, 0 = none), kbd when it is the keyboard's. `cast` is the
+// direction sent with the cast, which lasts a moment (a few ticks) so the server cannot miss it.
+let aiming = null, cast = { x: 0, y: 0 };
+const AIMED_KEY = { 7: 'k' }; // the keyboard key of the aimed skill, by character
+const CAST_PULSE = 120; // ms
+const toWorld = (x, y) => { const c = Math.cos(ROT), s = Math.sin(ROT); return { x: x * c + y * s, y: -x * s + y * c }; }; // a direction on screen, in the world
+function kbdAim() { return { x: (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0), y: (keys.has('s') ? 1 : 0) - (keys.has('w') ? 1 : 0) }; }
+function beginAim(a) { if (aiming || !snap) return; aiming = a; document.body.classList.add('aiming'); }
+function endAim(doCast) {
+  if (!aiming) return;
+  const a = aiming; aiming = null; document.body.classList.remove('aiming');
+  if (!doCast) return;
+  const n = Math.hypot(a.x, a.y), w = n ? toWorld(a.x / n, a.y / n) : { x: 0, y: 0 };
+  cast = w; touch.tail = true; sendInput();
+  setTimeout(() => { touch.tail = false; cast = { x: 0, y: 0 }; sendInput(); }, CAST_PULSE);
+}
 function sendInput() {
+  if (aiming && aiming.kbd) { const v = kbdAim(); aiming.x = v.x; aiming.y = v.y; } // WASD aims instead of walking while K is held
   const k = (n) => keys.has(n);
   // the keyboard is the same for every character: WASD walks, space is the main skill, K and J the two others
-  let sx = (k('d') ? 1 : 0) - (k('a') ? 1 : 0);
-  let sy = (k('s') ? 1 : 0) - (k('w') ? 1 : 0);
+  let sx = aiming && aiming.kbd ? 0 : (k('d') ? 1 : 0) - (k('a') ? 1 : 0);
+  let sy = aiming && aiming.kbd ? 0 : (k('s') ? 1 : 0) - (k('w') ? 1 : 0);
   if (stick.x || stick.y) { sx = stick.x; sy = stick.y; }
   const c = Math.cos(ROT), s = Math.sin(ROT);
   const msg = JSON.stringify({
@@ -329,13 +353,18 @@ function sendInput() {
     razor: k('j') || touch.razor, vine: k('k') || touch.vine,
     storm: k('j') || touch.storm, freeze: k('k') || touch.freeze,
     arrow: k('j') || touch.arrow, twister: k('k') || touch.twister,
-    tail: k('k') || touch.tail,
+    tail: touch.tail, tx: Math.round(cast.x * 100) / 100 || 0, ty: Math.round(cast.y * 100) / 100 || 0, // the tail is cast when its button is let go (see endAim), not while it is held
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
-addEventListener('keydown', (e) => { if (e.key === ' ') e.preventDefault(); keys.add(e.key.toLowerCase()); sendInput(); });
-addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); sendInput(); });
-addEventListener('blur', () => { keys.clear(); stick = { x: 0, y: 0 }; stickAim = { x: 0, y: 0 }; for (const n in touch) touch[n] = false; sendInput(); }); // no stuck keys after alt-tab
+addEventListener('keydown', (e) => {
+  if (e.key === ' ') e.preventDefault();
+  const n = e.key.toLowerCase();
+  if (!e.repeat && n === AIMED_KEY[padKind]) beginAim({ x: 0, y: 0, kbd: true });
+  keys.add(n); sendInput();
+});
+addEventListener('keyup', (e) => { const n = e.key.toLowerCase(); keys.delete(n); if (n === AIMED_KEY[padKind] && aiming && aiming.kbd) endAim(true); sendInput(); });
+addEventListener('blur', () => { endAim(false); keys.clear(); stick = { x: 0, y: 0 }; stickAim = { x: 0, y: 0 }; for (const n in touch) touch[n] = false; sendInput(); }); // no stuck keys after alt-tab
 addEventListener('contextmenu', (e) => { if (PORTRAIT) e.preventDefault(); }); // a long press must not open a menu
 
 // Keep the page from zooming. The viewport tag and touch-action cover most browsers; iOS Safari ignores
@@ -377,7 +406,7 @@ const PAD = [
   { main: ['冰山', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
   { main: ['滑翔', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
-  { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail']] }, // Gyarados
+  { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
@@ -404,11 +433,27 @@ function buildPad() {
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
   const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
-  const hold = (b, label, name) => {
+  const hold = (b, label, name, aimed) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
     cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1] });
     if (padKind === 0 && name === 'skill') { usesBadge = document.createElement('div'); usesBadge.className = 'uses'; b.append(usesBadge); }
+    if (aimed) { // the button turns into a stick while it is held: the way it is dragged is the way the skill goes
+      const ring = document.createElement('div'), dot = document.createElement('div'); ring.className = 'aimring'; dot.className = 'aimdot'; b.append(ring, dot);
+      const DEAD = 20, MAXR = 56;
+      const drag = (e) => {
+        const r = b.getBoundingClientRect(), vx = e.clientX - (r.left + r.width / 2), vy = e.clientY - (r.top + r.height / 2), len = Math.hypot(vx, vy);
+        if (aiming) { aiming.x = len < DEAD ? 0 : vx / len; aiming.y = len < DEAD ? 0 : vy / len; }
+        const pull = Math.min(len, MAXR);
+        dot.style.transform = len ? `translate(${vx / len * pull}px, ${vy / len * pull}px)` : '';
+      };
+      b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (id !== null) return; id = e.pointerId; b.setPointerCapture(id); beginAim({ x: 0, y: 0 }); b.classList.add('on', 'aim'); drag(e); });
+      b.addEventListener('pointermove', (e) => { if (e.pointerId === id) drag(e); });
+      const end = (doCast) => (e) => { if (e.pointerId !== id) return; id = null; b.classList.remove('on', 'aim'); dot.style.transform = ''; endAim(doCast); };
+      b.addEventListener('pointerup', end(true));
+      for (const t of ['pointercancel', 'lostpointercapture']) b.addEventListener(t, end(false));
+      return;
+    }
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (id !== null) return; id = e.pointerId; b.setPointerCapture(id); touch[name] = true; b.classList.add('on'); sendInput(); });
     const up = (e) => { if (e.pointerId !== id) return; id = null; touch[name] = false; b.classList.remove('on'); sendInput(); };
     for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(t, up);
@@ -421,7 +466,7 @@ function buildPad() {
     const def = PAD[padKind].small[n];
     if (!def) return;
     const b = el('btn'), a = deg * Math.PI / 180;
-    place(b, SMALL, mcx - R * Math.cos(a), mcy + R * Math.sin(a)); b.style.fontSize = '14px'; hold(b, def[0], def[1]);
+    place(b, SMALL, mcx - R * Math.cos(a), mcy + R * Math.sin(a)); b.style.fontSize = '14px'; hold(b, def[0], def[1], def[2]);
   });
 }
 
@@ -874,6 +919,18 @@ const teleCtx = tele.getContext('2d');
 function drawTelegraph() {
   for (const si of beamSlots()) drawFan(snap.p[si], disp[si]);
   for (const si of slotsOf(7)) drawTailWarning(snap.p[si], disp[si]);
+  if (aiming && snap.p[you].k === 7) drawTailAim(snap.p[you], disp[you]);
+}
+// The fan the player is choosing, drawn for them only (the opponent's page never gets it; it is not sent) until the cast, when the
+// real warning takes over. Without a direction it points at the opponent, which is where a tap would send it.
+function drawTailAim(p, d) {
+  const o = disp[1 - you], n = Math.hypot(aiming.x, aiming.y), w = n ? toWorld(aiming.x / n, aiming.y / n) : { x: o.x - d.x, y: o.y - d.y };
+  const half = tailCfg.angle / 2 * Math.PI / 180, base = Math.atan2(w.y, w.x), L = tailCfg.length, ready = !(p.tlcd > 0);
+  ctx.save(); ctx.globalAlpha = ready ? 1 : 0.4;
+  ctx.fillStyle = 'rgba(255,230,150,0.16)'; ctx.strokeStyle = 'rgba(255,235,190,0.85)'; ctx.lineWidth = 2; ctx.setLineDash([10, 7]);
+  ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.arc(d.x, d.y, L, base - half, base + half); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + Math.cos(base) * L, d.y + Math.sin(base) * L); ctx.stroke();
+  ctx.restore();
 }
 function drawFan(p, d) {
   if (!(p.bt > 0)) return;
