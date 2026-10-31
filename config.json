@@ -264,21 +264,21 @@
     }
   },
   "magikarp": {
-    "max_hp": 100,
+    "max_hp": 150,
     "walk_speed": 100,
     "radius": 10,
     "evolve_hops": 5,
     "jump": {
       "height": 150,
       "duration": 1.5,
-      "highest_point_duration": 0.5,
+      "highest_point_duration": 0.3,
       "cooldown": 4,
       "air_speed_first_half": 100,
       "air_speed_second_half": 30
     }
   },
   "gyarados": {
-    "max_hp": 300,
+    "max_hp": 450,
     "walk_speed": 130,
     "radius": 75,
     "wave": {
