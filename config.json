@@ -219,7 +219,7 @@
     "radius": 13,
     "fly_high": 30,
     "tailwind": {
-      "radius": 120,
+      "radius": 220,
       "speed": 600,
       "duration": 0.5,
       "cooldown": 4
