@@ -294,8 +294,8 @@
     "tail_whip": {
       "min_height": 0,
       "max_height": 60,
-      "charge_duration": 0.5,
-      "angle": 180,
+      "charge_duration": 0.6,
+      "angle": 110,
       "length": 700,
       "knockback": 400,
       "stun_duration": 1.5,
