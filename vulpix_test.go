@@ -282,6 +282,20 @@ func TestIceStormStrikesWearDownTheOpponentsProjectilesInItsArea(t *testing.T) {
 
 // ---- Freeze Beam ----
 
+func TestFreezeBeamStartsAsFarFromVulpixAsStartDistanceSays(t *testing.T) {
+	for _, d := range []float64{0, 40, 130, 450} {
+		cfg := vulpixConfig()
+		cfg.Vulpix.FreezeBeam.StartDistance = d
+		g := vg(cfg)
+		g.P[0].AimX, g.P[0].AimY = 0, 1 // not along the court's length, so x and y are not mixed up
+		g.P[0].In.Freeze = true
+		steps(g, 1)
+		if p := g.P[0]; p.FBeamX != 300 || math.Abs(p.FBeamY-(250+d)) > 1e-9 {
+			t.Errorf("start_distance %v: the beam starts at %v,%v, want 300,%v", d, p.FBeamX, p.FBeamY, 250+d)
+		}
+	}
+}
+
 func TestFreezeBeamRootsVulpixAndTheStickMovesItsEndAtSpeed(t *testing.T) {
 	cfg := vulpixConfig()
 	fb := cfg.Vulpix.FreezeBeam
@@ -289,8 +303,8 @@ func TestFreezeBeamRootsVulpixAndTheStickMovesItsEndAtSpeed(t *testing.T) {
 	g.P[0].AimX, g.P[0].AimY = 1, 0
 	g.P[0].In.Freeze = true
 	steps(g, 1)
-	if want := 300 + fb.Length/2; math.Abs(g.P[0].FBeamX-want) > 1e-9 || g.P[0].FBeamY != 250 {
-		t.Fatalf("the beam starts at %v,%v, want %v,250: half the length along the aim", g.P[0].FBeamX, g.P[0].FBeamY, want)
+	if want := 300 + fb.StartDistance; math.Abs(g.P[0].FBeamX-want) > 1e-9 || g.P[0].FBeamY != 250 {
+		t.Fatalf("the beam starts at %v,%v, want %v,250: start_distance along the aim", g.P[0].FBeamX, g.P[0].FBeamY, want)
 	}
 	if g.P[0].FBeamT <= 0 || g.P[0].FBeamCD <= 0 {
 		t.Fatalf("FBeamT %v FBeamCD %v", g.P[0].FBeamT, g.P[0].FBeamCD)
@@ -635,16 +649,17 @@ func TestVulpixConfigLoadsAndRefusesBadValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, mut := range map[string]func(c *Config){
-		"vulpix.frost_field.slow":         func(c *Config) { c.Vulpix.FrostField.Slow = 1.5 },
-		"vulpix.frost_field.patches":      func(c *Config) { c.Vulpix.FrostField.Patches = 201 },
-		"vulpix.frost_field.patch_radius": func(c *Config) { c.Vulpix.FrostField.PatchRadius = 0 },
-		"vulpix.frost_field.boost":        func(c *Config) { c.Vulpix.FrostField.Boost = -1 },
-		"vulpix.ice_storm.freeze_hits":    func(c *Config) { c.Vulpix.IceStorm.FreezeHits = 0 }, // it would divide by zero
-		"vulpix.ice_storm.strikes":        func(c *Config) { c.Vulpix.IceStorm.Strikes = 0 },
-		"vulpix.freeze_beam.pillar_hp":    func(c *Config) { c.Vulpix.FreezeBeam.PillarHP = 0 },
-		"vulpix.freeze_beam.length":       func(c *Config) { c.Vulpix.FreezeBeam.Length = 0 },
-		"vulpix.freeze_beam":              func(c *Config) { c.Vulpix.FreezeBeam.MinHeight, c.Vulpix.FreezeBeam.MaxHeight = 50, 10 },
-		"vulpix.ice_storm":                func(c *Config) { c.Vulpix.IceStorm.MinHeight = -1 },
+		"vulpix.frost_field.slow":           func(c *Config) { c.Vulpix.FrostField.Slow = 1.5 },
+		"vulpix.frost_field.patches":        func(c *Config) { c.Vulpix.FrostField.Patches = 201 },
+		"vulpix.frost_field.patch_radius":   func(c *Config) { c.Vulpix.FrostField.PatchRadius = 0 },
+		"vulpix.frost_field.boost":          func(c *Config) { c.Vulpix.FrostField.Boost = -1 },
+		"vulpix.ice_storm.freeze_hits":      func(c *Config) { c.Vulpix.IceStorm.FreezeHits = 0 }, // it would divide by zero
+		"vulpix.ice_storm.strikes":          func(c *Config) { c.Vulpix.IceStorm.Strikes = 0 },
+		"vulpix.freeze_beam.pillar_hp":      func(c *Config) { c.Vulpix.FreezeBeam.PillarHP = 0 },
+		"vulpix.freeze_beam.length":         func(c *Config) { c.Vulpix.FreezeBeam.Length = 0 },
+		"vulpix.freeze_beam.start_distance": func(c *Config) { c.Vulpix.FreezeBeam.StartDistance = c.Vulpix.FreezeBeam.Length + 1 },
+		"vulpix.freeze_beam":                func(c *Config) { c.Vulpix.FreezeBeam.MinHeight, c.Vulpix.FreezeBeam.MaxHeight = 50, 10 },
+		"vulpix.ice_storm":                  func(c *Config) { c.Vulpix.IceStorm.MinHeight = -1 },
 	} {
 		c := good
 		mut(&c)

@@ -271,6 +271,7 @@ type Config struct {
 			Cooldown        float64 `json:"cooldown"` // counted from the start of the beam
 			ControlDuration float64 `json:"control_duration"`
 			Length          float64 `json:"length"`
+			StartDistance   float64 `json:"start_distance"` // where the beam starts, from the body along the aim: 0 at Vulpix, `length` at the far end
 			PillarRadius    float64 `json:"pillar_radius"`
 			PillarHP        int     `json:"pillar_hp"`
 			PillarDuration  float64 `json:"pillar_duration"`
@@ -490,6 +491,7 @@ func DefaultConfig() Config {
 	c.Vulpix.FreezeBeam.Cooldown = 12
 	c.Vulpix.FreezeBeam.ControlDuration = 3
 	c.Vulpix.FreezeBeam.Length = 450
+	c.Vulpix.FreezeBeam.StartDistance = 225 // half the length
 	c.Vulpix.FreezeBeam.PillarRadius = 24
 	c.Vulpix.FreezeBeam.PillarHP = 25
 	c.Vulpix.FreezeBeam.PillarDuration = 8
@@ -748,6 +750,7 @@ func (c Config) validate() error {
 		{"rowlet.tornado.landing_damage", float64(c.Rowlet.Tornado.LandingDamage)},
 		{"rowlet.tornado.cooldown", c.Rowlet.Tornado.Cooldown},
 		{"rowlet.tornado.mass", c.Rowlet.Tornado.Mass},
+		{"vulpix.freeze_beam.start_distance", c.Vulpix.FreezeBeam.StartDistance},
 	} {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
@@ -797,6 +800,9 @@ func (c Config) validate() error {
 	}
 	if v := c.Vulpix.FrostField.Slow; !(v >= 0 && v <= 1) { // 1 = a body on the frost cannot move at all
 		return fmt.Errorf("vulpix.frost_field.slow must be between 0 and 1, got %v", v)
+	}
+	if fb := c.Vulpix.FreezeBeam; !(fb.StartDistance <= fb.Length) { // the end could not start farther out than it may go
+		return fmt.Errorf("vulpix.freeze_beam.start_distance must be at most length, got %v and %v", fb.StartDistance, fb.Length)
 	}
 	if a := c.Charizard.FireBreath.RandomOffsetAngle; !(a >= 0 && a <= 90) { // 0 = every fire ball flies straight at the target
 		return fmt.Errorf("charizard.fire_breath.random_offset_angle must be between 0 and 90, got %v", a)

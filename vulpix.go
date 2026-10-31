@@ -20,7 +20,7 @@ const (
 // Ice Storm: the storm starts on Vulpix and chases the opponent, striking every `interval` seconds like Thunder. Each
 // strike also takes `damage` off every projectile of the other player inside its area.
 //
-// Freeze Beam: the stick moves the end of the beam over the ground at `speed`, at most `length` from the body; the
+// Freeze Beam: the end of the beam starts `start_distance` from the body along the aim; the stick then moves it over the ground at `speed`, at most `length` from the body; the
 // beam hurts nobody, and an ice pillar rises wherever its end passes (not on top of another of Vulpix's).
 func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 	var events []Event
@@ -91,7 +91,7 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 	// ---- Freeze Beam ----
 	if in.Freeze && p.FBeamT == 0 && p.FBeamCD == 0 {
 		p.FBeamT, p.FBeamCD = fb.ControlDuration, fb.Cooldown
-		p.FBeamX, p.FBeamY = g.clampBeamEnd(p, p.X+p.AimX*fb.Length/2, p.Y+p.AimY*fb.Length/2)
+		p.FBeamX, p.FBeamY = g.clampBeamEnd(p, p.X+p.AimX*fb.StartDistance, p.Y+p.AimY*fb.StartDistance)
 		g.raisePillars(i, p.FBeamX, p.FBeamY, p.FBeamX, p.FBeamY)
 	} else if p.FBeamT > 0 {
 		x0, y0 := p.FBeamX, p.FBeamY

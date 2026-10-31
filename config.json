@@ -207,6 +207,7 @@
       "cooldown": 12,
       "control_duration": 4,
       "length": 500,
+      "start_distance": 150,
       "pillar_radius": 30,
       "pillar_hp": 15,
       "pillar_duration": 10
