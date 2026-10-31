@@ -278,7 +278,7 @@
     }
   },
   "gyarados": {
-    "max_hp": 450,
+    "max_hp": 600,
     "walk_speed": 130,
     "radius": 75,
     "wave": {
