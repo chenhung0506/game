@@ -323,7 +323,7 @@ func (r *room) nextRound() {
 		r.g.SetKinds(r.order[0][r.cur[0]], r.order[1][r.cur[1]])
 		for i, h := range hp {
 			if h > 0 {
-				r.g.P[i].HP = h
+				r.g.P[i].HP = min(h, r.g.maxHP(i)) // a Gyarados that won comes back as a Magikarp, which cannot hold that much
 			}
 		}
 	}
@@ -462,12 +462,15 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 
 	r.mu.Lock()
 	cfg := r.g.cfg
-	hb, th, fb, ts := cfg.Snorlax.HyperBeam, cfg.Pikachu.Thunder, cfg.Charizard.FireBreath, cfg.Charizard.SeismicToss // tunable, so the client takes them from here instead of hard-coding
+	hb, gb, th, fb, ts := cfg.Snorlax.HyperBeam, cfg.Gyarados.HyperBeam, cfg.Pikachu.Thunder, cfg.Charizard.FireBreath, cfg.Charizard.SeismicToss // tunable, so the client takes them from here instead of hard-coding
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
-		// per character: pikachu, snorlax, charizard, chikorita, vulpix, rowlet
-		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius},
-		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP},
+		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp and the gyarados it becomes
+		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Gyarados.Radius},
+		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Gyarados.MaxHP},
+		"evolve":  cfg.Magikarp.EvolveHops,
+		"wave":    map[string]float64{"radius": cfg.Gyarados.Wave.Radius, "speed": cfg.Gyarados.Wave.Speed},
+		"tail":    map[string]float64{"angle": cfg.Gyarados.TailWhip.Angle, "length": cfg.Gyarados.TailWhip.Length, "stun": cfg.Gyarados.TailWhip.StunDuration},
 		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "scale": cfg.Vulpix.FrostField.Scale, "duration": cfg.Vulpix.FrostField.Duration, "ride": cfg.Vulpix.FrostField.SprayDuration},
 		"storm":   map[string]float64{"radius": cfg.Vulpix.IceStorm.Radius, "interval": cfg.Vulpix.IceStorm.Interval, "strikes": float64(cfg.Vulpix.IceStorm.Strikes)},
 		"fbeam":   map[string]float64{"len": cfg.Vulpix.FreezeBeam.Length, "control": cfg.Vulpix.FreezeBeam.ControlDuration, "pillar": cfg.Vulpix.FreezeBeam.PillarRadius, "hp": float64(cfg.Vulpix.FreezeBeam.PillarHP), "life": cfg.Vulpix.FreezeBeam.PillarDuration},
@@ -481,16 +484,18 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"punch":   map[string]float64{"charge": cfg.Snorlax.IcePunch.ChargeDuration, "radius": cfg.Snorlax.IcePunch.Radius, "freeze": cfg.Snorlax.IcePunch.FreezeDuration, "distance": cfg.Snorlax.IcePunch.Distance},
 		"ball":    map[string]float64{"radius": cfg.Pikachu.ElectroBall.Radius, "hp": float64(cfg.Pikachu.ElectroBall.HP), "charge": cfg.Pikachu.ElectroBall.ChargeTime},
 		"beam":    map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},
+		"gbeam":   map[string]float64{"len": gb.Length, "w": gb.Width, "charge": gb.ChargeDuration, "angle": gb.SweepAngle}, // Gyarados's own
 		"thunder": map[string]float64{"radius": th.Radius, "delay": th.Delay, "interval": th.Interval, "strikes": float64(th.Strikes)},
 		"fire":    map[string]float64{"radius": fb.Radius, "hp": float64(fb.HP)},
 		"toss":    map[string]float64{"radius": ts.Radius, "high": ts.High},
 		"fly":     map[string]float64{"height": cfg.Charizard.Fly.Height},
 		"volt":    map[string]float64{"radius": cfg.Pikachu.VoltTackle.Radius, "uses": float64(cfg.Pikachu.VoltTackle.MaxUses), "window": cfg.Pikachu.VoltTackle.UseWindow},
 		// full cooldowns, so the pad's buttons can show how much of each is left
-		"cooldown": map[string]float64{"dash": cfg.Pikachu.VoltTackle.Cooldown, "thunder": th.Cooldown, "jump": cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown, "ball": cfg.Pikachu.ElectroBall.Cooldown, "punch": cfg.Snorlax.IcePunch.Cooldown,
+		"cooldown": map[string]float64{"dash": cfg.Pikachu.VoltTackle.Cooldown, "thunder": th.Cooldown, "jump": cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown, "gbeam": gb.Cooldown, "ball": cfg.Pikachu.ElectroBall.Cooldown, "punch": cfg.Snorlax.IcePunch.Cooldown,
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,
 			"frost": cfg.Vulpix.FrostField.Cooldown, "storm": cfg.Vulpix.IceStorm.Cooldown, "fbeam": cfg.Vulpix.FreezeBeam.Cooldown,
-			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown},
+			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown,
+			"hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
 	})
 	c.send <- hi
 	r.broadcastLobby() // both players learn who joined

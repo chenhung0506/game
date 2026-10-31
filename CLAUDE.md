@@ -1,6 +1,6 @@
 # game
 
-兩人即時對戰小遊戲：皮卡丘、卡比獸、噴火龍、菊草葉、六尾、木木梟六選二（連線後在選角畫面選，兩人可以選同一隻；美術是用形狀畫的佔位圖）。Go 伺服器 + 單頁 Canvas 前端，
+兩人即時對戰小遊戲：皮卡丘、卡比獸、噴火龍、菊草葉、六尾、木木梟、鯉魚王七選二（連線後在選角畫面選，兩人可以選同一隻；美術是用形狀畫的佔位圖）。Go 伺服器 + 單頁 Canvas 前端，
 WebSocket 同步。上線網址 https://game.linch.uk/ 。
 
 ## 指令
@@ -18,6 +18,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 
 | 檔案 | 內容 |
 |---|---|
+| `magikarp.go` | 鯉魚王（彈跳、累計進化）與它進化成的紅色暴鯉龍（海浪、擺尾；死光用卡比獸的）：`stepMagikarp` / `stepGyarados` / `stepWaves` / `evolve` |
 | `game.go` | 全部遊戲規則：`Step()` 每個 tick 推進一次，各技能（伏特攻擊、打雷、電球、跳躍落地、死光、急凍拳）都在這裡 |
 | `config.go` | `Config` 結構、預設值、驗證。設定檔的欄位名稱和註解以這裡為準 |
 | `config.json` | **實際在跑的數值**（會被打包進映像、也掛載到容器）。改這個調手感 |
@@ -32,7 +33,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 - **伺服器說了算**：客戶端只送「按住了哪些鍵」`{dx,dy,skill,razor,vine,punch,beam,ball,thunder,ax,ay}`，
   伺服器每 1/30 秒算一次，把所有狀態廣播給兩人。所以所有時間類參數實際上都以 tick（0.033 秒）為單位。
 - **配對（沒有房號）**：連線網址不帶房間，只帶 `?mode=`；`hub.join` 把新來的人放進「只有一個真人」的房間（`hub.waiting`：等最久的先；有同樣 `mode` 的優先，沒有就不挑），沒有就開一間新的（伺服器自己編號，玩家看不到）。所以同時在線的兩個人一定會被配在一起，也沒有「選房間」；那個人若正在和電腦對戰，電腦對局會被中斷（見「單機」）。真人離開後房間裡剩一個人就繼續等，沒人了房間就刪掉。已知限制：兩間房各剩一個人時，這兩個人不會被合併，要等新來的人才會各補滿一間。
-- **選角**：先進房的是 slot 0、後進的 slot 1，房間滿了就不會再有人被放進去（`full` 只在房間數到 `maxRooms` 時才出現）；角色由玩家選，存在 `Player.Kind`（0 皮卡丘、1 卡比獸、2 噴火龍、3 菊草葉、4 六尾、5 木木梟），快照每人帶 `k`。連線後伺服器送 `hi`（設定，`radius`/`maxhp` 依角色編號）與 `lobby`（`picks`、`here`）；客戶端送 `{"pick":k}`，兩人都選好才開打（`room.choose`）。不存在的角色、或比賽中選都會被拒絕，有人離開就回到選角畫面（另一人的選擇保留）。技能與判定看 `p.Kind`，不要看 slot；`NewGame` 的預設是 slot 0 皮卡丘、slot 1 卡比獸，所以大部分舊測試照舊。
+- **選角**：先進房的是 slot 0、後進的 slot 1，房間滿了就不會再有人被放進去（`full` 只在房間數到 `maxRooms` 時才出現）；角色由玩家選，存在 `Player.Kind`（0 皮卡丘、1 卡比獸、2 噴火龍、3 菊草葉、4 六尾、5 木木梟、6 鯉魚王；進化後變成 7 紅色暴鯉龍，是 `Player.Kind` 的值但**不能選**：`kinds`＝7 是能選的數量，`forms`＝8 是所有 kind 的數量，`hi` 的 `radius`/`maxhp` 長度是 `forms`，每一輪 `Reset` 都把暴鯉龍變回鯉魚王），快照每人帶 `k`。連線後伺服器送 `hi`（設定，`radius`/`maxhp` 依角色編號）與 `lobby`（`picks`、`here`）；客戶端送 `{"pick":k}`，兩人都選好才開打（`room.choose`）。不存在的角色、或比賽中選都會被拒絕，有人離開就回到選角畫面（另一人的選擇保留）。技能與判定看 `p.Kind`，不要看 slot；`NewGame` 的預設是 slot 0 皮卡丘、slot 1 卡比獸，所以大部分舊測試照舊。
 - **場地依開房者的版本決定**：頁面連線時帶 `mode=mobile|web`，只有第一個進房的人有效，兩種場地大小在
   `config.json` 的 `court`。`length` 是兩個角色之間的方向（網頁橫向、手機直向）。
 - **手機直式 = 把場地轉 90 度**：皮卡丘逆時針、卡比獸順時針，所以自己永遠在畫面下方。方向鍵與搖桿
@@ -66,6 +67,10 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 | 木木梟 | 空白鍵 / 主按鈕「滑翔」 | 滑翔（Tailwind）（`rowlet.go` `stepRowlet`）：沿按住的方向（沒按就朝向）出發，以半徑 `radius`、速度 `speed` 走圓弧 `duration` 秒，轉向對手所在那一側；轉過的角度 = `speed×duration/radius`（不另設角度參數），每步用弦長精確走在圓上；出發後方向鎖定；不傷人、不受冰霜／緩速影響；施放中視為定身（`casting`，走路程式不介入），被冰凍會中斷；蓄龍捲風時不能滑翔，滑翔中不能開始蓄龍捲風；冷卻從出發算。**木木梟一直飛在 `fly_high`**：`Reset` 就把 `Z` 設成它，沒被抓住時每步以 `fly_high/flyRiseTime` 爬回去，所以只有 `min_height`～`max_height` 含這個高度的招式打得到它 |
 | 木木梟 | J / 小按鈕「箭雨」 | 箭雨：一次射出 `count` 支箭（`K=ballArrow`），以對手方向為中心、相鄰 `angle` 度、速度 `speed`；碰到對手（半徑 `radius`、高度在 `min_height`～`max_height`）扣 `damage`、`SlowT` 設為 `slow_duration`（走路／飛行／空中操控速度 ×(1−`slow`)，與冰霜、放水疊乘）並用掉，沒打中的飛到牆邊；箭有 `hp`，和其他投射物互相扣對方傷害（同 `clashBalls`）；蓄／放龍捲風時不能射；冷卻從施放算 |
 | 木木梟 | K / 小按鈕「龍捲風」 | 龍捲風（`radius` 是判定範圍，`scale` 只放大畫面上的漏斗，兩者分開調）：先定身蓄力 `charge_duration`，龍捲風（`K=ballTornado`，`hp`、半徑 `radius`）出現在木木梟瞄準方向前方（身體半徑＋龍捲風半徑處），再定身 `recharge_duration`（龍捲風已經放出，之後自己跑）；它像冰風暴一樣以 `speed` 追著對手、不會衝過頭，累計走 `distance` 或活滿 `duration` 秒就消失；冷卻從蓄力開始算。碰到對手（半徑＋對手身體、高度在帶內、對手沒被別的東西抓住）就把它**抓住**：龍捲風停在原地、`Life` 變成 `spin_duration`（旋轉剩餘時間），對手 `Held`＋`Twirl=twirlSpin`（不能動不能出招）、位置釘在龍捲風中心、高度在旋轉一半時間內升到 `lift_height`，每 `spin_interval` 秒受 `spin_damage`（`stepTwirl`，在投射物之後跑所以高度以它為準）。旋轉時間到或龍捲風被打壞（HP≤0，或被投射物對撞用掉）就 `twirlFall`：`twirlFallTime`（0.4 秒）內落地，落地受 `landing_damage` 並發 `slam` 事件（和卡比獸落地同一個特效，半徑＝龍捲風半徑）。龍捲風和投射物同一套會被死光、落地震波、急凍拳、電球爆炸、冰風暴打掉血量，有自己的 `mass`（同 `hyper_beam.mass`：死光／急凍拳比它重就依質量差推開它，被抓的人跟著動；不比它重就推不動），和對手投射物對撞時扣對方 `spin_damage`；和冰柱互相穿過（`clashBalls` 特例），但會把碰到的對手冰柱**捲上天**（`grindPillars`）：冰柱升到 `lift_height`（速度＝落下速度 `lift_height/twirlFallTime`）、跟著龍捲風一起移動，在天上時不擋人（`blockByPillars` 跳過 `Z>0`）；碰到當下扣 `spin_damage`，之後只要龍捲風還抓著它就每 `spin_interval` 秒再扣一次，直到冰柱壞掉；龍捲風消失或被打壞就放開，冰柱落回地面（`Ball.Z`、`Carried`）。龍捲風自己不受傷、自己的冰柱不受影響。被冰凍會中斷蓄力，已放出的照跑。被抓的是木木梟時，落地後會自己爬回 `fly_high` |
+| 鯉魚王 | 空白鍵 / 主按鈕「彈跳」 | 彈跳（`magikarp.go` `stepMagikarp`，唯一的技能）：`duration` 秒內升到 `height`、在最高點停 `highest_point_duration` 秒再落下（升降各 `(duration−停留)/2` 秒，升的時候越來越慢、落的時候越來越快，所以高度與時間剛好是設定值，與 tick 長度無關）；空中可用方向鍵調整位置，前半段（到整段時間的一半）速度 `air_speed_first_half`、後半段 `air_speed_second_half`；高度在 0..`height`，所以只有打得到那麼高的招式碰得到它；落地不傷人；冷卻從起跳算。**每落地一次算一次**（`Player.Hops`），累計 `evolve_hops` 次那一下落地就進化（`evolve`：`Kind` 變 7，發 `evolve` 事件，HP 依「剩下的比例」換成暴鯉龍的上限）。跳到一半被抓住（`Held`，龍捲風、上投）就不算、由抓住它的人決定高度。被冰凍／擊暈時按鍵無效，但已經在空中的跳照跑。鯉魚王與暴鯉龍各有自己的 `max_hp`、`walk_speed`、`radius` |
+| 暴鯉龍 | 空白鍵 / 主按鈕「海浪」 | 海浪（`stepGyarados` / `stepWaves`）：先定身跳起 `wave.jump_height`、`jump_duration` 秒，落地震動地面，發 `wave` 事件，並產生一道海浪（`Game.Waves`，只在伺服器，客戶端用事件自己畫）：從身體邊緣以 `speed` 往四周擴散到 `radius`；海浪的前緣**第一次**碰到對手身體時，對手高度在 `min_height`～`max_height`（預設 0～60）內就受 `damage`，只打一次（跳在空中就從底下過去，但海浪也用掉了）；冷卻從起跳算；被冰凍／擊暈會中斷跳躍 |
+| 暴鯉龍 | J / 小按鈕「死光」 | 破壞死光：機制和卡比獸一樣（同一段程式，`Step` 裡那一塊是 `snorlax || gyarados`，用 `cfg.beamOf(kind)` 取數值；跳躍與冰拳只有卡比獸有），但**數值是自己的 `gyarados.hyper_beam`**（欄位同 `snorlax.hyper_beam`，預設與卡比獸相同，改一邊不影響另一邊）；`hi` 的 `gbeam` 與 `cooldown.gbeam` 是它的警示扇形與冷卻 |
+| 暴鯉龍 | K / 小按鈕「擺尾」 | 擺尾（`Input.Tail`）：朝瞄準方向（搖桿，沒有就是最後走的方向，和冰拳一樣，**不是**自動朝敵人）掃出扇形：總角度 `angle`、距離 `length`（加對手半徑），對手中心在扇形內、高度在帶內就被往瞄準方向擊退 `knockback` 並擊暈 `stun_duration` 秒（`Player.StunT`：和冰凍一樣不能走也不能出招，進行中的衝刺與蓄力會中斷，但不會被畫成冰），發 `tail` 事件（`dx`/`dy` 是方向，為 0 時被省略，前端要 `|| 0`）；不能在跳躍或死光進行中用；冷卻 `cooldown` 從出招算 |
 | 噴火龍 | K / 小按鈕「上投」 | 地球上投：朝瞄準方向衝 `length`，碰到（地面上的）敵人就抓住（`Held`，不能動不能用技能）、飛到 `high` 再摔下，落地受 `damage` 並播落地震波特效；噴火龍中途被冰凍會鬆手 |
 
 技能判定都是「技能範圍 + 對方身體半徑 `radius`」，另外每個攻擊技能都有自己的**高度範圍**
@@ -79,7 +84,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 ## 設定檔 `config.json`
 
 結構：`court.{mobile,web}`、`pikachu.{max_hp,walk_speed,radius,volt_tackle,thunder,electro_ball}`、
-`snorlax.{max_hp,walk_speed,radius,ice_punch,jump,hyper_beam}`、`charizard.{max_hp,walk_speed,radius,fly,fire_breath,seismic_toss}`、`chikorita.{max_hp,walk_speed,radius,leaf_slash,razor_leaf,vine_whip}`、`vulpix.{max_hp,walk_speed,radius,frost_field,ice_storm,freeze_beam}`、`rowlet.{max_hp,walk_speed,radius,fly_high,tailwind,arrows,tornado}`。每個欄位的意思看 `config.go` 的註解。
+`snorlax.{max_hp,walk_speed,radius,ice_punch,jump,hyper_beam}`、`charizard.{max_hp,walk_speed,radius,fly,fire_breath,seismic_toss}`、`chikorita.{max_hp,walk_speed,radius,leaf_slash,razor_leaf,vine_whip}`、`vulpix.{max_hp,walk_speed,radius,frost_field,ice_storm,freeze_beam}`、`rowlet.{max_hp,walk_speed,radius,fly_high,tailwind,arrows,tornado}`、`magikarp.{max_hp,walk_speed,radius,evolve_hops,jump}`、`gyarados.{max_hp,walk_speed,radius,wave,tail_whip}`（暴鯉龍的死光是自己的 `gyarados.hyper_beam`）。每個欄位的意思看 `config.go` 的註解。
 
 - 每個攻擊技能區塊都有 `min_height` / `max_height`（需 0 ≤ min ≤ max），沒寫就用 `DefaultConfig()` 的值。
 - 讀檔時**不認識的欄位或不合理的值會讓伺服器拒絕啟動**（刻意的，避免打錯字默默吃不到設定）。

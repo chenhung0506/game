@@ -95,17 +95,23 @@ func TestTwoPlayersMatchAndTheThirdWaitsInARoomOfItsOwn(t *testing.T) {
 	if arena, ok := hi["arena"].(map[string]any); !ok || arena["w"] != float64(2000) || arena["h"] != float64(1000) {
 		t.Fatalf("hi.arena = %v, want 2000x1000", hi["arena"])
 	}
-	if rd, ok := hi["radius"].([]any); !ok || len(rd) != 6 || rd[0] != float64(16) || rd[1] != float64(24) || rd[2] != float64(26) || rd[3] != float64(18) || rd[4] != float64(14) || rd[5] != float64(13) {
-		t.Fatalf("hi.radius = %v, want [16 24 26 18 14 13]: the client draws each body at its size, indexed by character", hi["radius"])
+	if rd, ok := hi["radius"].([]any); !ok || len(rd) != 8 || rd[0] != float64(16) || rd[1] != float64(24) || rd[2] != float64(26) || rd[3] != float64(18) || rd[4] != float64(14) || rd[5] != float64(13) || rd[6] != float64(10) || rd[7] != float64(36) {
+		t.Fatalf("hi.radius = %v, want [16 24 26 18 14 13 10 36]: the client draws each body at its size, indexed by kind (Magikarp, then the Gyarados it becomes)", hi["radius"])
 	}
 	if pu, ok := hi["punch"].(map[string]any); !ok || pu["charge"] != float64(0.4) || pu["radius"] != float64(40) || pu["freeze"] != float64(1.5) {
 		t.Fatalf("hi.punch = %v, want charge 0.4 / radius 40 / freeze 1.5", hi["punch"])
 	}
+	if gb, ok := hi["gbeam"].(map[string]any); !ok || gb["len"] != float64(450) || gb["charge"] != float64(0.6) {
+		t.Fatalf("hi.gbeam = %v, want Gyarados's own beam numbers (the client draws its warning fan from them)", hi["gbeam"])
+	}
+	if cd, ok := hi["cooldown"].(map[string]any); !ok || cd["gbeam"] != float64(5) {
+		t.Fatalf("hi.cooldown.gbeam = %v, want 5: the Gyarados pad button counts it down", hi["cooldown"])
+	}
 	if cd, ok := hi["cooldown"].(map[string]any); !ok || cd["punch"] != float64(5) {
 		t.Fatalf("hi.cooldown.punch = %v, want 5", hi["cooldown"])
 	}
-	if mh, ok := hi["maxhp"].([]any); !ok || len(mh) != 6 || mh[0] != float64(100) || mh[1] != float64(100) || mh[2] != float64(120) || mh[3] != float64(110) || mh[4] != float64(100) || mh[5] != float64(100) {
-		t.Fatalf("hi.maxhp = %v, want [100 100 120 110 100 100]: the client scales the HP bars with it", hi["maxhp"])
+	if mh, ok := hi["maxhp"].([]any); !ok || len(mh) != 8 || mh[0] != float64(100) || mh[1] != float64(100) || mh[2] != float64(120) || mh[3] != float64(110) || mh[4] != float64(100) || mh[5] != float64(100) || mh[6] != float64(70) || mh[7] != float64(170) {
+		t.Fatalf("hi.maxhp = %v, want [100 100 120 110 100 100 70 170]: the client scales the HP bars with it", hi["maxhp"])
 	}
 	if lf, ok := hi["leaf"].(map[string]any); !ok || lf["radius"] != float64(90) || lf["scale"] != float64(2.5) {
 		t.Fatalf("hi.leaf = %v, want the Leaf Slash radius 90 and leaf scale 2.5", hi["leaf"])
@@ -295,8 +301,8 @@ func TestTeamMatchOverTheWire(t *testing.T) {
 			t.Fatal("the lobby never said team")
 		}
 	}
-	a.WriteMessage(websocket.TextMessage, []byte(`{"order":[1,0,2,3,4,5]}`))
-	b.WriteMessage(websocket.TextMessage, []byte(`{"order":[0,1,2,3,4,5]}`))
+	a.WriteMessage(websocket.TextMessage, []byte(`{"order":[1,0,2,3,4,5,6]}`))
+	b.WriteMessage(websocket.TextMessage, []byte(`{"order":[0,1,2,3,4,5,6]}`))
 	s := next(t, a, "s")
 	tm, ok := s["tm"].(map[string]any)
 	if !ok || tm["o"] != false {
@@ -304,5 +310,20 @@ func TestTeamMatchOverTheWire(t *testing.T) {
 	}
 	if k := s["p"].([]any)[0].(map[string]any)["k"]; k != float64(1) {
 		t.Fatalf("slot 0 plays %v, want its first in order: 1", k)
+	}
+}
+
+// The page draws each beam's warning fan and counts its cooldown from what hi says, and Gyarados's beam is its own.
+func TestHiCarriesGyaradosBeamSeparatelyFromSnorlaxs(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Gyarados.HyperBeam.Length, cfg.Gyarados.HyperBeam.Cooldown, cfg.Gyarados.HyperBeam.SweepAngle = 333, 7, 11
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	hi := next(t, dial(t, srv), "hi")
+	gb, _ := hi["gbeam"].(map[string]any)
+	sb, _ := hi["beam"].(map[string]any)
+	cd, _ := hi["cooldown"].(map[string]any)
+	if gb["len"] != float64(333) || gb["angle"] != float64(11) || sb["len"] != float64(450) || cd["gbeam"] != float64(7) || cd["beam"] != float64(5) {
+		t.Fatalf("hi.gbeam %v, hi.beam %v, cooldowns %v: each beam should carry its own numbers", gb, sb, cd)
 	}
 }

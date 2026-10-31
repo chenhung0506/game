@@ -215,8 +215,8 @@ func (c *bctx) findThreat() threat {
 		consider(threat{h.kind, t, safe[0], safe[1]})
 	}
 
-	if f.Kind == snorlax && (f.BeamT > 0 || f.SweepT > 0) {
-		hb := cfg.Snorlax.HyperBeam
+	if (f.Kind == snorlax || f.Kind == gyarados) && (f.BeamT > 0 || f.SweepT > 0) {
+		hb := cfg.beamOf(f.Kind)
 		rx, ry := p.X-f.X, p.Y-f.Y
 		d := math.Hypot(rx, ry)
 		if d < hb.Length+c.pr {
@@ -378,8 +378,8 @@ func (c *bctx) lead(t float64) (float64, float64) {
 // rootedFor is how many more seconds the opponent is known to be unable to walk away.
 func (c *bctx) rootedFor() float64 {
 	f := c.f
-	t := math.Max(f.ParalyzeT, f.FrozenT)
-	if f.Kind == snorlax {
+	t := math.Max(math.Max(f.ParalyzeT, f.FrozenT), f.StunT)
+	if f.Kind == snorlax || f.Kind == gyarados {
 		t = math.Max(t, f.BeamT+f.SweepT+f.RechargeT)
 	}
 	if f.Kind == pikachu { // charging a ball or casting Thunder roots it too

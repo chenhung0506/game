@@ -30,7 +30,12 @@ const (
 	chikorita = 3
 	vulpix    = 4
 	rowlet    = 5
-	kinds     = 6
+	magikarp  = 6
+	// kinds is how many characters a player can pick. Gyarados is not one of them: it is what Magikarp becomes, so it
+	// is a kind a player can be in (Player.Kind, and everything indexed by kind) but never chooses.
+	kinds    = 7
+	gyarados = kinds
+	forms    = kinds + 1 // every kind a player can be in
 )
 
 // Input is the only thing a client controls: which keys are held. Skill is the
@@ -51,6 +56,7 @@ type Input struct {
 	Freeze  bool `json:"freeze"`  // Vulpix only: Freeze Beam
 	Arrow   bool `json:"arrow"`   // Rowlet only: Arrows
 	Twister bool `json:"twister"` // Rowlet only: Tornado
+	Tail    bool `json:"tail"`    // Gyarados only: Tail whip
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
@@ -194,6 +200,18 @@ type Player struct {
 	// Held is set through both, so it cannot move or act; TwirlIn is the seconds to the next spin damage.
 	Twirl   int     `json:"tw"`
 	TwirlIn float64 `json:"-"`
+
+	// Magikarp: seconds of the jump left (0 = on the ground), the cooldown, the landings so far (it evolves at
+	// evolve_hops of them).
+	HopLeft float64 `json:"ot"`
+	HopCD   float64 `json:"ocd"`
+	Hops    int     `json:"hn"`
+	// Gyarados: seconds of the hop left before the wave, the wave's cooldown, the tail whip's cooldown.
+	WaveT  float64 `json:"wvt"`
+	WaveCD float64 `json:"wvcd"`
+	TailCD float64 `json:"tlcd"`
+	// StunT is seconds left stunned (by the tail whip): like being frozen, it can neither move nor act.
+	StunT float64 `json:"sn"`
 }
 
 // Leaf Slash phases.
@@ -257,10 +275,12 @@ type Frost struct {
 
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
-	T string  `json:"t"` // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze" | "paralyze" | "storm"
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-	R float64 `json:"r,omitempty"` // slam reach, so the effect can match it
+	T  string  `json:"t"` // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze" | "paralyze" | "storm" | "iceburst" | "wave" | "tail" | "evolve"
+	X  float64 `json:"x"`
+	Y  float64 `json:"y"`
+	R  float64 `json:"r,omitempty"`  // slam reach, so the effect can match it
+	DX float64 `json:"dx,omitempty"` // a direction (the tail whip's)
+	DY float64 `json:"dy,omitempty"`
 }
 
 // The view a room was opened from decides its court.
@@ -275,6 +295,7 @@ type Game struct {
 	P     [2]Player
 	Balls []Ball
 	Frost []Frost
+	Waves []wave     // Gyarados's waves running out over the ground (the client draws them from an event)
 	rng   *rand.Rand // the fire's random spread; tests replace it
 	// Ease is each player's handicap in percent (a multiple of easeStep, at most easeMax): its HP and its
 	// walking speed are cut by that much. It survives Reset.
@@ -310,9 +331,14 @@ func (g *Game) SetKinds(a, b int) {
 // Reset starts a round over with the same characters: 400 apart, centred in the arena.
 func (g *Game) Reset() {
 	c := g.court
+	for i := range g.P {
+		if g.P[i].Kind == gyarados {
+			g.P[i].Kind = magikarp // a new round starts from the beginning
+		}
+	}
 	g.P[0] = Player{Kind: g.P[0].Kind, X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(0), FX: 1, AimX: 1}
 	g.P[1] = Player{Kind: g.P[1].Kind, X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(1), FX: -1, AimX: -1}
-	g.Balls, g.Frost = nil, nil
+	g.Balls, g.Frost, g.Waves = nil, nil, nil
 	for i := range g.P {
 		if g.P[i].Kind == rowlet {
 			g.P[i].Z = g.cfg.Rowlet.FlyHigh // it is always in the air
@@ -447,10 +473,15 @@ func (g *Game) Step(dt float64) []Event {
 		// A frozen or held player is deaf to its keys until it thaws or lands: the held keys take effect
 		// again afterwards.
 		in := p.In
-		if p.FrozenT > 0 || p.Held {
+		if p.FrozenT > 0 || p.Held || p.StunT > 0 {
 			if p.FrozenT > 0 {
 				if p.FrozenT -= dt; p.FrozenT < 1e-9 {
 					p.FrozenT = 0
+				}
+			}
+			if p.StunT > 0 {
+				if p.StunT -= dt; p.StunT < 1e-9 {
+					p.StunT = 0
 				}
 			}
 			in = Input{}
@@ -460,6 +491,7 @@ func (g *Game) Step(dt float64) []Event {
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
 			p.FrostT, p.FBeamT = 0, 0                              // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
 			p.DriftT, p.TwistT, p.TwistRecT, p.ArrowT = 0, 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
+			p.WaveT = 0                                            // Gyarados's hop stops
 		}
 		// Bound by a vine or paralyzed by a Volt Tackle: no walking and no movement skill (the others still work).
 		if p.BoundT > 0 || p.ParalyzeT > 0 {
@@ -513,10 +545,10 @@ func (g *Game) Step(dt float64) []Event {
 		// Snorlax's Hyper Beam: charge -> sweep -> recharge. It is rooted through all
 		// three. The aim is locked on the opponent's position when the beam is used.
 		busy := false
-		casting := false // Pikachu is rooted while Thunder runs
-		if p.Kind == snorlax {
-			hb := g.cfg.Snorlax.HyperBeam
-			if p.JumpCD > 0 {
+		casting := false                             // Pikachu is rooted while Thunder runs
+		if p.Kind == snorlax || p.Kind == gyarados { // Gyarados has Snorlax's Hyper Beam, and none of its other skills
+			hb := g.cfg.beamOf(p.Kind)
+			if p.Kind == snorlax && p.JumpCD > 0 {
 				if p.JumpCD -= dt; p.JumpCD < 1e-9 {
 					p.JumpCD = 0
 				}
@@ -587,7 +619,9 @@ func (g *Game) Step(dt float64) []Event {
 					p.RechargeT = hb.RechargeDuration
 				}
 			}
-			events = append(events, g.stepIcePunch(i, in, dt)...)
+			if p.Kind == snorlax {
+				events = append(events, g.stepIcePunch(i, in, dt)...)
+			}
 			busy = p.BeamT > 0 || p.SweepT > 0 || p.RechargeT > 0 || p.PunchT > 0 || p.PunchLeft > 0 || p.PunchRecover > 0
 		}
 
@@ -604,6 +638,16 @@ func (g *Game) Step(dt float64) []Event {
 		if p.Kind == vulpix {
 			events = append(events, g.stepVulpix(i, in, dt)...)
 			casting = p.FBeamT > 0 || p.Rode // the stick steers the beam, not the body; and the ride moves Vulpix itself
+		}
+
+		if p.Kind == magikarp {
+			events = append(events, g.stepMagikarp(i, in, dt)...)
+		}
+
+		if p.Kind == gyarados {
+			var ev []Event
+			ev, casting = g.stepGyarados(i, in, dt) // the hop roots it; the beam roots it through `busy`
+			events = append(events, ev...)
 		}
 
 		if p.Kind == rowlet {
@@ -697,6 +741,9 @@ func (g *Game) Step(dt float64) []Event {
 			if p.Kind == charizard && p.FlyT > 0 {
 				v = g.cfg.Charizard.Fly.Speed
 			}
+			if p.Kind == magikarp && p.HopLeft > 0 {
+				v = g.magikarpAirSpeed(p)
+			}
 			if p.Kind == snorlax && p.Z > 0 {
 				v = g.cfg.Snorlax.Jump.AirSpeedSecondHalf
 				if p.VZ > 0 {
@@ -745,6 +792,7 @@ func (g *Game) Step(dt float64) []Event {
 		}
 	}
 	g.tickFrost(dt)
+	g.stepWaves(dt)
 	events = append(events, g.stepBalls(dt)...)
 	return append(events, g.stepTwirl(dt)...)
 }

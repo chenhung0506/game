@@ -51,7 +51,7 @@
 </head>
 <body>
 <div id="bar"></div>
-<div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="sz6">6 隻</button></div><div id="botbar"><button id="bot0">單機：對皮卡丘</button><button id="bot1">單機：對卡比獸</button><button id="botOff">改和真人對戰</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="botbar"><button id="bot0">單機：對皮卡丘</button><button id="bot1">單機：對卡比獸</button><button id="botOff">改和真人對戰</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
@@ -66,8 +66,9 @@ let ROT = 0;               // how far the arena is turned on screen (radians); 0
 let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Each player picks a character in the lobby; a snapshot's p[i].k says who is who (0 Pikachu, 1 Snorlax, 2 Charizard, 3 Chikorita, 4 Vulpix, 5 Rowlet).
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
-const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟'];
-const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰山滑行・冰風暴・急凍光線', '滑翔・箭雨・龍捲風'];
+const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟', '鯉魚王'];
+const FORMS = [...NAMES, '紅色暴鯉龍']; // every kind a player can be in: Magikarp becomes the last one (nobody picks it)
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰山滑行・冰風暴・急凍光線', '滑翔・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍'];
 const HELP = [
   '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）',
@@ -75,22 +76,26 @@ const HELP = [
   '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　J＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　K＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）',
   '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
   '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝滑翔（朝按住的方向衝出一道半月形弧線，彎向敵人那一側）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
+  '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
+  '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
 const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
-let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }; // replaced by the server's values in 'hi'
+let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
+const beamCfgOf = (k) => (k === 7 ? gbeamCfg : beamCfg);
 let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewise
 // Body sizes from 'hi' (world units). The art below was drawn at REF, so it is scaled by radius / REF;
 // that is also the size the server hits with, and it does not depend on the court's size.
 let radius = [16, 24, 26, 18, 14, 13]; // indexed by character
-const REF = [16, 24, 26, 18, 14, 13];
+const REF = [16, 24, 26, 18, 14, 13, 10, 36];
 let maxHp = [100, 100, 120, 110, 100, 100]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let voltCfg = { radius: 16, uses: 3, window: 2 }; // Volt Tackle, from 'hi'
+let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2 }, evolveHops = 5; // Gyarados's, from 'hi'
 let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8 }; // Vulpix's, from 'hi'
 let arrowCfg = { radius: 8, hp: 2, slow: 2, count: 5, angle: 12, charge: 0.5, scale: 1 }, tornadoCfg = { radius: 50, hp: 40, charge: 0.4, lift: 200, scale: 1 }; // Rowlet's, from 'hi'
 const stormLook = [{ x: null, y: 0 }, { x: null, y: 0 }], fbLook = [{ x: null, y: 0 }, { x: null, y: 0 }]; // per slot: the smoothed storm position and beam end
@@ -118,14 +123,16 @@ let fx = [], shake = 0;
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?mode=' + (PORTRAIT ? 'mobile' : 'web')); // no room to name: the server puts you with whoever is waiting, or opens one; the first player's view picks the court
 let picks = [-1, -1], here = [true, false], bots = [-1, -1], padKind = -1; // bots: the character a computer plays in each slot (-1 = a person or nobody)
 let ease = [0, 0]; // each slot's handicap in percent, from the lobby
-let teamMode = false, teamSize = 6, myOrder = [], sentOrder = ''; // the lobby's match type; the order I field my characters in, and the one the server has
+let teamMode = false, teamSize = NAMES.length, myOrder = [], sentOrder = ''; // the lobby's match type; the order I field my characters in, and the one the server has
+const hasBeam = (k) => k === 1 || k === 7; // Snorlax and Gyarados fire the Hyper Beam
+const beamSlots = () => (snap ? [0, 1].filter((i) => hasBeam(snap.p[i].k)) : []);
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
+  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
-    if (teamSize !== (m.size || 6)) { teamSize = m.size || 6; myOrder = []; sentOrder = ''; } // another team size: choose again
+    if (teamSize !== (m.size || NAMES.length)) { teamSize = m.size || NAMES.length; myOrder = []; sentOrder = ''; } // another team size: choose again
     if (teamMode !== !!m.team) { teamMode = !!m.team; myOrder = []; sentOrder = ''; } // another match type: choose again
     if (sentOrder && m.picks[you] < 0) { myOrder = []; sentOrder = ''; } // sent back to choose again
     ease = m.ease || [0, 0];
@@ -140,10 +147,10 @@ ws.onmessage = (e) => {
     waiting = false; snap = m;
     document.getElementById('pick').style.display = 'none';
     if (padKind !== m.p[you].k) { padKind = m.p[you].k; document.getElementById('bar2').textContent = HELP[padKind]; if (PORTRAIT) buildPad(); }
-    for (const i of slotsOf(1)) {
+    for (const i of beamSlots()) {
       const st = m.p[i].st, prevSt = old ? old.p[i].st : 0;
       if (st > 0 && !(prevSt > 0)) shake = 14; // the sweep begins
-      if (!(st > 0) && prevSt > 0 && beamLook[i].ang !== null) beamLook[i].tail = { x: disp[i].x, y: disp[i].y - 6, ang: beamLook[i].ang, age: 0 };
+      if (!(st > 0) && prevSt > 0 && beamLook[i].ang !== null) beamLook[i].tail = { x: disp[i].x, y: disp[i].y - 6, ang: beamLook[i].ang, age: 0, bc: beamCfgOf(m.p[i].k) };
     }
     for (const ev of m.e || []) {
       fx.push({ ...ev, age: 0 });
@@ -151,6 +158,8 @@ ws.onmessage = (e) => {
       if (ev.t === 'thunder') shake = 10;
       if (ev.t === 'explode') shake = 14;
       if (ev.t === 'iceburst') shake = 12;
+      if (ev.t === 'wave') shake = 16;
+      if (ev.t === 'evolve') shake = 14;
       if (ev.t === 'leaf') shake = 6;
       if (ev.t === 'freeze') shake = 10;
       if (ev.t === 'storm') shake = Math.max(shake, 5);
@@ -213,7 +222,8 @@ function showPick() {
   document.getElementById('mSingle').classList.toggle('on', !teamMode);
   document.getElementById('mTeam').classList.toggle('on', teamMode);
   document.getElementById('teambar').style.display = teamMode ? 'flex' : 'none';
-  for (const n of [3, 6]) { const b = document.getElementById('sz' + n); b.style.display = teamMode ? '' : 'none'; b.classList.toggle('on', teamSize === n); }
+  document.getElementById('szAll').textContent = `${NAMES.length} 隻`;
+  for (const n of [3, NAMES.length]) { const b = document.getElementById(n === 3 ? 'sz3' : 'szAll'); b.style.display = teamMode ? '' : 'none'; b.classList.toggle('on', teamSize === n); }
   const vsComputer = bots[1 - you] >= 0, personHere = here[1 - you] && !vsComputer; // a computer can stand in for the opponent when no person is there
   document.getElementById('botbar').style.display = teamMode || personHere ? 'none' : 'flex';
   for (const k of [0, 1]) document.getElementById('bot' + k).classList.toggle('on', bots[1 - you] === k);
@@ -244,7 +254,7 @@ easeEl.onchange = () => send({ ease: +easeEl.value });
 document.getElementById('mSingle').onclick = () => send({ team: false });
 document.getElementById('mTeam').onclick = () => send({ team: true });
 document.getElementById('sz3').onclick = () => send({ size: 3 });
-document.getElementById('sz6').onclick = () => send({ size: 6 });
+document.getElementById('szAll').onclick = () => send({ size: NAMES.length });
 document.getElementById('bot0').onclick = () => send({ bot: 0 });
 document.getElementById('bot1').onclick = () => send({ bot: 1 });
 document.getElementById('botOff').onclick = () => send({ bot: -1 });
@@ -267,7 +277,7 @@ function drawCards() {
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false }; // the pad's buttons
+const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -291,6 +301,7 @@ function sendInput() {
     razor: k('j') || touch.razor, vine: k('k') || touch.vine,
     storm: k('j') || touch.storm, freeze: k('k') || touch.freeze,
     arrow: k('j') || touch.arrow, twister: k('k') || touch.twister,
+    tail: k('k') || touch.tail,
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
@@ -337,6 +348,8 @@ const PAD = [
   { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine']] }, // Chikorita
   { main: ['冰山', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
   { main: ['滑翔', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
+  { main: ['彈跳', 'skill'], small: [] }, // Magikarp
+  { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail']] }, // Gyarados
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
@@ -362,7 +375,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
   const hold = (b, label, name) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -395,7 +408,9 @@ function art(c, kind, x, y, t, flap, pose = IDLE) {
   else if (kind === 2) artCharizard(c, x, y, t, flap);
   else if (kind === 3) artChikorita(c, x, y, t, pose);
   else if (kind === 4) artVulpix(c, x, y, t, pose);
-  else artRowlet(c, x, y, t, pose);
+  else if (kind === 5) artRowlet(c, x, y, t, pose);
+  else if (kind === 6) artMagikarp(c, x, y, t, pose);
+  else artGyarados(c, x, y, t, pose);
 }
 
 // ---- Pikachu and Snorlax: one drawing per view ----
@@ -716,6 +731,58 @@ function artRowlet(c, x, y, t, pose) {
   c.restore();
 }
 
+// Magikarp: an orange-red fish with a cream belly, long whiskers and big dull eyes, seen from the side (it faces the
+// way it last walked). It flops its tail all the time, harder as it moves.
+function artMagikarp(c, x, y, t, pose) {
+  const { dir, mv } = pose, wag = Math.sin(t * (7 + 9 * mv)) * (0.28 + 0.2 * mv), bob = Math.sin(t * 4) * 1.2 - mv;
+  const R = '#ee5a36', RD = '#b9361f', CREAM = '#f7e5b4', GOLD = '#f3c640';
+  c.save(); c.translate(x, y + bob);
+  if (dir === 2) c.scale(-1, 1);
+  c.save(); c.translate(-11, 0); c.rotate(wag); // the tail fin, hinged at the body
+  poly(c, [[2, 0], [-9, -9], [-5, 0], [-9, 9]], RD); c.restore();
+  poly(c, [[-5, -7], [-2, -15], [2, -8], [5, -14], [8, -6]], RD); // the back fin
+  ov(c, 0, 0, 12.5, 9.2, R);
+  ov(c, 1.5, 3.8, 9.5, 4.6, CREAM, 0, null);
+  c.save(); c.translate(-1, 2); c.rotate(-0.4 - wag); poly(c, [[0, 0], [-6, 3], [-3, 7], [1, 3]], RD); c.restore(); // a side fin
+  ov(c, 11, 1.8, 3, 2.2, CREAM); // the lips
+  c.strokeStyle = GOLD; c.lineWidth = 1.2; c.lineCap = 'round'; // the whiskers
+  for (const sgn of [-1, 1]) { c.beginPath(); c.moveTo(11.5, 1.5); c.quadraticCurveTo(17, 1.5 + sgn * 4, 20 + wag * 4, 1.5 + sgn * (8 + wag * 5)); c.stroke(); }
+  ov(c, 6, -2.8, 3.2, 3.4, '#fff'); ov(c, 6.6, -2.6, 1.5, 1.8, '#1d1d1d', 0, null); // a big, blank eye
+  c.restore();
+}
+
+// Gyarados, the red one: a long coiled body in red with a cream belly and gold fins, rising behind a snarling head with
+// a crest, fangs and long gold whiskers. The coil sways. Seen from the side, facing the way it last walked.
+function artGyarados(c, x, y, t, pose) {
+  const { dir, mv } = pose, sway = Math.sin(t * (2.6 + 2 * mv)), bob = Math.sin(t * 3) * 1.5 - mv;
+  const R = '#d22a2a', RD = '#8f1b1f', CREAM = '#f3e3ba', GOLD = '#f0c23a', FANG = '#fffdf2';
+  c.save(); c.translate(x, y + bob);
+  c.scale(1.3, 1.3); // it is the big one: the coil is drawn bigger than the body it hits with
+  if (dir === 2) c.scale(-1, 1);
+  // the body: a chain of rings from the tail up to the neck, each a little to one side of the one before it
+  const ring = [[-34, 24, 7.5], [-31, 12, 10], [-23, 4, 12.5], [-12, 2, 14], [-2, -8, 14.5], [5, -20, 14]];
+  ring.forEach(([rx, ry, rr], i) => {
+    const sx = rx + sway * 1.6 * (i % 2 ? 1 : -1), sy = ry + Math.sin(t * 3 + i) * 1.2;
+    ov(c, sx, sy, rr, rr * 0.92, R);
+    ov(c, sx + 2, sy + rr * 0.45, rr * 0.7, rr * 0.4, CREAM, 0, null); // the belly stripes
+    if (i > 1) poly(c, [[sx - 4, sy - rr * 0.8], [sx - 1, sy - rr * 1.5], [sx + 4, sy - rr * 0.8]], GOLD); // a fin on the back
+  });
+  poly(c, [[-37, 27], [-48, 20], [-43, 30], [-50, 36], [-38, 32]], RD); // the tail fan
+  // the head: long, with the mouth open
+  c.save(); c.translate(15, -27); c.rotate(-0.05 + sway * 0.03);
+  poly(c, [[-12, -8], [-5, -23], [-1, -9]], GOLD); poly(c, [[-4, -9], [3, -22], [6, -8]], GOLD); // the crest
+  ov(c, 0, 0, 15, 11, R);
+  poly(c, [[2, 4], [19, 6], [22, 14], [8, 17], [-2, 12]], RD); // the lower jaw
+  poly(c, [[3, 4], [19, 5], [18, 8], [4, 7]], '#4a0b10', null); // the inside of the mouth
+  poly(c, [[7, 4.5], [9.5, 4.5], [8.2, 9]], FANG, null); poly(c, [[13, 4.8], [15.5, 4.8], [14.2, 9.5]], FANG, null); // fangs
+  ov(c, 4, -2, 3.8, 3.6, '#ffe58a'); poly(c, [[4, -5.2], [5.2, -2], [4, 1.2], [2.8, -2]], '#1d1d1d', null); // the slit eye
+  poly(c, [[-1, -6], [9, -6], [10, -4.6], [0, -3.6]], RD, null); // the heavy brow
+  c.strokeStyle = GOLD; c.lineWidth = 1.8; c.lineCap = 'round'; // the whiskers
+  for (const sgn of [-1, 1]) { c.beginPath(); c.moveTo(17, 4.5); c.quadraticCurveTo(25, 4.5 + sgn * 6, 32 + sway * 3, 4.5 + sgn * (11 + sway * 3)); c.stroke(); }
+  c.restore();
+  c.restore();
+}
+
 // Charizard: orange body and cream belly, a flame at the tail tip and two big teal wings. The wings beat all
 // the time, a lazy flutter standing and a hard fast beat in flight, with a small fast tremor on top.
 function artCharizard(c, x, y, t, flap) {
@@ -777,35 +844,36 @@ function drawBody(kind, X, Y, alpha, lift = 0, flap = 0, pose = IDLE, spin = 0) 
 const tele = document.createElement('canvas'); tele.width = arena.w; tele.height = arena.h;
 const teleCtx = tele.getContext('2d');
 function drawTelegraph() {
-  for (const si of slotsOf(1)) drawFan(snap.p[si], disp[si]);
+  for (const si of beamSlots()) drawFan(snap.p[si], disp[si]);
 }
 function drawFan(p, d) {
   if (!(p.bt > 0)) return;
-  const k = 1 - p.bt / beamCfg.charge; // 0 -> 1 as the charge fills
-  const base = Math.atan2(p.by, p.bx), A = beamCfg.angle * Math.PI / 180;
+  const bc = beamCfgOf(p.k);
+  const k = 1 - p.bt / bc.charge; // 0 -> 1 as the charge fills
+  const base = Math.atan2(p.by, p.bx), A = bc.angle * Math.PI / 180;
   teleCtx.clearRect(0, 0, tele.width, tele.height);
   teleCtx.fillStyle = teleCtx.strokeStyle = '#ff4628';
-  teleCtx.lineCap = 'round'; teleCtx.lineWidth = beamCfg.w;
-  teleCtx.beginPath(); teleCtx.moveTo(d.x, d.y); teleCtx.arc(d.x, d.y, beamCfg.len, base - A, base + A); teleCtx.closePath(); teleCtx.fill();
+  teleCtx.lineCap = 'round'; teleCtx.lineWidth = bc.w;
+  teleCtx.beginPath(); teleCtx.moveTo(d.x, d.y); teleCtx.arc(d.x, d.y, bc.len, base - A, base + A); teleCtx.closePath(); teleCtx.fill();
   for (const edge of [base - A, base + A]) {
     teleCtx.beginPath(); teleCtx.moveTo(d.x, d.y);
-    teleCtx.lineTo(d.x + Math.cos(edge) * beamCfg.len, d.y + Math.sin(edge) * beamCfg.len); teleCtx.stroke();
+    teleCtx.lineTo(d.x + Math.cos(edge) * bc.len, d.y + Math.sin(edge) * bc.len); teleCtx.stroke();
   }
   ctx.save(); ctx.globalAlpha = 0.12 + 0.3 * k; ctx.drawImage(tele, 0, 0); ctx.restore();
 }
 
 // One beam at canvas angle ang (radians): red glow, orange body, white-hot core, rings running outward.
-function drawBeamLine(x0, y0, ang, a) {
-  const dx = Math.cos(ang), dy = Math.sin(ang), x1 = x0 + dx * beamCfg.len, y1 = y0 + dy * beamCfg.len;
+function drawBeamLine(x0, y0, ang, a, bc) {
+  const dx = Math.cos(ang), dy = Math.sin(ang), x1 = x0 + dx * bc.len, y1 = y0 + dy * bc.len;
   ctx.save();
   ctx.lineCap = 'round';
-  for (const [wd, col] of [[beamCfg.w, `rgba(255,90,30,${0.35 * a})`], [beamCfg.w * 0.65, `rgba(255,170,50,${0.75 * a})`], [beamCfg.w * 0.3, `rgba(255,255,230,${a})`]]) {
+  for (const [wd, col] of [[bc.w, `rgba(255,90,30,${0.35 * a})`], [bc.w * 0.65, `rgba(255,170,50,${0.75 * a})`], [bc.w * 0.3, `rgba(255,255,230,${a})`]]) {
     ctx.strokeStyle = col; ctx.lineWidth = wd;
     ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
   }
   ctx.strokeStyle = `rgba(255,255,255,${0.8 * a})`; ctx.lineWidth = 2;
-  for (let s = (performance.now() * 0.9) % 70; s < beamCfg.len; s += 70) {
-    ctx.beginPath(); ctx.ellipse(x0 + dx * s, y0 + dy * s, beamCfg.w * 0.22, beamCfg.w * 0.55, ang, 0, 7); ctx.stroke();
+  for (let s = (performance.now() * 0.9) % 70; s < bc.len; s += 70) {
+    ctx.beginPath(); ctx.ellipse(x0 + dx * s, y0 + dy * s, bc.w * 0.22, bc.w * 0.55, ang, 0, 7); ctx.stroke();
   }
   ctx.restore();
 }
@@ -816,17 +884,17 @@ function drawBeams() {
   for (const i of [0, 1]) drawBeam(i, snap.p[i], disp[i], beamLook[i]);
 }
 function drawBeam(i, p, d, beamLook) {
-  if (p.k !== 1) { beamLook.ang = null; return; }
+  if (!hasBeam(p.k)) { beamLook.ang = null; return; }
   if (p.st > 0) {
     const target = Math.atan2(p.by, p.bx) - p.ba * Math.PI / 180;
     beamLook.ang = beamLook.ang === null ? target : beamLook.ang + (target - beamLook.ang) * 0.5; // 30 snapshots/s -> smooth at 60fps
-    drawBeamLine(d.x, d.y - 6, beamLook.ang, 1);
+    drawBeamLine(d.x, d.y - 6, beamLook.ang, 1, beamCfgOf(p.k));
   } else {
     beamLook.ang = null;
   }
   const t = beamLook.tail;
   if (t) {
-    drawBeamLine(t.x, t.y, t.ang, 1 - t.age / TAIL);
+    drawBeamLine(t.x, t.y, t.ang, 1 - t.age / TAIL, t.bc);
     if ((t.age += 1 / 60) >= TAIL) beamLook.tail = null;
   }
 }
@@ -1166,6 +1234,62 @@ function drawIceberg(d, p) {
     ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = Math.max(1, R * 0.02);
     ctx.beginPath(); ctx.ellipse(0, by + R * 0.06, R * 0.7, R * 0.2, 0, 0, 7); ctx.stroke();
   });
+}
+
+// Gyarados's wave: a ring of surf running out from where it landed at the wave's speed, up to its radius.
+function drawWave(f) {
+  const r0 = 6, R = Math.min(f.r, r0 + waveCfg.speed * f.age), a = Math.max(0, 1 - Math.max(0, R - f.r * 0.6) / (f.r * 0.4 + 1e-6));
+  ctx.save();
+  const disc = ctx.createRadialGradient(f.x, f.y, Math.max(0, R * 0.6), f.x, f.y, R);
+  disc.addColorStop(0, 'rgba(120,200,255,0)'); disc.addColorStop(1, `rgba(120,200,255,${0.28 * a})`);
+  ctx.fillStyle = disc; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = `rgba(235,250,255,${0.9 * a})`; ctx.lineWidth = 7; // the crest, with foam on it
+  ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.stroke();
+  ctx.strokeStyle = `rgba(90,170,235,${0.7 * a})`; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(f.x, f.y, Math.max(0, R - 9), 0, 7); ctx.stroke();
+  ctx.fillStyle = `rgba(255,255,255,${0.85 * a})`;
+  for (let k = 0; k < 28; k++) { const ang = k * 0.2244 + seeded(k * 3.3) * 0.15, rr = R + (seeded(k * 7.1) - 0.5) * 8; ctx.beginPath(); ctx.arc(f.x + Math.cos(ang) * rr, f.y + Math.sin(ang) * rr, 2 + seeded(k) * 2.4, 0, 7); ctx.fill(); }
+  ctx.restore();
+}
+
+// Gyarados's tail whip: the fan it hits, drawn as a sweep across it, with the tail's tip leaving a bright arc.
+function drawTailWhip(f) {
+  const k = Math.min(1, f.age / 0.3), a = 1 - k * k, half = tailCfg.angle / 2 * Math.PI / 180, base = Math.atan2(f.dy || 0, f.dx || 0), L = f.r; // a zero component is left out of the event, hence the || 0
+  ctx.save();
+  ctx.fillStyle = `rgba(255,170,80,${0.22 * a})`; ctx.strokeStyle = `rgba(255,220,150,${0.6 * a})`; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.arc(f.x, f.y, L, base - half, base + half); ctx.closePath(); ctx.fill(); ctx.stroke();
+  const tip = base - half + 2 * half * (1 - (1 - k) * (1 - k)); // the tail sweeps from one edge to the other, fast then slow
+  ctx.lineCap = 'round'; ctx.strokeStyle = `rgba(255,245,210,${a})`; ctx.lineWidth = 9 * (1 - k) + 2;
+  ctx.beginPath(); ctx.arc(f.x, f.y, L * 0.82, Math.max(base - half, tip - 0.6), tip); ctx.stroke();
+  ctx.strokeStyle = `rgba(210,40,40,${a})`; ctx.lineWidth = 5 * (1 - k) + 1;
+  ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x + Math.cos(tip) * L * 0.9, f.y + Math.sin(tip) * L * 0.9); ctx.stroke();
+  ctx.restore();
+}
+
+// Magikarp becomes Gyarados: a white flash that swells and drains away, with sparks flying out of it.
+function drawEvolve(f) {
+  const k = f.age / 0.9, a = 1 - k, R = f.r * (1.2 + 3 * k);
+  ctx.save();
+  const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);
+  g.addColorStop(0, `rgba(255,255,255,${0.95 * a})`); g.addColorStop(0.5, `rgba(255,240,170,${0.5 * a})`); g.addColorStop(1, 'rgba(255,200,80,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let s = 0; s < 14; s++) { const ang = s * 0.449 + seeded(s) * 0.2, r1 = R * (0.4 + 0.5 * k), r2 = R * (0.7 + 0.5 * k); ctx.beginPath(); ctx.moveTo(f.x + Math.cos(ang) * r1, f.y + Math.sin(ang) * r1); ctx.lineTo(f.x + Math.cos(ang) * r2, f.y + Math.sin(ang) * r2); ctx.stroke(); }
+  ctx.restore();
+}
+
+// A stunned player: little stars go round its head.
+function drawStunned(p, top, bs) {
+  const t = performance.now() / 1000;
+  ctx.save(); ctx.fillStyle = '#ffe14d'; ctx.strokeStyle = '#a77d00'; ctx.lineWidth = 1;
+  for (let k = 0; k < 3; k++) {
+    const a = t * 5 + k * 2.094, sx = Math.cos(a) * 16 * bs, sy = top - 22 * bs + Math.sin(a) * 4 * bs;
+    ctx.beginPath();
+    for (let q = 0; q < 10; q++) { const rr = q % 2 ? 2.2 : 5, ang = q * Math.PI / 5 - Math.PI / 2; ctx[q ? 'lineTo' : 'moveTo'](sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // Thunder: a dark circle the size of the strike area sits where the bolt will land.
@@ -1610,7 +1734,7 @@ function drawBound(d, p) {
 
 // Smoke over Snorlax's head while it cannot move (recharging after Hyper Beam).
 function drawSmoke() {
-  const resting = slotsOf(1).filter((i) => snap.p[i].rt > 0);
+  const resting = beamSlots().filter((i) => snap.p[i].rt > 0);
   if (resting.length) {
     for (smokeAcc += 1 / 60; smokeAcc > 0.06; smokeAcc -= 0.06) for (const i of resting) {
       const d = disp[i];
@@ -1664,8 +1788,8 @@ function drawPlayer(i, p) {
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.
   const top = -d.z;
   upright(d.x, d.y, () => {
-    if (p.k === 1 && p.bt > 0) { // glowing orb with radiating lines, growing as the charge fills
-      const k = 1 - p.bt / beamCfg.charge, [ax, ay] = rv(p.bx, p.by), ox = ax * 26 * bs, oy = top - 4 * bs + ay * 26 * bs, r = 4 + 12 * k;
+    if (hasBeam(p.k) && p.bt > 0) { // glowing orb with radiating lines, growing as the charge fills
+      const k = 1 - p.bt / beamCfgOf(p.k).charge, [ax, ay] = rv(p.bx, p.by), ox = ax * 26 * bs, oy = top - 4 * bs + ay * 26 * bs, r = 4 + 12 * k;
       ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5;
       for (let a = 0; a < 6.28; a += 0.5236) {
         ctx.beginPath();
@@ -1677,7 +1801,7 @@ function drawPlayer(i, p) {
       gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#ffb040'); gr.addColorStop(1, 'rgba(255,90,30,0)');
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(ox, oy, r * 1.8, 0, 7); ctx.fill();
     }
-    if (p.k === 1 && (p.bt > 0 || p.st > 0 || p.rt > 0)) {
+    if (hasBeam(p.k) && (p.bt > 0 || p.st > 0 || p.rt > 0)) {
       ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
       ctx.fillStyle = p.rt > 0 ? '#ff8a5c' : '#ffd27a';
       ctx.fillText(p.rt > 0 ? 'MUST RECHARGE' : '破壞死光！', 0, top - 54 * bs);
@@ -1690,6 +1814,8 @@ function drawPlayer(i, p) {
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(mx, my, R, 0, 7); ctx.fill();
     }
     if (p.k === 4 && p.yt > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#a8e0ff'; ctx.fillText(`冰山 ${p.yt.toFixed(1)}s`, 0, top - 54 * bs); }
+    if (p.sn > 0) { drawStunned(p, top, bs); ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe14d'; ctx.fillText('被擊暈！', 0, top - 54 * bs); }
+    if (p.k === 6) { ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd27a'; ctx.fillText(`進化 ${p.hn}/${evolveHops}`, 0, top - 40 * bs); }
     if (p.k === 4 && p.zt > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#a8e0ff'; ctx.fillText(`急凍光線 ${p.zt.toFixed(1)}s`, 0, top - 54 * bs); }
     if (p.tw > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#9be37b'; ctx.fillText(p.tw === 1 ? '被龍捲風捲走！' : '摔下來了！', 0, top - 54 * bs); }
     else if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, top - 54 * bs); }
@@ -1741,7 +1867,7 @@ function drawResult() {
   if (snap.w < 0) return;
   const tm = snap.tm, final = !tm || tm.o, me = snap.p[you], op = snap.p[1 - you];
   const text = final ? ((tm ? tm.mw : snap.w) === you ? '你贏了！' : '你輸了')
-    : me.hp <= 0 && op.hp <= 0 ? '同時倒下！雙方換下一隻' : me.hp <= 0 ? `${NAMES[me.k]}倒下了，換下一隻` : `打倒對手的${NAMES[op.k]}！`;
+    : me.hp <= 0 && op.hp <= 0 ? '同時倒下！雙方換下一隻' : me.hp <= 0 ? `${FORMS[me.k]}倒下了，換下一隻` : `打倒對手的${FORMS[op.k]}！`;
   ctx.fillStyle = '#000a'; ctx.fillRect(0, cv.height / 2 - 50, cv.width, 100);
   ctx.fillStyle = '#fff'; ctx.font = (final ? 40 : 28) + 'px system-ui'; ctx.textAlign = 'center';
   ctx.fillText(text, cv.width / 2, cv.height / 2 + 12);
@@ -1776,13 +1902,16 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? 0.35 : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
       else if (f.t === 'explode') drawExplosion(f);
       else if (f.t === 'freeze') drawFreezeBurst(f);
       else if (f.t === 'iceburst') drawIceBurst(f);
+      else if (f.t === 'wave') drawWave(f);
+      else if (f.t === 'tail') drawTailWhip(f);
+      else if (f.t === 'evolve') drawEvolve(f);
       else if (f.t === 'storm') drawStormStrike(f);
       else if (f.t === 'paralyze') drawParalyzeBurst(f);
       else if (f.t === 'leaf') drawLeafSpark(f);

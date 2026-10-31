@@ -851,3 +851,45 @@ func TestARoomWithOnlyTheComputerLeftIsGoneSoNobodyIsMatchedWithIt(t *testing.T)
 		t.Fatal("a newcomer was put in a room nobody is in")
 	}
 }
+
+// ---- the bots meet Gyarados ----
+
+func TestBotsTreatGyaradosBeamLikeSnorlaxsAndAStunnedOpponentAsRooted(t *testing.T) {
+	g := botDuel() // Pikachu (slot 0) against the foe in slot 1
+	g.P[1].Kind = gyarados
+	g.P[0].X = 600
+	g.P[1].BeamT, g.P[1].BeamX, g.P[1].BeamY = 0.5, -1, 0
+	b := newBot(pikachu, 1)
+	for i := 0; i <= botReact; i++ {
+		b.observe(g, 0)
+	}
+	if th := b.look(g, 0).th; th.kind != thBeam {
+		t.Fatalf("threat %+v, want the beam of a Gyarados to be dodged like a Snorlax's", th)
+	}
+
+	g = botDuel()
+	g.P[1].StunT = 1
+	b = newBot(pikachu, 1)
+	for i := 0; i <= botReact; i++ {
+		b.observe(g, 0)
+	}
+	if rf := b.look(g, 0).rootedFor(); rf < 0.99 {
+		t.Fatalf("rootedFor = %v, a stunned opponent cannot walk for a second", rf)
+	}
+}
+
+func TestBotsJudgeAGyaradosBeamByItsOwnLength(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Gyarados.HyperBeam.Length = 100 // Snorlax's is 450
+	g := duel(cfg, pikachu, magikarp)
+	g.P[1].Kind = gyarados
+	g.P[0].X, g.P[1].X = 600, 900 // 300 apart, along the beam
+	g.P[1].BeamT, g.P[1].BeamX, g.P[1].BeamY = 0.5, -1, 0
+	b := newBot(pikachu, 1)
+	for i := 0; i <= botReact; i++ {
+		b.observe(g, 0)
+	}
+	if th := b.look(g, 0).th; th.kind == thBeam {
+		t.Fatalf("threat %+v: a beam 100 long does not reach 300 away", th)
+	}
+}

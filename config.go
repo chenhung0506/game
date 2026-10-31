@@ -27,6 +27,23 @@ type Reach struct {
 // hits is whether the skill can hurt p at the height it is at now.
 func (r Reach) hits(p *Player) bool { return p.Z >= r.MinHeight && p.Z <= r.MaxHeight }
 
+// HyperBeamCfg is a Hyper Beam: Snorlax has one (snorlax.hyper_beam) and Gyarados has its own (gyarados.hyper_beam), the
+// same skill with numbers of its own.
+type HyperBeamCfg struct {
+	Reach
+	ChargeDuration   float64 `json:"charge_duration"`   // rooted and aim locked on the opponent; the warning fan shows
+	SweepAngle       float64 `json:"sweep_angle"`       // degrees each side of the facing; the beam goes +angle -> -angle
+	SweepDuration    float64 `json:"sweep_duration"`    // seconds the beam takes to cross that arc
+	RechargeDuration float64 `json:"recharge_duration"` // rooted after the sweep
+	Cooldown         float64 `json:"cooldown"`          // before the next beam; counted from the moment it is used
+	Damage           int     `json:"damage"`            // per hit
+	Knockback        float64 `json:"knockback"`         // each hit pushes the target this far straight away from Snorlax; 0 = none
+	HitInterval      float64 `json:"hit_interval"`      // a target still in the beam is hit again this often; 0 = a sweep hits only once
+	Mass             float64 `json:"mass"`              // against an Electro Ball: each hit pushes it mass - electro_ball.mass away (nothing if lighter)
+	Length           float64 `json:"length"`            // reach (radius of the fan)
+	Width            float64 `json:"width"`
+}
+
 // Config holds the tuning values. Distances are in game units and times are in seconds.
 type Config struct {
 	// Length runs between the two players (left-right on the web page, up-down on a phone), width
@@ -111,20 +128,7 @@ type Config struct {
 			Damage           int     `json:"damage"`          // on the opponent, and on an Electro Ball it hits
 			Mass             float64 `json:"mass"`            // against an Electro Ball: it is pushed mass - electro_ball.mass along the dash (nothing if lighter)
 		} `json:"ice_punch"`
-		HyperBeam struct {
-			Reach
-			ChargeDuration   float64 `json:"charge_duration"`   // rooted and aim locked on the opponent; the warning fan shows
-			SweepAngle       float64 `json:"sweep_angle"`       // degrees each side of the facing; the beam goes +angle -> -angle
-			SweepDuration    float64 `json:"sweep_duration"`    // seconds the beam takes to cross that arc
-			RechargeDuration float64 `json:"recharge_duration"` // rooted after the sweep
-			Cooldown         float64 `json:"cooldown"`          // before the next beam; counted from the moment it is used
-			Damage           int     `json:"damage"`            // per hit
-			Knockback        float64 `json:"knockback"`         // each hit pushes the target this far straight away from Snorlax; 0 = none
-			HitInterval      float64 `json:"hit_interval"`      // a target still in the beam is hit again this often; 0 = a sweep hits only once
-			Mass             float64 `json:"mass"`              // against an Electro Ball: each hit pushes it mass - electro_ball.mass away (nothing if lighter)
-			Length           float64 `json:"length"`            // reach (radius of the fan)
-			Width            float64 `json:"width"`
-		} `json:"hyper_beam"`
+		HyperBeam HyperBeamCfg `json:"hyper_beam"`
 	} `json:"snorlax"`
 	Charizard struct {
 		MaxHP     int     `json:"max_hp"`
@@ -345,6 +349,55 @@ type Config struct {
 			Scale            float64 `json:"scale"`    // how many times bigger the funnel is drawn than `radius` (what it hits within); looks only
 		} `json:"tornado"`
 	} `json:"rowlet"`
+	// Magikarp evolves into Gyarados (the red one): each hop it lands from counts, and the `evolve_hops`-th landing
+	// evolves it, keeping the share of its HP it has left. The two have their own HP, speed and size.
+	Magikarp struct {
+		MaxHP      int     `json:"max_hp"`
+		WalkSpeed  float64 `json:"walk_speed"`
+		Radius     float64 `json:"radius"`
+		EvolveHops int     `json:"evolve_hops"`
+		// Jump (the main button, its only skill): it goes up `height` and comes down in `duration` seconds in all, hanging at
+		// the top for `highest_point_duration` of them, out of reach of whatever cannot hit that high; landing hurts
+		// nobody. It can be steered in the air at `air_speed_first_half` for the first half of the jump and
+		// `air_speed_second_half` for the second. `cooldown` counts from the take-off.
+		Jump struct {
+			Height               float64 `json:"height"`
+			Duration             float64 `json:"duration"`
+			HighestPointDuration float64 `json:"highest_point_duration"`
+			Cooldown             float64 `json:"cooldown"`
+			AirSpeedFirstHalf    float64 `json:"air_speed_first_half"`
+			AirSpeedSecondHalf   float64 `json:"air_speed_second_half"`
+		} `json:"jump"`
+	} `json:"magikarp"`
+	Gyarados struct {
+		MaxHP     int     `json:"max_hp"`
+		WalkSpeed float64 `json:"walk_speed"`
+		Radius    float64 `json:"radius"`
+		// Wave (the main button): Gyarados hops `jump_height` for `jump_duration` seconds, rooted, and the landing shakes
+		// the ground: a wave runs out from it in every direction at `speed` up to `radius`, hurting the opponent
+		// once (`damage`) if the front reaches it at a height inside min_height..max_height.
+		Wave struct {
+			Reach
+			Damage       int     `json:"damage"`
+			Radius       float64 `json:"radius"`
+			Speed        float64 `json:"speed"`
+			JumpHeight   float64 `json:"jump_height"`
+			JumpDuration float64 `json:"jump_duration"`
+			Cooldown     float64 `json:"cooldown"` // counted from the start of the hop
+		} `json:"wave"`
+		// Tail whip (K): the opponent in a fan `angle` degrees wide (centred on it), up to `length` away, is knocked back
+		// `knockback` and stunned for `stun_duration` seconds (it can neither move nor act).
+		TailWhip struct {
+			Reach
+			Angle        float64 `json:"angle"`
+			Length       float64 `json:"length"`
+			Knockback    float64 `json:"knockback"`
+			StunDuration float64 `json:"stun_duration"`
+			Cooldown     float64 `json:"cooldown"`
+		} `json:"tail_whip"`
+		// Its Hyper Beam (J): the same skill as Snorlax's, with numbers of its own.
+		HyperBeam HyperBeamCfg `json:"hyper_beam"`
+	} `json:"gyarados"`
 }
 
 func DefaultConfig() Config {
@@ -542,6 +595,18 @@ func DefaultConfig() Config {
 	c.Rowlet.Tornado.Cooldown = 12
 	c.Rowlet.Tornado.Mass = 100
 	c.Rowlet.Tornado.Scale = 1
+
+	c.Magikarp.MaxHP, c.Magikarp.WalkSpeed, c.Magikarp.Radius, c.Magikarp.EvolveHops = 70, 150, 10, 5
+	c.Magikarp.Jump.Height, c.Magikarp.Jump.Duration, c.Magikarp.Jump.HighestPointDuration, c.Magikarp.Jump.Cooldown = 200, 2, 1, 3
+	c.Magikarp.Jump.AirSpeedFirstHalf, c.Magikarp.Jump.AirSpeedSecondHalf = 200, 100
+	c.Gyarados.MaxHP, c.Gyarados.WalkSpeed, c.Gyarados.Radius = 170, 130, 36
+	c.Gyarados.HyperBeam = c.Snorlax.HyperBeam // to start from: Snorlax's, which can then be told apart
+	c.Gyarados.Wave.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	c.Gyarados.Wave.Damage, c.Gyarados.Wave.Radius, c.Gyarados.Wave.Speed = 12, 260, 500
+	c.Gyarados.Wave.JumpHeight, c.Gyarados.Wave.JumpDuration, c.Gyarados.Wave.Cooldown = 40, 0.4, 6
+	c.Gyarados.TailWhip.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	c.Gyarados.TailWhip.Angle, c.Gyarados.TailWhip.Length, c.Gyarados.TailWhip.Knockback = 90, 180, 200
+	c.Gyarados.TailWhip.StunDuration, c.Gyarados.TailWhip.Cooldown = 1.2, 6
 	return c
 }
 
@@ -606,10 +671,15 @@ func (c Config) validate() error {
 		{"snorlax.ice_punch.radius", c.Snorlax.IcePunch.Radius, 0},
 		{"snorlax.ice_punch.freeze_duration", c.Snorlax.IcePunch.FreezeDuration, 0},
 		{"snorlax.hyper_beam.charge_duration", c.Snorlax.HyperBeam.ChargeDuration, 0},
+		{"gyarados.hyper_beam.charge_duration", c.Gyarados.HyperBeam.ChargeDuration, 0},
 		{"snorlax.hyper_beam.sweep_duration", c.Snorlax.HyperBeam.SweepDuration, 0},
+		{"gyarados.hyper_beam.sweep_duration", c.Gyarados.HyperBeam.SweepDuration, 0},
 		{"snorlax.hyper_beam.damage", float64(c.Snorlax.HyperBeam.Damage), 0},
+		{"gyarados.hyper_beam.damage", float64(c.Gyarados.HyperBeam.Damage), 0},
 		{"snorlax.hyper_beam.length", c.Snorlax.HyperBeam.Length, 0},
+		{"gyarados.hyper_beam.length", c.Gyarados.HyperBeam.Length, 0},
 		{"snorlax.hyper_beam.width", c.Snorlax.HyperBeam.Width, 0},
+		{"gyarados.hyper_beam.width", c.Gyarados.HyperBeam.Width, 0},
 		{"charizard.max_hp", float64(c.Charizard.MaxHP), 0},
 		{"charizard.walk_speed", c.Charizard.WalkSpeed, 0},
 		{"charizard.radius", c.Charizard.Radius, 0},
@@ -647,6 +717,21 @@ func (c Config) validate() error {
 		{"rowlet.max_hp", float64(c.Rowlet.MaxHP), 0},
 		{"rowlet.walk_speed", c.Rowlet.WalkSpeed, 0},
 		{"rowlet.radius", c.Rowlet.Radius, 0},
+		{"magikarp.max_hp", float64(c.Magikarp.MaxHP), 0},
+		{"magikarp.walk_speed", c.Magikarp.WalkSpeed, 0},
+		{"magikarp.radius", c.Magikarp.Radius, 0},
+		{"magikarp.evolve_hops", float64(c.Magikarp.EvolveHops), 0},
+		{"magikarp.jump.height", c.Magikarp.Jump.Height, 0},
+		{"magikarp.jump.duration", c.Magikarp.Jump.Duration, 0},
+		{"magikarp.jump.air_speed_first_half", c.Magikarp.Jump.AirSpeedFirstHalf, 0},
+		{"magikarp.jump.air_speed_second_half", c.Magikarp.Jump.AirSpeedSecondHalf, 0},
+		{"gyarados.max_hp", float64(c.Gyarados.MaxHP), 0},
+		{"gyarados.walk_speed", c.Gyarados.WalkSpeed, 0},
+		{"gyarados.radius", c.Gyarados.Radius, 0},
+		{"gyarados.wave.radius", c.Gyarados.Wave.Radius, 0},
+		{"gyarados.wave.speed", c.Gyarados.Wave.Speed, 0},
+		{"gyarados.wave.jump_duration", c.Gyarados.Wave.JumpDuration, 0},
+		{"gyarados.tail_whip.length", c.Gyarados.TailWhip.Length, 0},
 		{"rowlet.fly_high", c.Rowlet.FlyHigh, 0},
 		{"rowlet.tailwind.radius", c.Rowlet.Tailwind.Radius, 0},
 		{"rowlet.tailwind.speed", c.Rowlet.Tailwind.Speed, 0},
@@ -709,6 +794,7 @@ func (c Config) validate() error {
 		{"pikachu.electro_ball.cooldown", c.Pikachu.ElectroBall.Cooldown},
 		{"pikachu.electro_ball.mass", c.Pikachu.ElectroBall.Mass},
 		{"snorlax.hyper_beam.mass", c.Snorlax.HyperBeam.Mass},
+		{"gyarados.hyper_beam.mass", c.Gyarados.HyperBeam.Mass},
 		{"snorlax.jump.cooldown", c.Snorlax.Jump.Cooldown},
 		{"snorlax.jump.air_speed_first_half", c.Snorlax.Jump.AirSpeedFirstHalf},
 		{"snorlax.jump.air_speed_second_half", c.Snorlax.Jump.AirSpeedSecondHalf},
@@ -717,9 +803,13 @@ func (c Config) validate() error {
 		{"snorlax.ice_punch.damage", float64(c.Snorlax.IcePunch.Damage)},
 		{"snorlax.ice_punch.mass", c.Snorlax.IcePunch.Mass},
 		{"snorlax.hyper_beam.cooldown", c.Snorlax.HyperBeam.Cooldown},
+		{"gyarados.hyper_beam.cooldown", c.Gyarados.HyperBeam.Cooldown},
 		{"snorlax.hyper_beam.knockback", c.Snorlax.HyperBeam.Knockback},
+		{"gyarados.hyper_beam.knockback", c.Gyarados.HyperBeam.Knockback},
 		{"snorlax.hyper_beam.hit_interval", c.Snorlax.HyperBeam.HitInterval},
+		{"gyarados.hyper_beam.hit_interval", c.Gyarados.HyperBeam.HitInterval},
 		{"snorlax.hyper_beam.recharge_duration", c.Snorlax.HyperBeam.RechargeDuration},
+		{"gyarados.hyper_beam.recharge_duration", c.Gyarados.HyperBeam.RechargeDuration},
 		{"charizard.fly.cooldown", c.Charizard.Fly.Cooldown},
 		{"charizard.fire_breath.damage", float64(c.Charizard.FireBreath.Damage)},
 		{"charizard.fire_breath.cooldown", c.Charizard.FireBreath.Cooldown},
@@ -762,6 +852,14 @@ func (c Config) validate() error {
 		{"rowlet.tornado.mass", c.Rowlet.Tornado.Mass},
 		{"vulpix.freeze_beam.start_distance", c.Vulpix.FreezeBeam.StartDistance},
 		{"vulpix.frost_field.contact_damage", float64(c.Vulpix.FrostField.ContactDamage)},
+		{"magikarp.jump.highest_point_duration", c.Magikarp.Jump.HighestPointDuration},
+		{"magikarp.jump.cooldown", c.Magikarp.Jump.Cooldown},
+		{"gyarados.wave.damage", float64(c.Gyarados.Wave.Damage)},
+		{"gyarados.wave.jump_height", c.Gyarados.Wave.JumpHeight},
+		{"gyarados.wave.cooldown", c.Gyarados.Wave.Cooldown},
+		{"gyarados.tail_whip.knockback", c.Gyarados.TailWhip.Knockback},
+		{"gyarados.tail_whip.stun_duration", c.Gyarados.TailWhip.StunDuration},
+		{"gyarados.tail_whip.cooldown", c.Gyarados.TailWhip.Cooldown},
 		{"vulpix.frost_field.explosion_radius", c.Vulpix.FrostField.ExplosionRadius},
 		{"vulpix.frost_field.explosion_damage", float64(c.Vulpix.FrostField.ExplosionDamage)},
 	} {
@@ -776,6 +874,7 @@ func (c Config) validate() error {
 		"snorlax.jump":           c.Snorlax.Jump.Reach,
 		"snorlax.ice_punch":      c.Snorlax.IcePunch.Reach,
 		"snorlax.hyper_beam":     c.Snorlax.HyperBeam.Reach,
+		"gyarados.hyper_beam":    c.Gyarados.HyperBeam.Reach,
 		"charizard.fire_breath":  c.Charizard.FireBreath.Reach,
 		"charizard.seismic_toss": c.Charizard.SeismicToss.Reach,
 		"chikorita.leaf_slash":   c.Chikorita.LeafSlash.Reach,
@@ -786,13 +885,17 @@ func (c Config) validate() error {
 		"vulpix.freeze_beam":     c.Vulpix.FreezeBeam.Reach,
 		"rowlet.arrows":          c.Rowlet.Arrows.Reach,
 		"rowlet.tornado":         c.Rowlet.Tornado.Reach,
+		"gyarados.wave":          c.Gyarados.Wave.Reach,
+		"gyarados.tail_whip":     c.Gyarados.TailWhip.Reach,
 	} {
 		if !(r.MinHeight >= 0 && r.MaxHeight >= r.MinHeight) { // also rejects NaN
 			return fmt.Errorf("%s: need 0 <= min_height <= max_height, got %v and %v", name, r.MinHeight, r.MaxHeight)
 		}
 	}
-	if a := c.Snorlax.HyperBeam.SweepAngle; !(a >= 0 && a <= 180) { // 0 = a fixed beam, 180 = a full circle
-		return fmt.Errorf("snorlax.hyper_beam.sweep_angle must be between 0 and 180, got %v", a)
+	for name, a := range map[string]float64{"snorlax": c.Snorlax.HyperBeam.SweepAngle, "gyarados": c.Gyarados.HyperBeam.SweepAngle} {
+		if !(a >= 0 && a <= 180) { // 0 = a fixed beam, 180 = a full circle
+			return fmt.Errorf("%s.hyper_beam.sweep_angle must be between 0 and 180, got %v", name, a)
+		}
 	}
 	if rl := c.Chikorita.RazorLeaf; rl.Count > 200 {
 		return fmt.Errorf("chikorita.razor_leaf.count must be at most 200, got %d", rl.Count)
@@ -814,6 +917,12 @@ func (c Config) validate() error {
 	if fb := c.Vulpix.FreezeBeam; !(fb.StartDistance <= fb.Length) { // the end could not start farther out than it may go
 		return fmt.Errorf("vulpix.freeze_beam.start_distance must be at most length, got %v and %v", fb.StartDistance, fb.Length)
 	}
+	if j := c.Magikarp.Jump; !(j.HighestPointDuration < j.Duration) { // the rise and the fall need time of their own
+		return fmt.Errorf("magikarp.jump.highest_point_duration must be less than duration, got %v and %v", j.HighestPointDuration, j.Duration)
+	}
+	if a := c.Gyarados.TailWhip.Angle; !(a > 0 && a <= 360) {
+		return fmt.Errorf("gyarados.tail_whip.angle must be between 0 (exclusive) and 360, got %v", a)
+	}
 	if a := c.Charizard.FireBreath.RandomOffsetAngle; !(a >= 0 && a <= 90) { // 0 = every fire ball flies straight at the target
 		return fmt.Errorf("charizard.fire_breath.random_offset_angle must be between 0 and 90, got %v", a)
 	}
@@ -821,6 +930,14 @@ func (c Config) validate() error {
 }
 
 // maxHPOf, walkSpeedOf and radiusOf are a character's full HP, walking speed and body size.
+// beamOf is the Hyper Beam of whoever is playing kind (Snorlax or Gyarados).
+func (c Config) beamOf(kind int) HyperBeamCfg {
+	if kind == gyarados {
+		return c.Gyarados.HyperBeam
+	}
+	return c.Snorlax.HyperBeam
+}
+
 func (c Config) maxHPOf(kind int) int {
 	switch kind {
 	case snorlax:
@@ -833,6 +950,10 @@ func (c Config) maxHPOf(kind int) int {
 		return c.Vulpix.MaxHP
 	case rowlet:
 		return c.Rowlet.MaxHP
+	case magikarp:
+		return c.Magikarp.MaxHP
+	case gyarados:
+		return c.Gyarados.MaxHP
 	}
 	return c.Pikachu.MaxHP
 }
@@ -849,6 +970,10 @@ func (c Config) walkSpeedOf(kind int) float64 {
 		return c.Vulpix.WalkSpeed
 	case rowlet:
 		return c.Rowlet.WalkSpeed
+	case magikarp:
+		return c.Magikarp.WalkSpeed
+	case gyarados:
+		return c.Gyarados.WalkSpeed
 	}
 	return c.Pikachu.WalkSpeed
 }
@@ -865,6 +990,10 @@ func (c Config) radiusOf(kind int) float64 {
 		return c.Vulpix.Radius
 	case rowlet:
 		return c.Rowlet.Radius
+	case magikarp:
+		return c.Magikarp.Radius
+	case gyarados:
+		return c.Gyarados.Radius
 	}
 	return c.Pikachu.Radius
 }

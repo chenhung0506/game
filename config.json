@@ -137,7 +137,7 @@
       "jump_height": 40,
       "slashes": 5,
       "slash_interval": 0.3,
-      "slash_step": 45,
+      "slash_step": 55,
       "slash_radius": 100,
       "leaf_scale": 3,
       "damage": 7,
@@ -261,6 +261,59 @@
       "cooldown": 12,
       "mass": 100,
       "scale": 1.4
+    }
+  },
+  "magikarp": {
+    "max_hp": 100,
+    "walk_speed": 120,
+    "radius": 10,
+    "evolve_hops": 5,
+    "jump": {
+      "height": 200,
+      "duration": 2,
+      "highest_point_duration": 1,
+      "cooldown": 3,
+      "air_speed_first_half": 200,
+      "air_speed_second_half": 100
+    }
+  },
+  "gyarados": {
+    "max_hp": 200,
+    "walk_speed": 130,
+    "radius": 75,
+    "wave": {
+      "min_height": 0,
+      "max_height": 60,
+      "damage": 12,
+      "radius": 800,
+      "speed": 500,
+      "jump_height": 40,
+      "jump_duration": 0.4,
+      "cooldown": 3
+    },
+    "tail_whip": {
+      "min_height": 0,
+      "max_height": 60,
+      "angle": 90,
+      "length": 200,
+      "knockback": 200,
+      "stun_duration": 2,
+      "cooldown": 4
+    },
+    "hyper_beam": {
+      "min_height": 0,
+      "max_height": 40,
+      "charge_duration": 0.6,
+      "sweep_angle": 38,
+      "sweep_duration": 1.2,
+      "recharge_duration": 2,
+      "cooldown": 5,
+      "damage": 10,
+      "knockback": 80,
+      "hit_interval": 0.05,
+      "mass": 130,
+      "length": 650,
+      "width": 50
     }
   }
 }
