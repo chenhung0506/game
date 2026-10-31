@@ -25,6 +25,12 @@
   /* cooldown: a dark pie over the button, the part still to wait, shrinking clockwise from the top */
   /* character choice: shown from connecting until the match starts */
   #pick { position: fixed; inset: 0; z-index: 4; background: #14161c; display: none; flex-direction: column; align-items: center; padding: 56px 12px 12px; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; }
+  #rooms { position: fixed; inset: 0; z-index: 5; background: #14161c; display: none; flex-direction: column; align-items: center; padding: 56px 12px 12px; box-sizing: border-box; overflow-y: auto; }
+  #rooms h2 { margin: 6px 0 12px; font-size: 20px; }
+  #roomlist { display: flex; flex-direction: column; gap: 8px; width: min(420px, 100%); margin-bottom: 14px; }
+  #rooms button { font: bold 15px system-ui; padding: 12px 16px; border-radius: 10px; border: 2px solid #3d4a40; background: #1b1f27; color: #eee; cursor: pointer; }
+  #rooms button.stale { opacity: .5; border-style: dashed; }
+  #rooms .hint { margin-top: 12px; font-size: 13px; opacity: .6; }
   #pick h2 { margin: 6px 0 12px; font-size: 20px; }
   #cards { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
   .card { width: 148px; border: 2px solid #3d4a40; border-radius: 12px; padding: 8px; background: #1b1f27; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; }
@@ -51,6 +57,7 @@
 </head>
 <body>
 <div id="bar"></div>
+<div id="rooms"><h2>選擇房間</h2><div id="roomlist"></div><button id="newroom">開新房間</button><div class="hint">灰色表示對方可能已斷線；沒有人等待時會自動開房</div></div>
 <div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="botbar"><button id="bot0">單機：對皮卡丘</button><button id="bot1">單機：對卡比獸</button><button id="botOff">改和真人對戰</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button>
 <canvas id="c" width="2000" height="1000"></canvas>
@@ -120,7 +127,7 @@ const look = [{ dir: null, vx: 0, vy: 0, mv: 0, ph: 0, ls: 1, la: 0 }, { dir: nu
 const disp = [{ x: null, y: 0, z: 0 }, { x: null, y: 0, z: 0 }]; // smoothed positions; set from the first snapshot
 let fx = [], shake = 0;
 
-const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?mode=' + (PORTRAIT ? 'mobile' : 'web')); // no room to name: the server puts you with whoever is waiting, or opens one; the first player's view picks the court
+const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?menu=1&mode=' + (PORTRAIT ? 'mobile' : 'web')); // no room number to type: when people are waiting the server sends their rooms to choose from, otherwise it opens one; the first player's view picks the court
 let picks = [-1, -1], here = [true, false], bots = [-1, -1], padKind = -1; // bots: the character a computer plays in each slot (-1 = a person or nobody)
 let ease = [0, 0]; // each slot's handicap in percent, from the lobby
 let teamMode = false, teamSize = NAMES.length, myOrder = [], sentOrder = ''; // the lobby's match type; the order I field my characters in, and the one the server has
@@ -129,7 +136,7 @@ const beamSlots = () => (snap ? [0, 1].filter((i) => hasBeam(snap.p[i].k)) : [])
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
     if (teamSize !== (m.size || NAMES.length)) { teamSize = m.size || NAMES.length; myOrder = []; sentOrder = ''; } // another team size: choose again
@@ -140,6 +147,7 @@ ws.onmessage = (e) => {
     document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
     showPick();
   }
+  else if (m.t === 'rooms') showRooms(m.rooms);
   else if (m.t === 'full') { status = '房間已滿（最多 2 人）'; waiting = false; }
   else if (m.t === 's') {
     if (!snap) { ghosts.length = iceTrail.length = voltTrail.length = smoke.length = flames.length = 0; fx = []; for (const b of beamLook) b.ang = b.tail = null; for (const sh of shadow) sh.x = null; for (const l of stormLook) l.x = null; for (const l of fbLook) l.x = null; for (const d of disp) d.x = null; for (const l of look) l.dir = null; } // a new match starts clean
@@ -167,7 +175,27 @@ ws.onmessage = (e) => {
     }
   }
 };
-ws.onclose = () => { status = '連線中斷，重新整理頁面再試'; waiting = false; snap = null; document.getElementById('pick').style.display = 'none'; };
+ws.onclose = () => { hideRooms(); status = '連線中斷，重新整理頁面再試'; waiting = false; snap = null; document.getElementById('pick').style.display = 'none'; };
+
+// The room menu: shown when people are waiting, so a player who has dropped off can be skipped. The server sends the
+// list again whenever it is asked, and on its own after a choice that failed.
+let roomsTimer = 0;
+function hideRooms() { clearInterval(roomsTimer); roomsTimer = 0; document.getElementById('rooms').style.display = 'none'; }
+function showRooms(list) {
+  const box = document.getElementById('rooms'), ul = document.getElementById('roomlist');
+  box.style.display = 'flex';
+  ul.textContent = '';
+  list.forEach((r) => {
+    const b = document.createElement('button');
+    const who = r.pick >= 0 ? NAMES[r.pick] : '選角中';
+    b.textContent = (r.bot ? '對電腦中・' : '') + who + '　等了 ' + r.wait + ' 秒' + (r.stale ? '　（可能已斷線）' : '');
+    if (r.stale) b.className = 'stale';
+    b.onclick = () => ws.send(JSON.stringify({ join: r.id }));
+    ul.appendChild(b);
+  });
+  if (!roomsTimer) roomsTimer = setInterval(() => { if (ws.readyState === 1) ws.send(JSON.stringify({ rooms: true })); }, 2000);
+}
+document.getElementById('newroom').onclick = () => ws.send(JSON.stringify({ new: true }));
 
 // The view: the world is drawn through VIEW, so everything that is not upright art (rings, beams, the
 // strike areas) just follows. Pikachu starts on the left, so its view turns the arena a quarter turn

@@ -5,8 +5,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -14,11 +16,12 @@ import (
 
 const (
 	tickRate   = 30
-	maxRooms   = 1000            // rooms live in memory and every player nobody can be matched with opens one
-	roundReset = 2 * time.Second // between two bouts of a team match
-	resultHold = 6 * time.Second // how long the result stays up before the next match starts by itself; the repick button works meanwhile
-	pongWait   = 60 * time.Second
-	pingEvery  = 20 * time.Second
+	maxRooms   = 1000             // rooms live in memory and every player nobody can be matched with opens one
+	roundReset = 2 * time.Second  // between two bouts of a team match
+	resultHold = 6 * time.Second  // how long the result stays up before the next match starts by itself; the repick button works meanwhile
+	pongWait   = 10 * time.Second // a connection that never answers a ping is dropped this long after the last answer; it holds a seat (and pairs with newcomers) until then
+	pingEvery  = 3 * time.Second
+	staleAfter = 2 * pingEvery // the menu marks a waiting player who has been quiet this long as probably gone
 )
 
 // CheckOrigin is left nil: gorilla then only accepts same-origin browsers.
@@ -27,7 +30,10 @@ var upgrader = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
 type client struct {
 	conn *websocket.Conn
 	send chan []byte
+	seen atomic.Int64 // unix nanoseconds of the last pong or message from the page
 }
+
+func (c *client) touch() { c.seen.Store(time.Now().UnixNano()) }
 
 type room struct {
 	id      string // the server's own number for it (never shown to players)
@@ -41,6 +47,7 @@ type room struct {
 	running bool
 	overAt  time.Time // zero while a round is in progress
 	winner  int
+	aloneAt time.Time // since when one person has been in it alone
 
 	// Team match: both players send the order they field `teamN()` characters in (3, or all `kinds`); when one is knocked out the
 	// next in order steps in, and the match is over when a side has run out. A survivor keeps its HP.
@@ -77,7 +84,7 @@ func (h *hub) waiting(mode string) *room {
 	}
 	for _, r := range h.rooms {
 		r.mu.Lock()
-		single := (r.c[0] == nil) != (r.c[1] == nil)
+		single := r.alone()
 		r.mu.Unlock()
 		if single && better(r) {
 			best = r
@@ -86,20 +93,22 @@ func (h *hub) waiting(mode string) *room {
 	return best
 }
 
-// join seats a newcomer. Nobody picks a room: whoever is alone in one is matched with the newcomer, which ends
-// any game that person was playing against the computer; with nobody waiting the newcomer opens a room.
-// Lock order is always hub.mu -> room.mu.
-func (h *hub) join(mode string, c *client) (r *room, idx int, ok bool) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if r = h.waiting(mode); r == nil {
-		if len(h.rooms) >= maxRooms {
-			return nil, 0, false
-		}
-		h.seq++
-		r = &room{id: strconv.Itoa(h.seq), n: h.seq, mode: mode, g: NewGameFor(h.cfg, mode), winner: -1, pick: [2]int{-1, -1}}
-		h.rooms[r.id] = r
+// alone is whether exactly one person is in the room (who may be playing the computer). Must be called with r.mu held.
+func (r *room) alone() bool { return (r.c[0] == nil) != (r.c[1] == nil) }
+
+// open makes a room for c's view. Must be called with h.mu held; nil when there are too many rooms.
+func (h *hub) open(mode string) *room {
+	if len(h.rooms) >= maxRooms {
+		return nil
 	}
+	h.seq++
+	r := &room{id: strconv.Itoa(h.seq), n: h.seq, mode: mode, g: NewGameFor(h.cfg, mode), winner: -1, pick: [2]int{-1, -1}, aloneAt: time.Now()}
+	h.rooms[r.id] = r
+	return r
+}
+
+// sit puts c in a free slot of r; a person takes the place of a computer when there is no other. Must be called with h.mu held.
+func sit(r *room, c *client) (idx int, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for i := range r.c {
@@ -107,7 +116,7 @@ func (h *hub) join(mode string, c *client) (r *room, idx int, ok bool) {
 			r.c[i] = c
 			r.pick[i] = -1
 			r.ease[i] = 0
-			return r, i, true
+			return i, true
 		}
 	}
 	for i := range r.c { // no free slot: a person takes the place of the computer
@@ -115,10 +124,145 @@ func (h *hub) join(mode string, c *client) (r *room, idx int, ok bool) {
 			r.c[i], r.bot[i] = c, nil
 			r.pick[i], r.ease[i] = -1, 0
 			r.overAt, r.winner, r.matchOver = time.Time{}, -1, false
-			return r, i, true
+			return i, true
 		}
 	}
-	return nil, 0, false
+	return 0, false
+}
+
+// join seats a newcomer who did not ask to choose: whoever is alone in a room is matched with the newcomer, which ends
+// any game that person was playing against the computer; with nobody waiting the newcomer opens a room.
+// Lock order is always hub.mu -> room.mu.
+func (h *hub) join(mode string, c *client) (r *room, idx int, ok bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if r = h.waiting(mode); r == nil {
+		if r = h.open(mode); r == nil {
+			return nil, 0, false
+		}
+	}
+	if idx, ok = sit(r, c); !ok {
+		return nil, 0, false
+	}
+	return r, idx, true
+}
+
+// joinRoom seats c in the room the player picked from the menu, if someone is still alone in it.
+func (h *hub) joinRoom(id string, c *client) (r *room, idx int, ok bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if r = h.rooms[id]; r == nil {
+		return nil, 0, false
+	}
+	r.mu.Lock()
+	alone := r.alone()
+	r.mu.Unlock()
+	if !alone {
+		return nil, 0, false
+	}
+	if idx, ok = sit(r, c); !ok {
+		return nil, 0, false
+	}
+	return r, idx, true
+}
+
+// openRoom seats c in a room of its own that others can then pick from the menu.
+func (h *hub) openRoom(mode string, c *client) (r *room, idx int, ok bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if r = h.open(mode); r == nil {
+		return nil, 0, false
+	}
+	idx, ok = sit(r, c)
+	return r, idx, ok
+}
+
+// roomInfo is one line of the menu: a room with one person in it.
+type roomInfo struct {
+	ID    string `json:"id"`
+	Wait  int    `json:"wait"`  // seconds the person has been alone
+	Stale bool   `json:"stale"` // quiet for so long that they have probably dropped off
+	Pick  int    `json:"pick"`  // the character they chose, -1 if none yet
+	Bot   bool   `json:"bot"`   // they are playing the computer
+	Team  bool   `json:"team"`
+}
+
+// waitingRooms lists the rooms someone is alone in: those still answering first, then the longest waiting.
+func (h *hub) waitingRooms() []roomInfo {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	now := time.Now()
+	type row struct {
+		roomInfo
+		n int
+	}
+	var rows []row
+	for _, r := range h.rooms {
+		r.mu.Lock()
+		if r.alone() {
+			i := 0
+			if r.c[0] == nil {
+				i = 1
+			}
+			o := 1 - i
+			rows = append(rows, row{roomInfo{
+				ID: r.id, Wait: int(now.Sub(r.aloneAt).Seconds()), Pick: r.pick[i], Bot: r.bot[o] != nil, Team: r.team,
+				Stale: now.UnixNano()-r.c[i].seen.Load() > int64(staleAfter),
+			}, r.n})
+		}
+		r.mu.Unlock()
+	}
+	sort.Slice(rows, func(a, b int) bool {
+		if rows[a].Stale != rows[b].Stale {
+			return !rows[a].Stale
+		}
+		return rows[a].n < rows[b].n
+	})
+	out := make([]roomInfo, len(rows))
+	for i, w := range rows {
+		out[i] = w.roomInfo
+	}
+	return out
+}
+
+// seat puts c in a room. A page that asked for the menu and finds people waiting is shown them and chooses
+// (or opens a room of its own); everyone else is paired with whoever has waited longest. ok is false when the
+// connection is over: the server is full, or the page left while choosing.
+func (h *hub) seat(c *client, mode string, menu bool) (r *room, idx int, ok bool) {
+	if !menu {
+		return h.join(mode, c)
+	}
+	for {
+		list := h.waitingRooms()
+		if len(list) == 0 {
+			return h.join(mode, c)
+		}
+		msg, _ := json.Marshal(map[string]any{"t": "rooms", "rooms": list})
+		select {
+		case c.send <- msg:
+		default:
+		}
+		_, data, err := c.conn.ReadMessage()
+		if err != nil {
+			return nil, 0, false
+		}
+		c.touch()
+		var m struct {
+			Join string `json:"join"`
+			New  bool   `json:"new"`
+		}
+		if json.Unmarshal(data, &m) != nil {
+			continue
+		}
+		switch {
+		case m.Join != "":
+			if r, idx, ok = h.joinRoom(m.Join, c); ok {
+				return
+			} // taken meanwhile: the list is sent again
+		case m.New:
+			return h.openRoom(mode, c)
+		}
+	}
 }
 
 func (h *hub) leave(r *room, idx int) {
@@ -138,6 +282,7 @@ func (h *hub) leave(r *room, idx int) {
 	}
 	// The remaining player keeps its pick and waits in the lobby for a new opponent, who picks something else.
 	r.overAt, r.winner = time.Time{}, -1
+	r.aloneAt = time.Now()
 	r.broadcastLobby()
 }
 
@@ -452,13 +597,20 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	c := &client{conn: conn, send: make(chan []byte, 8)}
-	r, idx, ok := h.join(mode, c)
+	c.touch()
+	go c.writePump()
+	conn.SetReadLimit(512)
+	conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error {
+		c.touch()
+		return conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+	r, idx, ok := h.seat(c, mode, req.URL.Query().Get("menu") == "1")
 	if !ok {
-		conn.WriteMessage(websocket.TextMessage, []byte(`{"t":"full"}`))
-		conn.Close()
+		c.send <- []byte(`{"t":"full"}`) // also when the page left meanwhile: nobody reads it then
+		close(c.send)
 		return
 	}
-	go c.writePump()
 
 	r.mu.Lock()
 	cfg := r.g.cfg
@@ -502,16 +654,12 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	r.mu.Unlock()
 
 	defer h.leave(r, idx)
-	conn.SetReadLimit(512)
-	conn.SetReadDeadline(time.Now().Add(pongWait))
-	conn.SetPongHandler(func(string) error {
-		return conn.SetReadDeadline(time.Now().Add(pongWait))
-	})
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
 			return
 		}
+		c.touch()
 		// The other messages from the page are the lobby's: the character choice {"pick":2}, the match type
 		// {"team":true}, the team's order {"order":[2,0,3,1]} and {"repick":true} after a result, the handicap {"ease":30}; the rest is held keys.
 		var m struct {
