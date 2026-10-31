@@ -35,7 +35,8 @@ type room struct {
 	mu      sync.Mutex
 	g       *Game
 	c       [2]*client
-	pick    [2]int // the character each slot chose; -1 until it does
+	bot     [2]*Bot // a slot a computer plays instead of a client (single-player); never in a team match
+	pick    [2]int  // the character each slot chose; -1 until it does
 	running bool
 	overAt  time.Time // zero while a round is in progress
 	winner  int
@@ -74,10 +75,18 @@ func (h *hub) join(id, mode string, c *client) (r *room, idx int, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for i := range r.c {
-		if r.c[i] == nil {
+		if r.c[i] == nil && r.bot[i] == nil {
 			r.c[i] = c
 			r.pick[i] = -1
 			r.ease[i] = 0
+			return r, i, true
+		}
+	}
+	for i := range r.c { // no free slot: a person takes the place of the computer
+		if r.c[i] == nil {
+			r.c[i], r.bot[i] = c, nil
+			r.pick[i], r.ease[i] = -1, 0
+			r.overAt, r.winner, r.matchOver = time.Time{}, -1, false
 			return r, i, true
 		}
 	}
@@ -95,7 +104,7 @@ func (h *hub) leave(id string, r *room, idx int) {
 	}
 	r.pick[idx] = -1
 	r.matchOver = false
-	if r.c[0] == nil && r.c[1] == nil {
+	if r.c[0] == nil && r.c[1] == nil { // nobody is left to play: a computer does not keep a room alive
 		delete(h.rooms, id)
 		return
 	}
@@ -104,9 +113,43 @@ func (h *hub) leave(id string, r *room, idx int) {
 	r.broadcastLobby()
 }
 
-// playing is whether a match is on: both players are here and both have picked. Must be called with r.mu held.
+// present is whether slot i has a player: a person, or a computer.
+func (r *room) present(i int) bool { return r.c[i] != nil || r.bot[i] != nil }
+
+// playing is whether a match is on: both players are here and both have picked. A computer only ever sits beside a
+// person (and leaves the room with them), so there is always someone watching. Must be called with r.mu held.
 func (r *room) playing() bool {
-	return r.c[0] != nil && r.c[1] != nil && r.pick[0] >= 0 && r.pick[1] >= 0
+	return r.present(0) && r.present(1) && r.pick[0] >= 0 && r.pick[1] >= 0
+}
+
+// clearPicks makes everyone choose again; a computer keeps its character.
+func (r *room) clearPicks() {
+	r.pick = [2]int{-1, -1}
+	for i, b := range r.bot {
+		if b != nil {
+			r.pick[i] = b.kind
+		}
+	}
+}
+
+// setBot has a computer play the empty slot beside idx (kind >= 0) or sends it away (kind < 0). Only characters
+// the bot knows how to play are accepted; it is refused in a team match, while a match is on, and when a person
+// is in that slot. Must be called with r.mu held.
+func (r *room) setBot(idx, kind int) bool {
+	o := 1 - idx
+	if r.playing() || r.team || r.c[o] != nil {
+		return false
+	}
+	if kind < 0 {
+		r.bot[o], r.pick[o] = nil, -1
+		return true
+	}
+	if !botCanPlay(kind) {
+		return false
+	}
+	r.bot[o], r.pick[o], r.ease[o] = newBot(kind, uint64(time.Now().UnixNano())), kind, 0
+	r.startIfReady()
+	return true
 }
 
 // choose records slot idx's pick and starts the match once both players have one. It reports whether the
@@ -137,7 +180,8 @@ func (r *room) setSize(n int) bool {
 	if r.playing() || (n != teamSize3 && n != kinds) {
 		return false
 	}
-	r.size, r.pick = n, [2]int{-1, -1}
+	r.size = n
+	r.clearPicks()
 	return true
 }
 
@@ -164,10 +208,11 @@ func (r *room) setOrder(idx int, order []int) bool {
 // setTeam switches the room between single matches and team matches. Everyone has to choose again. It is refused
 // while a match is on. Must be called with r.mu held.
 func (r *room) setTeam(team bool) bool {
-	if r.playing() {
+	if r.playing() || (team && (r.bot[0] != nil || r.bot[1] != nil)) { // the computer plays single matches only
 		return false
 	}
-	r.team, r.pick = team, [2]int{-1, -1}
+	r.team = team
+	r.clearPicks()
 	return true
 }
 
@@ -187,7 +232,7 @@ func (r *room) repick() bool {
 	if r.overAt.IsZero() || !r.matchEnded() {
 		return false
 	}
-	r.pick = [2]int{-1, -1}
+	r.clearPicks()
 	r.overAt, r.winner, r.matchOver = time.Time{}, -1, false
 	return true
 }
@@ -202,6 +247,7 @@ func (r *room) startIfReady() {
 	}
 	r.cur, r.matchOver = [2]int{}, false
 	r.g.Ease = r.ease
+	r.resetBots()
 	if r.team {
 		r.g.SetKinds(r.order[0][0], r.order[1][0])
 	} else {
@@ -254,6 +300,16 @@ func (r *room) nextRound() {
 		}
 	}
 	r.overAt, r.winner = time.Time{}, -1
+	r.resetBots()
+}
+
+// resetBots makes the computer players forget the bout that ended.
+func (r *room) resetBots() {
+	for _, b := range r.bot {
+		if b != nil {
+			b.reset()
+		}
+	}
 }
 
 // teamInfo is what a snapshot says about a team match. Who is next is each side's secret, so only the characters
@@ -269,7 +325,13 @@ type teamInfo struct {
 // broadcastLobby tells both players who is here and what they picked; the page shows its character
 // choice until snapshots start. Must be called with r.mu held.
 func (r *room) broadcastLobby() {
-	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.c[0] != nil, r.c[1] != nil}, "team": r.team, "size": r.teamN(), "ease": r.ease})
+	bots := [2]int{-1, -1} // the character a computer plays in each slot
+	for i, b := range r.bot {
+		if b != nil {
+			bots[i] = b.kind
+		}
+	}
+	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.present(0), r.present(1)}, "bot": bots, "team": r.team, "size": r.teamN(), "ease": r.ease})
 	r.broadcast(msg)
 }
 
@@ -307,6 +369,11 @@ func (r *room) loop() {
 func (r *room) step(now time.Time) []byte {
 	var events []Event
 	if r.overAt.IsZero() {
+		for i, b := range r.bot {
+			if b != nil {
+				r.g.P[i].In = b.Decide(r.g, i)
+			}
+		}
 		events = r.g.Step(1.0 / tickRate)
 		if w := r.g.Winner(); w >= 0 {
 			r.overAt, r.winner = now, w
@@ -426,13 +493,14 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			Order  []int `json:"order"`
 			Repick bool  `json:"repick"`
 			Ease   *int  `json:"ease"`
+			Bot    *int  `json:"bot"`
 			Input
 		}
 		if json.Unmarshal(data, &m) != nil {
 			continue
 		}
 		r.mu.Lock()
-		if m.Pick != nil || m.Team != nil || m.Size != nil || m.Order != nil || m.Repick || m.Ease != nil {
+		if m.Pick != nil || m.Team != nil || m.Size != nil || m.Order != nil || m.Repick || m.Ease != nil || m.Bot != nil {
 			switch {
 			case m.Pick != nil:
 				r.choose(idx, *m.Pick)
@@ -444,6 +512,8 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 				r.setOrder(idx, m.Order)
 			case m.Ease != nil:
 				r.setEase(idx, *m.Ease)
+			case m.Bot != nil:
+				r.setBot(idx, *m.Bot)
 			default:
 				r.repick()
 			}

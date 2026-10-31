@@ -35,7 +35,7 @@
   #easebox { margin: 0 0 12px; text-align: center; line-height: 1.6; }
   #easebox input { width: 220px; vertical-align: middle; }
   #easemsg { font-size: 12px; opacity: .75; }
-  #modes, #teambar { display: flex; gap: 10px; margin: 0 0 12px; }
+  #modes, #teambar, #botbar { display: flex; gap: 10px; margin: 0 0 12px; }
   #teambar { margin: 12px 0 0; }
   #pick button, #repick { font: bold 15px system-ui; padding: 9px 16px; border-radius: 10px; border: 2px solid #3d4a40; background: #1b1f27; color: #eee; cursor: pointer; }
   #pick button.on { border-color: #6fd36f; background: #243026; }
@@ -51,7 +51,7 @@
 </head>
 <body>
 <div id="bar"></div>
-<div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="sz6">6 隻</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="sz6">6 隻</button></div><div id="botbar"><button id="bot0">單機：對皮卡丘</button><button id="bot1">單機：對卡比獸</button><button id="botOff">改和真人對戰</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
@@ -119,7 +119,7 @@ const disp = [{ x: null, y: 0, z: 0 }, { x: null, y: 0, z: 0 }]; // smoothed pos
 let fx = [], shake = 0;
 
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // the first player's view picks the court
-let picks = [-1, -1], here = [true, false], padKind = -1;
+let picks = [-1, -1], here = [true, false], bots = [-1, -1], padKind = -1; // bots: the character a computer plays in each slot (-1 = a person or nobody)
 let ease = [0, 0]; // each slot's handicap in percent, from the lobby
 let teamMode = false, teamSize = 6, myOrder = [], sentOrder = ''; // the lobby's match type; the order I field my characters in, and the one the server has
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
@@ -132,7 +132,7 @@ ws.onmessage = (e) => {
     if (teamMode !== !!m.team) { teamMode = !!m.team; myOrder = []; sentOrder = ''; } // another match type: choose again
     if (sentOrder && m.picks[you] < 0) { myOrder = []; sentOrder = ''; } // sent back to choose again
     ease = m.ease || [0, 0];
-    picks = m.picks; here = m.here; waiting = !(here[0] && here[1]); snap = null; padKind = -1;
+    picks = m.picks; here = m.here; bots = m.bot || [-1, -1]; waiting = !(here[0] && here[1]); snap = null; padKind = -1;
     document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
     showPick();
   }
@@ -216,6 +216,10 @@ function showPick() {
   document.getElementById('mTeam').classList.toggle('on', teamMode);
   document.getElementById('teambar').style.display = teamMode ? 'flex' : 'none';
   for (const n of [3, 6]) { const b = document.getElementById('sz' + n); b.style.display = teamMode ? '' : 'none'; b.classList.toggle('on', teamSize === n); }
+  const vsComputer = bots[1 - you] >= 0, personHere = here[1 - you] && !vsComputer; // a computer can stand in for the opponent when no person is there
+  document.getElementById('botbar').style.display = teamMode || personHere ? 'none' : 'flex';
+  for (const k of [0, 1]) document.getElementById('bot' + k).classList.toggle('on', bots[1 - you] === k);
+  document.getElementById('botOff').style.display = vsComputer ? '' : 'none';
   document.getElementById('tOk').disabled = myOrder.length !== teamSize || myOrder.join() === sentOrder;
   document.getElementById('tClear').disabled = !myOrder.length;
   const link = location.origin + location.pathname + '?room=' + room;
@@ -229,8 +233,8 @@ function showPick() {
     document.getElementById('pickmsg').innerHTML = lines.join('<br>');
     return;
   }
-  if (!here[1 - you]) lines.push(`等待對手加入… 把這個連結傳給對方：<br><code>${link}</code><br>（電腦橫式版：在自己的網址後面加上 &landscape）`);
-  else if (mine < 0 && theirs >= 0) lines.push(`對手選了${NAMES[theirs]}，換你選（可以選一樣的）`);
+  if (!here[1 - you]) lines.push(`等待對手加入… 把這個連結傳給對方：<br><code>${link}</code><br>（電腦橫式版：在自己的網址後面加上 &landscape）<br>沒有人可以一起玩？按上面的「單機」和電腦對戰`);
+  else if (mine < 0 && theirs >= 0) lines.push(vsComputer ? `電腦玩${NAMES[theirs]}，換你選` : `對手選了${NAMES[theirs]}，換你選（可以選一樣的）`);
   else if (mine >= 0 && theirs < 0) lines.push('對手選擇中…');
   if (mine >= 0) lines.push(`你選了${NAMES[mine]}（對手還沒選好以前，可以重選；兩人可以選同一隻）`);
   else if (here[1 - you] && theirs < 0) lines.push('點一隻寶可夢開始');
@@ -244,6 +248,9 @@ document.getElementById('mSingle').onclick = () => send({ team: false });
 document.getElementById('mTeam').onclick = () => send({ team: true });
 document.getElementById('sz3').onclick = () => send({ size: 3 });
 document.getElementById('sz6').onclick = () => send({ size: 6 });
+document.getElementById('bot0').onclick = () => send({ bot: 0 });
+document.getElementById('bot1').onclick = () => send({ bot: 1 });
+document.getElementById('botOff').onclick = () => send({ bot: -1 });
 document.getElementById('tClear').onclick = () => { myOrder = []; showPick(); };
 document.getElementById('tOk').onclick = () => { send({ order: myOrder }); sentOrder = myOrder.join(); showPick(); };
 document.getElementById('repick').onclick = () => send({ repick: true });
