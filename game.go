@@ -61,7 +61,7 @@ type Input struct {
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
 	AimY float64 `json:"ay"`
-	// The direction a skill that is aimed before it is cast goes (the Tail whip): the page lets the player drag the
+	// The direction a skill that is aimed before it is cast goes (the Tail whip, the Vine whip): the page lets the player drag the
 	// button's own stick while it is held and sends the cast when it is let go. (0,0) = no direction chosen: at the opponent.
 	CastX float64 `json:"tx"`
 	CastY float64 `json:"ty"`
@@ -157,7 +157,7 @@ type Player struct {
 	// Razor Leaf cooldown; Vine Whip: seconds of swing left, the angle each vine is at now (degrees off the aim,
 	// they swing in from sweep_angle to 0), the locked aim, whether it has struck, and the cooldown.
 	RazorCD     float64 `json:"rcd"`
-	VineChargeT float64 `json:"vc"` // seconds of unfurling left before the swing; the aim still follows the stick
+	VineChargeT float64 `json:"vc"` // seconds of unfurling left before the swing; the aim is locked from the cast
 	VineRecT    float64 `json:"vr"` // seconds of recovery left after the swing
 	VineT       float64 `json:"vt"`
 	VineA       float64 `json:"va"`
@@ -1302,16 +1302,15 @@ func (g *Game) stepChikoritaVines(i int, in Input, dt float64) []Event {
 	// ---- Vine Whip: two vines swing in from either side of the aim and meet on it ----
 	if in.Vine && ready && p.VineCD == 0 {
 		p.VineChargeT, p.VineHit, p.VineCD = vw.ChargeDuration, false, vw.Cooldown
-		p.VineX, p.VineY = p.AimX, p.AimY
+		p.VineX, p.VineY = g.castDir(i, in) // the way the player chose when it was cast (see Input.CastX), or at the opponent
 		if p.VineChargeT == 0 {
 			p.VineT, p.VineA = vw.SweepDuration, vw.SweepAngle
 		}
 	}
-	if p.VineChargeT > 0 { // unfurling: rooted, and the vines keep pointing where the stick does
-		p.VineX, p.VineY = p.AimX, p.AimY
+	if p.VineChargeT > 0 { // unfurling: rooted, and the aim is already locked
 		if p.VineChargeT -= dt; p.VineChargeT < 1e-9 {
 			p.VineChargeT = 0
-			p.VineT, p.VineA = vw.SweepDuration, vw.SweepAngle // the aim is locked from here
+			p.VineT, p.VineA = vw.SweepDuration, vw.SweepAngle
 		}
 	}
 	if p.VineT > 0 {

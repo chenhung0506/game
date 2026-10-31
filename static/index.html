@@ -314,23 +314,23 @@ const touch = { skill: false, thunder: false, beam: false, ball: false, punch: f
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
-// An aimed skill (the Tail whip; more to come): holding its button shows the fan only to its player and turns the button
+// An aimed skill (the Tail whip and the Vine whip; more to come): holding its button shows the fan only to its player and turns the button
 // into a stick (or WASD, on the keyboard); letting go casts it that way, and a tap with no direction goes at the opponent.
 // `aiming` is the held one: { x, y } the direction on screen (0, 0 = none), kbd when it is the keyboard's. `cast` is the
 // direction sent with the cast, which lasts a moment (a few ticks) so the server cannot miss it.
 let aiming = null, cast = { x: 0, y: 0 };
-const AIMED_KEY = { 7: 'k' }; // the keyboard key of the aimed skill, by character
+const AIMED = { 3: 'vine', 7: 'tail' }; // the aimed skill (K's) of each character; its button is `touch[name]`
 const CAST_PULSE = 120; // ms
 const toWorld = (x, y) => { const c = Math.cos(ROT), s = Math.sin(ROT); return { x: x * c + y * s, y: -x * s + y * c }; }; // a direction on screen, in the world
 function kbdAim() { return { x: (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0), y: (keys.has('s') ? 1 : 0) - (keys.has('w') ? 1 : 0) }; }
-function beginAim(a) { if (aiming || !snap) return; aiming = a; document.body.classList.add('aiming'); }
+function beginAim(a) { if (aiming || !snap) return; aiming = a; document.body.classList.add('aiming'); } // a: { name, x, y, kbd? }
 function endAim(doCast) {
   if (!aiming) return;
   const a = aiming; aiming = null; document.body.classList.remove('aiming');
   if (!doCast) return;
   const n = Math.hypot(a.x, a.y), w = n ? toWorld(a.x / n, a.y / n) : { x: 0, y: 0 };
-  cast = w; touch.tail = true; sendInput();
-  setTimeout(() => { touch.tail = false; cast = { x: 0, y: 0 }; sendInput(); }, CAST_PULSE);
+  cast = w; touch[a.name] = true; sendInput();
+  setTimeout(() => { touch[a.name] = false; cast = { x: 0, y: 0 }; sendInput(); }, CAST_PULSE);
 }
 function sendInput() {
   if (aiming && aiming.kbd) { const v = kbdAim(); aiming.x = v.x; aiming.y = v.y; } // WASD aims instead of walking while K is held
@@ -350,20 +350,20 @@ function sendInput() {
     skill: k(' ') || touch.skill, thunder: k('j') || touch.thunder, ball: k('k') || touch.ball, beam: k('j') || touch.beam, punch: k('k') || touch.punch,
     // the keys are shared between the characters (J and K each do whatever the one you play has); the server uses the ones that fit
     fire: k('j') || touch.fire, toss: k('k') || touch.toss,
-    razor: k('j') || touch.razor, vine: k('k') || touch.vine,
+    razor: k('j') || touch.razor, vine: touch.vine,
     storm: k('j') || touch.storm, freeze: k('k') || touch.freeze,
     arrow: k('j') || touch.arrow, twister: k('k') || touch.twister,
-    tail: touch.tail, tx: Math.round(cast.x * 100) / 100 || 0, ty: Math.round(cast.y * 100) / 100 || 0, // the tail is cast when its button is let go (see endAim), not while it is held
+    tail: touch.tail, tx: Math.round(cast.x * 100) / 100 || 0, ty: Math.round(cast.y * 100) / 100 || 0, // the tail and the vines are cast when the button is let go (see endAim), not while it is held
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
 }
 addEventListener('keydown', (e) => {
   if (e.key === ' ') e.preventDefault();
   const n = e.key.toLowerCase();
-  if (!e.repeat && n === AIMED_KEY[padKind]) beginAim({ x: 0, y: 0, kbd: true });
+  if (!e.repeat && n === 'k' && AIMED[padKind]) beginAim({ name: AIMED[padKind], x: 0, y: 0, kbd: true });
   keys.add(n); sendInput();
 });
-addEventListener('keyup', (e) => { const n = e.key.toLowerCase(); keys.delete(n); if (n === AIMED_KEY[padKind] && aiming && aiming.kbd) endAim(true); sendInput(); });
+addEventListener('keyup', (e) => { const n = e.key.toLowerCase(); keys.delete(n); if (n === 'k' && aiming && aiming.kbd) endAim(true); sendInput(); });
 addEventListener('blur', () => { endAim(false); keys.clear(); stick = { x: 0, y: 0 }; stickAim = { x: 0, y: 0 }; for (const n in touch) touch[n] = false; sendInput(); }); // no stuck keys after alt-tab
 addEventListener('contextmenu', (e) => { if (PORTRAIT) e.preventDefault(); }); // a long press must not open a menu
 
@@ -402,7 +402,7 @@ const PAD = [
   { main: ['伏特攻擊', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball']] }, // Pikachu
   { main: ['跳躍', 'skill'], small: [['死光', 'beam'], ['冰拳', 'punch']] }, // Snorlax
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
-  { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine']] }, // Chikorita
+  { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine', true]] }, // Chikorita
   { main: ['冰山', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
   { main: ['滑翔', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
@@ -447,7 +447,7 @@ function buildPad() {
         const pull = Math.min(len, MAXR);
         dot.style.transform = len ? `translate(${vx / len * pull}px, ${vy / len * pull}px)` : '';
       };
-      b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (id !== null) return; id = e.pointerId; b.setPointerCapture(id); beginAim({ x: 0, y: 0 }); b.classList.add('on', 'aim'); drag(e); });
+      b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (id !== null) return; id = e.pointerId; b.setPointerCapture(id); beginAim({ name, x: 0, y: 0 }); b.classList.add('on', 'aim'); drag(e); });
       b.addEventListener('pointermove', (e) => { if (e.pointerId === id) drag(e); });
       const end = (doCast) => (e) => { if (e.pointerId !== id) return; id = null; b.classList.remove('on', 'aim'); dot.style.transform = ''; endAim(doCast); };
       b.addEventListener('pointerup', end(true));
@@ -919,13 +919,14 @@ const teleCtx = tele.getContext('2d');
 function drawTelegraph() {
   for (const si of beamSlots()) drawFan(snap.p[si], disp[si]);
   for (const si of slotsOf(7)) drawTailWarning(snap.p[si], disp[si]);
-  if (aiming && snap.p[you].k === 7) drawTailAim(snap.p[you], disp[you]);
+  if (aiming && AIMED[snap.p[you].k] === aiming.name) drawAimFan(snap.p[you], disp[you]);
 }
-// The fan the player is choosing, drawn for them only (the opponent's page never gets it; it is not sent) until the cast, when the
+// The fan of an aimed skill the player is choosing, drawn for them only (the opponent's page never gets it; it is not sent) until the cast, when the
 // real warning takes over. Without a direction it points at the opponent, which is where a tap would send it.
-function drawTailAim(p, d) {
+function drawAimFan(p, d) {
   const o = disp[1 - you], n = Math.hypot(aiming.x, aiming.y), w = n ? toWorld(aiming.x / n, aiming.y / n) : { x: o.x - d.x, y: o.y - d.y };
-  const half = tailCfg.angle / 2 * Math.PI / 180, base = Math.atan2(w.y, w.x), L = tailCfg.length, ready = !(p.tlcd > 0);
+  const vine = aiming.name === 'vine'; // the vines sweep in from +-angle, the tail covers its whole angle
+  const half = (vine ? vineCfg.angle : tailCfg.angle / 2) * Math.PI / 180, base = Math.atan2(w.y, w.x), L = vine ? vineCfg.len : tailCfg.length, ready = !((vine ? p.vcd : p.tlcd) > 0);
   ctx.save(); ctx.globalAlpha = ready ? 1 : 0.4;
   ctx.fillStyle = 'rgba(255,230,150,0.16)'; ctx.strokeStyle = 'rgba(255,235,190,0.85)'; ctx.lineWidth = 2; ctx.setLineDash([10, 7]);
   ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.arc(d.x, d.y, L, base - half, base + half); ctx.closePath(); ctx.fill(); ctx.stroke();

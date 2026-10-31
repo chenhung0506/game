@@ -218,7 +218,7 @@
   },
   "rowlet": {
     "max_hp": 100,
-    "walk_speed": 150,
+    "walk_speed": 175,
     "radius": 13,
     "fly_high": 30,
     "tailwind": {
@@ -238,9 +238,9 @@
       "angle": 14,
       "slow_duration": 5,
       "slow": 0.8,
-      "cooldown": 5,
+      "cooldown": 4,
       "mass": 20,
-      "charge_duration": 2.5,
+      "charge_duration": 2,
       "scale": 1
     },
     "tornado": {

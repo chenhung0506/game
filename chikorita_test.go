@@ -450,7 +450,7 @@ func castVine(g *Game) {
 }
 
 func pressVine(g *Game) {
-	g.P[0].In = Input{Vine: true}
+	g.P[0].In = Input{Vine: true, CastX: 1} // the player chose to the right; the foes below are placed relative to that
 	g.Step(dt)
 	g.P[0].In = Input{}
 }
@@ -510,23 +510,32 @@ func TestVineWhipHurtsOnceEvenWhenBothVinesMeetOnTheTarget(t *testing.T) {
 	}
 }
 
-func TestVineWhipFollowsTheAimAndLocksIt(t *testing.T) {
+func TestVineWhipGoesWhereTheCastSaysAndKeepsItWhateverTheStickDoes(t *testing.T) {
 	cfg := DefaultConfig()
 	g := chGame(cfg)
-	g.P[0].In = Input{Vine: true, AimX: 0, AimY: 1} // aim straight down
+	g.P[0].In = Input{Vine: true, CastX: 0, CastY: 1} // chosen straight down
 	g.Step(dt)
-	g.P[0].In = Input{AimX: 0, AimY: 1}
+	g.P[0].In = Input{AimX: 1, AimY: 0, DX: 1}
 	for g.P[0].VineChargeT > 0 {
 		g.Step(dt)
 	}
-	g.P[0].In = Input{AimX: 1, AimY: 0} // turning the stick once the swing has begun changes nothing
 	if g.P[0].VineX != 0 || g.P[0].VineY != 1 {
-		t.Fatalf("vine aim = %v,%v, want 0,1", g.P[0].VineX, g.P[0].VineY)
+		t.Fatalf("vine aim = %v,%v, want 0,1: the stick does not turn it", g.P[0].VineX, g.P[0].VineY)
 	}
 	g.P[1].X, g.P[1].Y = g.P[0].X, g.P[0].Y+100
 	steps(g, 30)
 	if g.P[1].HP == cfg.Snorlax.MaxHP {
-		t.Fatal("the vines did not go where it aimed")
+		t.Fatal("the vines did not go where it was cast")
+	}
+}
+
+func TestVineWhipWithNoDirectionGoesAtTheOpponent(t *testing.T) {
+	g := chGame(DefaultConfig())
+	g.P[1].X, g.P[1].Y = g.P[0].X, g.P[0].Y+100
+	g.P[0].In = Input{Vine: true, AimX: 1, AimY: 0} // the stick says right, the opponent is below
+	g.Step(dt)
+	if g.P[0].VineX != 0 || g.P[0].VineY != 1 {
+		t.Fatalf("vine aim = %v,%v, want 0,1 at the opponent", g.P[0].VineX, g.P[0].VineY)
 	}
 }
 
@@ -687,18 +696,6 @@ func TestVineWhipUnfurlsFirstAndHurtsNobodyUntilTheSwing(t *testing.T) {
 	steps(g, 6)
 	if g.P[0].VineT <= 0 && g.P[1].HP == cfg.Snorlax.MaxHP {
 		t.Fatal("the swing never began")
-	}
-}
-
-func TestVineChargeFollowsTheStickThenLocks(t *testing.T) {
-	cfg := DefaultConfig()
-	g := chGame(cfg)
-	g.P[0].In = Input{Vine: true, AimX: 0, AimY: 1}
-	g.Step(dt)
-	g.P[0].In = Input{AimX: 1, AimY: 0} // turned during the charge: the vines follow
-	g.Step(dt)
-	if g.P[0].VineX != 1 || g.P[0].VineY != 0 {
-		t.Fatalf("aim during the charge = %v,%v, want it following the stick", g.P[0].VineX, g.P[0].VineY)
 	}
 }
 
