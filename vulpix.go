@@ -14,8 +14,8 @@ const (
 // stepVulpix runs Vulpix's three skills. They do not lock each other: the frost can be laid while a storm runs or
 // the beam is held; only the beam roots it.
 //
-// Frost Field: for spray_duration seconds, `patches` patches are laid evenly, each at a random spot within `radius`
-// of where Vulpix is when it lays it.
+// Frost Field: Vulpix rides an iceberg for spray_duration seconds, sliding fast and leaving a trail of frost; the iceberg
+// bursts when it touches the opponent or when the ride is over.
 //
 // Ice Storm: the storm starts on Vulpix and chases the opponent, striking every `interval` seconds like Thunder. Each
 // strike also takes `damage` off every projectile of the other player inside its area.
@@ -34,25 +34,43 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 		}
 	}
 
-	// ---- Frost Field ----
-	if in.Skill && p.FrostT == 0 && p.FrostCD == 0 {
-		p.FrostT, p.FrostN, p.FrostCD = fs.SprayDuration, 0, fs.Cooldown
+	// ---- Frost Field: ride the iceberg ----
+	p.Rode = false
+	if in.Skill && p.FrostT == 0 && p.FrostCD == 0 && p.FBeamT == 0 {
+		p.FrostT, p.FrostCD = fs.SprayDuration, fs.Cooldown
+		p.FrostX, p.FrostY = p.X, p.Y
+		g.layFrost(i, p.X, p.Y)
 	}
 	if p.FrostT > 0 {
-		if p.FrostT -= dt; p.FrostT < 1e-9 {
+		if p.BoundT > 0 || p.ParalyzeT > 0 { // no movement skill while bound or paralyzed: the iceberg is gone, without a burst
 			p.FrostT = 0
-		}
-		due := fs.Patches // the patches laid by now: all of them once the spray is over
-		if p.FrostT > 0 {
-			due = int(float64(fs.Patches) * (1 - p.FrostT/fs.SprayDuration))
-		}
-		for ; p.FrostN < due; p.FrostN++ {
-			a, d := g.rng.Float64()*2*math.Pi, fs.Radius*math.Sqrt(g.rng.Float64()) // uniform over the disc
-			g.Frost = append(g.Frost, Frost{
-				Owner: i, Left: fs.Duration,
-				X: math.Min(math.Max(p.X+math.Cos(a)*d, 0), g.court.Length),
-				Y: math.Min(math.Max(p.Y+math.Sin(a)*d, 0), g.court.Width),
-			})
+		} else {
+			dx, dy := float64(in.DX), float64(in.DY)
+			if dx == 0 && dy == 0 {
+				dx, dy = float64(p.FX), float64(p.FY) // it cannot stop: with no stick it keeps the way it faces
+			}
+			ux, uy := unit(dx, dy)
+			p.Rode = true
+			step := math.Min(dt, p.FrostT) // the last step is clipped so the ride covers exactly speed x duration
+			x0, y0 := p.X, p.Y
+			p.X = math.Min(math.Max(x0+ux*fs.SlideSpeed*step, 0), g.court.Length)
+			p.Y = math.Min(math.Max(y0+uy*fs.SlideSpeed*step, 0), g.court.Width)
+			for d := math.Hypot(p.X-p.FrostX, p.Y-p.FrostY); d >= fs.Radius; d = math.Hypot(p.X-p.FrostX, p.Y-p.FrostY) {
+				p.FrostX += (p.X - p.FrostX) / d * fs.Radius // a bit of frost every `radius` along the way, so the trail has no gap
+				p.FrostY += (p.Y - p.FrostY) / d * fs.Radius
+				g.layFrost(i, p.FrostX, p.FrostY)
+			}
+			touched := fs.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= fs.Radius+g.radius(1-i)
+			if touched {
+				g.hit(other, fs.ContactDamage)
+			}
+			if p.FrostT -= step; touched || p.FrostT < 1e-9 {
+				p.FrostT = 0
+				events = append(events, Event{T: "iceburst", X: p.X, Y: p.Y, R: fs.ExplosionRadius})
+				if fs.Reach.hits(other) && math.Hypot(other.X-p.X, other.Y-p.Y) <= fs.ExplosionRadius+g.radius(1-i) {
+					g.hit(other, fs.ExplosionDamage)
+				}
+			}
 		}
 	}
 
@@ -89,7 +107,7 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 	}
 
 	// ---- Freeze Beam ----
-	if in.Freeze && p.FBeamT == 0 && p.FBeamCD == 0 {
+	if in.Freeze && p.FBeamT == 0 && p.FBeamCD == 0 && p.FrostT == 0 { // not while riding: the beam roots it
 		p.FBeamT, p.FBeamCD = fb.ControlDuration, fb.Cooldown
 		p.FBeamX, p.FBeamY = g.clampBeamEnd(p, p.X+p.AimX*fb.StartDistance, p.Y+p.AimY*fb.StartDistance)
 		g.raisePillars(i, p.FBeamX, p.FBeamY, p.FBeamX, p.FBeamY)
@@ -151,7 +169,7 @@ func (g *Game) frostFactor(i int) float64 {
 	}
 	own, foe := false, false
 	for _, f := range g.Frost {
-		if math.Hypot(p.X-f.X, p.Y-f.Y) <= fs.PatchRadius {
+		if math.Hypot(p.X-f.X, p.Y-f.Y) <= fs.Radius {
 			own, foe = own || f.Owner == i, foe || f.Owner != i
 		}
 	}
@@ -163,6 +181,17 @@ func (g *Game) frostFactor(i int) float64 {
 		v *= 1 - fs.Slow
 	}
 	return v
+}
+
+// maxFrost bounds the bits of frost on the court, whatever the config says (the oldest are dropped first).
+const maxFrost = 1500
+
+// layFrost leaves a bit of slot i's frost at (x, y).
+func (g *Game) layFrost(i int, x, y float64) {
+	g.Frost = append(g.Frost, Frost{Owner: i, X: x, Y: y, Left: g.cfg.Vulpix.FrostField.Duration})
+	if over := len(g.Frost) - maxFrost; over > 0 {
+		g.Frost = g.Frost[over:]
+	}
 }
 
 // tickFrost melts the frost.

@@ -184,8 +184,10 @@
       "slow": 0.5,
       "boost": 1,
       "radius": 30,
-      "patch_radius": 60,
-      "patches": 30,
+      "slide_speed": 400,
+      "contact_damage": 8,
+      "explosion_radius": 150,
+      "explosion_damage": 15,
       "cooldown": 8
     },
     "ice_storm": {
@@ -209,7 +211,7 @@
       "length": 500,
       "start_distance": 50,
       "pillar_radius": 30,
-      "pillar_hp": 15,
+      "pillar_hp": 10,
       "pillar_duration": 10
     }
   },

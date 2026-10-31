@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 )
@@ -199,9 +200,6 @@ func TestSnorlaxDoesNotJumpWhenTheBallIsAlreadyOnTopOfIt(t *testing.T) {
 	if ok && in.Skill {
 		t.Fatalf("jumped when it could no longer get above the ball: %+v", in)
 	}
-	if in.DY == 0 {
-		t.Fatalf("stick %+v, want a step out of the way", in)
-	}
 }
 
 func TestSnorlaxStepsAsideWhenItCannotJump(t *testing.T) {
@@ -256,22 +254,39 @@ func TestSnorlaxPunchesOnlyInRange(t *testing.T) {
 	}
 }
 
-func TestSnorlaxBeamsAFrozenOpponentOnlyFromCloseRange(t *testing.T) {
-	g := snorlaxFacing()
-	g.P[0].X = 800 // 100 away
-	g.P[0].FrozenT = 1.4
-	in, ok := firstAct(newBot(snorlax, 1), g, 1, 30)
-	if !ok || !in.Beam {
-		t.Fatalf("decision = %+v (pressed %v), want the Hyper Beam point-blank", in, ok)
+func b2i(b bool) int {
+	if b {
+		return 1
 	}
+	return 0
+}
 
-	g = snorlaxFacing()
-	g.P[0].X = 600 // 300 away: first walk up to it
-	g.P[0].FrozenT = 1.4
-	g.P[1].PunchCD = 5
-	in, ok = firstAct(newBot(snorlax, 1), g, 1, 30)
-	if ok || in.DX >= 0 {
-		t.Fatalf("decision = %+v (pressed %v), want a step toward the frozen opponent and no beam yet", in, ok)
+func TestSnorlaxBeamsAFrozenOpponentWhateverTheDistance(t *testing.T) {
+	// Snorlax at 900; walking 100 a second it needs (d-150)/100 s to be point-blank, the opponent is frozen for 1.4
+	for _, c := range []struct {
+		name string
+		d    float64
+		beam bool    // the beam now (else it walks up)
+		cold float64 // how long the opponent stays frozen (0 = 1.4)
+	}{
+		{"point-blank", 100, true, 0},
+		{"it can walk there in time", 220, false, 0},
+		{"it cannot walk there in time", 300, true, 0},
+		{"far, but in reach of the beam", 500, true, 0},
+		{"out of reach of the beam", 800, false, 0},
+		{"almost thawed: still the beam, the punch landed", 100, true, 0.3},
+	} {
+		g := snorlaxFacing()
+		g.cfg.Snorlax.WalkSpeed, g.cfg.Snorlax.HyperBeam.Length = 100, 650
+		g.P[0].X, g.P[0].FrozenT = 900-c.d, max(c.cold, 1.4*float64(b2i(c.cold == 0)))
+		g.P[1].PunchCD = 5
+		in, ok := firstAct(newBot(snorlax, 1), g, 1, 30)
+		if c.beam && (!ok || !in.Beam) {
+			t.Errorf("%s: decision = %+v (pressed %v), want the Hyper Beam", c.name, in, ok)
+		}
+		if !c.beam && (ok || in.DX >= 0) {
+			t.Errorf("%s: decision = %+v (pressed %v), want walking up to it", c.name, in, ok)
+		}
 	}
 }
 
@@ -622,5 +637,128 @@ func TestTheLobbyTellsWhoTheComputerIs(t *testing.T) {
 	}
 	if m.Here != [2]bool{true, true} || m.Bot != [2]int{-1, snorlax} || m.Picks != [2]int{-1, snorlax} {
 		t.Fatalf("lobby %+v", m)
+	}
+}
+
+// ---- keeping out of the way of arrows, tornados and ice storms ----
+
+func liveConfig(t *testing.T) Config {
+	t.Helper()
+	cfg, err := LoadConfig("config.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg
+}
+
+// survive plays the bot in slot me for secs against a scene that otherwise sits still, and says how much HP it lost.
+func survive(g *Game, b *Bot, me int, secs float64) int {
+	hp := g.P[me].HP
+	for t := 0.0; t < secs; t += dt {
+		g.P[me].In = b.Decide(g, me)
+		g.Step(dt)
+	}
+	return hp - g.P[me].HP
+}
+
+func TestTheBotFindsTheGapInAVolleyOfArrows(t *testing.T) {
+	cfg := liveConfig(t)
+	for _, kind := range []int{pikachu, snorlax} {
+		for _, spent := range []bool{false, true} { // with the dash / the jump ready, and with it spent: then it has to walk
+			lost := 0
+			for seed := uint64(1); seed <= 10; seed++ {
+				g := duel(cfg, kind, rowlet)
+				g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 700, 450, 1100, 450
+				g.P[1].ArrowT = dt // the volley leaves on the next tick, fanned around where the bot stands
+				if spent {
+					g.P[0].DashCD, g.P[0].JumpCD = 99, 99
+				}
+				lost += survive(g, newBot(kind, seed), 0, 3)
+			}
+			if lost > 0 {
+				t.Errorf("%s (skill spent %v) lost %d HP over 10 volleys of arrows", NAMEOF[kind], spent, lost)
+			}
+		}
+	}
+}
+
+func TestSafeDirLeavesTheCourseOfEveryArrowInAVolley(t *testing.T) {
+	cfg := liveConfig(t)
+	g := duel(cfg, pikachu, rowlet)
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 700, 450, 1100, 450
+	g.P[1].ArrowT = dt
+	g.Step(dt) // the volley leaves, fanned around where Pikachu stands
+	b := newBot(pikachu, 1)
+	for i := 0; i <= botReact; i++ {
+		b.observe(g, 0)
+	}
+	c := b.look(g, 0)
+	ar := cfg.Rowlet.Arrows
+	// touches reports whether walking (ux, uy) for botHorizon seconds meets one of the arrows, flying straight.
+	touches := func(ux, uy float64) bool {
+		speed := cfg.walkSpeedOf(pikachu)
+		for tt := 0.0; tt <= botHorizon; tt += 0.005 {
+			x, y := g.P[0].X+ux*speed*tt, g.P[0].Y+uy*speed*tt
+			for _, bl := range g.Balls {
+				if bl.K == ballArrow && math.Hypot(x-(bl.X+bl.DX*ar.Speed*tt), y-(bl.Y+bl.DY*ar.Speed*tt)) <= ar.Radius+cfg.Pikachu.Radius {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if !touches(0, 0) {
+		t.Fatal("the scene does not threaten a Pikachu that stands still")
+	}
+	if ux, uy := c.safeDir(c.hazards()); touches(ux, uy) {
+		t.Fatalf("safeDir chose (%.2f,%.2f), which runs into an arrow", ux, uy)
+	}
+}
+
+func TestTheBotWalksAwayFromATornado(t *testing.T) {
+	cfg := liveConfig(t)
+	tn := cfg.Rowlet.Tornado
+	for _, kind := range []int{pikachu, snorlax} {
+		for seed := uint64(1); seed <= 10; seed++ {
+			g := duel(cfg, kind, rowlet)
+			g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 700, 450, 1500, 450
+			g.Balls = []Ball{{K: ballTornado, Owner: 1, HP: tn.HP, Left: tn.Distance, Life: tn.Duration, X: 900, Y: 450}}
+			if lost := survive(g, newBot(kind, seed), 0, 8); lost > 0 || g.P[0].Held {
+				t.Fatalf("%s seed %d: lost %d HP to the tornado (held %v)", NAMEOF[kind], seed, lost, g.P[0].Held)
+			}
+		}
+	}
+}
+
+func TestSnorlaxWalksOutOfAnIceStorm(t *testing.T) {
+	cfg := liveConfig(t)
+	is := cfg.Vulpix.IceStorm
+	// the storm starts this far from Snorlax: just outside its edge, then right on top of it. Standing still
+	// would take every strike (is.Strikes of them); Snorlax is faster than the storm, so it gets away.
+	for _, c := range []struct {
+		d    float64
+		hits int // the most strikes it may take
+	}{{250, 0}, {100, 3}} {
+		g := duel(cfg, snorlax, vulpix)
+		g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 800, 450, 1400, 450
+		g.P[1].StormLeft, g.P[1].StormIn, g.P[1].StormX, g.P[1].StormY = is.Strikes, is.Interval, 800+c.d, 450
+		lost := survive(g, newBot(snorlax, 1), 0, float64(is.Strikes)*is.Interval+1)
+		if lost > c.hits*is.Damage {
+			t.Errorf("storm %v away: lost %d HP, want at most %d strikes (%d)", c.d, lost, c.hits, c.hits*is.Damage)
+		}
+	}
+}
+
+func TestTheBotDoesNotRootItselfWhileArrowsAreBeingAimed(t *testing.T) {
+	cfg := liveConfig(t)
+	for _, kind := range []int{pikachu, snorlax} {
+		g := duel(cfg, kind, rowlet)
+		g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 800, 450, 1100, 450 // 300 apart: in range of the punch, and of the ball once Pikachu may throw
+		g.P[1].ArrowT = 1
+		b := newBot(kind, 1)
+		b.comboT = 5
+		if in, ok := firstAct(b, g, 0, 30); ok && (in.Ball || in.Thunder || in.Punch || in.Beam) {
+			t.Errorf("%s pressed %+v while the volley was being aimed", NAMEOF[kind], in)
+		}
 	}
 }

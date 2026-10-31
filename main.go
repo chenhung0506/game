@@ -445,7 +445,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		// per character: pikachu, snorlax, charizard, chikorita, vulpix, rowlet
 		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius},
 		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP},
-		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "patch": cfg.Vulpix.FrostField.PatchRadius, "duration": cfg.Vulpix.FrostField.Duration, "spray": cfg.Vulpix.FrostField.SprayDuration},
+		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "duration": cfg.Vulpix.FrostField.Duration, "ride": cfg.Vulpix.FrostField.SprayDuration},
 		"storm":   map[string]float64{"radius": cfg.Vulpix.IceStorm.Radius, "interval": cfg.Vulpix.IceStorm.Interval, "strikes": float64(cfg.Vulpix.IceStorm.Strikes)},
 		"fbeam":   map[string]float64{"len": cfg.Vulpix.FreezeBeam.Length, "control": cfg.Vulpix.FreezeBeam.ControlDuration, "pillar": cfg.Vulpix.FreezeBeam.PillarRadius, "hp": float64(cfg.Vulpix.FreezeBeam.PillarHP), "life": cfg.Vulpix.FreezeBeam.PillarDuration},
 		"flyhigh": cfg.Rowlet.FlyHigh,

@@ -231,20 +231,25 @@ type Config struct {
 		MaxHP     int     `json:"max_hp"`
 		WalkSpeed float64 `json:"walk_speed"`
 		Radius    float64 `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
-		// Frost Field (the main button): for `spray_duration` seconds Vulpix lays `patches` patches of frost, each
-		// `patch_radius` wide, at random spots within `radius` of where it stands as it lays them. A patch stays
-		// `duration` seconds. A body whose centre is on a patch (at a height inside min_height..max_height) walks
-		// `boost` faster on its owner's frost and `slow` slower (a fraction, 0..1) on the other player's.
+		// Frost Field (the main button): Vulpix rides an iceberg for `spray_duration` seconds, sliding at
+		// `slide_speed` along the stick (or the way it faces) and unable to stop. The iceberg is `radius` wide and
+		// leaves a trail of frost as wide, which stays `duration` seconds. A body whose centre is on the frost (at a
+		// height inside min_height..max_height) walks `boost` faster on its owner's frost and `slow` slower (a
+		// fraction, 0..1) on the other player's. When the iceberg touches the opponent it bursts: `contact_damage`,
+		// then `explosion_damage` to whoever is within `explosion_radius` of it (the same two blows as the Electro
+		// Ball); when the ride runs out it bursts the same way without the contact blow. The ride is over once it bursts.
 		FrostField struct {
 			Reach
-			SprayDuration float64 `json:"spray_duration"`
-			Duration      float64 `json:"duration"`
-			Slow          float64 `json:"slow"`
-			Boost         float64 `json:"boost"`
-			Radius        float64 `json:"radius"`
-			PatchRadius   float64 `json:"patch_radius"`
-			Patches       int     `json:"patches"`
-			Cooldown      float64 `json:"cooldown"` // counted from the start of the spray
+			SprayDuration   float64 `json:"spray_duration"` // how long the ride lasts
+			Duration        float64 `json:"duration"`
+			Slow            float64 `json:"slow"`
+			Boost           float64 `json:"boost"`
+			Radius          float64 `json:"radius"`
+			SlideSpeed      float64 `json:"slide_speed"`
+			ContactDamage   int     `json:"contact_damage"`
+			ExplosionRadius float64 `json:"explosion_radius"` // from the iceberg's centre, plus the body's radius
+			ExplosionDamage int     `json:"explosion_damage"`
+			Cooldown        float64 `json:"cooldown"` // counted from the start of the ride
 		} `json:"frost_field"`
 		// Ice Storm: a storm appears where Vulpix stands and chases the opponent at `follow_speed`, like Thunder's
 		// shadow. Every `interval` seconds, `strikes` times, it hits anyone within `radius` (plus their body) for
@@ -473,9 +478,11 @@ func DefaultConfig() Config {
 	c.Vulpix.FrostField.Duration = 6
 	c.Vulpix.FrostField.Slow = 0.5
 	c.Vulpix.FrostField.Boost = 0.5
-	c.Vulpix.FrostField.Radius = 160
-	c.Vulpix.FrostField.PatchRadius = 50
-	c.Vulpix.FrostField.Patches = 12
+	c.Vulpix.FrostField.Radius = 40
+	c.Vulpix.FrostField.SlideSpeed = 450
+	c.Vulpix.FrostField.ContactDamage = 10
+	c.Vulpix.FrostField.ExplosionRadius = 120
+	c.Vulpix.FrostField.ExplosionDamage = 15
 	c.Vulpix.FrostField.Cooldown = 10
 	c.Vulpix.IceStorm.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	c.Vulpix.IceStorm.Radius = 80
@@ -623,8 +630,7 @@ func (c Config) validate() error {
 		{"vulpix.frost_field.spray_duration", c.Vulpix.FrostField.SprayDuration, 0},
 		{"vulpix.frost_field.duration", c.Vulpix.FrostField.Duration, 0},
 		{"vulpix.frost_field.radius", c.Vulpix.FrostField.Radius, 0},
-		{"vulpix.frost_field.patch_radius", c.Vulpix.FrostField.PatchRadius, 0},
-		{"vulpix.frost_field.patches", float64(c.Vulpix.FrostField.Patches), 0},
+		{"vulpix.frost_field.slide_speed", c.Vulpix.FrostField.SlideSpeed, 0},
 		{"vulpix.ice_storm.radius", c.Vulpix.IceStorm.Radius, 0},
 		{"vulpix.ice_storm.strikes", float64(c.Vulpix.IceStorm.Strikes), 0},
 		{"vulpix.ice_storm.freeze_hits", float64(c.Vulpix.IceStorm.FreezeHits), 0},
@@ -751,6 +757,9 @@ func (c Config) validate() error {
 		{"rowlet.tornado.cooldown", c.Rowlet.Tornado.Cooldown},
 		{"rowlet.tornado.mass", c.Rowlet.Tornado.Mass},
 		{"vulpix.freeze_beam.start_distance", c.Vulpix.FreezeBeam.StartDistance},
+		{"vulpix.frost_field.contact_damage", float64(c.Vulpix.FrostField.ContactDamage)},
+		{"vulpix.frost_field.explosion_radius", c.Vulpix.FrostField.ExplosionRadius},
+		{"vulpix.frost_field.explosion_damage", float64(c.Vulpix.FrostField.ExplosionDamage)},
 	} {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
@@ -788,9 +797,6 @@ func (c Config) validate() error {
 	}
 	if a := c.Chikorita.VineWhip.SweepAngle; !(a > 0 && a <= 180) {
 		return fmt.Errorf("chikorita.vine_whip.sweep_angle must be between 0 (exclusive) and 180, got %v", a)
-	}
-	if n := c.Vulpix.FrostField.Patches; n > 200 {
-		return fmt.Errorf("vulpix.frost_field.patches must be at most 200, got %d", n)
 	}
 	if n := c.Rowlet.Arrows.Count; n > 100 {
 		return fmt.Errorf("rowlet.arrows.count must be at most 100, got %d", n)

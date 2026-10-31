@@ -157,10 +157,12 @@ type Player struct {
 	VineCD      float64 `json:"vcd"`
 	BoundT      float64 `json:"bd"` // seconds left bound by a vine: cannot walk or use a movement skill
 
-	// Vulpix. Frost Field: seconds of spraying left, how many of the config's patches have been laid, the cooldown.
+	// Vulpix. Frost Field: seconds of the ride left, where the last bit of frost was laid, the cooldown.
 	FrostT  float64 `json:"yt"`
-	FrostN  int     `json:"-"`
+	FrostX  float64 `json:"-"`
+	FrostY  float64 `json:"-"`
 	FrostCD float64 `json:"ycd"`
+	Rode    bool    `json:"-"` // it slid this tick (so the walking code leaves it alone, including on the tick the ride ends in)
 	// Ice Storm: strikes still to come (0 = no storm), seconds to the next one, where the storm is, hits so far this cast.
 	StormLeft int     `json:"wn"`
 	StormIn   float64 `json:"-"`
@@ -600,7 +602,7 @@ func (g *Game) Step(dt float64) []Event {
 
 		if p.Kind == vulpix {
 			events = append(events, g.stepVulpix(i, in, dt)...)
-			casting = p.FBeamT > 0 // the stick steers the beam, not the body
+			casting = p.FBeamT > 0 || p.Rode // the stick steers the beam, not the body; and the ride moves Vulpix itself
 		}
 
 		if p.Kind == rowlet {

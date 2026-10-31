@@ -134,7 +134,8 @@ func (b *Bot) look(g *Game, me int) *bctx {
 // The kinds of threat. The direction in threat.a* is a unit step that gets out of the way.
 const (
 	thNone   = iota
-	thBall   // a projectile on a course that touches the bot
+	thBall   // a projectile on a course that touches the bot (Snorlax can jump over it)
+	thChase  // something that follows the bot: a tornado, an ice storm
 	thBeam   // inside the fan of a Hyper Beam that is charging or sweeping
 	thPunch  // on the line of an Ice Punch
 	thLand   // near where a jumping Snorlax will come down
@@ -181,27 +182,37 @@ func (c *bctx) findThreat() threat {
 	}
 	lag := botReact * dtBot
 
-	for i := range c.balls {
-		bl := &c.balls[i]
-		if bl.Owner == c.me || bl.Wait || bl.K == ballPillar || bl.K == ballTornado {
-			continue
-		}
-		sp := cfg.ballSpeed(bl.K)
-		vx, vy := bl.DX*sp, bl.DY*sp
-		v2 := vx*vx + vy*vy
+	hz := c.hazards()
+	var safe *[2]float64 // the way to go, worked out once for whatever of them is coming
+	for _, h := range hz {
+		hx, hy := h.x+h.vx*lag, h.y+h.vy*lag // where it is now, as far as the bot can tell
+		rx, ry := p.X-hx, p.Y-hy
+		v2 := h.vx*h.vx + h.vy*h.vy
 		if v2 < 1e-9 {
 			continue
 		}
-		rx, ry := p.X-bl.X, p.Y-bl.Y
-		t := (rx*vx + ry*vy) / v2
-		if t < 0 || t > 1.2 {
-			continue // it is going away, or it is still far
-		}
-		if math.Hypot(rx-vx*t, ry-vy*t) > g.ballRadius(bl)+c.pr+25 {
+		if h.kind == thChase { // it never gives up, so stay out of its way for as long as it is near, not only when it is about to arrive
+			if math.Hypot(rx, ry)-h.r-c.pr <= botChaseZone {
+				if safe == nil {
+					ax, ay := c.safeDir(hz)
+					safe = &[2]float64{ax, ay}
+				}
+				consider(threat{thChase, 0.3, safe[0], safe[1]})
+			}
 			continue
 		}
-		ax, ay := c.sideOf(bl.X, bl.Y, vx, vy, p.X, p.Y)
-		consider(threat{thBall, math.Max(0, t-lag), ax, ay})
+		t := (rx*h.vx + ry*h.vy) / v2
+		if t < 0 || t > botHorizon {
+			continue // it is going away, or it is still far
+		}
+		if math.Hypot(rx-h.vx*t, ry-h.vy*t) > h.r+c.pr+25 {
+			continue
+		}
+		if safe == nil {
+			ax, ay := c.safeDir(hz)
+			safe = &[2]float64{ax, ay}
+		}
+		consider(threat{h.kind, t, safe[0], safe[1]})
 	}
 
 	if f.Kind == snorlax && (f.BeamT > 0 || f.SweepT > 0) {
@@ -251,6 +262,94 @@ func (c *bctx) findThreat() threat {
 		consider(threat{thRush, 0.3, ax, ay})
 	}
 	return best
+}
+
+// botHorizon is how far ahead (seconds) the bot looks for things coming at it.
+const botHorizon = 1.2
+
+// botChaseZone is how close (between the bodies' edges) a chaser may get before the bot walks away from it.
+const botChaseZone = 220.0
+
+// A hazard is something that hurts what it touches and moves: a projectile flies straight, a chaser (thChase)
+// heads for the bot.
+type hazard struct {
+	kind         int
+	x, y, vx, vy float64 // where the bot last saw it, and its velocity
+	r            float64
+}
+
+func (c *bctx) hazards() []hazard {
+	cfg, p, f := &c.g.cfg, c.p, c.f
+	var hz []hazard
+	chase := func(x, y, speed, r float64) {
+		ux, uy := unit(p.X-x, p.Y-y)
+		hz = append(hz, hazard{thChase, x, y, ux * speed, uy * speed, r})
+	}
+	for i := range c.balls {
+		bl := &c.balls[i]
+		if bl.Owner == c.me || bl.Wait || bl.HP <= 0 {
+			continue
+		}
+		switch bl.K {
+		case ballPillar:
+		case ballTornado:
+			if !bl.Caught {
+				chase(bl.X, bl.Y, cfg.Rowlet.Tornado.Speed, cfg.Rowlet.Tornado.Radius)
+			}
+		default:
+			sp := cfg.ballSpeed(bl.K)
+			hz = append(hz, hazard{thBall, bl.X, bl.Y, bl.DX * sp, bl.DY * sp, c.g.ballRadius(bl)})
+		}
+	}
+	if f.Kind == vulpix && f.StormLeft > 0 {
+		chase(f.StormX, f.StormY, cfg.Vulpix.IceStorm.FollowSpeed, cfg.Vulpix.IceStorm.Radius)
+	}
+	return hz
+}
+
+// safeDir is the unit step (or none) that keeps the bot farthest from every hazard over the next botHorizon
+// seconds, walking at its own speed: each of the eight stick positions is played forward, with projectiles
+// flying straight and chasers heading for wherever the bot is then. That finds the gap in a volley, which one
+// "step aside" from the nearest arrow does not.
+func (c *bctx) safeDir(hz []hazard) (float64, float64) {
+	const step = 0.1
+	p, cfg := c.p, &c.g.cfg
+	speed := cfg.walkSpeedOf(p.Kind)
+	lag := botReact * dtBot
+	bestScore, bx, by := math.Inf(-1), 0.0, 0.0
+	pos := make([][2]float64, len(hz))
+	for k := -1; k < 8; k++ {
+		var ux, uy float64
+		if k >= 0 {
+			ux, uy = unit(float64(stickX[k]), float64(stickY[k]))
+		}
+		for i, h := range hz {
+			pos[i] = [2]float64{h.x + h.vx*lag, h.y + h.vy*lag}
+		}
+		x, y, score := p.X, p.Y, math.Inf(1)
+		for t := step; t <= botHorizon+1e-9; t += step {
+			x = math.Min(math.Max(x+ux*speed*step, 0), c.g.court.Length)
+			y = math.Min(math.Max(y+uy*speed*step, 0), c.g.court.Width)
+			for i, h := range hz {
+				nx, ny := pos[i][0]+h.vx*step, pos[i][1]+h.vy*step
+				if h.kind == thChase {
+					dx, dy := unit(x-pos[i][0], y-pos[i][1])
+					nx, ny = pos[i][0]+dx*math.Hypot(h.vx, h.vy)*step, pos[i][1]+dy*math.Hypot(h.vx, h.vy)*step
+				}
+				// the nearest they get during the step, so a fast projectile cannot jump over the bot between two samples
+				cx, cy := closestOnSegment(x, y, pos[i][0], pos[i][1], nx, ny)
+				score = math.Min(score, math.Hypot(x-cx, y-cy)-h.r-c.pr)
+				pos[i] = [2]float64{nx, ny}
+			}
+		}
+		if k < 0 {
+			score -= 1 // standing still only if nothing else is any better
+		}
+		if score > bestScore {
+			bestScore, bx, by = score, ux, uy
+		}
+	}
+	return bx, by
 }
 
 // ballSpeed is how fast a projectile of this kind flies.
@@ -347,6 +446,7 @@ func (b *Bot) pikachu(c *bctx) Input {
 		return c.stay() // rooted: nothing to decide
 	}
 	th := c.th
+	volley := f.Kind == rowlet && f.ArrowT > 0 // the arrows go where it stands when they leave: do not be rooted
 	canDash := p.DashT == 0 && (p.VoltLeft > 0 || p.DashCD == 0) && p.ParalyzeT == 0
 	// aligned reports whether a dash along the best 8-way direction would touch the opponent.
 	aligned := func() (int, int, bool) {
@@ -361,14 +461,14 @@ func (b *Bot) pikachu(c *bctx) Input {
 
 	// An opponent that cannot walk away is the time for Thunder, unless something is coming at the bot: the cast
 	// roots it for seconds.
-	if c.rootedFor() >= 0.6 && th.kind == thNone && p.ThunderCD == 0 && g.cfg.Pikachu.Thunder.Reach.hits(f) {
+	if c.rootedFor() >= 0.6 && th.kind == thNone && !volley && p.ThunderCD == 0 && g.cfg.Pikachu.Thunder.Reach.hits(f) {
 		in := c.stay()
 		in.Thunder = true
 		return in
 	}
 
-	if th.kind != thNone && th.eta <= 0.7 {
-		if canDash && th.eta <= 0.5 && th.kind != thShadow {
+	if th.kind != thNone && th.eta <= botHorizon {
+		if canDash && th.eta <= 0.5 && th.kind != thShadow && th.kind != thChase {
 			in := c.stay()
 			in.Skill = true
 			in.DX, in.DY = dir8(th.ax, th.ay)
@@ -401,7 +501,7 @@ func (b *Bot) pikachu(c *bctx) Input {
 	if f.Kind == snorlax {
 		lo = g.cfg.Snorlax.IcePunch.Distance + g.cfg.Snorlax.IcePunch.Radius + c.fr + 30
 	}
-	if p.BallCD == 0 && bc.Reach.hits(f) && (c.dist >= lo || c.rootedFor() > 0.6 && c.dist >= 100) {
+	if p.BallCD == 0 && !volley && bc.Reach.hits(f) && (c.dist >= lo || c.rootedFor() > 0.6 && c.dist >= 100) {
 		in := c.stay()
 		in.Ball = true
 		return in
@@ -442,32 +542,40 @@ func (b *Bot) snorlax(c *bctx) Input {
 	th := c.th
 	toward := func() Input { return c.move(c.ux, c.uy) }
 
-	if th.kind != thNone && th.eta <= 0.9 {
+	if th.kind != thNone && th.eta <= botHorizon {
 		jump := false
 		switch th.kind {
-		case thBall: // it has to still be coming when Snorlax is at the top
-			jump = canJump && th.eta >= 0.25
+		case thBall: // it has to still be coming when Snorlax is at the top, and not be there yet
+			jump = canJump && th.eta >= 0.25 && th.eta <= 0.9
 		case thPunch:
 			jump = canJump && th.eta <= 0.5
 		case thRush:
 			jump = canJump
 		}
-		if jump {
+		switch {
+		case jump:
 			in := toward()
 			in.Skill = true
 			return in
-		}
-		if th.kind != thRush {
+		case th.kind == thBall && canJump && th.eta > 0.9: // the moment to jump is coming: do not start anything slow
+		case th.kind != thRush:
 			return c.move(th.ax, th.ay)
 		}
 	}
+	// Anything slow (a punch, a beam) is held back while projectiles are on their way or a volley is being aimed.
+	danger := th.kind == thBall || f.Kind == rowlet && f.ArrowT > 0
 
 	punchReady := p.PunchCD == 0 && ip.Reach.hits(f)
 	punchRange := ip.Distance + ip.Radius + c.fr - 40
 
-	// A frozen (or otherwise rooted) opponent cannot get out of the beam, and the nearer it is the longer it stays in it.
-	if c.rootedFor() >= 0.8 && p.BeamCD == 0 && hb.Reach.hits(f) {
-		if c.dist <= 150 {
+	// An opponent the punch froze (or that cannot walk for a good while) gets the beam whatever the distance: the
+	// nearer it is the longer it stays in the beam, so Snorlax walks up to it if it can be there before the
+	// opponent is free, and beams from where it stands if it cannot.
+	rooted := c.rootedFor()
+	if (f.FrozenT > 0 || rooted >= 0.8) && p.BeamCD == 0 && hb.Reach.hits(f) && !danger {
+		walk := (c.dist - 150) / g.cfg.walkSpeedOf(snorlax)
+		switch {
+		case c.dist <= 150, c.dist <= hb.Length-50 && walk > rooted-0.3:
 			in := c.stay()
 			in.Beam = true
 			return in
@@ -475,14 +583,14 @@ func (b *Bot) snorlax(c *bctx) Input {
 		return toward()
 	}
 
-	if punchReady && c.dist <= punchRange && (b.comboT > 0 || c.rootedFor() > 0 || b.rng.Float64() < 0.5) {
+	if punchReady && !danger && c.dist <= punchRange && (b.comboT > 0 || c.rootedFor() > 0 || b.rng.Float64() < 0.5) {
 		in := c.stay()
 		in.AimX, in.AimY = c.lead(ip.ChargeDuration + c.dist/ip.Speed)
 		in.Punch = true
 		return in
 	}
 
-	if canJump && c.dist >= 60 && c.dist <= 330 && f.Z <= jp.Reach.MaxHeight && b.rng.Float64() < 0.25 {
+	if canJump && !danger && c.dist >= 60 && c.dist <= 330 && f.Z <= jp.Reach.MaxHeight && b.rng.Float64() < 0.25 {
 		in := toward()
 		in.Skill = true
 		return in

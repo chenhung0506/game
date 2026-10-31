@@ -13,7 +13,8 @@ func vulpixConfig() Config {
 	cfg := DefaultConfig()
 	fs, is, fb := &cfg.Vulpix.FrostField, &cfg.Vulpix.IceStorm, &cfg.Vulpix.FreezeBeam
 	fs.Reach, is.Reach, fb.Reach = Reach{0, 60}, Reach{0, 60}, Reach{0, 60}
-	fs.SprayDuration, fs.Duration, fs.Slow, fs.Boost, fs.Radius, fs.PatchRadius, fs.Patches, fs.Cooldown = 2, 6, 0.5, 0.5, 160, 50, 12, 10
+	fs.SprayDuration, fs.Duration, fs.Slow, fs.Boost, fs.Radius, fs.Cooldown = 1.5, 6, 0.5, 0.5, 40, 10
+	fs.SlideSpeed, fs.ContactDamage, fs.ExplosionRadius, fs.ExplosionDamage = 400, 10, 100, 15
 	is.Radius, is.Interval, is.Damage, is.Strikes, is.FollowSpeed, is.Cooldown, is.FreezeHits, is.FreezeDuration = 80, 0.5, 8, 6, 60, 9, 3, 1.5
 	fb.Speed, fb.Cooldown, fb.ControlDuration, fb.Length, fb.PillarRadius, fb.PillarHP, fb.PillarDuration = 240, 12, 3, 450, 24, 25, 8
 	return cfg
@@ -39,53 +40,173 @@ func pillars(g *Game, owner int) (n int) {
 
 // ---- Frost Field ----
 
-func TestFrostIsLaidEvenlyOverTheSprayAroundVulpixAndMelts(t *testing.T) {
+// ride plays the Frost Field from the press to the end of the ride, keeping the stick as given, and returns every
+// event it produced.
+func ride(g *Game, slot int, in Input) (events []Event) {
+	fs := g.cfg.Vulpix.FrostField
+	g.P[slot].In = in
+	for i := 0; i < int(fs.SprayDuration*tickRate)+10; i++ {
+		events = append(events, g.Step(dt)...)
+		g.P[slot].In.Skill = false // one press
+		if g.P[slot].FrostT == 0 {
+			break // the ride is over (it ran out, or the iceberg burst)
+		}
+	}
+	g.P[slot].In = Input{}
+	return events
+}
+
+func count(events []Event, kind string) (n int) {
+	for _, e := range events {
+		if e.T == kind {
+			n++
+		}
+	}
+	return n
+}
+
+func TestIcebergSlidesAtSlideSpeedAndLeavesAnUnbrokenTrailThatMelts(t *testing.T) {
 	cfg := vulpixConfig()
+	cfg.Vulpix.FrostField.SprayDuration = 1.55 // not a whole number of ticks: the last step has to be clipped
 	fs := cfg.Vulpix.FrostField
 	g := vg(cfg)
-	g.P[0].In.Skill = true
-	steps(g, 1)
-	g.P[0].In = Input{}
-	half := int(fs.SprayDuration/2*tickRate) - 1
-	steps(g, half)
-	if n := len(g.Frost); n < fs.Patches/2-1 || n > fs.Patches/2+1 {
-		t.Fatalf("%d patches half way through the spray, want about %d", n, fs.Patches/2)
+	g.P[0].X, g.P[0].Y = 300, 100
+	ev := ride(g, 0, Input{Skill: true, DY: 1})
+	if want := 100 + fs.SlideSpeed*fs.SprayDuration; math.Abs(g.P[0].Y-want) > 1e-6 || g.P[0].X != 300 {
+		t.Fatalf("Vulpix ended at %v,%v, want 300,%v: slide_speed x spray_duration along the stick", g.P[0].X, g.P[0].Y, want)
 	}
-	steps(g, int(fs.SprayDuration/2*tickRate)+2)
-	if len(g.Frost) != fs.Patches {
-		t.Fatalf("%d patches after the spray, want %d", len(g.Frost), fs.Patches)
-	}
+	ys := []float64{}
 	for _, f := range g.Frost {
-		if f.Owner != 0 || math.Hypot(f.X-g.P[0].X, f.Y-g.P[0].Y) > fs.Radius+1e-9 {
-			t.Fatalf("patch %+v is not Vulpix's or lies outside the radius %v of it", f, fs.Radius)
+		if f.Owner != 0 || f.X != 300 {
+			t.Fatalf("frost %+v is not Vulpix's or is off its path", f)
 		}
+		ys = append(ys, f.Y)
+	}
+	if len(ys) < int(fs.SlideSpeed*fs.SprayDuration/fs.Radius) {
+		t.Fatalf("%d bits of frost along %v, want one every %v", len(ys), fs.SlideSpeed*fs.SprayDuration, fs.Radius)
+	}
+	sort.Float64s(ys)
+	if ys[0] != 100 {
+		t.Fatalf("the trail starts at %v, want where the ride began (100)", ys[0])
+	}
+	for i := 1; i < len(ys); i++ {
+		if ys[i]-ys[i-1] > fs.Radius+1e-6 {
+			t.Fatalf("a gap of %v in the trail (radius %v)", ys[i]-ys[i-1], fs.Radius)
+		}
+	}
+	if ys[len(ys)-1] < g.P[0].Y-fs.Radius {
+		t.Fatalf("the trail stops at %v, short of Vulpix at %v", ys[len(ys)-1], g.P[0].Y)
+	}
+	if count(ev, "iceburst") != 1 {
+		t.Fatalf("%d bursts at the end of the ride, want 1", count(ev, "iceburst"))
 	}
 	steps(g, int((fs.Duration+0.1)*tickRate))
 	if len(g.Frost) != 0 {
-		t.Fatalf("%d patches left after they should have melted", len(g.Frost))
+		t.Fatalf("%d bits of frost left after they should have melted", len(g.Frost))
 	}
 }
 
-func TestFrostFollowsVulpixWhileItWalksAndCooldownBlocksASecondSpray(t *testing.T) {
+func TestIcebergCannotStopAndKeepsTheWayVulpixFaces(t *testing.T) {
+	cfg := vulpixConfig()
+	fs := cfg.Vulpix.FrostField
+	g := vg(cfg)
+	g.P[1].Y = 700 // out of the way
+	g.P[0].FX, g.P[0].FY = 0, 1
+	ride(g, 0, Input{Skill: true}) // no stick at all
+	if want := 250 + fs.SlideSpeed*fs.SprayDuration; math.Abs(g.P[0].Y-want) > 1e-6 {
+		t.Fatalf("Vulpix ended at y=%v, want %v: it slides the way it faces", g.P[0].Y, want)
+	}
+}
+
+func TestIcebergBurstsAtTheEndOfTheRideAndHurtsWhatIsWithinTheExplosionRadius(t *testing.T) {
+	cfg := vulpixConfig()
+	fs := cfg.Vulpix.FrostField
+	for _, c := range []struct {
+		name  string
+		foeY  float64
+		taken int
+	}{
+		{"inside the radius, not touched on the way", 250 + 90, fs.ExplosionDamage}, // 90 from the end: more than radius+body (40+30), less than 100+30
+		{"outside the radius", 250 + 140, 0},
+	} {
+		g := vg(cfg)
+		g.P[1].X, g.P[1].Y = 900, c.foeY // the ride ends at (900, 250)
+		hp := g.P[1].HP
+		ev := ride(g, 0, Input{Skill: true, DX: 1})
+		if got := hp - g.P[1].HP; got != c.taken || count(ev, "iceburst") != 1 {
+			t.Errorf("%s: took %d (want %d), %d bursts", c.name, got, c.taken, count(ev, "iceburst"))
+		}
+		if math.Abs(g.P[0].X-(300+fs.SlideSpeed*fs.SprayDuration)) > 1e-6 {
+			t.Errorf("%s: Vulpix ended at %v", c.name, g.P[0].X)
+		}
+	}
+}
+
+func TestIcebergBurstsOnTheOpponentWithBothBlowsAndTheRideIsOver(t *testing.T) {
+	cfg := vulpixConfig()
+	fs := cfg.Vulpix.FrostField
+	g := vg(cfg)
+	g.P[1].X = 600 // in the way
+	hp := g.P[1].HP
+	ev := ride(g, 0, Input{Skill: true, DX: 1})
+	if got, want := hp-g.P[1].HP, fs.ContactDamage+fs.ExplosionDamage; got != want {
+		t.Fatalf("Snorlax took %d, want contact %d + explosion %d", got, fs.ContactDamage, fs.ExplosionDamage)
+	}
+	if count(ev, "iceburst") != 1 {
+		t.Fatalf("%d bursts, want 1", count(ev, "iceburst"))
+	}
+	touch := 600 - fs.Radius - cfg.Snorlax.Radius // where the iceberg first reaches it; the step that gets there ends at most one step (slide_speed*dt) further
+	if g.P[0].FrostT != 0 || g.P[0].X < touch || g.P[0].X > touch+fs.SlideSpeed*dt+1e-6 {
+		t.Fatalf("FrostT %v, Vulpix at x=%v: the ride should have ended at the touch (%v)", g.P[0].FrostT, g.P[0].X, touch)
+	}
+	for _, e := range ev {
+		if e.T == "iceburst" && e.R != fs.ExplosionRadius {
+			t.Fatalf("the burst says radius %v, want %v", e.R, fs.ExplosionRadius)
+		}
+	}
+}
+
+func TestIcebergPassesOverAnOpponentAboveTheBand(t *testing.T) {
+	cfg := vulpixConfig()
+	cfg.Vulpix.FrostField.Reach = Reach{MinHeight: 0, MaxHeight: 15}
+	g := duel(cfg, vulpix, rowlet) // Rowlet flies at fly_high, above the band
+	g.P[1].X, g.P[1].Y = 600, 250
+	if cfg.Rowlet.FlyHigh <= cfg.Vulpix.FrostField.MaxHeight {
+		t.Fatal("the scene needs a Rowlet above the band")
+	}
+	hp := g.P[1].HP
+	ev := ride(g, 0, Input{Skill: true, DX: 1})
+	if g.P[1].HP != hp || g.P[0].X < 300+cfg.Vulpix.FrostField.SlideSpeed*cfg.Vulpix.FrostField.SprayDuration-1 {
+		t.Fatalf("Rowlet HP %d -> %d, Vulpix at %v: the iceberg should have gone under it", hp, g.P[1].HP, g.P[0].X)
+	}
+	if count(ev, "iceburst") != 1 {
+		t.Fatalf("%d bursts", count(ev, "iceburst"))
+	}
+}
+
+func TestIcebergCooldownBlocksASecondRideAndCountsFromTheStart(t *testing.T) {
 	cfg := vulpixConfig()
 	g := vg(cfg)
-	g.P[0].In = Input{Skill: true, DX: 1}
-	steps(g, int(cfg.Vulpix.FrostField.SprayDuration*tickRate)+3)
-	minX, maxX := 1e9, -1e9
-	for _, f := range g.Frost {
-		minX, maxX = math.Min(minX, f.X), math.Max(maxX, f.X)
-	}
-	if maxX-minX < 300 { // Vulpix walked 160*2 = 320 while it sprayed, and the patches are laid wherever it is then
-		t.Fatalf("patches only span %v in x: they were not laid along the walk", maxX-minX)
-	}
-	n := len(g.Frost)
+	g.P[1].Y = 700
+	ride(g, 0, Input{Skill: true, DX: 1})
+	x := g.P[0].X
 	g.P[0].In = Input{Skill: true}
 	steps(g, 5)
-	if len(g.Frost) != n {
-		t.Fatalf("a second spray started during the cooldown: %d -> %d patches", n, len(g.Frost))
+	if g.P[0].FrostT != 0 || g.P[0].X != x {
+		t.Fatalf("a second ride started during the cooldown (FrostT %v, x %v -> %v)", g.P[0].FrostT, x, g.P[0].X)
 	}
-	if cd := g.P[0].FrostCD; cd <= 0 || cd > cfg.Vulpix.FrostField.Cooldown {
-		t.Fatalf("FrostCD = %v", cd)
+	if cd := g.P[0].FrostCD; cd <= 0 || cd > cfg.Vulpix.FrostField.Cooldown-cfg.Vulpix.FrostField.SprayDuration+0.2 {
+		t.Fatalf("FrostCD = %v: it counts from the start of the ride", cd)
+	}
+}
+
+func TestFrostIsCappedAndTheOldestGoesFirst(t *testing.T) {
+	g := vg(vulpixConfig())
+	for i := 0; i < maxFrost+10; i++ {
+		g.layFrost(0, float64(i), 0)
+	}
+	if len(g.Frost) != maxFrost || g.Frost[0].X != 10 || g.Frost[maxFrost-1].X != float64(maxFrost+9) {
+		t.Fatalf("%d bits of frost, first at x=%v last at x=%v", len(g.Frost), g.Frost[0].X, g.Frost[len(g.Frost)-1].X)
 	}
 }
 
@@ -104,7 +225,7 @@ func TestFrostSpeedsUpTheOwnerAndSlowsTheOtherPlayerOnlyInsideThePatchAndTheBand
 		g.P[1].Z = z
 		g.P[1].In.DX = 1
 		x0 := g.P[1].X
-		steps(g, 4)                       // short enough to stay on a patch 50 wide
+		steps(g, 4)                       // short enough to stay on a patch
 		return (g.P[1].X - x0) / (4 * dt) // speed
 	}
 	base := walk(pikachu, false, false, 0)
@@ -128,11 +249,11 @@ func TestFrostSpeedsUpTheOwnerAndSlowsTheOtherPlayerOnlyInsideThePatchAndTheBand
 func TestFrostOnlyCountsWhereTheBodyCentreIs(t *testing.T) {
 	cfg := vulpixConfig()
 	g := vg(cfg)
-	g.Frost = []Frost{{Owner: 1, X: 300 + cfg.Vulpix.FrostField.PatchRadius + 1, Y: 250, Left: 5}}
+	g.Frost = []Frost{{Owner: 1, X: 300 + cfg.Vulpix.FrostField.Radius + 1, Y: 250, Left: 5}}
 	if f := g.frostFactor(0); f != 1 {
 		t.Fatalf("factor %v just outside the patch, want 1", f)
 	}
-	g.Frost[0].X = 300 + cfg.Vulpix.FrostField.PatchRadius - 1
+	g.Frost[0].X = 300 + cfg.Vulpix.FrostField.Radius - 1
 	if f := g.frostFactor(0); math.Abs(f-0.5) > 1e-9 {
 		t.Fatalf("factor %v just inside the foe's patch, want 0.5", f)
 	}
@@ -465,18 +586,71 @@ func TestFreezeBeamEndsAfterTheControlTimeHasACooldownAndHurtsNobody(t *testing.
 	}
 }
 
-func TestFrozenVulpixLosesItsBeamAndItsSpray(t *testing.T) {
+func TestFrozenVulpixLosesItsBeamAndItsRideWithoutABurst(t *testing.T) {
 	cfg := vulpixConfig()
 	g := vg(cfg)
-	g.P[0].In = Input{Freeze: true, Skill: true}
+	g.P[0].In = Input{Freeze: true}
 	steps(g, 2)
-	if g.P[0].FBeamT == 0 || g.P[0].FrostT == 0 {
-		t.Fatalf("FBeamT %v FrostT %v: both should be running", g.P[0].FBeamT, g.P[0].FrostT)
+	if g.P[0].FBeamT == 0 {
+		t.Fatal("the beam did not start")
 	}
 	g.P[0].FrozenT = 1
 	steps(g, 1)
-	if g.P[0].FBeamT != 0 || g.P[0].FrostT != 0 {
-		t.Fatalf("FBeamT %v FrostT %v after freezing", g.P[0].FBeamT, g.P[0].FrostT)
+	if g.P[0].FBeamT != 0 {
+		t.Fatalf("FBeamT %v after freezing", g.P[0].FBeamT)
+	}
+
+	g = vg(cfg)
+	g.P[1].Y = 700
+	g.P[0].In = Input{Skill: true, DX: 1}
+	steps(g, 2)
+	if g.P[0].FrostT == 0 {
+		t.Fatal("the ride did not start")
+	}
+	g.P[0].FrozenT = 1
+	var ev []Event
+	for i := 0; i < 3; i++ {
+		ev = append(ev, g.Step(dt)...)
+	}
+	if g.P[0].FrostT != 0 || count(ev, "iceburst") != 0 {
+		t.Fatalf("FrostT %v, %d bursts after freezing: the iceberg should just be gone", g.P[0].FrostT, count(ev, "iceburst"))
+	}
+}
+
+func TestBoundOrParalyzedVulpixLosesItsRideWithoutABurst(t *testing.T) {
+	for name, set := range map[string]func(p *Player){"bound": func(p *Player) { p.BoundT = 1 }, "paralyzed": func(p *Player) { p.ParalyzeT = 1 }} {
+		g := vg(vulpixConfig())
+		g.P[1].Y = 700
+		g.P[0].In = Input{Skill: true, DX: 1}
+		steps(g, 2)
+		set(&g.P[0])
+		var ev []Event
+		for i := 0; i < 3; i++ {
+			ev = append(ev, g.Step(dt)...)
+		}
+		if g.P[0].FrostT != 0 || count(ev, "iceburst") != 0 {
+			t.Errorf("%s: FrostT %v, %d bursts", name, g.P[0].FrostT, count(ev, "iceburst"))
+		}
+	}
+}
+
+func TestTheRideAndTheBeamDoNotStartOnTopOfEachOther(t *testing.T) {
+	g := vg(vulpixConfig())
+	g.P[1].Y = 700
+	g.P[0].In = Input{Skill: true, Freeze: true, DX: 1}
+	steps(g, 3)
+	if g.P[0].FrostT == 0 || g.P[0].FBeamT != 0 {
+		t.Fatalf("FrostT %v FBeamT %v: pressed together, the ride wins", g.P[0].FrostT, g.P[0].FBeamT)
+	}
+
+	g = vg(vulpixConfig())
+	g.P[1].Y = 700
+	g.P[0].In = Input{Freeze: true}
+	steps(g, 3)
+	g.P[0].In = Input{Skill: true, DX: 1}
+	steps(g, 3)
+	if g.P[0].FBeamT == 0 || g.P[0].FrostT != 0 {
+		t.Fatalf("FBeamT %v FrostT %v: the beam roots Vulpix, so there is no ride in the middle of it", g.P[0].FBeamT, g.P[0].FrostT)
 	}
 }
 
@@ -649,17 +823,19 @@ func TestVulpixConfigLoadsAndRefusesBadValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, mut := range map[string]func(c *Config){
-		"vulpix.frost_field.slow":           func(c *Config) { c.Vulpix.FrostField.Slow = 1.5 },
-		"vulpix.frost_field.patches":        func(c *Config) { c.Vulpix.FrostField.Patches = 201 },
-		"vulpix.frost_field.patch_radius":   func(c *Config) { c.Vulpix.FrostField.PatchRadius = 0 },
-		"vulpix.frost_field.boost":          func(c *Config) { c.Vulpix.FrostField.Boost = -1 },
-		"vulpix.ice_storm.freeze_hits":      func(c *Config) { c.Vulpix.IceStorm.FreezeHits = 0 }, // it would divide by zero
-		"vulpix.ice_storm.strikes":          func(c *Config) { c.Vulpix.IceStorm.Strikes = 0 },
-		"vulpix.freeze_beam.pillar_hp":      func(c *Config) { c.Vulpix.FreezeBeam.PillarHP = 0 },
-		"vulpix.freeze_beam.length":         func(c *Config) { c.Vulpix.FreezeBeam.Length = 0 },
-		"vulpix.freeze_beam.start_distance": func(c *Config) { c.Vulpix.FreezeBeam.StartDistance = c.Vulpix.FreezeBeam.Length + 1 },
-		"vulpix.freeze_beam":                func(c *Config) { c.Vulpix.FreezeBeam.MinHeight, c.Vulpix.FreezeBeam.MaxHeight = 50, 10 },
-		"vulpix.ice_storm":                  func(c *Config) { c.Vulpix.IceStorm.MinHeight = -1 },
+		"vulpix.frost_field.slow":             func(c *Config) { c.Vulpix.FrostField.Slow = 1.5 },
+		"vulpix.frost_field.slide_speed":      func(c *Config) { c.Vulpix.FrostField.SlideSpeed = 0 },
+		"vulpix.frost_field.contact_damage":   func(c *Config) { c.Vulpix.FrostField.ContactDamage = -1 },
+		"vulpix.frost_field.explosion_radius": func(c *Config) { c.Vulpix.FrostField.ExplosionRadius = -1 },
+		"vulpix.frost_field.explosion_damage": func(c *Config) { c.Vulpix.FrostField.ExplosionDamage = -1 },
+		"vulpix.frost_field.boost":            func(c *Config) { c.Vulpix.FrostField.Boost = -1 },
+		"vulpix.ice_storm.freeze_hits":        func(c *Config) { c.Vulpix.IceStorm.FreezeHits = 0 }, // it would divide by zero
+		"vulpix.ice_storm.strikes":            func(c *Config) { c.Vulpix.IceStorm.Strikes = 0 },
+		"vulpix.freeze_beam.pillar_hp":        func(c *Config) { c.Vulpix.FreezeBeam.PillarHP = 0 },
+		"vulpix.freeze_beam.length":           func(c *Config) { c.Vulpix.FreezeBeam.Length = 0 },
+		"vulpix.freeze_beam.start_distance":   func(c *Config) { c.Vulpix.FreezeBeam.StartDistance = c.Vulpix.FreezeBeam.Length + 1 },
+		"vulpix.freeze_beam":                  func(c *Config) { c.Vulpix.FreezeBeam.MinHeight, c.Vulpix.FreezeBeam.MaxHeight = 50, 10 },
+		"vulpix.ice_storm":                    func(c *Config) { c.Vulpix.IceStorm.MinHeight = -1 },
 	} {
 		c := good
 		mut(&c)
