@@ -269,12 +269,12 @@
     "radius": 10,
     "evolve_hops": 5,
     "jump": {
-      "height": 100,
+      "height": 150,
       "duration": 1.5,
-      "highest_point_duration": 1,
-      "cooldown": 3,
+      "highest_point_duration": 0.5,
+      "cooldown": 4,
       "air_speed_first_half": 100,
-      "air_speed_second_half": 50
+      "air_speed_second_half": 30
     }
   },
   "gyarados": {
@@ -294,10 +294,11 @@
     "tail_whip": {
       "min_height": 0,
       "max_height": 60,
+      "charge_duration": 0.5,
       "angle": 180,
-      "length": 600,
+      "length": 700,
       "knockback": 400,
-      "stun_duration": 2,
+      "stun_duration": 1.5,
       "cooldown": 4
     },
     "hyper_beam": {

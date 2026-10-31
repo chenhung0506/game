@@ -893,3 +893,26 @@ func TestBotsJudgeAGyaradosBeamByItsOwnLength(t *testing.T) {
 		t.Fatalf("threat %+v: a beam 100 long does not reach 300 away", th)
 	}
 }
+
+func TestBotsStepOutOfAWarnedTailWhipFan(t *testing.T) {
+	cfg := DefaultConfig()
+	g := duel(cfg, pikachu, magikarp)
+	g.P[1].Kind = gyarados
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 700, 450, 600, 450 // 100 away, in a fan along (1,0)
+	g.P[1].TailT, g.P[1].TailX, g.P[1].TailY = 0.4, 1, 0
+	b := newBot(pikachu, 1)
+	for i := 0; i <= botReact; i++ {
+		b.observe(g, 0)
+	}
+	if th := b.look(g, 0).th; th.kind != thPunch || th.eta > 0.4+1e-9 || th.ax <= 0 {
+		t.Fatalf("threat %+v, want the fan of a winding-up whip, with away (+x) the way out", th)
+	}
+	g.P[0].Y = 450 + 250 // far to the side of the fan: nothing to fear
+	b = newBot(pikachu, 1)
+	for i := 0; i <= botReact; i++ {
+		b.observe(g, 0)
+	}
+	if th := b.look(g, 0).th; th.kind == thPunch {
+		t.Fatalf("threat %+v for a bot standing well outside the fan", th)
+	}
+}

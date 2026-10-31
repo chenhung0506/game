@@ -86,7 +86,7 @@ func (g *Game) magikarpAirSpeed(p *Player) float64 {
 // walking code stays out of it).
 func (g *Game) stepGyarados(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
-	p, other := &g.P[i], &g.P[1-i]
+	p := &g.P[i]
 	wv, tw := g.cfg.Gyarados.Wave, g.cfg.Gyarados.TailWhip
 	for _, cd := range []*float64{&p.WaveCD, &p.TailCD} {
 		if *cd > 0 {
@@ -98,7 +98,7 @@ func (g *Game) stepGyarados(i int, in Input, dt float64) ([]Event, bool) {
 	beamBusy := p.BeamT > 0 || p.SweepT > 0 || p.RechargeT > 0
 
 	// ---- Wave: a hop, and the landing shakes the ground ----
-	if in.Skill && p.WaveT == 0 && p.WaveCD == 0 && !beamBusy && p.Z == 0 {
+	if in.Skill && p.WaveT == 0 && p.WaveCD == 0 && !beamBusy && p.TailT == 0 && p.Z == 0 {
 		p.WaveT, p.WaveCD = wv.JumpDuration, wv.Cooldown
 	}
 	rooted := p.WaveT > 0 // through the tick the hop ends in, free from the next
@@ -115,22 +115,42 @@ func (g *Game) stepGyarados(i int, in Input, dt float64) ([]Event, bool) {
 		p.Z = 0
 	}
 
-	// ---- Tail whip: a fan along the aim (the stick, else the last way it walked), like the Ice Punch ----
-	if in.Tail && p.TailCD == 0 && p.WaveT == 0 && !beamBusy {
-		p.TailCD = tw.Cooldown
-		ux, uy := p.AimX, p.AimY
-		if math.Hypot(ux, uy) < 1e-9 {
-			ux, uy = unit(float64(p.FX), float64(p.FY))
+	// ---- Tail whip: wind up with the fan shown, then hit what is in it ----
+	// The fan goes along the aim (the stick, else the last way it walked, like the Ice Punch) as it was when K was
+	// pressed, so the warning is exactly what gets hit. Gyarados is rooted while it winds up, and through the tick it hits in.
+	if in.Tail && p.TailCD == 0 && p.TailT == 0 && p.WaveT == 0 && !beamBusy {
+		p.TailCD = tw.Cooldown // counted from the press
+		p.TailX, p.TailY = p.AimX, p.AimY
+		if math.Hypot(p.TailX, p.TailY) < 1e-9 {
+			p.TailX, p.TailY = unit(float64(p.FX), float64(p.FY))
 		}
-		dx, dy := other.X-p.X, other.Y-p.Y
-		d := math.Hypot(dx, dy)
-		events = append(events, Event{T: "tail", X: p.X, Y: p.Y, R: tw.Length, DX: ux, DY: uy})
-		if tw.Reach.hits(other) && d <= tw.Length+g.radius(1-i) && (d < 1e-9 || (dx*ux+dy*uy)/d >= math.Cos(tw.Angle/2*math.Pi/180)) {
-			g.knockBack(p.X, p.Y, other, tw.Knockback, ux, uy)
-			other.StunT = math.Max(other.StunT, tw.StunDuration)
+		p.TailT = tw.ChargeDuration
+		if p.TailT == 0 {
+			events = append(events, g.whip(i)...)
+		}
+	}
+	if p.TailT > 0 {
+		rooted = true
+		if p.TailT -= dt; p.TailT < 1e-9 {
+			p.TailT = 0
+			events = append(events, g.whip(i)...)
 		}
 	}
 	return events, rooted
+}
+
+// whip is the tail whip landing: the fan fixed when it was started, knocking back and stunning the opponent in it.
+func (g *Game) whip(i int) []Event {
+	p, other := &g.P[i], &g.P[1-i]
+	tw := g.cfg.Gyarados.TailWhip
+	ux, uy := p.TailX, p.TailY
+	dx, dy := other.X-p.X, other.Y-p.Y
+	d := math.Hypot(dx, dy)
+	if tw.Reach.hits(other) && d <= tw.Length+g.radius(1-i) && (d < 1e-9 || (dx*ux+dy*uy)/d >= math.Cos(tw.Angle/2*math.Pi/180)) {
+		g.knockBack(p.X, p.Y, other, tw.Knockback, ux, uy)
+		other.StunT = math.Max(other.StunT, tw.StunDuration)
+	}
+	return []Event{{T: "tail", X: p.X, Y: p.Y, R: tw.Length, DX: ux, DY: uy}}
 }
 
 // stepWaves spreads Gyarados's waves. The edge of a wave hurts the opponent once, the first time it reaches the

@@ -305,6 +305,7 @@ func TestWaveHasACooldownFromTheStartOfTheHopAndNeedsTheGround(t *testing.T) {
 
 func TestTailWhipKnocksBackAndStunsWhoeverIsInTheFanAlongTheAim(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Gyarados.TailWhip.ChargeDuration = 0 // these are about the whip itself: no wind-up
 	tw := cfg.Gyarados.TailWhip
 	deg := func(a float64) (float64, float64) { return math.Cos(a * math.Pi / 180), math.Sin(a * math.Pi / 180) }
 	for _, c := range []struct {
@@ -343,6 +344,7 @@ func TestTailWhipKnocksBackAndStunsWhoeverIsInTheFanAlongTheAim(t *testing.T) {
 
 func TestTailWhipFollowsTheAimNotTheOpponent(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Gyarados.TailWhip.ChargeDuration = 0 // these are about the whip itself: no wind-up
 	g := gya(cfg, snorlax)
 	g.P[0].AimX, g.P[0].AimY = 0, 1 // aimed at the floor of the court, the opponent is to the right
 	g.P[1].X, g.P[1].Y = 450, 250
@@ -354,6 +356,7 @@ func TestTailWhipFollowsTheAimNotTheOpponent(t *testing.T) {
 
 func TestTailWhipCoolsDownAndIsHeldBackAboveItsBand(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Gyarados.TailWhip.ChargeDuration = 0 // these are about the whip itself: no wind-up
 	g := gya(cfg, snorlax)
 	g.P[1].X = 450
 	press(g, 0, Input{Tail: true})
@@ -380,6 +383,7 @@ func TestTailWhipCoolsDownAndIsHeldBackAboveItsBand(t *testing.T) {
 
 func TestAStunnedPlayerCanNeitherMoveNorActUntilItWearsOff(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Gyarados.TailWhip.ChargeDuration = 0 // these are about the whip itself: no wind-up
 	tw := cfg.Gyarados.TailWhip
 	g := gya(cfg, pikachu)
 	g.P[1].X, g.P[1].Y = 450, 250
@@ -444,7 +448,7 @@ func TestMagikarpAndGyaradosSnapshotKeysAndEventFields(t *testing.T) {
 	b, _ := json.Marshal(Player{})
 	var m map[string]any
 	json.Unmarshal(b, &m)
-	for _, k := range []string{"ot", "ocd", "hn", "wvt", "wvcd", "tlcd", "sn"} {
+	for _, k := range []string{"ot", "ocd", "hn", "wvt", "wvcd", "tlcd", "tlt", "tlx", "tly", "sn"} {
 		if _, ok := m[k]; !ok {
 			t.Errorf("snapshot is missing %q: %s", k, b)
 		}
@@ -477,6 +481,7 @@ func TestMagikarpAndGyaradosConfigIsLoadedAndRefusesBadValues(t *testing.T) {
 		"gyarados.tail_whip.angle":             func(c *Config) { c.Gyarados.TailWhip.Angle = 361 },
 		"gyarados.tail_whip.length":            func(c *Config) { c.Gyarados.TailWhip.Length = 0 },
 		"gyarados.tail_whip.stun_duration":     func(c *Config) { c.Gyarados.TailWhip.StunDuration = -1 },
+		"gyarados.tail_whip.charge_duration":   func(c *Config) { c.Gyarados.TailWhip.ChargeDuration = -1 },
 		"gyarados.tail_whip.knockback":         func(c *Config) { c.Gyarados.TailWhip.Knockback = -1 },
 		"gyarados.hyper_beam.length":           func(c *Config) { c.Gyarados.HyperBeam.Length = 0 },
 		"gyarados.hyper_beam.damage":           func(c *Config) { c.Gyarados.HyperBeam.Damage = -1 },
@@ -536,5 +541,103 @@ func TestGyaradosAndSnorlaxEachHaveTheirOwnHyperBeamSettings(t *testing.T) {
 	press(g, 0, Input{Beam: true})
 	if g.P[0].BeamCD <= 8 || g.P[0].BeamCD > 9 {
 		t.Fatalf("Gyarados's beam cooldown is %v, want its own 9", g.P[0].BeamCD)
+	}
+}
+
+// ---- the tail whip's wind-up ----
+
+func windUp(cfg Config, foe int) *Game {
+	cfg.Gyarados.TailWhip.ChargeDuration = 0.5
+	g := gya(cfg, foe)
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 800, 500, 950, 500 // 150 away, straight ahead
+	g.P[0].AimX, g.P[0].AimY = 1, 0
+	return g
+}
+
+func TestTailWhipWindsUpRootedAndHitsOnlyWhenTheChargeIsOver(t *testing.T) {
+	tw := DefaultConfig().Gyarados.TailWhip
+	g := windUp(DefaultConfig(), snorlax)
+	g.P[1].X = 950
+	ev := press(g, 0, Input{Tail: true})
+	if g.P[0].TailT <= 0 || g.P[0].TailCD <= 0 || count(ev, "tail") != 0 || g.P[1].StunT != 0 || g.P[1].X != 950 {
+		t.Fatalf("TailT %v TailCD %v, %d tail events, foe stunned %v at x=%v: nothing should land at the press", g.P[0].TailT, g.P[0].TailCD, count(ev, "tail"), g.P[1].StunT, g.P[1].X)
+	}
+	x := g.P[0].X
+	var events []Event
+	for i := 0; i < int(0.5*tickRate)-2; i++ { // most of the wind-up, trying to walk away
+		g.P[0].In = Input{DX: -1}
+		events = append(events, g.Step(dt)...)
+	}
+	if g.P[0].X != x || count(events, "tail") != 0 || g.P[1].StunT != 0 {
+		t.Fatalf("mid wind-up: x %v -> %v, %d tail events, stun %v: it should be rooted and not have hit yet", x, g.P[0].X, count(events, "tail"), g.P[1].StunT)
+	}
+	for i := 0; i < 4; i++ {
+		g.P[0].In = Input{}
+		events = append(events, g.Step(dt)...)
+	}
+	if count(events, "tail") != 1 || g.P[1].StunT <= 0 || math.Abs(g.P[1].X-(950+tw.Knockback)) > 1e-6 {
+		t.Fatalf("after the wind-up: %d tail events, stun %v, x %v: want one hit that knocks back %v and stuns", count(events, "tail"), g.P[1].StunT, g.P[1].X, tw.Knockback)
+	}
+	if g.P[0].TailT != 0 {
+		t.Fatalf("TailT %v after the hit", g.P[0].TailT)
+	}
+}
+
+func TestTheFanIsFixedWhenKIsPressedAndWhoeverLeavesItIsNotHit(t *testing.T) {
+	g := windUp(DefaultConfig(), snorlax)
+	press(g, 0, Input{Tail: true})
+	if math.Abs(g.P[0].TailX-1) > 1e-9 || g.P[0].TailY != 0 {
+		t.Fatalf("the warning aim is (%v,%v), want the aim at the press (1,0)", g.P[0].TailX, g.P[0].TailY)
+	}
+	for i := 0; i < int(0.5*tickRate)+2; i++ { // the stick turns away, the opponent steps out of the fan
+		g.P[0].In = Input{DY: 1}
+		g.P[1].X, g.P[1].Y = 800, 800 // straight below, far outside a fan along (1,0)
+		g.Step(dt)
+	}
+	if g.P[1].StunT != 0 {
+		t.Fatal("it hit an opponent that had stepped out of the warned fan")
+	}
+
+	g = windUp(DefaultConfig(), snorlax)
+	press(g, 0, Input{Tail: true})
+	for i := 0; i < int(0.5*tickRate)+2; i++ {
+		g.P[0].In = Input{DY: 1} // turning the stick does not turn the fan
+		g.Step(dt)
+	}
+	if g.P[1].StunT == 0 {
+		t.Fatal("the fan followed the stick: it should stay where it was warned")
+	}
+}
+
+func TestAWindUpIsLostWhenFrozenStunnedOrCaught(t *testing.T) {
+	for name, cut := range map[string]func(p *Player){"frozen": func(p *Player) { p.FrozenT = 1 }, "stunned": func(p *Player) { p.StunT = 1 }, "caught": func(p *Player) { p.Held = true }} {
+		g := windUp(DefaultConfig(), snorlax)
+		press(g, 0, Input{Tail: true})
+		cut(&g.P[0])
+		steps(g, int(0.8*tickRate))
+		if g.P[0].TailT != 0 || g.P[1].StunT != 0 {
+			t.Errorf("%s: TailT %v, foe stunned %v: the whip should have been cancelled", name, g.P[0].TailT, g.P[1].StunT)
+		}
+	}
+}
+
+func TestNothingElseStartsInTheMiddleOfAWindUp(t *testing.T) {
+	g := windUp(DefaultConfig(), snorlax)
+	press(g, 0, Input{Tail: true})
+	press(g, 0, Input{Skill: true, Beam: true})
+	if g.P[0].WaveT != 0 || g.P[0].BeamT != 0 {
+		t.Fatalf("WaveT %v BeamT %v: a hop or a beam began in the middle of the wind-up", g.P[0].WaveT, g.P[0].BeamT)
+	}
+}
+
+func TestTailWhipWithNoChargeHitsAtOnce(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Gyarados.TailWhip.ChargeDuration = 0
+	g := gya(cfg, snorlax)
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 800, 500, 950, 500
+	g.P[0].AimX, g.P[0].AimY = 1, 0
+	ev := press(g, 0, Input{Tail: true})
+	if count(ev, "tail") != 1 || g.P[1].StunT == 0 || g.P[0].TailT != 0 {
+		t.Fatalf("%d tail events, stun %v, TailT %v: with no charge it should land at the press", count(ev, "tail"), g.P[1].StunT, g.P[0].TailT)
 	}
 }

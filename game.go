@@ -210,6 +210,11 @@ type Player struct {
 	WaveT  float64 `json:"wvt"`
 	WaveCD float64 `json:"wvcd"`
 	TailCD float64 `json:"tlcd"`
+	// The tail whip's wind-up: seconds left (0 = not winding up), and the aim it was started with (unit vector), which
+	// is also where the warning fan is drawn.
+	TailT float64 `json:"tlt"`
+	TailX float64 `json:"tlx"`
+	TailY float64 `json:"tly"`
 	// StunT is seconds left stunned (by the tail whip): like being frozen, it can neither move nor act.
 	StunT float64 `json:"sn"`
 }
@@ -491,7 +496,7 @@ func (g *Game) Step(dt float64) []Event {
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
 			p.FrostT, p.FBeamT = 0, 0                              // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
 			p.DriftT, p.TwistT, p.TwistRecT, p.ArrowT = 0, 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
-			p.WaveT = 0                                            // Gyarados's hop stops
+			p.WaveT, p.TailT = 0, 0                                // Gyarados's hop and wind-up stop
 		}
 		// Bound by a vine or paralyzed by a Volt Tackle: no walking and no movement skill (the others still work).
 		if p.BoundT > 0 || p.ParalyzeT > 0 {
@@ -564,7 +569,7 @@ func (g *Game) Step(dt float64) []Event {
 				}
 			}
 			punchBusy := p.PunchT > 0 || p.PunchLeft > 0 || p.PunchRecover > 0
-			if p.BeamT == 0 && p.SweepT == 0 && p.RechargeT == 0 && p.BeamCD == 0 && in.Beam && p.Z == 0 && !punchBusy {
+			if p.BeamT == 0 && p.SweepT == 0 && p.RechargeT == 0 && p.BeamCD == 0 && in.Beam && p.Z == 0 && !punchBusy && p.TailT == 0 {
 				dx, dy := other.X-p.X, other.Y-p.Y
 				n := math.Hypot(dx, dy)
 				if n < 1e-9 { // standing on the opponent: there is no direction, so use the facing

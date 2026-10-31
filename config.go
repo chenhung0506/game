@@ -385,15 +385,18 @@ type Config struct {
 			JumpDuration float64 `json:"jump_duration"`
 			Cooldown     float64 `json:"cooldown"` // counted from the start of the hop
 		} `json:"wave"`
-		// Tail whip (K): the opponent in a fan `angle` degrees wide (centred on it), up to `length` away, is knocked back
-		// `knockback` and stunned for `stun_duration` seconds (it can neither move nor act).
+		// Tail whip (K): Gyarados winds up for `charge_duration` seconds, rooted, with the fan it will hit drawn on the
+		// ground for the opponent to see (the aim is fixed when K is pressed; 0 = no wind-up, it hits at once). Then
+		// the opponent in the fan, `angle` degrees wide and up to `length` away, is knocked back `knockback` and
+		// stunned for `stun_duration` seconds (it can neither move nor act).
 		TailWhip struct {
 			Reach
-			Angle        float64 `json:"angle"`
-			Length       float64 `json:"length"`
-			Knockback    float64 `json:"knockback"`
-			StunDuration float64 `json:"stun_duration"`
-			Cooldown     float64 `json:"cooldown"`
+			ChargeDuration float64 `json:"charge_duration"`
+			Angle          float64 `json:"angle"`
+			Length         float64 `json:"length"`
+			Knockback      float64 `json:"knockback"`
+			StunDuration   float64 `json:"stun_duration"`
+			Cooldown       float64 `json:"cooldown"`
 		} `json:"tail_whip"`
 		// Its Hyper Beam (J): the same skill as Snorlax's, with numbers of its own.
 		HyperBeam HyperBeamCfg `json:"hyper_beam"`
@@ -607,6 +610,7 @@ func DefaultConfig() Config {
 	c.Gyarados.TailWhip.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	c.Gyarados.TailWhip.Angle, c.Gyarados.TailWhip.Length, c.Gyarados.TailWhip.Knockback = 90, 180, 200
 	c.Gyarados.TailWhip.StunDuration, c.Gyarados.TailWhip.Cooldown = 1.2, 6
+	c.Gyarados.TailWhip.ChargeDuration = 0.5
 	return c
 }
 
@@ -860,6 +864,7 @@ func (c Config) validate() error {
 		{"gyarados.tail_whip.knockback", c.Gyarados.TailWhip.Knockback},
 		{"gyarados.tail_whip.stun_duration", c.Gyarados.TailWhip.StunDuration},
 		{"gyarados.tail_whip.cooldown", c.Gyarados.TailWhip.Cooldown},
+		{"gyarados.tail_whip.charge_duration", c.Gyarados.TailWhip.ChargeDuration},
 		{"vulpix.frost_field.explosion_radius", c.Vulpix.FrostField.ExplosionRadius},
 		{"vulpix.frost_field.explosion_damage", float64(c.Vulpix.FrostField.ExplosionDamage)},
 	} {

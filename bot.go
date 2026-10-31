@@ -240,6 +240,15 @@ func (c *bctx) findThreat() threat {
 		}
 	}
 
+	if f.Kind == gyarados && f.TailT > 0 { // a tail whip winding up: its fan is where it was warned to be
+		tw := cfg.Gyarados.TailWhip
+		dx, dy := p.X-f.X, p.Y-f.Y
+		if d := math.Hypot(dx, dy); d <= tw.Length+c.pr && (d < 1e-9 || (dx*f.TailX+dy*f.TailY)/d >= math.Cos((tw.Angle/2+8)*math.Pi/180)) {
+			ax, ay := unit(dx, dy) // out of reach is the way out; a jump goes over it (it hits at the ground)
+			consider(threat{thPunch, f.TailT, ax, ay})
+		}
+	}
+
 	if f.Kind == snorlax && f.Z > 0 {
 		jp := cfg.Snorlax.Jump
 		if d := math.Hypot(p.X-f.X, p.Y-f.Y); d < jp.SlamRadius+c.pr+60 { // it steers in the air, so leave a margin

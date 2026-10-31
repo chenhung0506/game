@@ -95,7 +95,7 @@ let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice P
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let voltCfg = { radius: 16, uses: 3, window: 2 }; // Volt Tackle, from 'hi'
-let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2 }, evolveHops = 5; // Gyarados's, from 'hi'
+let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
 let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8 }; // Vulpix's, from 'hi'
 let arrowCfg = { radius: 8, hp: 2, slow: 2, count: 5, angle: 12, charge: 0.5, scale: 1 }, tornadoCfg = { radius: 50, hp: 40, charge: 0.4, lift: 200, scale: 1 }; // Rowlet's, from 'hi'
 const stormLook = [{ x: null, y: 0 }, { x: null, y: 0 }], fbLook = [{ x: null, y: 0 }, { x: null, y: 0 }]; // per slot: the smoothed storm position and beam end
@@ -845,6 +845,7 @@ const tele = document.createElement('canvas'); tele.width = arena.w; tele.height
 const teleCtx = tele.getContext('2d');
 function drawTelegraph() {
   for (const si of beamSlots()) drawFan(snap.p[si], disp[si]);
+  for (const si of slotsOf(7)) drawTailWarning(snap.p[si], disp[si]);
 }
 function drawFan(p, d) {
   if (!(p.bt > 0)) return;
@@ -1257,31 +1258,19 @@ function drawWave(f) {
 // the other (cocked back a little first, then fast and slowing), bent behind its tip the way a whip is, with a smear
 // of the sweep behind it. It pivots on Gyarados's middle; the body is drawn without its own tail meanwhile.
 const TAIL_SWING = 0.3; // seconds the tail takes to lash across
-function drawTailWhip(f) {
-  const k = Math.min(1, f.age / TAIL_SWING), fade = f.age <= TAIL_SWING ? 1 : Math.max(0, 1 - (f.age - TAIL_SWING) / 0.15);
-  const half = tailCfg.angle / 2 * Math.PI / 180, base = Math.atan2(f.dy || 0, f.dx || 0), L = f.r; // a zero component is left out of the event, hence the || 0
-  const cock = 0.12, from = base - half; // the first part of the swing winds back a little
-  const s2 = k < cock ? 0 : (k - cock) / (1 - cock); // 0..1 over the lash itself
-  const tip = k < cock ? from - half * 0.15 * Math.sin(Math.PI * k / cock) : from + 2 * half * (1 - Math.pow(1 - s2, 2.2)); // fast, then slow
-  const mid = tip - 0.9 * (1 - s2) * (k < cock ? 0 : 1); // the middle of the tail trails behind the tip
+// The tail itself, a thick red limb that narrows to a fan fin: from the pivot (x, y) out to `L`, pointing at angle `tip`, its
+// middle bent towards angle `mid` the way a whip trails behind its tip. Returns where the fin is (and which way it points).
+function drawTailLimb(x, y, L, tip, mid, alpha) {
   const thick = Math.max(8, radius[7] * 0.5);
-  const pt = (t) => { // a point along the tail, t 0..1: a curve from the pivot, bent towards where the tail has just been
-    const c1 = [f.x + Math.cos(mid) * L * 0.55, f.y + Math.sin(mid) * L * 0.55], p2 = [f.x + Math.cos(tip) * L * 0.97, f.y + Math.sin(tip) * L * 0.97];
-    return [(1 - t) * (1 - t) * f.x + 2 * (1 - t) * t * c1[0] + t * t * p2[0], (1 - t) * (1 - t) * f.y + 2 * (1 - t) * t * c1[1] + t * t * p2[1]];
+  const pt = (t) => { // a point along the tail, t 0..1: a curve from the pivot
+    const c1 = [x + Math.cos(mid) * L * 0.55, y + Math.sin(mid) * L * 0.55], p2 = [x + Math.cos(tip) * L * 0.97, y + Math.sin(tip) * L * 0.97];
+    return [(1 - t) * (1 - t) * x + 2 * (1 - t) * t * c1[0] + t * t * p2[0], (1 - t) * (1 - t) * y + 2 * (1 - t) * t * c1[1] + t * t * p2[1]];
   };
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  // where it can reach, and the smear the tail has left on the way
-  ctx.fillStyle = `rgba(255,170,80,${0.12 * fade})`; ctx.strokeStyle = `rgba(255,220,150,${0.35 * fade})`; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.arc(f.x, f.y, L, base - half, base + half); ctx.closePath(); ctx.fill(); ctx.stroke();
-  const sweep = ctx.createRadialGradient(f.x, f.y, L * 0.2, f.x, f.y, L);
-  sweep.addColorStop(0, `rgba(255,230,190,0)`); sweep.addColorStop(1, `rgba(255,236,200,${0.45 * fade})`);
-  ctx.fillStyle = sweep; ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.arc(f.x, f.y, L, from, Math.max(from, tip)); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = `rgba(255,250,230,${0.8 * fade})`; ctx.lineWidth = 5 * (1 - k) + 1; // the streak at the tip's end of the smear
-  ctx.beginPath(); ctx.arc(f.x, f.y, L * 0.95, Math.max(from, tip - 0.7), Math.max(from, tip)); ctx.stroke();
   // the tail: sampled along its curve, drawn fat to thin, dark outline under red, with a pale belly line
   const N = 16, pts = []; for (let i = 0; i <= N; i++) pts.push(pt(i / N));
   const w = (i) => thick * (1 - 0.7 * i / N);
-  ctx.globalAlpha = fade;
+  ctx.globalAlpha = alpha;
   for (const [col, extra] of [['#5c1014', 5], ['#d22a2a', 0]]) {
     for (let i = 0; i < N; i++) { ctx.strokeStyle = col; ctx.lineWidth = w(i + 0.5) + extra; ctx.beginPath(); ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[i + 1][0], pts[i + 1][1]); ctx.stroke(); }
   }
@@ -1297,9 +1286,49 @@ function drawTailWhip(f) {
   for (let q = 0; q <= 4; q++) { const ang = -1 + q * 0.5; ctx.moveTo(fin * 0.1, 0); ctx.lineTo(Math.cos(ang) * fin * 0.95, Math.sin(ang) * fin * 0.95); }
   ctx.stroke();
   ctx.restore();
+  ctx.restore();
+  return { tx, ty, ta, fin };
+}
+
+function drawTailWhip(f) {
+  const k = Math.min(1, f.age / TAIL_SWING), fade = f.age <= TAIL_SWING ? 1 : Math.max(0, 1 - (f.age - TAIL_SWING) / 0.15);
+  const half = tailCfg.angle / 2 * Math.PI / 180, base = Math.atan2(f.dy || 0, f.dx || 0), L = f.r; // a zero component is left out of the event, hence the || 0
+  const cock = 0.12, from = base - half; // the first part of the swing winds back a little
+  const s2 = k < cock ? 0 : (k - cock) / (1 - cock); // 0..1 over the lash itself
+  const tip = k < cock ? from - half * 0.15 * Math.sin(Math.PI * k / cock) : from + 2 * half * (1 - Math.pow(1 - s2, 2.2)); // fast, then slow
+  const mid = tip - 0.9 * (1 - s2) * (k < cock ? 0 : 1); // the middle of the tail trails behind the tip
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  // where it can reach, and the smear the tail has left on the way
+  ctx.fillStyle = `rgba(255,170,80,${0.12 * fade})`; ctx.strokeStyle = `rgba(255,220,150,${0.35 * fade})`; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.arc(f.x, f.y, L, base - half, base + half); ctx.closePath(); ctx.fill(); ctx.stroke();
+  const sweep = ctx.createRadialGradient(f.x, f.y, L * 0.2, f.x, f.y, L);
+  sweep.addColorStop(0, `rgba(255,230,190,0)`); sweep.addColorStop(1, `rgba(255,236,200,${0.45 * fade})`);
+  ctx.fillStyle = sweep; ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.arc(f.x, f.y, L, from, Math.max(from, tip)); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = `rgba(255,250,230,${0.8 * fade})`; ctx.lineWidth = 5 * (1 - k) + 1; // the streak at the tip's end of the smear
+  ctx.beginPath(); ctx.arc(f.x, f.y, L * 0.95, Math.max(from, tip - 0.7), Math.max(from, tip)); ctx.stroke();
+  ctx.restore();
+  const { tx, ty, ta, fin } = drawTailLimb(f.x, f.y, L, tip, mid, fade);
+  ctx.save(); ctx.lineCap = 'round';
   // the crack of it: white flashes at the tip while it is going fast
   if (k > cock && k < 0.7) { ctx.strokeStyle = `rgba(255,255,255,${0.9 * (1 - k)})`; ctx.lineWidth = 2; for (let q = -1; q <= 1; q++) { ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + Math.cos(ta + q * 0.9) * fin * 1.4, ty + Math.sin(ta + q * 0.9) * fin * 1.4); ctx.stroke(); } }
   ctx.restore();
+}
+
+// The tail whip winding up: the fan it will hit is drawn on the ground, where the opponent can see what to keep out of, filling
+// with colour as the wind-up runs out; a ring runs out to the edge of it so the moment of the hit can be read, and the tail is
+// cocked back at one side of the fan.
+function drawTailWarning(p, d) {
+  if (!(p.tlt > 0)) return;
+  const k = 1 - p.tlt / Math.max(tailCfg.charge, 1e-6), half = tailCfg.angle / 2 * Math.PI / 180, base = Math.atan2(p.tly, p.tlx), L = tailCfg.length;
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
+  ctx.save(); ctx.lineCap = 'round';
+  ctx.fillStyle = `rgba(255,70,40,${0.12 + 0.3 * k})`; ctx.strokeStyle = `rgba(255,${120 + 80 * pulse | 0},60,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.arc(d.x, d.y, L, base - half, base + half); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = `rgba(255,235,200,${0.35 + 0.4 * k})`; ctx.lineWidth = 2; // the ring that reaches the edge as it hits
+  ctx.beginPath(); ctx.arc(d.x, d.y, L * k, base - half, base + half); ctx.stroke();
+  ctx.restore();
+  const from = base - half, tip = from - half * 0.15 - 0.05 * pulse; // cocked back past the first edge, trembling
+  drawTailLimb(d.x, d.y, L * 0.9, tip, tip - 0.3, 0.95);
 }
 
 // Magikarp becomes Gyarados: a white flash that swells and drains away, with sparks flying out of it.
@@ -1800,7 +1829,7 @@ function drawPlayer(i, p) {
   const running = sp > 0.35;
   if (running && Math.hypot(lk.vx, lk.vy) > 0.3) lk.dir = faceOf(lk.vx, lk.vy);
   lk.mv += ((running ? 1 : 0) - lk.mv) * 0.25; lk.ph += 0.2 * lk.mv;
-  const pose = { dir: lk.dir, mv: lk.mv, ph: lk.ph, whip: p.k === 7 && p.tlcd > cdCfg.tail - TAIL_SWING }; // whip: its tail is out swinging, so the body is drawn without it
+  const pose = { dir: lk.dir, mv: lk.mv, ph: lk.ph, whip: p.k === 7 && (p.tlt > 0 || (p.tlcd <= cdCfg.tail - tailCfg.charge && p.tlcd > cdCfg.tail - tailCfg.charge - TAIL_SWING)) }; // whip: its tail is out (cocked, or lashing), so the body is drawn without it
   if (p.k === 3) { // the leaf grows for the Leaf Slash and is swung by it, upper left to lower right on the first, the other way on the next
     const sgn = p.ln % 2 === 0 ? 1 : -1, e = p.lk * p.lk * (3 - 2 * p.lk); // eased: the swing gathers speed and slows at the end
     lk.ls += ((p.lp > 0 ? leafCfg.scale : 1) - lk.ls) * 0.3;
