@@ -132,13 +132,13 @@
     "leaf_slash": {
       "min_height": 0,
       "max_height": 20,
-      "jump_distance": 240,
+      "jump_distance": 280,
       "jump_duration": 0.35,
       "jump_height": 40,
       "slashes": 5,
       "slash_interval": 0.3,
-      "slash_step": 55,
-      "slash_radius": 100,
+      "slash_step": 70,
+      "slash_radius": 120,
       "leaf_scale": 3,
       "damage": 7,
       "cooldown": 6
