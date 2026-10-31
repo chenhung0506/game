@@ -1132,21 +1132,38 @@ function drawIceBurst(f) {
   ctx.restore();
 }
 
-// The iceberg Vulpix rides: a chunk of ice under its feet, frost_field.radius x scale big (the scale is looks only; the server hits with the radius).
-function drawIceberg(d, t) {
-  const R = frostCfg.radius * frostCfg.scale;
-  ctx.save(); ctx.translate(d.x, d.y);
-  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, R * 0.12, R * 1.05, R * 0.5, 0, 0, 7); ctx.fill();
-  const pts = [];
-  for (let k = 0; k < 9; k++) { const ang = k * 0.698 + 0.2, rr = R * (0.82 + 0.18 * seeded(k * 7.3)); pts.push([Math.cos(ang) * rr, Math.sin(ang) * rr * 0.55]); }
-  const g = ctx.createLinearGradient(-R, -R * 0.5, R, R * 0.5);
-  g.addColorStop(0, 'rgba(245,253,255,.95)'); g.addColorStop(0.5, 'rgba(160,222,250,.9)'); g.addColorStop(1, 'rgba(95,170,230,.9)');
-  ctx.fillStyle = g; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
-  ctx.beginPath(); pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); // facets
-  for (let k = 0; k < 9; k += 2) { ctx.moveTo(0, -R * 0.08); ctx.lineTo(pts[k][0] * 0.8, pts[k][1] * 0.8); }
-  ctx.stroke();
-  ctx.restore();
+// The iceberg Vulpix rides: a little ice mountain, frost_field.radius x scale wide (the scale is looks only; the server hits
+// with the radius). It stands upright on screen whichever way the arena is turned: a platform of ice with three peaks
+// behind Vulpix, each lit on its left face and shaded on its right, snow on the tips.
+function drawIceberg(d, p) {
+  const R = frostCfg.radius * frostCfg.scale, t = performance.now() / 1000;
+  const by = (radius[p.k] || 14) * 0.9; // where Vulpix's feet are, below its centre
+  upright(d.x, d.y, () => {
+    ctx.translate(0, Math.sin(t * 9) * R * 0.015); // it rocks a little as it slides
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, by + R * 0.12, R * 1.15, R * 0.42, 0, 0, 7); ctx.fill();
+    // [centre x, half width, height] of the peaks, the small ones first so the big one overlaps them
+    for (const [cx, w, h, k] of [[-0.62, 0.5, 0.85, 1], [0.7, 0.42, 0.62, 2], [0.02, 0.62, 1.35, 3]]) {
+      const x = cx * R, hw = w * R, hh = h * R, ax = x + (seeded(k * 3.1) - 0.5) * hw * 0.4, ay = by - hh, rx = x + hw * 0.12;
+      ctx.beginPath(); ctx.moveTo(x - hw, by); ctx.lineTo(x - hw * 0.5, by - hh * 0.5); ctx.lineTo(ax - hw * 0.12, ay + hh * 0.12); ctx.lineTo(ax, ay); ctx.lineTo(rx, by); ctx.closePath();
+      let g = ctx.createLinearGradient(x - hw, ay, rx, by); g.addColorStop(0, '#f4fdff'); g.addColorStop(1, '#a9defa');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(rx, by); ctx.lineTo(ax, ay); ctx.lineTo(ax + hw * 0.18, ay + hh * 0.3); ctx.lineTo(x + hw * 0.55, by - hh * 0.5); ctx.lineTo(x + hw, by); ctx.closePath();
+      g = ctx.createLinearGradient(ax, ay, x + hw, by); g.addColorStop(0, '#7cc4ee'); g.addColorStop(1, '#3f86c9');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = Math.max(1, R * 0.025);
+      ctx.beginPath(); ctx.moveTo(x - hw, by); ctx.lineTo(x - hw * 0.5, by - hh * 0.5); ctx.lineTo(ax - hw * 0.12, ay + hh * 0.12); ctx.lineTo(ax, ay); ctx.lineTo(ax + hw * 0.18, ay + hh * 0.3); ctx.lineTo(x + hw * 0.55, by - hh * 0.5); ctx.lineTo(x + hw, by); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(rx, by); ctx.stroke(); // the ridge between the faces
+      ctx.fillStyle = 'rgba(255,255,255,.96)'; // snow on the tip
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax - hw * 0.3, ay + hh * 0.27); ctx.lineTo(ax - hw * 0.08, ay + hh * 0.2); ctx.lineTo(ax + hw * 0.1, ay + hh * 0.31); ctx.lineTo(ax + hw * 0.3, ay + hh * 0.28); ctx.closePath(); ctx.fill();
+    }
+    // the platform the mountain stands on, with Vulpix in front of it
+    const g = ctx.createLinearGradient(-R, by, R, by + R * 0.3); g.addColorStop(0, '#e8f9ff'); g.addColorStop(0.6, '#9ad4f4'); g.addColorStop(1, '#5aa2dc');
+    ctx.fillStyle = g; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = Math.max(1.5, R * 0.03);
+    ctx.beginPath(); ctx.ellipse(0, by + R * 0.06, R * 1.08, R * 0.34, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = Math.max(1, R * 0.02);
+    ctx.beginPath(); ctx.ellipse(0, by + R * 0.06, R * 0.7, R * 0.2, 0, 0, 7); ctx.stroke();
+  });
 }
 
 // Thunder: a dark circle the size of the strike area sits where the bolt will land.
@@ -1637,7 +1654,7 @@ function drawPlayer(i, p) {
     ctx.fillStyle = `rgba(0,0,0,${0.35 - 0.2 * lift})`;
     ctx.beginPath(); ctx.ellipse(0, 14 * bs, 18 * bs * (1 - 0.4 * lift), 7 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.fill();
   });
-  if (p.k === 4 && p.yt > 0) drawIceberg(d);
+  if (p.k === 4 && p.yt > 0) drawIceberg(d, p);
   drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose, p.tw === 1 ? performance.now() / 1000 * 14 : 0); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
   if (p.bd > 0) drawBound(d, p);
