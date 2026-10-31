@@ -237,7 +237,8 @@ type Config struct {
 		// height inside min_height..max_height) walks `boost` faster on its owner's frost and `slow` slower (a
 		// fraction, 0..1) on the other player's. When the iceberg touches the opponent it bursts: `contact_damage`,
 		// then `explosion_damage` to whoever is within `explosion_radius` of it (the same two blows as the Electro
-		// Ball); when the ride runs out it bursts the same way without the contact blow. The ride is over once it bursts.
+		// Ball); when the ride runs out it bursts the same way without the contact blow. The ride is over once it bursts,
+		// and the burst leaves a patch of frost `explosion_radius` wide (it slows like the trail).
 		FrostField struct {
 			Reach
 			SprayDuration   float64 `json:"spray_duration"` // how long the ride lasts

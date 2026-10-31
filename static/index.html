@@ -1260,7 +1260,7 @@ const seeded = (n) => { const v = Math.sin(n * 127.1) * 43758.5453; return v - M
 // A patch grows in over a quarter of a second and fades out over its last second and a half.
 function drawFrost() {
   for (const f of snap.f || []) {
-    const age = frostCfg.duration - f.l, grow = Math.min(1, age / 0.25), a = Math.min(1, f.l / 1.5) * grow, R = frostCfg.radius * (0.5 + 0.5 * grow * (2 - grow));
+    const age = frostCfg.duration - f.l, grow = Math.min(1, age / 0.25), a = Math.min(1, f.l / 1.5) * grow, R = (f.r || frostCfg.radius) * (0.5 + 0.5 * grow * (2 - grow));
     const mine = f.o === you, rim = mine ? '120,225,255' : '190,160,255', sd = f.x * 0.37 + f.y * 0.91;
     ctx.save();
     const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R);

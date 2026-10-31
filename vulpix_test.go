@@ -166,6 +166,63 @@ func TestIcebergBurstsOnTheOpponentWithBothBlowsAndTheRideIsOver(t *testing.T) {
 	}
 }
 
+func TestTheBurstLeavesAPatchOfFrostAsWideAsTheExplosionThatSlowsTheOpponent(t *testing.T) {
+	cfg := vulpixConfig()
+	fs := cfg.Vulpix.FrostField
+	for _, c := range []struct {
+		name string
+		foeX float64 // 600 = in the way (a contact burst), 1500 = out of the way (the ride runs out)
+	}{{"on contact", 600}, {"at the end of the ride", 1500}} {
+		g := vg(cfg)
+		g.P[1].X, g.P[1].Y = c.foeX, 250
+		if c.foeX > 900 {
+			g.P[1].Y = 700
+		}
+		ride(g, 0, Input{Skill: true, DX: 1})
+		var big *Frost
+		for i := range g.Frost {
+			if g.Frost[i].R > 0 {
+				if big != nil {
+					t.Fatalf("%s: two bursts' worth of frost", c.name)
+				}
+				big = &g.Frost[i]
+			}
+		}
+		if big == nil || big.R != fs.ExplosionRadius || big.Owner != 0 || big.Left > fs.Duration || big.Left < fs.Duration-0.2 ||
+			math.Hypot(big.X-g.P[0].X, big.Y-g.P[0].Y) > 1e-9 {
+			t.Fatalf("%s: patch %+v, want one %v wide owned by Vulpix where it burst (%v,%v), lasting %v", c.name, big, fs.ExplosionRadius, g.P[0].X, g.P[0].Y, fs.Duration)
+		}
+		// the opponent walks slower anywhere inside it, and not outside it
+		g.Frost = []Frost{*big}
+		for _, p := range []struct {
+			dx   float64
+			slow bool
+		}{{big.R - 1, true}, {big.R + 1, false}} {
+			g.P[1].X, g.P[1].Y, g.P[1].Z = big.X+p.dx, big.Y, 0
+			want := 1.0
+			if p.slow {
+				want = 1 - fs.Slow
+			}
+			if f := g.frostFactor(1); math.Abs(f-want) > 1e-9 {
+				t.Errorf("%s: factor %v at %v from the middle, want %v", c.name, f, p.dx, want)
+			}
+		}
+	}
+}
+
+func TestNoExplosionRadiusMeansNoFrostFromTheBurst(t *testing.T) {
+	cfg := vulpixConfig()
+	cfg.Vulpix.FrostField.ExplosionRadius = 0
+	g := vg(cfg)
+	g.P[1].Y = 700
+	ride(g, 0, Input{Skill: true, DX: 1})
+	for _, f := range g.Frost {
+		if f.R != 0 {
+			t.Fatalf("a patch %+v although the explosion has no radius", f)
+		}
+	}
+}
+
 func TestIcebergPassesOverAnOpponentAboveTheBand(t *testing.T) {
 	cfg := vulpixConfig()
 	cfg.Vulpix.FrostField.Reach = Reach{MinHeight: 0, MaxHeight: 15}

@@ -67,6 +67,9 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 			if p.FrostT -= step; touched || p.FrostT < 1e-9 {
 				p.FrostT = 0
 				events = append(events, Event{T: "iceburst", X: p.X, Y: p.Y, R: fs.ExplosionRadius})
+				if fs.ExplosionRadius > 0 { // the blast leaves a patch of frost as wide as itself
+					g.layFrostOf(i, p.X, p.Y, fs.ExplosionRadius)
+				}
 				if fs.Reach.hits(other) && math.Hypot(other.X-p.X, other.Y-p.Y) <= fs.ExplosionRadius+g.radius(1-i) {
 					g.hit(other, fs.ExplosionDamage)
 				}
@@ -169,7 +172,11 @@ func (g *Game) frostFactor(i int) float64 {
 	}
 	own, foe := false, false
 	for _, f := range g.Frost {
-		if math.Hypot(p.X-f.X, p.Y-f.Y) <= fs.Radius {
+		w := fs.Radius
+		if f.R > 0 {
+			w = f.R
+		}
+		if math.Hypot(p.X-f.X, p.Y-f.Y) <= w {
 			own, foe = own || f.Owner == i, foe || f.Owner != i
 		}
 	}
@@ -186,9 +193,12 @@ func (g *Game) frostFactor(i int) float64 {
 // maxFrost bounds the bits of frost on the court, whatever the config says (the oldest are dropped first).
 const maxFrost = 1500
 
-// layFrost leaves a bit of slot i's frost at (x, y).
-func (g *Game) layFrost(i int, x, y float64) {
-	g.Frost = append(g.Frost, Frost{Owner: i, X: x, Y: y, Left: g.cfg.Vulpix.FrostField.Duration})
+// layFrost leaves a bit of slot i's trail at (x, y).
+func (g *Game) layFrost(i int, x, y float64) { g.layFrostOf(i, x, y, 0) }
+
+// layFrostOf leaves slot i's frost, r wide (0 = as wide as the trail), at (x, y).
+func (g *Game) layFrostOf(i int, x, y, r float64) {
+	g.Frost = append(g.Frost, Frost{Owner: i, X: x, Y: y, R: r, Left: g.cfg.Vulpix.FrostField.Duration})
 	if over := len(g.Frost) - maxFrost; over > 0 {
 		g.Frost = g.Frost[over:]
 	}

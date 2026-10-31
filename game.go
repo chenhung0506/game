@@ -251,7 +251,8 @@ type Frost struct {
 	Owner int     `json:"o"`
 	X     float64 `json:"x"`
 	Y     float64 `json:"y"`
-	Left  float64 `json:"l"` // seconds before it melts
+	Left  float64 `json:"l"`           // seconds before it melts
+	R     float64 `json:"r,omitempty"` // how wide it is; 0 = the trail's width, frost_field.radius
 }
 
 // Event is a one-shot effect the client plays (ring, screen shake).
