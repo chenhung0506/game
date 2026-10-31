@@ -246,6 +246,7 @@ type Config struct {
 			Slow            float64 `json:"slow"`
 			Boost           float64 `json:"boost"`
 			Radius          float64 `json:"radius"`
+			Scale           float64 `json:"scale"` // how big the iceberg under Vulpix is drawn, times radius; looks only, the reach is radius
 			SlideSpeed      float64 `json:"slide_speed"`
 			ContactDamage   int     `json:"contact_damage"`
 			ExplosionRadius float64 `json:"explosion_radius"` // from the iceberg's centre, plus the body's radius
@@ -480,6 +481,7 @@ func DefaultConfig() Config {
 	c.Vulpix.FrostField.Slow = 0.5
 	c.Vulpix.FrostField.Boost = 0.5
 	c.Vulpix.FrostField.Radius = 40
+	c.Vulpix.FrostField.Scale = 1
 	c.Vulpix.FrostField.SlideSpeed = 450
 	c.Vulpix.FrostField.ContactDamage = 10
 	c.Vulpix.FrostField.ExplosionRadius = 120
@@ -632,6 +634,7 @@ func (c Config) validate() error {
 		{"vulpix.frost_field.duration", c.Vulpix.FrostField.Duration, 0},
 		{"vulpix.frost_field.radius", c.Vulpix.FrostField.Radius, 0},
 		{"vulpix.frost_field.slide_speed", c.Vulpix.FrostField.SlideSpeed, 0},
+		{"vulpix.frost_field.scale", c.Vulpix.FrostField.Scale, 0},
 		{"vulpix.ice_storm.radius", c.Vulpix.IceStorm.Radius, 0},
 		{"vulpix.ice_storm.strikes", float64(c.Vulpix.IceStorm.Strikes), 0},
 		{"vulpix.ice_storm.freeze_hits", float64(c.Vulpix.IceStorm.FreezeHits), 0},

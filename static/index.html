@@ -91,7 +91,7 @@ let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice P
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let voltCfg = { radius: 16, uses: 3, window: 2 }; // Volt Tackle, from 'hi'
-let frostCfg = { radius: 40, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8 }; // Vulpix's, from 'hi'
+let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8 }; // Vulpix's, from 'hi'
 let arrowCfg = { radius: 8, hp: 2, slow: 2, count: 5, angle: 12, charge: 0.5, scale: 1 }, tornadoCfg = { radius: 50, hp: 40, charge: 0.4, lift: 200, scale: 1 }; // Rowlet's, from 'hi'
 const stormLook = [{ x: null, y: 0 }, { x: null, y: 0 }], fbLook = [{ x: null, y: 0 }, { x: null, y: 0 }]; // per slot: the smoothed storm position and beam end
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
@@ -103,9 +103,6 @@ const smoke = []; // puffs rising off Snorlax while it recharges
 const flames = []; // fading flames Charizard leaves while it runs with a catch
 let smokeAcc = 0;
 
-const query = new URLSearchParams(location.search);
-let room = query.get('room');
-if (!room) { room = Math.random().toString(36).slice(2, 8); query.set('room', room); location.replace('?' + query); }
 
 const bar = document.getElementById('bar');
 const cv = document.getElementById('c');
@@ -118,7 +115,7 @@ const look = [{ dir: null, vx: 0, vy: 0, mv: 0, ph: 0, ls: 1, la: 0 }, { dir: nu
 const disp = [{ x: null, y: 0, z: 0 }, { x: null, y: 0, z: 0 }]; // smoothed positions; set from the first snapshot
 let fx = [], shake = 0;
 
-const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?room=' + room + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // the first player's view picks the court
+const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?mode=' + (PORTRAIT ? 'mobile' : 'web')); // no room to name: the server puts you with whoever is waiting, or opens one; the first player's view picks the court
 let picks = [-1, -1], here = [true, false], bots = [-1, -1], padKind = -1; // bots: the character a computer plays in each slot (-1 = a person or nobody)
 let ease = [0, 0]; // each slot's handicap in percent, from the lobby
 let teamMode = false, teamSize = 6, myOrder = [], sentOrder = ''; // the lobby's match type; the order I field my characters in, and the one the server has
@@ -223,18 +220,17 @@ function showPick() {
   document.getElementById('botOff').style.display = vsComputer ? '' : 'none';
   document.getElementById('tOk').disabled = myOrder.length !== teamSize || myOrder.join() === sentOrder;
   document.getElementById('tClear').disabled = !myOrder.length;
-  const link = location.origin + location.pathname + '?room=' + room;
   const mine = picks[you], theirs = picks[1 - you];
   const lines = [];
   if (teamMode) {
-    if (!here[1 - you]) lines.push(`等待對手加入… 把這個連結傳給對方：<br><code>${link}</code>`);
+    if (!here[1 - you]) lines.push('等待對手加入… 有人上線就會自動配對');
     if (sentOrder) lines.push(`你的出場順序：${sentOrder.split(',').map((k) => NAMES[k]).join(' → ')}${picks[1 - you] >= 0 ? '' : '（等對手排好順序…）'}`);
     else lines.push(`依序點選 ${teamSize} 隻，決定出場順序（點已排的可以取消）；${here[1 - you] && picks[1 - you] >= 0 ? '對手已經排好了' : '雙方都確認後開打'}`);
     lines.push('一隻被打倒就換下一隻上場，活著的角色保留剩下的血量，一方的隊伍全部倒下就輸了');
     document.getElementById('pickmsg').innerHTML = lines.join('<br>');
     return;
   }
-  if (!here[1 - you]) lines.push(`等待對手加入… 把這個連結傳給對方：<br><code>${link}</code><br>（電腦橫式版：在自己的網址後面加上 &landscape）<br>沒有人可以一起玩？按上面的「單機」和電腦對戰`);
+  if (!here[1 - you]) lines.push('等待對手加入… 有人上線就會自動配對（來了就直接開打）<br>（電腦橫式版：在網址後面加上 ?landscape）<br>等不到人？按上面的「單機」先和電腦對戰，有人來就會換成真人');
   else if (mine < 0 && theirs >= 0) lines.push(vsComputer ? `電腦玩${NAMES[theirs]}，換你選` : `對手選了${NAMES[theirs]}，換你選（可以選一樣的）`);
   else if (mine >= 0 && theirs < 0) lines.push('對手選擇中…');
   if (mine >= 0) lines.push(`你選了${NAMES[mine]}（對手還沒選好以前，可以重選；兩人可以選同一隻）`);
@@ -1136,9 +1132,9 @@ function drawIceBurst(f) {
   ctx.restore();
 }
 
-// The iceberg Vulpix rides: a chunk of ice as big as the one the server hits with (frost_field.radius), under its feet.
+// The iceberg Vulpix rides: a chunk of ice under its feet, frost_field.radius x scale big (the scale is looks only; the server hits with the radius).
 function drawIceberg(d, t) {
-  const R = frostCfg.radius;
+  const R = frostCfg.radius * frostCfg.scale;
   ctx.save(); ctx.translate(d.x, d.y);
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, R * 0.12, R * 1.05, R * 0.5, 0, 0, 7); ctx.fill();
   const pts = [];
@@ -1780,8 +1776,7 @@ function frame() {
   ctx.restore();
   document.getElementById('repick').style.display = snap && snap.w >= 0 && (!snap.tm || snap.tm.o) ? 'block' : 'none';
 
-  const link = location.origin + location.pathname + '?room=' + room;
-  bar.innerHTML = waiting ? `等待對手加入… 把這個連結傳給對方：<br><code>${link}</code><br>（電腦橫式版：在自己的網址後面加上 &landscape）` : status === '連線中…' ? '' : status;
+  bar.innerHTML = waiting ? '等待對手加入… 有人上線就會自動配對<br>（電腦橫式版：在網址後面加上 ?landscape）' : status === '連線中…' ? '' : status;
   requestAnimationFrame(frame);
 }
 frame();

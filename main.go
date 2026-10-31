@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"regexp"
+	"strconv"
 	"sync"
 	"time"
 
@@ -14,14 +14,12 @@ import (
 
 const (
 	tickRate   = 30
-	maxRooms   = 1000            // rooms live in memory and anyone can open one
+	maxRooms   = 1000            // rooms live in memory and every player nobody can be matched with opens one
 	roundReset = 2 * time.Second // between two bouts of a team match
 	resultHold = 6 * time.Second // how long the result stays up before the next match starts by itself; the repick button works meanwhile
 	pongWait   = 60 * time.Second
 	pingEvery  = 20 * time.Second
 )
-
-var roomIDRe = regexp.MustCompile(`^[a-z0-9]{1,16}$`)
 
 // CheckOrigin is left nil: gorilla then only accepts same-origin browsers.
 var upgrader = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
@@ -32,6 +30,9 @@ type client struct {
 }
 
 type room struct {
+	id      string // the server's own number for it (never shown to players)
+	n       int    // counts the rooms opened, so the longest-waiting one is the lowest
+	mode    string // the view it was opened from
 	mu      sync.Mutex
 	g       *Game
 	c       [2]*client
@@ -56,21 +57,48 @@ type hub struct {
 	mu    sync.Mutex
 	rooms map[string]*room
 	cfg   Config
+	seq   int // rooms opened so far
 }
 
 func newHub(cfg Config) *hub { return &hub{rooms: map[string]*room{}, cfg: cfg} }
 
-// join claims a slot in the room. Lock order is always hub.mu -> room.mu.
-func (h *hub) join(id, mode string, c *client) (r *room, idx int, ok bool) {
+// waiting is the room a newcomer is put in: one with a single person in it (who may be playing the computer),
+// the one that has waited longest, preferring one opened from the newcomer's own view. Must be called with h.mu held.
+func (h *hub) waiting(mode string) *room {
+	var best *room
+	better := func(r *room) bool {
+		switch {
+		case best == nil:
+			return true
+		case (r.mode == mode) != (best.mode == mode):
+			return r.mode == mode
+		}
+		return r.n < best.n
+	}
+	for _, r := range h.rooms {
+		r.mu.Lock()
+		single := (r.c[0] == nil) != (r.c[1] == nil)
+		r.mu.Unlock()
+		if single && better(r) {
+			best = r
+		}
+	}
+	return best
+}
+
+// join seats a newcomer. Nobody picks a room: whoever is alone in one is matched with the newcomer, which ends
+// any game that person was playing against the computer; with nobody waiting the newcomer opens a room.
+// Lock order is always hub.mu -> room.mu.
+func (h *hub) join(mode string, c *client) (r *room, idx int, ok bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	r = h.rooms[id]
-	if r == nil {
+	if r = h.waiting(mode); r == nil {
 		if len(h.rooms) >= maxRooms {
 			return nil, 0, false
 		}
-		r = &room{g: NewGameFor(h.cfg, mode), winner: -1, pick: [2]int{-1, -1}}
-		h.rooms[id] = r
+		h.seq++
+		r = &room{id: strconv.Itoa(h.seq), n: h.seq, mode: mode, g: NewGameFor(h.cfg, mode), winner: -1, pick: [2]int{-1, -1}}
+		h.rooms[r.id] = r
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -93,7 +121,7 @@ func (h *hub) join(id, mode string, c *client) (r *room, idx int, ok bool) {
 	return nil, 0, false
 }
 
-func (h *hub) leave(id string, r *room, idx int) {
+func (h *hub) leave(r *room, idx int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	r.mu.Lock()
@@ -105,7 +133,7 @@ func (h *hub) leave(id string, r *room, idx int) {
 	r.pick[idx] = -1
 	r.matchOver = false
 	if r.c[0] == nil && r.c[1] == nil { // nobody is left to play: a computer does not keep a room alive
-		delete(h.rooms, id)
+		delete(h.rooms, r.id)
 		return
 	}
 	// The remaining player keeps its pick and waits in the lobby for a new opponent, who picks something else.
@@ -411,11 +439,6 @@ func (r *room) step(now time.Time) []byte {
 }
 
 func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
-	id := req.URL.Query().Get("room")
-	if !roomIDRe.MatchString(id) {
-		http.Error(w, "bad room id", http.StatusBadRequest)
-		return
-	}
 	mode := req.URL.Query().Get("mode") // the view the player opened the page in; it only matters to whoever opens the room
 	if mode == "" {
 		mode = modeMobile
@@ -429,7 +452,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	c := &client{conn: conn, send: make(chan []byte, 8)}
-	r, idx, ok := h.join(id, mode, c)
+	r, idx, ok := h.join(mode, c)
 	if !ok {
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"t":"full"}`))
 		conn.Close()
@@ -445,7 +468,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		// per character: pikachu, snorlax, charizard, chikorita, vulpix, rowlet
 		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius},
 		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP},
-		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "duration": cfg.Vulpix.FrostField.Duration, "ride": cfg.Vulpix.FrostField.SprayDuration},
+		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "scale": cfg.Vulpix.FrostField.Scale, "duration": cfg.Vulpix.FrostField.Duration, "ride": cfg.Vulpix.FrostField.SprayDuration},
 		"storm":   map[string]float64{"radius": cfg.Vulpix.IceStorm.Radius, "interval": cfg.Vulpix.IceStorm.Interval, "strikes": float64(cfg.Vulpix.IceStorm.Strikes)},
 		"fbeam":   map[string]float64{"len": cfg.Vulpix.FreezeBeam.Length, "control": cfg.Vulpix.FreezeBeam.ControlDuration, "pillar": cfg.Vulpix.FreezeBeam.PillarRadius, "hp": float64(cfg.Vulpix.FreezeBeam.PillarHP), "life": cfg.Vulpix.FreezeBeam.PillarDuration},
 		"flyhigh": cfg.Rowlet.FlyHigh,
@@ -473,7 +496,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	r.broadcastLobby() // both players learn who joined
 	r.mu.Unlock()
 
-	defer h.leave(id, r, idx)
+	defer h.leave(r, idx)
 	conn.SetReadLimit(512)
 	conn.SetReadDeadline(time.Now().Add(pongWait))
 	conn.SetPongHandler(func(string) error {

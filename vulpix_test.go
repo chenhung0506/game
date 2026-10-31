@@ -882,6 +882,7 @@ func TestVulpixConfigLoadsAndRefusesBadValues(t *testing.T) {
 	for name, mut := range map[string]func(c *Config){
 		"vulpix.frost_field.slow":             func(c *Config) { c.Vulpix.FrostField.Slow = 1.5 },
 		"vulpix.frost_field.slide_speed":      func(c *Config) { c.Vulpix.FrostField.SlideSpeed = 0 },
+		"vulpix.frost_field.scale":            func(c *Config) { c.Vulpix.FrostField.Scale = 0 },
 		"vulpix.frost_field.contact_damage":   func(c *Config) { c.Vulpix.FrostField.ContactDamage = -1 },
 		"vulpix.frost_field.explosion_radius": func(c *Config) { c.Vulpix.FrostField.ExplosionRadius = -1 },
 		"vulpix.frost_field.explosion_damage": func(c *Config) { c.Vulpix.FrostField.ExplosionDamage = -1 },

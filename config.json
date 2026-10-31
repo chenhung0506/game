@@ -184,6 +184,7 @@
       "slow": 0.5,
       "boost": 1,
       "radius": 30,
+      "scale": 3,
       "slide_speed": 400,
       "contact_damage": 8,
       "explosion_radius": 150,

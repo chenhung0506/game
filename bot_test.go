@@ -584,7 +584,7 @@ func TestTheComputerCanBeSentAway(t *testing.T) {
 func TestAPersonJoiningTakesTheComputersPlace(t *testing.T) {
 	h := newHub(DefaultConfig())
 	c0 := &client{send: make(chan []byte, 8)}
-	r, idx, ok := h.join("a", modeWeb, c0)
+	r, idx, ok := h.join(modeWeb, c0)
 	if !ok || idx != 0 {
 		t.Fatal("first join failed")
 	}
@@ -593,27 +593,27 @@ func TestAPersonJoiningTakesTheComputersPlace(t *testing.T) {
 	r.choose(0, pikachu)
 	r.mu.Unlock()
 	c1 := &client{send: make(chan []byte, 8)}
-	r2, idx2, ok := h.join("a", modeWeb, c1)
+	r2, idx2, ok := h.join(modeWeb, c1)
 	if !ok || r2 != r || idx2 != 1 {
 		t.Fatalf("second person: room same %v slot %d ok %v", r2 == r, idx2, ok)
 	}
 	if r.bot[1] != nil || r.pick[1] != -1 || r.playing() {
 		t.Fatalf("the computer stayed: bot %v pick %v playing %v", r.bot, r.pick, r.playing())
 	}
-	if _, _, ok := h.join("a", modeWeb, &client{send: make(chan []byte, 8)}); ok {
-		t.Fatal("a third person got in")
+	if r3, idx3, ok := h.join(modeWeb, &client{send: make(chan []byte, 8)}); !ok || r3 == r || idx3 != 0 {
+		t.Fatalf("a third person: ok %v, same room %v, slot %d: it should open a room of its own", ok, r3 == r, idx3)
 	}
 }
 
 func TestTheRoomIsGoneWhenTheOnlyPersonLeaves(t *testing.T) {
 	h := newHub(DefaultConfig())
-	r, idx, _ := h.join("a", modeWeb, &client{send: make(chan []byte, 8)})
+	r, idx, _ := h.join(modeWeb, &client{send: make(chan []byte, 8)})
 	r.mu.Lock()
 	r.setBot(idx, snorlax)
 	r.choose(idx, pikachu)
 	r.mu.Unlock()
-	h.leave("a", r, idx)
-	if _, ok := h.rooms["a"]; ok {
+	h.leave(r, idx)
+	if len(h.rooms) != 0 {
 		t.Fatal("a room with only a computer in it stayed")
 	}
 	r.mu.Lock()
@@ -760,5 +760,94 @@ func TestTheBotDoesNotRootItselfWhileArrowsAreBeingAimed(t *testing.T) {
 		if in, ok := firstAct(b, g, 0, 30); ok && (in.Ball || in.Thunder || in.Punch || in.Beam) {
 			t.Errorf("%s pressed %+v while the volley was being aimed", NAMEOF[kind], in)
 		}
+	}
+}
+
+// ---- matchmaking: nobody picks a room ----
+
+func person() *client { return &client{send: make(chan []byte, 8)} }
+
+func TestWhoeverIsAloneGetsTheNextPlayerAndThenTheRoomIsFull(t *testing.T) {
+	h := newHub(DefaultConfig())
+	a, ai, _ := h.join(modeWeb, person())
+	b, bi, _ := h.join(modeWeb, person())
+	c, ci, _ := h.join(modeWeb, person())
+	d, di, _ := h.join(modeWeb, person())
+	e, ei, _ := h.join(modeWeb, person())
+	if a != b || ai != 0 || bi != 1 {
+		t.Fatalf("the second player should join the first's room as slot 1 (same room %v, slots %d %d)", a == b, ai, bi)
+	}
+	if c == a || ci != 0 || d != c || di != 1 {
+		t.Fatalf("the third opens a room, the fourth joins it (c same as a %v, slots %d %d, d same as c %v)", c == a, ci, di, d == c)
+	}
+	if e == a || e == c || ei != 0 || len(h.rooms) != 3 {
+		t.Fatalf("the fifth opens a third room (%d rooms, slot %d)", len(h.rooms), ei)
+	}
+}
+
+func TestTheLongestWaitingRoomIsFilledFirstAndOwnViewBreaksTies(t *testing.T) {
+	h := newHub(DefaultConfig())
+	a, ai, _ := h.join(modeMobile, person())
+	_, _, _ = h.join(modeWeb, person()) // pairs with a
+	c, ci, _ := h.join(modeWeb, person())
+	_, _, _ = h.join(modeMobile, person()) // pairs with c
+	h.leave(a, ai)
+	h.leave(c, ci) // both rooms have one person left: a's opened from a phone, c's from the web, a's the older
+	if a.mode != modeMobile || c.mode != modeWeb || a.n >= c.n {
+		t.Fatalf("the scene is not what the test needs: %v %v %d %d", a.mode, c.mode, a.n, c.n)
+	}
+	if r, _, _ := h.join(modeWeb, person()); r != c {
+		t.Fatal("a player on the web should be put in the room opened from the web, although the other waited longer")
+	}
+	if r, _, _ := h.join(modeWeb, person()); r != a {
+		t.Fatal("the next one has no room of its own view to pick, so it goes to the one that is left")
+	}
+}
+
+func TestOfTwoWaitingRoomsTheOlderIsFilledFirst(t *testing.T) {
+	h := newHub(DefaultConfig())
+	a, ai, _ := h.join(modeWeb, person())
+	h.join(modeWeb, person())
+	c, ci, _ := h.join(modeWeb, person())
+	h.join(modeWeb, person())
+	h.leave(a, ai)
+	h.leave(c, ci)
+	for i, want := range []*room{a, c} {
+		if r, _, _ := h.join(modeWeb, person()); r != want {
+			t.Fatalf("newcomer %d went to the wrong room (the older one first)", i)
+		}
+	}
+}
+
+func TestMatchingEndsTheGameAgainstTheComputer(t *testing.T) {
+	h := newHub(DefaultConfig())
+	r, idx, _ := h.join(modeWeb, person())
+	r.mu.Lock()
+	r.setBot(idx, snorlax)
+	r.choose(idx, pikachu)
+	if !r.playing() || r.bot[1-idx] == nil {
+		t.Fatal("the match against the computer did not start")
+	}
+	r.mu.Unlock()
+	r2, _, _ := h.join(modeWeb, person())
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r2 != r || r.bot[0] != nil || r.bot[1] != nil || r.playing() {
+		t.Fatalf("the newcomer should take the computer's place and send both to the lobby (bot %v, playing %v)", r.bot, r.playing())
+	}
+	if r.setBot(idx, snorlax) {
+		t.Fatal("the computer was allowed back with two people in the room")
+	}
+}
+
+func TestARoomWithOnlyTheComputerLeftIsGoneSoNobodyIsMatchedWithIt(t *testing.T) {
+	h := newHub(DefaultConfig())
+	r, idx, _ := h.join(modeWeb, person())
+	r.mu.Lock()
+	r.setBot(idx, snorlax)
+	r.mu.Unlock()
+	h.leave(r, idx)
+	if r2, _, _ := h.join(modeWeb, person()); r2 == r {
+		t.Fatal("a newcomer was put in a room nobody is in")
 	}
 }

@@ -11,17 +11,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func dial(t *testing.T, srv *httptest.Server, room string) *websocket.Conn {
+func dial(t *testing.T, srv *httptest.Server) *websocket.Conn {
 	t.Helper()
-	return dialIn(t, srv, room, "")
+	return dialIn(t, srv, "")
 }
 
-// dialIn opens the socket the way the page does from a given view ("mobile", "web" or "" for none).
-func dialIn(t *testing.T, srv *httptest.Server, room, mode string) *websocket.Conn {
+// dialIn opens the socket the way the page does from a given view ("mobile", "web" or "" for none). Nobody names a
+// room: the server puts the player with whoever is waiting, or opens a room.
+func dialIn(t *testing.T, srv *httptest.Server, mode string) *websocket.Conn {
 	t.Helper()
-	url := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws?room=" + room
+	url := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws"
 	if mode != "" {
-		url += "&mode=" + mode
+		url += "?mode=" + mode
 	}
 	c, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
@@ -69,9 +70,9 @@ func lobbyWith(t *testing.T, c *websocket.Conn, want [2]int) {
 }
 
 // startMatch connects two players to a room and has them pick the given characters.
-func startMatch(t *testing.T, srv *httptest.Server, room string, ka, kb int) (a, b *websocket.Conn) {
+func startMatch(t *testing.T, srv *httptest.Server, ka, kb int) (a, b *websocket.Conn) {
 	t.Helper()
-	a, b = dial(t, srv, room), dial(t, srv, room)
+	a, b = dial(t, srv), dial(t, srv)
 	pick(t, a, ka)
 	pick(t, b, kb)
 	next(t, a, "s")
@@ -79,11 +80,11 @@ func startMatch(t *testing.T, srv *httptest.Server, room string, ka, kb int) (a,
 	return a, b
 }
 
-func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
+func TestTwoPlayersMatchAndTheThirdWaitsInARoomOfItsOwn(t *testing.T) {
 	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
 
-	a := dial(t, srv, "abc")
+	a := dial(t, srv)
 	hi := next(t, a, "hi")
 	if hi["you"] != float64(0) {
 		t.Fatalf("first player index = %v, want 0", hi["you"])
@@ -126,11 +127,14 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	if v, ok := hi["volt"].(map[string]any); !ok || v["uses"] != float64(3) || v["radius"] != float64(16) || v["window"] != float64(2) {
 		t.Fatalf("hi.volt = %v, want 3 uses in a 2s window: the button shows the uses left", hi["volt"])
 	}
+	if fr, ok := hi["frost"].(map[string]any); !ok || fr["radius"] != float64(40) || fr["scale"] != float64(1) {
+		t.Fatalf("hi.frost = %v, want radius 40 and scale 1: the client draws the iceberg at radius x scale", hi["frost"])
+	}
 	if l := next(t, a, "lobby"); l["here"].([]any)[1] != false {
 		t.Fatalf("lobby = %v, want the opponent absent", l)
 	}
 
-	b := dial(t, srv, "abc")
+	b := dial(t, srv)
 	if got := next(t, b, "hi")["you"]; got != float64(1) {
 		t.Fatalf("second player index = %v, want 1", got)
 	}
@@ -142,19 +146,25 @@ func TestTwoPlayersMatchAndThirdIsRejected(t *testing.T) {
 	next(t, a, "s") // snapshots flow once both are here and both have picked
 	next(t, b, "s")
 
-	c := dial(t, srv, "abc")
-	next(t, c, "full")
-
-	// A different room is independent.
-	d := dial(t, srv, "other")
-	next(t, d, "lobby")
+	// A third player is not turned away: nobody is waiting, so it opens a room of its own, and the fourth joins it.
+	c := dial(t, srv)
+	if got := next(t, c, "hi")["you"]; got != float64(0) {
+		t.Fatalf("third player index = %v, want 0 in a room of its own", got)
+	}
+	if l := next(t, c, "lobby"); l["here"].([]any)[1] != false {
+		t.Fatalf("lobby = %v, want the third player alone", l)
+	}
+	d := dial(t, srv)
+	if got := next(t, d, "hi")["you"]; got != float64(1) {
+		t.Fatalf("fourth player index = %v, want 1: the one who is waiting", got)
+	}
 }
 
 // Nobody plays before both have picked, and the picks decide who is who.
 func TestPickingCharactersStartsTheMatch(t *testing.T) {
 	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
-	a, b := dial(t, srv, "pk"), dial(t, srv, "pk")
+	a, b := dial(t, srv), dial(t, srv)
 
 	pick(t, a, snorlax)
 	lobbyWith(t, b, [2]int{snorlax, -1}) // the opponent sees what was picked
@@ -186,12 +196,12 @@ func TestPickingCharactersStartsTheMatch(t *testing.T) {
 func TestLeavingReturnsToTheLobby(t *testing.T) {
 	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
-	a, b := startMatch(t, srv, "lv", pikachu, snorlax)
+	a, b := startMatch(t, srv, pikachu, snorlax)
 
 	b.Close()
 	lobbyWith(t, a, [2]int{pikachu, -1})
 
-	c := dial(t, srv, "lv")
+	c := dial(t, srv)
 	pick(t, c, charizard)
 	ps := next(t, a, "s")["p"].([]any)
 	if k := ps[1].(map[string]any)["k"]; k != float64(charizard) {
@@ -203,7 +213,7 @@ func TestInputMovesPlayerAndLeaveSendsWait(t *testing.T) {
 	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
 
-	a, b := startMatch(t, srv, "mv", pikachu, snorlax)
+	a, b := startMatch(t, srv, pikachu, snorlax)
 	x0 := next(t, b, "s")["p"].([]any)[0].(map[string]any)["x"].(float64) // the real spawn point
 
 	a.WriteMessage(websocket.TextMessage, []byte(`{"dx":1,"dy":0}`))
@@ -239,12 +249,11 @@ func TestRoomCourtFollowsTheViewThatOpenedIt(t *testing.T) {
 		{"no mode counts as phone", "", "web", 1200, 600},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			room := "c" + tc.first + tc.second // short, lower-case, unique per row
-			a := dialIn(t, srv, room, tc.first)
+			a := dialIn(t, srv, tc.first)
 			if w, h := arenaOf(next(t, a, "hi")); w != tc.w || h != tc.h {
 				t.Fatalf("first player's arena = %vx%v, want %vx%v", w, h, tc.w, tc.h)
 			}
-			b := dialIn(t, srv, room, tc.second)
+			b := dialIn(t, srv, tc.second)
 			if w, h := arenaOf(next(t, b, "hi")); w != tc.w || h != tc.h {
 				t.Fatalf("second player's arena = %vx%v, want the room's %vx%v", w, h, tc.w, tc.h)
 			}
@@ -255,16 +264,7 @@ func TestRoomCourtFollowsTheViewThatOpenedIt(t *testing.T) {
 func TestBadModeRejected(t *testing.T) {
 	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
-	url := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws?room=abc&mode=tablet"
-	if _, resp, err := websocket.DefaultDialer.Dial(url, nil); err == nil || resp == nil || resp.StatusCode != 400 {
-		t.Fatalf("want HTTP 400 handshake failure, got err=%v resp=%v", err, resp)
-	}
-}
-
-func TestBadRoomIDRejected(t *testing.T) {
-	srv := httptest.NewServer(newMux(DefaultConfig()))
-	defer srv.Close()
-	url := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws?room=Bad%20Room"
+	url := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws?mode=tablet"
 	if _, resp, err := websocket.DefaultDialer.Dial(url, nil); err == nil || resp == nil || resp.StatusCode != 400 {
 		t.Fatalf("want HTTP 400 handshake failure, got err=%v resp=%v", err, resp)
 	}
@@ -274,7 +274,7 @@ func TestBadRoomIDRejected(t *testing.T) {
 func TestBothPlayersMayPickTheSameCharacter(t *testing.T) {
 	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
-	a, b := startMatch(t, srv, "same", snorlax, snorlax)
+	a, b := startMatch(t, srv, snorlax, snorlax)
 	ps := next(t, a, "s")["p"].([]any)
 	if k0, k1 := ps[0].(map[string]any)["k"], ps[1].(map[string]any)["k"]; k0 != float64(snorlax) || k1 != float64(snorlax) {
 		t.Fatalf("kinds = %v, %v, want snorlax twice", k0, k1)
@@ -285,7 +285,7 @@ func TestBothPlayersMayPickTheSameCharacter(t *testing.T) {
 func TestTeamMatchOverTheWire(t *testing.T) {
 	srv := httptest.NewServer(newMux(DefaultConfig()))
 	defer srv.Close()
-	a, b := dial(t, srv, "team1"), dial(t, srv, "team1")
+	a, b := dial(t, srv), dial(t, srv)
 	a.WriteMessage(websocket.TextMessage, []byte(`{"team":true}`))
 	for deadline := time.Now().Add(2 * time.Second); ; {
 		if next(t, a, "lobby")["team"] == true {
