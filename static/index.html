@@ -69,12 +69,12 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟'];
 const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰山滑行・冰風暴・急凍光線', '滑翔・箭雨・龍捲風'];
 const HELP = [
-  '你是皮卡丘　移動 WASD / 方向鍵　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
-  '你是卡比獸　移動 WASD / 方向鍵　空白鍵＝跳躍（落地壓人，附地震特效）　J＝急凍拳（蓄力時按方向鍵決定方向，朝該方向衝拳，打到的敵人被冰凍）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
-  '你是噴火龍　移動 WASD / 方向鍵　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　K＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　J＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
-  '你是菊草葉　移動 WASD / 方向鍵　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　K＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　J＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）',
-  '你是六尾　移動 WASD / 方向鍵　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，方向鍵控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　K＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　J＝急凍光線（站定不動，方向鍵或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
-  '你是木木梟　移動 WASD / 方向鍵　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝滑翔（朝按住的方向衝出一道半月形弧線，彎向敵人那一側）　K＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　J＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
+  '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）',
+  '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）　K＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）',
+  '你是噴火龍　移動 WASD　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　K＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　J＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
+  '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　K＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　J＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）',
+  '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　K＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　J＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
+  '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝滑翔（朝按住的方向衝出一道半月形弧線，彎向敵人那一側）　K＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　J＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
 ];
 const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
@@ -273,8 +273,9 @@ let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit 
 let last = '';
 function sendInput() {
   const k = (n) => keys.has(n);
-  let sx = (k('d') || k('arrowright') ? 1 : 0) - (k('a') || k('arrowleft') ? 1 : 0);
-  let sy = (k('s') || k('arrowdown') ? 1 : 0) - (k('w') || k('arrowup') ? 1 : 0);
+  // the keyboard is the same for every character: WASD walks, space is the main skill, K and J the two others
+  let sx = (k('d') ? 1 : 0) - (k('a') ? 1 : 0);
+  let sy = (k('s') ? 1 : 0) - (k('w') ? 1 : 0);
   if (stick.x || stick.y) { sx = stick.x; sy = stick.y; }
   const c = Math.cos(ROT), s = Math.sin(ROT);
   const msg = JSON.stringify({
@@ -283,7 +284,7 @@ function sendInput() {
     // the aim of the Electro Ball and the Ice Punch: the stick's exact direction (2 decimals is 0.6 degrees)
     ax: Math.round((stickAim.x * c + stickAim.y * s) * 100) / 100 || 0,
     ay: Math.round((-stickAim.x * s + stickAim.y * c) * 100) / 100 || 0,
-    skill: k(' ') || touch.skill, punch: k('j') || touch.punch, beam: k('k') || touch.beam, ball: k('k') || touch.ball, thunder: k('l') || touch.thunder,
+    skill: k(' ') || touch.skill, punch: k('j') || touch.punch, beam: k('k') || touch.beam, ball: k('k') || touch.ball, thunder: k('j') || touch.thunder,
     // the keys are shared between the characters (J and K each do whatever the one you play has); the server uses the ones that fit
     fire: k('k') || touch.fire, toss: k('j') || touch.toss,
     razor: k('k') || touch.razor, vine: k('j') || touch.vine,
