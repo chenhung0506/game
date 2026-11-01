@@ -305,9 +305,9 @@
       "ring_radius": 260,
       "spread_speed": 400,
       "convergence_speed": 250,
-      "damage": 20,
+      "damage": 15,
       "count": 18,
-      "radius": 30
+      "radius": 15
     },
     "shadow_ball": {
       "min_height": 0,
@@ -323,7 +323,7 @@
       "ghost_fire_radius": 20,
       "ghost_fire_spread_distance": 220,
       "ghost_fire_count": 10,
-      "ghost_fire_damage": 5
+      "ghost_fire_damage": 10
     }
   },
   "gyarados": {
