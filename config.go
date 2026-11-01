@@ -418,6 +418,7 @@ type Config struct {
 			JumpDuration   float64 `json:"jump_duration"`
 			JumpHeight     float64 `json:"jump_height"`
 			ChargeDuration float64 `json:"charge_duration"`
+			SwingDuration  float64 `json:"swing_duration"`
 			TrunkScale     float64 `json:"trunk_scale"`
 			TrunkLength    float64 `json:"trunk_length"`
 			TrunkWidth     float64 `json:"trunk_width"`
@@ -679,7 +680,7 @@ func DefaultConfig() Config {
 	c.Machamp.MaxHP, c.Machamp.WalkSpeed, c.Machamp.Radius = 140, 140, 30
 	ts := &c.Machamp.TreeSlam
 	ts.Reach = Reach{MinHeight: 0, MaxHeight: 60}
-	ts.JumpDistance, ts.JumpDuration, ts.JumpHeight, ts.ChargeDuration = 250, 0.5, 50, 0.6
+	ts.JumpDistance, ts.JumpDuration, ts.JumpHeight, ts.ChargeDuration, ts.SwingDuration = 250, 0.5, 50, 0.6, 0.25
 	ts.TrunkScale, ts.TrunkLength, ts.TrunkWidth, ts.LeafScale, ts.LeafRadius, ts.LeafAngle = 1, 300, 70, 1, 180, 180
 	ts.Damage, ts.Cooldown = 35, 8
 	cp := &c.Machamp.CometPunch
@@ -968,6 +969,7 @@ func (c Config) validate() error {
 		{"gyarados.tail_whip.charge_duration", c.Gyarados.TailWhip.ChargeDuration},
 		{"machamp.tree_slam.jump_height", c.Machamp.TreeSlam.JumpHeight},
 		{"machamp.tree_slam.charge_duration", c.Machamp.TreeSlam.ChargeDuration},
+		{"machamp.tree_slam.swing_duration", c.Machamp.TreeSlam.SwingDuration},
 		{"machamp.tree_slam.damage", float64(c.Machamp.TreeSlam.Damage)},
 		{"machamp.tree_slam.cooldown", c.Machamp.TreeSlam.Cooldown},
 		{"machamp.comet_punch.damage", float64(c.Machamp.CometPunch.Damage)},

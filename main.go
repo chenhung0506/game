@@ -622,7 +622,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Machamp.Radius, cfg.Gyarados.Radius},
 		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Machamp.MaxHP, cfg.Gyarados.MaxHP},
 		"evolve":  cfg.Magikarp.EvolveHops,
-		"tree":    map[string]float64{"len": tree.TrunkLength, "w": tree.TrunkWidth, "scale": tree.TrunkScale, "leaf": tree.LeafRadius, "leafscale": tree.LeafScale, "angle": tree.LeafAngle, "charge": tree.ChargeDuration, "dist": tree.JumpDistance, "jump": tree.JumpDuration},
+		"tree":    map[string]float64{"len": tree.TrunkLength, "w": tree.TrunkWidth, "scale": tree.TrunkScale, "leaf": tree.LeafRadius, "leafscale": tree.LeafScale, "angle": tree.LeafAngle, "charge": tree.ChargeDuration, "swing": tree.SwingDuration, "dist": tree.JumpDistance, "jump": tree.JumpDuration},
 		"fist":    map[string]float64{"radius": comet.Radius, "hp": float64(comet.HP), "life": comet.FistDuration},
 		"stone":   map[string]float64{"radius": rock.StoneRadius, "hp": float64(rock.StoneHP), "life": rock.StoneDuration},
 		"wave":    map[string]float64{"radius": cfg.Gyarados.Wave.Radius, "speed": cfg.Gyarados.Wave.Speed},

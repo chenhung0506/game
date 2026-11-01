@@ -77,7 +77,7 @@ let ROT = 0;               // how far the arena is turned on screen (radians); 0
 let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Each player picks a character in the lobby; a snapshot's p[i].k says who is who (0 Pikachu, 1 Snorlax, 2 Charizard, 3 Chikorita, 4 Vulpix, 5 Rowlet).
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
-const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟', '鯉魚王', '怪力'];
+const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟', '鯉魚王', '小智'];
 const FORMS = [...NAMES, '紅色暴鯉龍']; // every kind a player can be in: Magikarp becomes the last one (nobody picks it)
 const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰山滑行・冰風暴・急凍光線', '滑翔・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '拔樹・百裂拳・岩石陣'];
 const HELP = [
@@ -88,13 +88,13 @@ const HELP = [
   '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
   '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝滑翔（朝按住的方向衝出一道半月形弧線，彎向敵人那一側）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
-  '你是怪力　移動 WASD　空白鍵＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒再砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　J＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
+  '你是真新鎮小智　移動 WASD　空白鍵＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　J＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
 const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
-let treeCfg = { len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, dist: 250, jump: 0.5 }, fistCfg = { radius: 22, hp: 20, life: 0.2 }, stoneCfg = { radius: 60, hp: 100, life: 8 }; // Machamp's, from 'hi'
+let treeCfg = { len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }, fistCfg = { radius: 22, hp: 20, life: 0.2 }, stoneCfg = { radius: 60, hp: 100, life: 8 }; // Machamp's, from 'hi'
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
 const beamCfgOf = (k) => (k === 8 ? gbeamCfg : beamCfg);
 let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewise
@@ -488,7 +488,7 @@ function art(c, kind, x, y, t, flap, pose = IDLE) {
   else if (kind === 4) artVulpix(c, x, y, t, pose);
   else if (kind === 5) artRowlet(c, x, y, t, pose);
   else if (kind === 6) artMagikarp(c, x, y, t, pose);
-  else if (kind === 7) artMachamp(c, x, y, t, pose);
+  else if (kind === 7) artAsh(c, x, y, t, pose);
   else artGyarados(c, x, y, t, pose);
 }
 
@@ -836,6 +836,38 @@ function artMachamp(c, x, y, t, pose) {
     for (const m of [-1, 1]) { ov(c, m * 4.5, -13, 2.4, 2.4, '#fff', 0, null); ov(c, m * 4.5, -13, 1.2, 1.6, EYE, 0, null); }
     c.strokeStyle = '#222'; c.lineWidth = 1; c.beginPath(); c.arc(0, -8, 3, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
   }
+  c.restore();
+}
+
+// Ash Ketchum of Pallet Town: black hair under a red-and-white cap, a blue jacket with white sleeves, black fingerless
+// gloves and jeans, seen from the front (his back when he walks up; the side view is the front one turned a little).
+function artAsh(c, x, y, t, pose) {
+  const { dir, mv, ph } = pose, sw = Math.sin(ph) * mv, bob = -Math.abs(Math.sin(ph)) * 2 * mv + Math.sin(t * 3) * 0.6;
+  const SKIN = '#f2c9a0', JEAN = '#3d5a99', JEAND = '#2c4373', BLUE = '#2f6fd0', WHITE = '#f4f4f4', RED = '#d9322b', BLK = '#22252b';
+  const back = dir === 1;
+  c.save(); c.translate(x, y + bob);
+  if (dir === 2) c.scale(-1, 1);
+  if (dir === 2 || dir === 3) c.scale(0.86, 1);
+  ov(c, -7, 27 - Math.max(0, sw) * 4, 7, 4, '#e8e8e8'); ov(c, 7, 27 - Math.max(0, -sw) * 4, 7, 4, '#e8e8e8'); // shoes
+  ov(c, -6, 18 - Math.max(0, sw) * 2, 6, 10, JEAN); ov(c, 6, 18 - Math.max(0, -sw) * 2, 6, 10, JEAN); // legs
+  ov(c, 0, 5, 14, 15, BLUE); // the jacket
+  if (!back) { poly(c, [[-3, -4], [0, 4], [3, -4]], WHITE); c.strokeStyle = BLK; c.lineWidth = 0.9; c.beginPath(); c.moveTo(0, 4); c.lineTo(0, 17); c.stroke(); }
+  ov(c, 0, 17, 13, 3.5, JEAND); // the belt line
+  for (const m of [-1, 1]) { // arms swing against the legs; white sleeves, black gloves
+    const swing = sw * m * 4;
+    ov(c, m * 16, 6 + swing, 4.5, 10, WHITE, m * 0.15); ov(c, m * 17, 17 + swing, 4, 4, BLK);
+  }
+  ov(c, 0, -11, 11, 10.5, SKIN); // head
+  if (back) ov(c, 0, -13, 11.5, 10.5, BLK); // the hair, all there is to see from behind
+  else {
+    for (const m of [-1, 1]) { ov(c, m * 4.2, -10, 1.8, 2.4, BLK, 0, null); ov(c, m * 4.2 - 0.5, -10.8, 0.6, 0.6, '#fff', 0, null); poly(c, [[m * 11, -10], [m * 14, -6], [m * 10, -4]], BLK); }
+    c.strokeStyle = '#8a4a3a'; c.lineWidth = 0.9; c.beginPath(); c.arc(0, -5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); c.stroke();
+    for (const m of [-1, 0, 1]) c.beginPath(), c.moveTo(m * 3.5 - 2, -17), c.lineTo(m * 3.5, -14), c.lineTo(m * 3.5 + 2, -17), c.fillStyle = BLK, c.fill(); // the fringe
+  }
+  c.save(); // the cap: red crown, white front panel with the ball badge, a peak toward the viewer
+  ov(c, 0, -18, 11.5, 7, RED);
+  if (!back) { ov(c, 0, -18, 6.5, 5, WHITE, 0, null); ov(c, 0, -18.5, 2.6, 2.6, RED, 0, null); ov(c, 0, -18.5, 1, 1, WHITE, 0, null); poly(c, [[-11, -13], [11, -13], [8, -10], [-8, -10]], RED); }
+  c.restore();
   c.restore();
 }
 
@@ -1463,29 +1495,39 @@ function drawTailWarning(p, d) {
   drawTailLimb(d.x, d.y, L * 0.9, tip, tip - 0.3, 0.95);
 }
 
-// Machamp's tree, `t` along it 0..1 from the foot: the trunk (a rectangle) with the canopy (a half disc, or whatever sector) at the
-// tip, drawn `scale` times bigger than what it hits. (x, y) is the foot, `base` the way it points, `lift` how high it is held up
-// (0 = flat on the ground) and `alpha` how solid it is.
-function drawTreeArt(x, y, base, lift, alpha) {
+// The tree, as an axe: the trunk (a rectangle) with the canopy (a half disc, or whatever sector) at the tip, drawn `scale` times
+// bigger than what it hits. (x, y) is the foot (where it is gripped), `base` the way it points on the ground, `pitch` how far it
+// is raised about the foot (0 = flat on the ground, PI/2 = standing straight up toward the top of the screen, whichever way the
+// arena is turned) and `alpha` how solid it is.
+const TREE_UP = 0.85; // how far up the screen a raised tree reaches, per unit of its length
+function drawTreeArt(x, y, base, pitch, alpha) {
   const L = treeCfg.len, W = treeCfg.w * treeCfg.scale, R = treeCfg.leaf * treeCfg.leafscale, half = treeCfg.angle / 2 * Math.PI / 180, ts = treeCfg.scale;
-  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(-ROT); ctx.translate(0, -lift); ctx.rotate(ROT + base); // held up towards the top of the screen, whichever way the arena is turned
+  const th = ROT + base, cp = Math.cos(pitch), sp = Math.sin(pitch), len = L * ts;
+  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(-ROT);
+  ctx.save(); ctx.transform(Math.cos(th) * cp, Math.sin(th) * cp - TREE_UP * sp, -Math.sin(th), Math.cos(th), 0, 0); // the trunk, foreshortened as it rises
   ctx.fillStyle = '#6b4a2a'; ctx.strokeStyle = '#3d2814'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.rect(0, -W / 2, L * ts, W); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.rect(0, -W / 2, len, W); ctx.fill(); ctx.stroke();
   ctx.strokeStyle = 'rgba(40,25,10,.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); // bark
-  for (const f of [-0.28, 0, 0.28]) { ctx.moveTo(L * ts * 0.05, W * f); ctx.lineTo(L * ts * 0.95, W * f); }
+  for (const f of [-0.28, 0, 0.28]) { ctx.moveTo(len * 0.05, W * f); ctx.lineTo(len * 0.95, W * f); }
   ctx.stroke();
-  ctx.translate(L * ts, 0);
+  ctx.restore();
+  const ax = Math.cos(th) * cp, ay = Math.sin(th) * cp - TREE_UP * sp; // where the trunk points on screen
+  ctx.translate(len * ax, len * ay); // the canopy stays a full disc, capping the trunk whichever way it points
+  ctx.rotate(Math.atan2(ay, ax));
   ctx.fillStyle = '#3f9a3c'; ctx.strokeStyle = '#1f5f22'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, -half, half); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.fillStyle = 'rgba(120,210,100,.45)';
   for (const [rr, aa] of [[0.55, -0.4], [0.7, 0.35], [0.4, 0.05], [0.8, -0.05]]) { ctx.beginPath(); ctx.arc(Math.cos(aa * half) * R * rr, Math.sin(aa * half) * R * rr, R * 0.14, 0, 7); ctx.fill(); }
   ctx.restore();
 }
-// The tree held up after the jump: where it will come down is drawn on the ground (the trunk's rectangle and the canopy's sector,
-// exactly what it hits, filling with colour as the time runs out) for the opponent, with the tree itself hanging above it.
+// The tree hoisted overhead and chopped down, like an axe. While it is held (trp 2) it rises slowly and trembles; then it swings
+// (trp 3), speeding up all the way down. Where it will land is drawn on the ground for the opponent (the trunk's rectangle and
+// the canopy's sector, exactly what it hits, filling with colour as the time runs out).
+const TREE_RAISED = 1.35; // about 77 degrees: nearly upright
 function drawTreeWarning(p, d) {
-  if (p.trp !== 2) return; // 2 = held up (treeSmash)
-  const k = 1 - p.trt / Math.max(treeCfg.charge, 1e-6), base = Math.atan2(p.try, p.trx), L = treeCfg.len, W = treeCfg.w, R = treeCfg.leaf, half = treeCfg.angle / 2 * Math.PI / 180;
+  if (p.trp !== 2 && p.trp !== 3) return;
+  const swing = p.trp === 3, t = swing ? 1 - p.trt / Math.max(treeCfg.swing, 1e-6) : 1 - p.trt / Math.max(treeCfg.charge, 1e-6);
+  const k = swing ? 1 : t, base = Math.atan2(p.try, p.trx), L = treeCfg.len, W = treeCfg.w, R = treeCfg.leaf, half = treeCfg.angle / 2 * Math.PI / 180;
   const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
   ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(base);
   ctx.fillStyle = `rgba(255,70,40,${0.12 + 0.3 * k})`; ctx.strokeStyle = `rgba(255,${120 + 80 * pulse | 0},60,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
@@ -1493,12 +1535,14 @@ function drawTreeWarning(p, d) {
   ctx.translate(L, 0);
   ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, -half, half); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
-  drawTreeArt(d.x, d.y, base, 70 * (1 - 0.2 * k), 0.55); // hoisted above its place on the ground
+  const wind = swing ? 0 : Math.sin(performance.now() / 45) * 0.02 * k; // it trembles with the strain while it is held up
+  const pitch = swing ? TREE_RAISED * (1 - t * t) : 0.6 + (TREE_RAISED - 0.6) * (1 - (1 - t) * (1 - t)) + wind; // lifted, then thrown down faster and faster
+  drawTreeArt(d.x, d.y, base, Math.max(0, pitch), swing ? 0.8 : 0.6);
 }
-// The tree coming down: it falls flat along the ground, shaking the screen, then fades.
+// The tree hitting the ground: it lies flat, shaking the screen, then fades.
 function drawTreeSlam(f) {
-  const k = f.age / 0.6, base = Math.atan2(f.dy || 0, f.dx || 0), drop = Math.min(1, f.age / 0.12);
-  drawTreeArt(f.x, f.y, base, 70 * (1 - drop), 1 - Math.max(0, k - 0.5) * 2);
+  const k = f.age / 0.6, base = Math.atan2(f.dy || 0, f.dx || 0), bounce = Math.max(0, 0.12 - f.age) * 2.5; // a small rebound off the ground
+  drawTreeArt(f.x, f.y, base, bounce, 1 - Math.max(0, k - 0.5) * 2);
   ctx.save(); ctx.strokeStyle = `rgba(255,235,200,${(1 - k) * 0.8})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(f.x, f.y, 30 + 160 * k, 0, 7); ctx.stroke(); ctx.restore();
 }
 // One Comet Punch fist: a clenched fist pointing the way Machamp is running, swelling as it lands and fading as its time runs out;

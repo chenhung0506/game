@@ -6,7 +6,8 @@ import "math"
 const (
 	treeNone  = iota
 	treeJump  // leaping along the direction chosen
-	treeSmash // landed, holding the tree up with its shape on show, until it comes down
+	treeSmash // landed, holding the tree up overhead with its shape on show
+	treeSwing // the tree coming down like an axe; it hits when the swing ends
 )
 
 // dropMachamp ends whatever Machamp was doing (it was frozen, stunned or caught).
@@ -60,18 +61,18 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		p.Y = math.Min(math.Max(p.Y+p.TreeY*v*step, 0), g.court.Width)
 		if p.TreeT -= step; p.TreeT < 1e-9 {
 			p.Z, p.TreePhase, p.TreeT = 0, treeSmash, ts.ChargeDuration
-			if p.TreeT == 0 { // no holding it up: down it comes on the landing tick
-				p.TreePhase = treeNone
-				events = append(events, g.smashTree(i)...)
+			if n := math.Hypot(other.X-p.X, other.Y-p.Y); n > 1e-9 { // the tree goes down where the opponent stands, not the way it leapt
+				p.TreeX, p.TreeY = (other.X-p.X)/n, (other.Y-p.Y)/n
 			}
+			events = append(events, g.advanceTree(i)...) // a phase of zero seconds is skipped
 		} else {
 			u := 1 - p.TreeT/ts.JumpDuration
 			p.Z = 4 * ts.JumpHeight * u * (1 - u)
 		}
-	case treeSmash:
+	case treeSmash, treeSwing:
 		if p.TreeT -= dt; p.TreeT < 1e-9 {
-			p.TreePhase, p.TreeT = treeNone, 0
-			events = append(events, g.smashTree(i)...)
+			p.TreeT = 0
+			events = append(events, g.advanceTree(i)...)
 		}
 	}
 	rooted := p.TreePhase != treeNone || len(events) > 0 // through the tick of the smash, free from the next
@@ -134,7 +135,24 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	return events, rooted
 }
 
-// smashTree brings the tree down along the way Machamp jumped and hurts the opponent it lands on, once.
+// advanceTree moves the tree on from a phase whose time is up (and past any that last no time): held up, then swung
+// down, then the hit.
+func (g *Game) advanceTree(i int) []Event {
+	var events []Event
+	p, ts := &g.P[i], g.cfg.Machamp.TreeSlam
+	for p.TreePhase != treeNone && p.TreeT == 0 {
+		switch p.TreePhase {
+		case treeSmash:
+			p.TreePhase, p.TreeT = treeSwing, ts.SwingDuration
+		case treeSwing:
+			p.TreePhase = treeNone
+			events = append(events, g.smashTree(i)...)
+		}
+	}
+	return events
+}
+
+// smashTree brings the tree down toward where the opponent stood as it landed and hurts the opponent it lands on, once.
 func (g *Game) smashTree(i int) []Event {
 	p, other, ts := &g.P[i], &g.P[1-i], g.cfg.Machamp.TreeSlam
 	if ts.Reach.hits(other) && treeHits(p.X, p.Y, p.TreeX, p.TreeY, other.X, other.Y, g.radius(1-i), ts.TrunkLength, ts.TrunkWidth, ts.LeafRadius, ts.LeafAngle) {

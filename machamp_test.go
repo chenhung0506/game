@@ -79,7 +79,7 @@ func TestTreeSlamJumpsTheConfiguredDistanceAndHeightThenHoldsTheTreeUpAndSmashes
 	g.P[0].In = Input{DX: 1}
 	x1 := g.P[0].X
 	smashes := 0
-	for tick := 0; tick < int(ts.ChargeDuration*tickRate)+2 && smashes == 0; tick++ {
+	for tick := 0; tick < int((ts.ChargeDuration+ts.SwingDuration)*tickRate)+3 && smashes == 0; tick++ {
 		smashes += count(g.Step(dt), "tree") // it is still rooted on the tick of the smash
 	}
 	if g.P[0].X != x1 {
@@ -506,5 +506,76 @@ func TestMachampStateReachesTheSnapshot(t *testing.T) {
 		if _, ok := m[k]; !ok {
 			t.Errorf("snapshot has no %q", k)
 		}
+	}
+}
+
+func TestTreeSmashesTowardTheOpponentNotTheWayItLeapt(t *testing.T) {
+	cfg := DefaultConfig()
+	g := mach(cfg, snorlax)
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 300, 250, 900, 250
+	g.P[0].In = Input{Skill: true, DY: 1} // leaps down, the opponent is to the right
+	for n := 0; n < 200 && g.P[0].TreePhase != treeSmash; n++ {
+		g.Step(dt)
+		g.P[0].In = Input{}
+	}
+	if g.P[0].TreePhase != treeSmash {
+		t.Fatal("never landed")
+	}
+	dx, dy := g.P[1].X-g.P[0].X, g.P[1].Y-g.P[0].Y
+	n := math.Hypot(dx, dy)
+	if math.Abs(g.P[0].TreeX-dx/n) > 1e-9 || math.Abs(g.P[0].TreeY-dy/n) > 1e-9 {
+		t.Fatalf("tree points %v,%v, want %v,%v: at the opponent", g.P[0].TreeX, g.P[0].TreeY, dx/n, dy/n)
+	}
+}
+
+func TestTreeSwingsDownAfterBeingHeldAndHitsOnlyWhenTheSwingEnds(t *testing.T) {
+	cfg := DefaultConfig()
+	ts := cfg.Machamp.TreeSlam
+	g := mach(cfg, snorlax)
+	g.P[0].In = Input{Skill: true, DX: 1}
+	g.Step(dt)
+	g.P[0].In = Input{}
+	for g.P[0].TreePhase == treeJump {
+		g.Step(dt)
+	}
+	held, swung, hp := 0, 0, g.P[1].HP
+	for n := 0; n < 200 && g.P[0].TreePhase != treeNone; n++ {
+		switch g.P[0].TreePhase {
+		case treeSmash:
+			held++
+		case treeSwing:
+			swung++
+		}
+		if g.P[1].HP != hp {
+			t.Fatalf("hurt during phase %d, before the swing ended", g.P[0].TreePhase)
+		}
+		g.Step(dt)
+	}
+	if want := int(math.Round(ts.ChargeDuration * tickRate)); held != want {
+		t.Fatalf("held %d ticks, want %d", held, want)
+	}
+	if want := int(math.Round(ts.SwingDuration * tickRate)); swung != want {
+		t.Fatalf("swung %d ticks, want %d", swung, want)
+	}
+	if g.P[1].HP >= hp {
+		t.Fatal("the swing never hit")
+	}
+}
+
+func TestTreeSwingOfZeroHitsRightAfterTheHold(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Machamp.TreeSlam.SwingDuration = 0
+	g := mach(cfg, snorlax)
+	g.P[0].In = Input{Skill: true, DX: 1}
+	hit := 0
+	for n := 0; n < 100 && hit == 0; n++ {
+		hit += count(g.Step(dt), "tree")
+		g.P[0].In = Input{}
+		if g.P[0].TreePhase == treeSwing {
+			t.Fatal("entered the swing phase with no time for it")
+		}
+	}
+	if hit != 1 {
+		t.Fatalf("%d hits, want 1", hit)
 	}
 }
