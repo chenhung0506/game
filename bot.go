@@ -13,7 +13,7 @@ import (
 //   - it decides only every botEvery ticks and holds the stick in between (a skill key is pressed for one tick);
 //   - it takes a chance on some moves instead of always making the best one.
 //
-// Everything about how a character plays is in its own function (pikachu, snorlax); the rest here is shared: what
+// Everything about how a character plays is in its own function (pikachu, snorlax, chikorita, ash); the rest here is shared: what
 // threatens the bot, where to stand, and the 8-way stick.
 const (
 	botEvery = 4 // ticks between decisions
@@ -21,7 +21,7 @@ const (
 )
 
 // botKinds are the characters a Bot can play so far.
-var botKinds = []int{pikachu, snorlax}
+var botKinds = []int{pikachu, snorlax, chikorita, ash}
 
 func botCanPlay(kind int) bool {
 	for _, k := range botKinds {
@@ -75,6 +75,10 @@ func (b *Bot) Decide(g *Game, me int) Input {
 		in = b.pikachu(c)
 	case snorlax:
 		in = b.snorlax(c)
+	case chikorita:
+		in = b.chikorita(c)
+	case ash:
+		in = b.ash(c)
 	}
 	b.held = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY}
 	return in
@@ -141,6 +145,7 @@ const (
 	thLand   // near where a jumping Snorlax will come down
 	thShadow // under a Thunder shadow
 	thRush   // Pikachu is in the middle of a Volt Tackle chain (only Snorlax minds it)
+	thTree   // inside the shape (trunk and canopy) of a tree that is held up or coming down
 )
 
 type threat struct {
@@ -249,6 +254,22 @@ func (c *bctx) findThreat() threat {
 		}
 	}
 
+	if (f.Kind == ash || f.Kind == machamp) && (f.TreePhase == treeSmash || f.TreePhase == treeSwing) {
+		// The whole shape is on the ground for everyone to see: the trunk and the canopy. Leave all of it, by the way out that is soonest.
+		ts := cfg.brawlerOf(f.Kind).TreeSlam
+		eta := f.TreeT
+		if f.TreePhase == treeSmash {
+			eta += ts.SwingDuration
+		}
+		hits := func(x, y float64) bool {
+			return treeHits(f.X, f.Y, f.TreeX, f.TreeY, x, y, c.pr+15, ts.TrunkLength, ts.TrunkWidth, ts.LeafRadius, ts.LeafAngle)
+		}
+		if hits(p.X, p.Y) {
+			ax, ay := c.wayOutOf(hits)
+			consider(threat{thTree, math.Max(0, eta-lag), ax, ay})
+		}
+	}
+
 	if f.Kind == snorlax && f.Z > 0 {
 		jp := cfg.Snorlax.Jump
 		if d := math.Hypot(p.X-f.X, p.Y-f.Y); d < jp.SlamRadius+c.pr+60 { // it steers in the air, so leave a margin
@@ -271,6 +292,29 @@ func (c *bctx) findThreat() threat {
 		consider(threat{thRush, 0.3, ax, ay})
 	}
 	return best
+}
+
+// wayOutOf is the 8-way stick step that gets the bot out of an area soonest (inside(x, y) says where it is), walking at
+// its own speed; none of them does it in time then it is the one that gets nearest to being out (the last it tries).
+func (c *bctx) wayOutOf(inside func(x, y float64) bool) (float64, float64) {
+	const step = 0.05
+	speed := c.g.cfg.walkSpeedOf(c.p.Kind)
+	bestT, bx, by := math.Inf(1), 0.0, 0.0
+	for k := 0; k < 8; k++ {
+		ux, uy := unit(float64(stickX[k]), float64(stickY[k]))
+		for t := step; t <= 2+1e-9 && t < bestT; t += step {
+			x := math.Min(math.Max(c.p.X+ux*speed*t, 0), c.g.court.Length)
+			y := math.Min(math.Max(c.p.Y+uy*speed*t, 0), c.g.court.Width)
+			if !inside(x, y) {
+				bestT, bx, by = t, ux, uy
+				break
+			}
+		}
+	}
+	if math.IsInf(bestT, 1) {
+		return unit(-c.ux, -c.uy) // walled in: away from the opponent
+	}
+	return bx, by
 }
 
 // botHorizon is how far ahead (seconds) the bot looks for things coming at it.
@@ -607,6 +651,124 @@ func (b *Bot) snorlax(c *bctx) Input {
 
 	if c.dist > 120 {
 		return toward()
+	}
+	return c.stay()
+}
+
+// ---- Chikorita ----
+
+// Chikorita keeps a middle distance and scatters Razor Leaves, which fly at the opponent on their own; close in, it
+// hops at it with the Leaf Slash or catches it in the Vine Whip, which roots it while the vines unfurl, so that is
+// kept for when nothing is coming.
+func (b *Bot) chikorita(c *bctx) Input {
+	g, p, f := c.g, c.p, c.f
+	ls, rl, vw := g.cfg.Chikorita.LeafSlash, g.cfg.Chikorita.RazorLeaf, g.cfg.Chikorita.VineWhip
+	if p.FrozenT > 0 || p.Held || p.vineBusy() || p.LeafPhase != leafNone {
+		return c.stay() // rooted, or the leaf slash is moving it
+	}
+	th := c.th
+	if th.kind != thNone && th.eta <= botHorizon {
+		return c.move(th.ax, th.ay)
+	}
+	danger := f.Kind == rowlet && f.ArrowT > 0
+	vineRange := vw.Length + c.fr - 20
+	if p.VineCD == 0 && vw.Reach.hits(f) && c.dist <= vineRange && !danger && (c.rootedFor() > 0.4 || b.rng.Float64() < 0.5) {
+		in := c.stay()
+		in.Vine = true // a tap: straight at the opponent
+		return in
+	}
+	if p.LeafCD == 0 && p.BoundT == 0 && ls.Reach.hits(f) && c.dist >= 60 && c.dist <= ls.JumpDistance+ls.SlashStep*2 && !danger && b.rng.Float64() < 0.3 {
+		in := c.move(c.ux, c.uy)
+		in.Skill = true
+		return in
+	}
+	if p.RazorCD == 0 && rl.Reach.hits(f) && c.dist >= 180 && !danger && b.rng.Float64() < 0.8 {
+		in := c.stay()
+		in.Razor = true
+		return in
+	}
+	const lo = 230.0
+	tx, ty := -c.uy*b.strafe, c.ux*b.strafe
+	switch {
+	case c.dist < 130:
+		return c.move(-c.ux+tx*0.6, -c.uy+ty*0.6)
+	case c.dist > lo+120:
+		return c.move(c.ux+tx*0.3, c.uy+ty*0.3)
+	}
+	return c.move(tx, ty)
+}
+
+// ---- Ash ----
+
+// Ash (and Machamp, who has the same three skills) is a brawler with a trap. The Rock Tomb raises a ring of stones
+// round where it lands that the opponent cannot walk through and Ash can, so it jumps at the opponent to land with
+// it inside the ring, and then, with the opponent shut in, it runs at it with the Comet Punch or smashes the tree
+// down on it. Outside a ring it still punches and smashes, but only when it has the chance.
+func (b *Bot) ash(c *bctx) Input {
+	g, p, f := c.g, c.p, c.f
+	bc := g.brawler(c.me)
+	ts, cp, rt := bc.TreeSlam, bc.CometPunch, bc.RockTomb
+	if p.FrozenT > 0 || p.Held || p.TreePhase != treeNone || p.CometT > 0 {
+		return c.stay() // rooted, or it moves itself
+	}
+	if p.RockT > 0 {
+		return c.move(c.ux, c.uy) // steer the jump so it comes down on the opponent
+	}
+	th := c.th
+	if th.kind != thNone && th.eta <= botHorizon {
+		return c.move(th.ax, th.ay)
+	}
+	danger := f.Kind == rowlet && f.ArrowT > 0
+
+	// Is the opponent shut in? The ring is the stones that are still standing: it is inside when it is nearer their middle than they are.
+	var n int
+	var mx, my float64
+	for i := range c.balls {
+		if bl := &c.balls[i]; bl.K == ballStone && bl.Owner == c.me && bl.HP > 0 {
+			n++
+			mx, my = mx+bl.X, my+bl.Y
+		}
+	}
+	trapped := false
+	if n >= rt.Count/2 {
+		mx, my = mx/float64(n), my/float64(n)
+		trapped = math.Hypot(f.X-mx, f.Y-my)+c.fr < rt.RingRadius-rt.StoneRadius*0.5
+	}
+
+	punch := p.CometCD == 0 && cp.Reach.hits(f) && c.dist <= cp.Distance+cp.ScatterMaxDistance+c.fr
+	smash := p.TreeCD == 0 && p.Z == 0 && ts.Reach.hits(f) && c.dist <= ts.JumpDistance+ts.TrunkLength*0.8
+	if trapped {
+		switch {
+		case punch && !danger:
+			in := c.stay()
+			in.Comet = true
+			return in
+		case smash && !danger:
+			in := c.move(c.ux, c.uy)
+			in.Skill = true // the jump takes it onto the opponent, and the tree comes down on it
+			return in
+		case c.dist > 100:
+			return c.move(c.ux, c.uy) // the ring is its to walk in: close in while the skills are charging
+		}
+		return c.stay()
+	}
+	if p.RockCD == 0 && !danger && rt.Reach.hits(f) && c.dist <= rt.RingRadius*0.5 && b.rng.Float64() < 0.7 {
+		in := c.move(c.ux, c.uy)
+		in.Rock = true
+		return in
+	}
+	if punch && !danger && c.dist <= cp.Distance && b.rng.Float64() < 0.35 {
+		in := c.stay()
+		in.Comet = true
+		return in
+	}
+	if smash && !danger && c.dist <= ts.JumpDistance+ts.TrunkLength*0.5 && b.rng.Float64() < 0.25 {
+		in := c.move(c.ux, c.uy)
+		in.Skill = true
+		return in
+	}
+	if c.dist > 110 {
+		return c.move(c.ux, c.uy)
 	}
 	return c.stay()
 }

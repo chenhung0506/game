@@ -752,3 +752,34 @@ func TestAFistThatLandsPushesTheOpponentBackByTheConfiguredDistance(t *testing.T
 		t.Fatalf("a held body was pushed to %v", g.P[1].X)
 	}
 }
+
+// A ring of stones whose band reaches higher than a jump goes keeps the jumper in; a lower band is jumped over.
+func TestARingWhoseBandIsHigherThanSnorlaxsJumpKeepsItIn(t *testing.T) {
+	for _, tc := range []struct {
+		maxHeight float64
+		escapes   bool
+	}{{120, false}, {60, true}} {
+		cfg, err := LoadConfig("config.json") // the jump the game really has (its height and the speed it is steered at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.Ash.RockTomb.MaxHeight = tc.maxHeight
+		g := duel(cfg, ash, snorlax)
+		g.P[0].X, g.P[0].Y = 1000, 500
+		g.P[1].X, g.P[1].Y = 1000, 500
+		rt := cfg.Ash.RockTomb
+		for n := 0; n < rt.Count; n++ {
+			a := 2 * math.Pi * float64(n) / float64(rt.Count)
+			g.Balls = append(g.Balls, Ball{K: ballStone, Owner: 0, X: 1000 + math.Cos(a)*rt.RingRadius, Y: 500 + math.Sin(a)*rt.RingRadius, HP: 1 << 20, Life: 1000})
+		}
+		furthest := 0.0
+		for tick := 0; tick < int(10*tickRate); tick++ {
+			g.P[1].In = Input{Skill: true, DX: 1} // jump and walk at the wall, again and again
+			g.Step(dt)
+			furthest = math.Max(furthest, math.Hypot(g.P[1].X-1000, g.P[1].Y-500))
+		}
+		if out := furthest > rt.RingRadius+rt.StoneRadius; out != tc.escapes {
+			t.Fatalf("band up to %v: got out %v (furthest %.0f from the middle), want %v", tc.maxHeight, out, furthest, tc.escapes)
+		}
+	}
+}

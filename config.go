@@ -1231,3 +1231,11 @@ func (b *BrawlerCfg) validate(name string) error {
 	}
 	return nil
 }
+
+// brawlerOf is the numbers of the brawler of this kind (Machamp's own, Ash's for anyone else).
+func (c *Config) brawlerOf(kind int) *BrawlerCfg {
+	if kind == machamp {
+		return &c.Machamp
+	}
+	return &c.Ash
+}

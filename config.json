@@ -358,17 +358,17 @@
     },
     "rock_tomb": {
       "min_height": 0,
-      "max_height": 60,
-      "ring_radius": 300,
+      "max_height": 120,
+      "ring_radius": 270,
       "height": 80,
       "duration": 0.8,
-      "cooldown": 12,
-      "air_speed_first_half": 150,
+      "cooldown": 6,
+      "air_speed_first_half": 200,
       "air_speed_second_half": 100,
       "count": 24,
       "stone_radius": 60,
       "stone_hp": 100,
-      "stone_duration": 10
+      "stone_duration": 8
     }
   },
   "machamp": {
@@ -412,7 +412,7 @@
     },
     "rock_tomb": {
       "min_height": 0,
-      "max_height": 60,
+      "max_height": 120,
       "ring_radius": 270,
       "height": 80,
       "duration": 0.8,

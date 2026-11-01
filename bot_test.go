@@ -9,7 +9,9 @@ import (
 
 // ---- the computer player ----
 
-func hasAct(in Input) bool { return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch }
+func hasAct(in Input) bool {
+	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock
+}
 
 // firstAct runs the bot for n ticks on a scene that does not change and returns the first decision that presses a
 // skill key; if it never does, ok is false and the last decision (the stick) is returned.
@@ -424,9 +426,9 @@ func TestTheBotNoticesAThreatOnlyAfterItsReactionTime(t *testing.T) {
 	t.Fatal("it never reacted")
 }
 
-func TestOnlyPikachuAndSnorlaxCanBePlayedByTheComputer(t *testing.T) {
+func TestOnlyPikachuSnorlaxChikoritaAndAshCanBePlayedByTheComputer(t *testing.T) {
 	for k := 0; k < kinds; k++ {
-		if got, want := botCanPlay(k), k == pikachu || k == snorlax; got != want {
+		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash; got != want {
 			t.Errorf("botCanPlay(%d) = %v, want %v", k, got, want)
 		}
 	}
@@ -457,7 +459,8 @@ func TestBotsFightToAFinishWithoutGettingStuck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pairs := [][2]int{{pikachu, snorlax}, {snorlax, pikachu}, {pikachu, pikachu}, {snorlax, snorlax}}
+	pairs := [][2]int{{pikachu, snorlax}, {snorlax, pikachu}, {pikachu, pikachu}, {snorlax, snorlax},
+		{chikorita, snorlax}, {snorlax, chikorita}, {chikorita, pikachu}, {ash, pikachu}, {pikachu, ash}, {ash, snorlax}, {ash, chikorita}, {chikorita, ash}, {ash, ash}, {chikorita, chikorita}}
 	for _, pr := range pairs {
 		wins, timeouts, total := [2]int{}, 0, 0.0
 		const n = 20
@@ -477,7 +480,7 @@ func TestBotsFightToAFinishWithoutGettingStuck(t *testing.T) {
 	}
 }
 
-var NAMEOF = [...]string{"Pikachu", "Snorlax"}
+var NAMEOF = [...]string{"Pikachu", "Snorlax", "Charizard", "Chikorita", "Vulpix", "Rowlet", "Magikarp", "Ash"}
 
 // ---- in a room ----
 
@@ -914,5 +917,183 @@ func TestBotsStepOutOfAWarnedTailWhipFan(t *testing.T) {
 	}
 	if th := b.look(g, 0).th; th.kind == thPunch {
 		t.Fatalf("threat %+v for a bot standing well outside the fan", th)
+	}
+}
+
+// ---- a tree coming down ----
+
+// treeFall is the bot (slot 0, `kind`) against an Ash in slot 1 at (1300, 450) that has its tree up and facing the bot's side of the
+// court, held up (a moment more, then the swing).
+func treeFall(cfg Config, kind int) *Game {
+	g := duel(cfg, kind, ash)
+	g.P[1].X, g.P[1].Y = 1300, 450
+	g.P[1].TreePhase, g.P[1].TreeT, g.P[1].TreeX, g.P[1].TreeY = treeSmash, 0.6, -1, 0
+	return g
+}
+
+func TestTheBotLeavesTheCanopyAsWellAsTheTrunkOfATree(t *testing.T) {
+	cfg := DefaultConfig()
+	ts := cfg.Ash.TreeSlam
+	for name, off := range map[string]float64{"trunk": ts.TrunkLength * 0.4, "canopy": ts.TrunkLength + ts.LeafRadius*0.8} {
+		for _, kind := range []int{pikachu, snorlax, chikorita, ash} {
+			for seed := uint64(1); seed <= 5; seed++ {
+				g := treeFall(cfg, kind)
+				g.P[0].X, g.P[0].Y = 1300-off, 450
+				if !treeHits(1300, 450, -1, 0, g.P[0].X, g.P[0].Y, g.radius(0), ts.TrunkLength, ts.TrunkWidth, ts.LeafRadius, ts.LeafAngle) {
+					t.Fatalf("%s: the scene is not under the tree", name)
+				}
+				b := newBot(kind, seed)
+				for i := 0; i < 8; i++ { // let it see the scene
+					b.observe(g, 0)
+				}
+				if th := b.look(g, 0).th; th.kind != thTree {
+					t.Fatalf("%s %s: threat %+v, want the tree", name, NAMEOF[kind], th)
+				}
+				if lost := survive(g, b, 0, 1); lost > 0 {
+					t.Fatalf("%s %s seed %d: lost %d HP standing in the %s of the tree", name, NAMEOF[kind], seed, lost, name)
+				}
+			}
+		}
+	}
+}
+
+func TestTheBotIgnoresATreeThatWillNotTouchIt(t *testing.T) {
+	cfg := DefaultConfig()
+	g := treeFall(cfg, pikachu)
+	g.P[0].X, g.P[0].Y = 1300-cfg.Ash.TreeSlam.TrunkLength*0.4, 450+cfg.Ash.TreeSlam.TrunkWidth+120 // beside the trunk, clear of it
+	b := newBot(pikachu, 1)
+	for i := 0; i < 8; i++ {
+		b.observe(g, 0)
+	}
+	if th := b.look(g, 0).th; th.kind == thTree {
+		t.Fatalf("threat %+v: it is clear of the tree", th)
+	}
+}
+
+// ---- Chikorita ----
+
+func chikoritaDuel() *Game {
+	g := duel(DefaultConfig(), chikorita, pikachu)
+	g.P[0].X, g.P[1].X = 900, 1100
+	return g
+}
+
+func TestChikoritaCatchesACloseOpponentInTheVines(t *testing.T) {
+	g := chikoritaDuel()
+	g.P[1].X = 1020 // 120 away: inside the vines' length
+	g.P[0].LeafCD, g.P[0].RazorCD = 99, 99
+	if in, ok := firstAct(newBot(chikorita, 1), g, 0, 60); !ok || !in.Vine {
+		t.Fatalf("decision = %+v (pressed %v), want the Vine Whip", in, ok)
+	}
+}
+
+func TestChikoritaScattersLeavesFromAMiddleDistance(t *testing.T) {
+	g := chikoritaDuel()
+	g.P[1].X = 1300 // 400 away: too far for the vines
+	g.P[0].LeafCD = 99
+	if in, ok := firstAct(newBot(chikorita, 1), g, 0, 60); !ok || !in.Razor {
+		t.Fatalf("decision = %+v (pressed %v), want the Razor Leaf", in, ok)
+	}
+}
+
+func TestChikoritaHopsAtAnOpponentWithTheLeafSlash(t *testing.T) {
+	g := chikoritaDuel()
+	g.P[1].X = 1200 // 300 away: a hop reaches it
+	g.P[0].RazorCD, g.P[0].VineCD = 99, 99
+	in, ok := firstAct(newBot(chikorita, 1), g, 0, 200)
+	if !ok || !in.Skill || in.DX <= 0 {
+		t.Fatalf("decision = %+v (pressed %v), want a hop toward the opponent", in, ok)
+	}
+}
+
+func TestChikoritaDoesNotRootItselfWithTheVinesWhileLeavesComeAtIt(t *testing.T) {
+	g := chikoritaDuel()
+	cfg := g.cfg
+	g.P[0].LeafCD, g.P[0].RazorCD = 99, 99
+	g.Balls = []Ball{{K: ballElectro, Owner: 1, X: 1000, Y: 250, DX: -1, HP: cfg.Pikachu.ElectroBall.HP}}
+	g.P[1].BallCD = 99
+	b := newBot(chikorita, 1)
+	for i := 0; i < 8; i++ {
+		b.observe(g, 0)
+	}
+	for i := 0; i < 40; i++ {
+		if in := b.Decide(g, 0); in.Vine {
+			t.Fatal("it started the vines with a ball on its way")
+		}
+	}
+}
+
+// ---- Ash ----
+
+// ringAround puts a closed ring of Ash's stones (slot 0's) round (x, y).
+func ringAround(g *Game, x, y float64) {
+	rt := g.cfg.Ash.RockTomb
+	for n := 0; n < rt.Count; n++ {
+		a := 2 * math.Pi * float64(n) / float64(rt.Count)
+		g.Balls = append(g.Balls, Ball{K: ballStone, Owner: 0, X: x + math.Cos(a)*rt.RingRadius, Y: y + math.Sin(a)*rt.RingRadius, HP: rt.StoneHP, Life: rt.StoneDuration})
+	}
+}
+
+func ashDuel() *Game {
+	g := duel(DefaultConfig(), ash, snorlax)
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 900, 500, 1000, 500
+	g.P[1].JumpCD = 99 // the dummy does nothing
+	return g
+}
+
+func TestAshRaisesTheRingWhenTheOpponentIsCloseEnoughToBeInsideIt(t *testing.T) {
+	g := ashDuel()
+	g.P[0].CometCD, g.P[0].TreeCD = 99, 99
+	if in, ok := firstAct(newBot(ash, 1), g, 0, 200); !ok || !in.Rock {
+		t.Fatalf("decision = %+v (pressed %v), want the Rock Tomb", in, ok)
+	}
+	g = ashDuel()
+	g.P[1].X = 900 + g.cfg.Ash.RockTomb.RingRadius // outside the ring it would make
+	g.P[0].CometCD, g.P[0].TreeCD = 99, 99
+	if in, ok := firstAct(newBot(ash, 1), g, 0, 200); ok && in.Rock {
+		t.Fatalf("decision = %+v: it raised a ring the opponent stands outside of", in)
+	}
+}
+
+func TestAshPunchesAnOpponentItHasShutInTheRing(t *testing.T) {
+	g := ashDuel()
+	ringAround(g, 1000, 500)
+	g.P[0].RockCD = 99
+	if in, ok := firstAct(newBot(ash, 1), g, 0, 200); !ok || !in.Comet {
+		t.Fatalf("decision = %+v (pressed %v), want the Comet Punch on the one in the ring", in, ok)
+	}
+}
+
+func TestAshSmashesTheTreeOnAnOpponentShutInTheRingWhenThePunchIsSpent(t *testing.T) {
+	g := ashDuel()
+	ringAround(g, 1000, 500)
+	g.P[0].RockCD, g.P[0].CometCD = 99, 99
+	in, ok := firstAct(newBot(ash, 1), g, 0, 200)
+	if !ok || !in.Skill || in.DX <= 0 {
+		t.Fatalf("decision = %+v (pressed %v), want the tree jump toward the opponent", in, ok)
+	}
+}
+
+func TestAshDoesNotRaiseASecondRingWhileTheOpponentIsStillInTheFirst(t *testing.T) {
+	g := ashDuel()
+	ringAround(g, 1000, 500)
+	g.P[0].CometCD, g.P[0].TreeCD = 99, 99 // nothing else to do: it should wait, not wall it in again
+	b := newBot(ash, 1)
+	for i := 0; i < 200; i++ {
+		if in := b.Decide(g, 0); in.Rock {
+			t.Fatal("it raised another ring with the opponent already shut in")
+		}
+	}
+}
+
+func TestAshBotKeepsStillWhileItsSkillsMoveIt(t *testing.T) {
+	g := ashDuel()
+	g.P[0].CometT = 0.5
+	in := newBot(ash, 1)
+	for i := 0; i < 8; i++ {
+		in.observe(g, 0)
+	}
+	if got := in.ash(in.look(g, 0)); got.DX != 0 || got.DY != 0 || hasAct(got) {
+		t.Fatalf("decision = %+v while the flurry runs", got)
 	}
 }
