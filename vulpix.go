@@ -219,7 +219,7 @@ func (g *Game) tickFrost(dt float64) {
 // but its owner, at the heights of its own skill's band. Two passes, so being pushed out of one into the next is
 // settled; a body walled in by a ring of them is simply held until one melts or breaks.
 func (g *Game) blockByPillars(i int) {
-	p, fb, rt := &g.P[i], g.cfg.Vulpix.FreezeBeam, g.cfg.Machamp.RockTomb
+	p, fb := &g.P[i], g.cfg.Vulpix.FreezeBeam
 	for pass := 0; pass < 2; pass++ {
 		for j := range g.Balls {
 			b := &g.Balls[j]
@@ -228,6 +228,7 @@ func (g *Game) blockByPillars(i int) {
 			}
 			reach, r := fb.Reach, fb.PillarRadius
 			if b.K == ballStone {
+				rt := g.brawler(b.Owner).RockTomb
 				reach, r = rt.Reach, rt.StoneRadius
 			}
 			if !reach.hits(p) {

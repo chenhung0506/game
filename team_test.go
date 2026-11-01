@@ -34,18 +34,18 @@ func knockOut(r *room, i int, now time.Time) []byte {
 	return r.step(now)
 }
 
-func TestOrderMustBeAPermutationOfEveryCharacter(t *testing.T) {
+func TestOrderMustBeSixOrThreeDifferentCharactersOutOfAllOfThem(t *testing.T) {
 	r := teamRoom()
-	if r.setOrder(0, []int{0, 1, 2, 3, 4, 5, 6, 7}) {
+	if r.setOrder(0, []int{0, 1, 2, 3, 4, 5}) {
 		t.Fatal("an order was taken outside team mode")
 	}
 	r.setTeam(true)
-	for _, bad := range [][]int{{0, 1, 2, 3, 4, 5, 6}, {0, 1, 2, 3, 4, 5, 6, 6}, {0, 1, 2, 3, 4, 5, 6, 8}, {-1, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3, 4, 5, 6, 7, 0}, nil} {
+	for _, bad := range [][]int{{0, 1, 2, 3, 4}, {0, 1, 2, 3, 4, 4}, {0, 1, 2, 3, 4, 9}, {-1, 1, 2, 3, 4, 5}, {0, 1, 2, 3, 4, 5, 6}, nil} {
 		if r.setOrder(0, bad) {
 			t.Errorf("order %v was taken", bad)
 		}
 	}
-	if !r.setOrder(0, []int{2, 0, 3, 1, 4, 5, 6, 7}) || r.pick[0] != 2 {
+	if !r.setOrder(0, []int{2, 0, 3, 1, 4, 5}) || r.pick[0] != 2 {
 		t.Fatalf("a good order was refused, or its first character is not the pick (%v)", r.pick)
 	}
 	if r.choose(1, 0) {
@@ -56,15 +56,15 @@ func TestOrderMustBeAPermutationOfEveryCharacter(t *testing.T) {
 func TestTeamMatchStartsWhenBothOrdersAreIn(t *testing.T) {
 	r := teamRoom()
 	r.setTeam(true)
-	r.setOrder(0, []int{2, 0, 3, 1, 4, 5, 6, 7})
+	r.setOrder(0, []int{2, 0, 3, 1, 4, 5})
 	if r.playing() && r.g.P[0].Kind == 2 && r.g.P[1].Kind == 3 {
 		t.Fatal("started with one order only")
 	}
-	r.setOrder(1, []int{3, 1, 0, 2, 4, 5, 6, 7})
+	r.setOrder(1, []int{3, 1, 0, 2, 4, 5})
 	if !r.playing() || r.g.P[0].Kind != 2 || r.g.P[1].Kind != 3 {
 		t.Fatalf("kinds %d,%d, want each side's first: 2 and 3", r.g.P[0].Kind, r.g.P[1].Kind)
 	}
-	if r.setOrder(0, []int{0, 1, 2, 3, 4, 5, 6, 7}) || r.setTeam(false) {
+	if r.setOrder(0, []int{0, 1, 2, 3, 4, 5}) || r.setTeam(false) {
 		t.Fatal("the order or the mode changed while a match is on")
 	}
 }
@@ -72,8 +72,8 @@ func TestTeamMatchStartsWhenBothOrdersAreIn(t *testing.T) {
 func TestKnockedOutCharacterIsReplacedInOrderAndSurvivorKeepsItsHP(t *testing.T) {
 	r := teamRoom()
 	r.setTeam(true)
-	r.setOrder(0, []int{0, 1, 2, 3, 4, 5, 6, 7})
-	r.setOrder(1, []int{3, 2, 1, 0, 4, 5, 6, 7})
+	r.setOrder(0, []int{0, 1, 2, 3, 4, 5})
+	r.setOrder(1, []int{3, 2, 1, 0, 4, 5})
 	now := time.Now()
 	r.step(now)
 	r.g.P[0].HP = 37 // slot 0's Pikachu is hurt, then slot 1's Chikorita goes down
@@ -100,11 +100,11 @@ func TestKnockedOutCharacterIsReplacedInOrderAndSurvivorKeepsItsHP(t *testing.T)
 func TestMatchEndsWhenASideRunsOutAndHoldsTheResult(t *testing.T) {
 	r := teamRoom()
 	r.setTeam(true)
-	r.setOrder(0, []int{0, 1, 2, 3, 4, 5, 6, 7})
-	r.setOrder(1, []int{3, 2, 1, 0, 4, 5, 6, 7})
+	r.setOrder(0, []int{0, 1, 2, 3, 4, 5})
+	r.setOrder(1, []int{3, 2, 1, 0, 4, 5})
 	now := time.Now()
 	r.step(now)
-	for n := 0; n < kinds-1; n++ {
+	for n := 0; n < r.teamN()-1; n++ {
 		if m := snapOf(t, knockOut(r, 1, now)); m.TM.Over {
 			t.Fatalf("over after %d knock-outs", n+1)
 		}
@@ -112,7 +112,7 @@ func TestMatchEndsWhenASideRunsOutAndHoldsTheResult(t *testing.T) {
 		r.step(now)
 	}
 	m := snapOf(t, knockOut(r, 1, now))
-	if !m.TM.Over || m.TM.Winner != 0 || len(m.TM.Fallen[1]) != kinds {
+	if !m.TM.Over || m.TM.Winner != 0 || len(m.TM.Fallen[1]) != r.teamN() {
 		t.Fatalf("team %+v, want the match over, won by slot 0, with all four of slot 1 fallen", m.TM)
 	}
 	if r.repick() == false {
@@ -123,9 +123,9 @@ func TestMatchEndsWhenASideRunsOutAndHoldsTheResult(t *testing.T) {
 func TestSimultaneousKnockOutOfBothLastCharactersGoesToSlotZero(t *testing.T) {
 	r := teamRoom()
 	r.setTeam(true)
-	r.setOrder(0, []int{0, 1, 2, 3, 4, 5, 6, 7})
-	r.setOrder(1, []int{0, 1, 2, 3, 4, 5, 6, 7})
-	r.cur = [2]int{kinds - 1, kinds - 1}
+	r.setOrder(0, []int{0, 1, 2, 3, 4, 5})
+	r.setOrder(1, []int{0, 1, 2, 3, 4, 5})
+	r.cur = [2]int{r.teamN() - 1, r.teamN() - 1}
 	r.g.P[0].HP = 0
 	m := snapOf(t, knockOut(r, 1, time.Now()))
 	if !m.TM.Over || m.TM.Winner != 0 {
@@ -136,11 +136,11 @@ func TestSimultaneousKnockOutOfBothLastCharactersGoesToSlotZero(t *testing.T) {
 func TestResultStaysUpLongerThanABoutBreakThenRestartsTheSameMatch(t *testing.T) {
 	r := teamRoom()
 	r.setTeam(true)
-	r.setOrder(0, []int{1, 0, 2, 3, 4, 5, 6, 7})
-	r.setOrder(1, []int{2, 0, 1, 3, 4, 5, 6, 7})
+	r.setOrder(0, []int{1, 0, 2, 3, 4, 5})
+	r.setOrder(1, []int{2, 0, 1, 3, 4, 5})
 	now := time.Now()
 	r.step(now)
-	r.cur = [2]int{0, kinds - 1}
+	r.cur = [2]int{0, r.teamN() - 1}
 	snapOf(t, knockOut(r, 1, now))
 	if m := snapOf(t, r.step(now.Add(roundReset+time.Millisecond))); m.W != 0 {
 		t.Fatal("the result went away after a bout break: the repick button needs longer")
@@ -170,8 +170,8 @@ func TestRepickIsOnlyForAFinishedMatchAndFreesBothPlayers(t *testing.T) {
 
 	// A team match between bouts is not finished: no repick until it is over.
 	r.setTeam(true)
-	r.setOrder(0, []int{0, 1, 2, 3, 4, 5, 6, 7})
-	r.setOrder(1, []int{0, 1, 2, 3, 4, 5, 6, 7})
+	r.setOrder(0, []int{0, 1, 2, 3, 4, 5})
+	r.setOrder(1, []int{0, 1, 2, 3, 4, 5})
 	r.step(now)
 	knockOut(r, 1, now)
 	if r.repick() {
@@ -200,9 +200,9 @@ func TestSingleMatchesStillRestartAndTheSnapshotHasNoTeam(t *testing.T) {
 func TestRunningOutOnSlotZeroGivesTheMatchToSlotOne(t *testing.T) {
 	r := teamRoom()
 	r.setTeam(true)
-	r.setOrder(0, []int{0, 1, 2, 3, 4, 5, 6, 7})
-	r.setOrder(1, []int{0, 1, 2, 3, 4, 5, 6, 7})
-	r.cur = [2]int{kinds - 1, 0}
+	r.setOrder(0, []int{0, 1, 2, 3, 4, 5})
+	r.setOrder(1, []int{0, 1, 2, 3, 4, 5})
+	r.cur = [2]int{r.teamN() - 1, 0}
 	m := snapOf(t, knockOut(r, 0, time.Now()))
 	if !m.TM.Over || m.TM.Winner != 1 || m.W != 1 {
 		t.Fatalf("team %+v winner %d, want slot 1 to win", m.TM, m.W)
@@ -212,19 +212,19 @@ func TestRunningOutOnSlotZeroGivesTheMatchToSlotOne(t *testing.T) {
 func TestTeamSizeIsThreeOrAllAndChangingItMakesEveryoneChooseAgain(t *testing.T) {
 	r := teamRoom()
 	r.setTeam(true)
-	if r.teamN() != kinds {
-		t.Fatalf("default size %d, want all %d", r.teamN(), kinds)
+	if r.teamN() != 6 {
+		t.Fatalf("default size %d, want 6", r.teamN())
 	}
-	for _, bad := range []int{0, 1, 2, 4, 5, 6, 7, 9, -3} {
+	for _, bad := range []int{0, 1, 2, 4, 5, 7, 8, 9, 10, -3} {
 		if r.setSize(bad) {
 			t.Errorf("size %d was taken", bad)
 		}
 	}
-	r.setOrder(0, []int{0, 1, 2, 3, 4, 5, 6, 7})
+	r.setOrder(0, []int{0, 1, 2, 3, 4, 5})
 	if !r.setSize(3) || r.teamN() != 3 || r.pick != [2]int{-1, -1} {
 		t.Fatalf("size %d, picks %v after choosing 3: want everyone to choose again", r.teamN(), r.pick)
 	}
-	if r.setOrder(0, []int{0, 1, 2, 3, 4, 5, 6, 7}) || r.setOrder(0, []int{0, 1}) || r.setOrder(0, []int{0, 1, 1}) || r.setOrder(0, []int{0, 1, 8}) {
+	if r.setOrder(0, []int{0, 1, 2, 3, 4, 5}) || r.setOrder(0, []int{0, 1}) || r.setOrder(0, []int{0, 1, 1}) || r.setOrder(0, []int{0, 1, 9}) {
 		t.Fatal("a bad order for a team of 3 was taken")
 	}
 	if !r.setOrder(0, []int{5, 0, 3}) || r.pick[0] != 5 {
@@ -255,5 +255,20 @@ func TestATeamOfThreeEndsAfterThreeKnockOutsAndReportsItsSize(t *testing.T) {
 	m := snapOf(t, knockOut(r, 1, now))
 	if !m.TM.Over || m.TM.Winner != 0 || len(m.TM.Fallen[1]) != 3 {
 		t.Fatalf("team %+v, want the match over after 3 knock-outs, won by slot 0", m.TM)
+	}
+}
+
+func TestAnyCharacterCanBeFieldedInATeamOfSixOrThree(t *testing.T) {
+	r := teamRoom()
+	r.setTeam(true)
+	if !r.setOrder(0, []int{ash, machamp, magikarp, 0, 1, 2}) || r.pick[0] != ash {
+		t.Fatalf("a team of six with the last characters was refused (%v)", r.pick)
+	}
+	r.setSize(3)
+	if !r.setOrder(0, []int{machamp, ash, 0}) || r.pick[0] != machamp {
+		t.Fatalf("a team of three with the last characters was refused (%v)", r.pick)
+	}
+	if r.setOrder(0, []int{gyarados, 0, 1}) {
+		t.Fatal("Gyarados was fielded; it is only a form")
 	}
 }

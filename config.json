@@ -317,7 +317,7 @@
       "width": 50
     }
   },
-  "machamp": {
+  "ash": {
     "max_hp": 140,
     "walk_speed": 150,
     "radius": 30,
@@ -367,6 +367,58 @@
       "stone_radius": 60,
       "stone_hp": 100,
       "stone_duration": 8
+    }
+  },
+  "machamp": {
+    "max_hp": 126,
+    "walk_speed": 140,
+    "radius": 30,
+    "tree_slam": {
+      "min_height": 0,
+      "max_height": 60,
+      "jump_distance": 250,
+      "jump_duration": 0.5,
+      "jump_height": 50,
+      "charge_duration": 0.6,
+      "swing_duration": 0.2,
+      "trunk_scale": 1,
+      "trunk_length": 270,
+      "trunk_width": 70,
+      "leaf_scale": 1,
+      "leaf_radius": 198,
+      "leaf_angle": 220,
+      "damage": 30,
+      "cooldown": 9.2
+    },
+    "comet_punch": {
+      "min_height": 0,
+      "max_height": 60,
+      "radius": 22,
+      "hp": 16,
+      "damage": 2,
+      "cooldown": 9.2,
+      "mass": 100,
+      "duration": 1.5,
+      "quantity": 41,
+      "random_offset_angle": 60,
+      "distance": 500,
+      "scatter_min_distance": 20,
+      "scatter_max_distance": 90,
+      "fist_duration": 0.2
+    },
+    "rock_tomb": {
+      "min_height": 0,
+      "max_height": 60,
+      "ring_radius": 270,
+      "height": 80,
+      "duration": 0.8,
+      "cooldown": 13.8,
+      "air_speed_first_half": 150,
+      "air_speed_second_half": 100,
+      "count": 20,
+      "stone_radius": 60,
+      "stone_hp": 80,
+      "stone_duration": 6.8
     }
   }
 }

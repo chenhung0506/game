@@ -31,10 +31,11 @@ const (
 	vulpix    = 4
 	rowlet    = 5
 	magikarp  = 6
-	machamp   = 7
+	ash       = 7
+	machamp   = 8
 	// kinds is how many characters a player can pick. Gyarados is not one of them: it is what Magikarp becomes, so it
 	// is a kind a player can be in (Player.Kind, and everything indexed by kind) but never chooses.
-	kinds    = 8
+	kinds    = 9
 	gyarados = kinds
 	forms    = kinds + 1 // every kind a player can be in
 )
@@ -272,9 +273,10 @@ const (
 // Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
 // touches the opponent, runs out of range or HP, or reaches a wall.
 type Ball struct {
-	K         int     `json:"k,omitempty"` // ballElectro | ballFire | ballLeaf
-	Owner     int     `json:"-"`           // the slot that threw it; the other slot is its target
-	Left      float64 `json:"-"`           // fire ball: range left
+	K         int     `json:"k,omitempty"`  // ballElectro | ballFire | ballLeaf
+	Owner     int     `json:"-"`            // the slot that threw it; the other slot is its target
+	Side      int     `json:"sd,omitempty"` // a fist or a stone: its owner's slot + 1, for the page to tell Ash's from Machamp's
+	Left      float64 `json:"-"`            // fire ball: range left
 	X         float64 `json:"x"`
 	Y         float64 `json:"y"`
 	DX        float64 `json:"dx,omitempty"` // unit direction
@@ -310,6 +312,7 @@ type Event struct {
 	R  float64 `json:"r,omitempty"`  // slam reach, so the effect can match it
 	DX float64 `json:"dx,omitempty"` // a direction (the tail whip's)
 	DY float64 `json:"dy,omitempty"`
+	K  int     `json:"k,omitempty"` // the kind that made it, where that changes how it looks (the tree slam: Ash's or Machamp's)
 }
 
 // The view a room was opened from decides its court.
@@ -401,9 +404,9 @@ func (g *Game) ballRadius(b *Ball) float64 {
 	case ballPillar:
 		return g.cfg.Vulpix.FreezeBeam.PillarRadius
 	case ballStone:
-		return g.cfg.Machamp.RockTomb.StoneRadius
+		return g.brawler(b.Owner).RockTomb.StoneRadius
 	case ballFist:
-		return g.cfg.Machamp.CometPunch.Radius
+		return g.brawler(b.Owner).CometPunch.Radius
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Radius
 	case ballTornado:
@@ -421,7 +424,7 @@ func (g *Game) ballMass(b *Ball) float64 {
 	case ballPillar, ballStone:
 		return pillarMass // a beam or a punch does not push it
 	case ballFist:
-		return g.cfg.Machamp.CometPunch.Mass
+		return g.brawler(b.Owner).CometPunch.Mass
 	case ballTornado:
 		return g.cfg.Rowlet.Tornado.Mass
 	case ballArrow:
@@ -686,7 +689,7 @@ func (g *Game) Step(dt float64) []Event {
 			events = append(events, ev...)
 		}
 
-		if p.Kind == machamp {
+		if isBrawler(p.Kind) {
 			var ev []Event
 			ev, casting = g.stepMachamp(i, in, dt) // the tree jump and the flurry move it themselves; the smash roots it
 			events = append(events, ev...)
@@ -790,8 +793,8 @@ func (g *Game) Step(dt float64) []Event {
 			if p.Kind == magikarp && p.HopLeft > 0 {
 				v = g.magikarpAirSpeed(p)
 			}
-			if p.Kind == machamp && p.RockT > 0 {
-				v = g.machampAirSpeed(p)
+			if isBrawler(p.Kind) && p.RockT > 0 {
+				v = g.machampAirSpeed(i)
 			}
 			if p.Kind == snorlax && p.Z > 0 {
 				v = g.cfg.Snorlax.Jump.AirSpeedSecondHalf
@@ -928,7 +931,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 		}
 		if b.K == ballFist {
 			if b.HP > 0 {
-				cp := g.cfg.Machamp.CometPunch
+				cp := g.brawler(b.Owner).CometPunch
 				if cp.Reach.hits(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= cp.Radius+g.radius(1-b.Owner) {
 					g.hit(foe, cp.Damage)
 					events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
@@ -1089,7 +1092,7 @@ func (g *Game) ballDamage(b *Ball) int {
 	case ballPillar, ballStone:
 		return pillarBlock
 	case ballFist:
-		return g.cfg.Machamp.CometPunch.Damage
+		return g.brawler(b.Owner).CometPunch.Damage
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Damage
 	case ballTornado:

@@ -10,6 +10,17 @@ const (
 	treeSwing // the tree coming down like an axe; it hits when the swing ends
 )
 
+// isBrawler is whether kind is one of the two that fight with the tree, the fists and the rocks.
+func isBrawler(kind int) bool { return kind == ash || kind == machamp }
+
+// brawler is the numbers slot i plays by: Machamp's own, else Ash's (a stone or a fist is looked up by its owner).
+func (g *Game) brawler(i int) *BrawlerCfg {
+	if g.P[i].Kind == machamp {
+		return &g.cfg.Machamp
+	}
+	return &g.cfg.Ash
+}
+
 // dropMachamp ends whatever Machamp was doing (it was frozen, stunned or caught).
 func (g *Game) dropMachamp(i int) {
 	p := &g.P[i]
@@ -20,8 +31,9 @@ func (g *Game) dropMachamp(i int) {
 }
 
 // machampAirSpeed is how fast Machamp is steered in the Rock Tomb jump: the first speed until the middle, the second after.
-func (g *Game) machampAirSpeed(p *Player) float64 {
-	rt := g.cfg.Machamp.RockTomb
+func (g *Game) machampAirSpeed(i int) float64 {
+	p := &g.P[i]
+	rt := g.brawler(i).RockTomb
 	if rt.Duration-p.RockT < rt.Duration/2 {
 		return rt.AirSpeedFirstHalf
 	}
@@ -33,7 +45,7 @@ func (g *Game) machampAirSpeed(p *Player) float64 {
 func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
 	p, other := &g.P[i], &g.P[1-i]
-	ts, cp, rt := g.cfg.Machamp.TreeSlam, g.cfg.Machamp.CometPunch, g.cfg.Machamp.RockTomb
+	ts, cp, rt := g.brawler(i).TreeSlam, g.brawler(i).CometPunch, g.brawler(i).RockTomb
 	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD} {
 		if *cd > 0 {
 			if *cd -= dt; *cd < 1e-9 {
@@ -105,7 +117,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 			dx, dy := fx*ca-fy*sa, fx*sa+fy*ca
 			d := g.radius(i) + cp.ScatterMinDistance + g.rng.Float64()*(cp.ScatterMaxDistance-cp.ScatterMinDistance)
 			g.Balls = append(g.Balls, Ball{
-				K: ballFist, Owner: i, DX: dx, DY: dy, HP: cp.HP, Life: cp.FistDuration,
+				K: ballFist, Owner: i, Side: i + 1, DX: dx, DY: dy, HP: cp.HP, Life: cp.FistDuration,
 				X: math.Min(math.Max(p.X+dx*d, 0), g.court.Length), Y: math.Min(math.Max(p.Y+dy*d, 0), g.court.Width),
 			})
 		}
@@ -125,7 +137,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 				if x < 0 || x > g.court.Length || y < 0 || y > g.court.Width {
 					continue // out of the court
 				}
-				g.Balls = append(g.Balls, Ball{K: ballStone, Owner: i, X: x, Y: y, HP: rt.StoneHP, Life: rt.StoneDuration})
+				g.Balls = append(g.Balls, Ball{K: ballStone, Owner: i, Side: i + 1, X: x, Y: y, HP: rt.StoneHP, Life: rt.StoneDuration})
 			}
 		} else {
 			u := 1 - p.RockT/rt.Duration
@@ -139,7 +151,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 // down, then the hit.
 func (g *Game) advanceTree(i int) []Event {
 	var events []Event
-	p, ts := &g.P[i], g.cfg.Machamp.TreeSlam
+	p, ts := &g.P[i], g.brawler(i).TreeSlam
 	for p.TreePhase != treeNone && p.TreeT == 0 {
 		switch p.TreePhase {
 		case treeSmash:
@@ -154,11 +166,11 @@ func (g *Game) advanceTree(i int) []Event {
 
 // smashTree brings the tree down toward where the opponent stood as it landed and hurts the opponent it lands on, once.
 func (g *Game) smashTree(i int) []Event {
-	p, other, ts := &g.P[i], &g.P[1-i], g.cfg.Machamp.TreeSlam
+	p, other, ts := &g.P[i], &g.P[1-i], g.brawler(i).TreeSlam
 	if ts.Reach.hits(other) && treeHits(p.X, p.Y, p.TreeX, p.TreeY, other.X, other.Y, g.radius(1-i), ts.TrunkLength, ts.TrunkWidth, ts.LeafRadius, ts.LeafAngle) {
 		g.hit(other, ts.Damage)
 	}
-	return []Event{{T: "tree", X: p.X, Y: p.Y, R: ts.TrunkLength, DX: p.TreeX, DY: p.TreeY}}
+	return []Event{{T: "tree", X: p.X, Y: p.Y, R: ts.TrunkLength, DX: p.TreeX, DY: p.TreeY, K: p.Kind}}
 }
 
 // treeHits is whether a body of radius r at (bx, by) touches a tree smashed down from (x, y) along the unit vector

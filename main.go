@@ -49,11 +49,11 @@ type room struct {
 	winner  int
 	aloneAt time.Time // since when one person has been in it alone
 
-	// Team match: both players send the order they field `teamN()` characters in (3, or all `kinds`); when one is knocked out the
+	// Team match: both players send the order they field `teamN()` characters in (3 or 6 of the `kinds`); when one is knocked out the
 	// next in order steps in, and the match is over when a side has run out. A survivor keeps its HP.
 	team        bool
-	size        int // characters per side in a team match: teamSize3 or kinds; 0 is kinds
-	order       [2][kinds]int
+	size        int // characters per side in a team match: teamSize3 or teamSize6; 0 is teamSize6
+	order       [2][teamSize6]int
 	ease        [2]int // each slot's handicap in percent, chosen in the lobby
 	cur         [2]int // index into order of the character each side is fielding
 	matchOver   bool
@@ -336,13 +336,16 @@ func (r *room) choose(idx, kind int) bool {
 	return true
 }
 
-// teamSize3 is the small team match; the other is all `kinds` characters.
-const teamSize3 = 3
+// The two team matches there are: three characters a side, or six. Each side picks them out of the `kinds` there are.
+const (
+	teamSize3 = 3
+	teamSize6 = 6
+)
 
 // teamN is how many characters each side fields in a team match.
 func (r *room) teamN() int {
 	if r.size == 0 {
-		return kinds
+		return teamSize6
 	}
 	return r.size
 }
@@ -350,7 +353,7 @@ func (r *room) teamN() int {
 // setSize chooses the team match's size (3 or all `kinds`). Everyone has to choose again; it is refused while a
 // match is on. Must be called with r.mu held.
 func (r *room) setSize(n int) bool {
-	if r.playing() || (n != teamSize3 && n != kinds) {
+	if r.playing() || (n != teamSize3 && n != teamSize6) {
 		return false
 	}
 	r.size = n
@@ -615,16 +618,23 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	r.mu.Lock()
 	cfg := r.g.cfg
 	hb, gb, th, fb, ts := cfg.Snorlax.HyperBeam, cfg.Gyarados.HyperBeam, cfg.Pikachu.Thunder, cfg.Charizard.FireBreath, cfg.Charizard.SeismicToss // tunable, so the client takes them from here instead of hard-coding
-	tree, comet, rock := cfg.Machamp.TreeSlam, cfg.Machamp.CometPunch, cfg.Machamp.RockTomb
+	brawl := func(b BrawlerCfg) (tree, fist, stone map[string]float64) {                                                                          // what the page draws of Ash's and of Machamp's tree, fists and stones
+		return map[string]float64{"len": b.TreeSlam.TrunkLength, "w": b.TreeSlam.TrunkWidth, "scale": b.TreeSlam.TrunkScale, "leaf": b.TreeSlam.LeafRadius, "leafscale": b.TreeSlam.LeafScale, "angle": b.TreeSlam.LeafAngle, "charge": b.TreeSlam.ChargeDuration, "swing": b.TreeSlam.SwingDuration, "dist": b.TreeSlam.JumpDistance, "jump": b.TreeSlam.JumpDuration},
+			map[string]float64{"radius": b.CometPunch.Radius, "hp": float64(b.CometPunch.HP), "life": b.CometPunch.FistDuration},
+			map[string]float64{"radius": b.RockTomb.StoneRadius, "hp": float64(b.RockTomb.StoneHP), "life": b.RockTomb.StoneDuration}
+	}
+	aTree, aFist, aStone := brawl(cfg.Ash)
+	mTree, mFist, mStone := brawl(cfg.Machamp)
+	tree, comet, rock := cfg.Ash.TreeSlam, cfg.Ash.CometPunch, cfg.Ash.RockTomb
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
-		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, machamp and the gyarados magikarp becomes
-		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Machamp.Radius, cfg.Gyarados.Radius},
-		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Machamp.MaxHP, cfg.Gyarados.MaxHP},
+		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp and the gyarados magikarp becomes
+		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gyarados.Radius},
+		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gyarados.MaxHP},
 		"evolve":  cfg.Magikarp.EvolveHops,
-		"tree":    map[string]float64{"len": tree.TrunkLength, "w": tree.TrunkWidth, "scale": tree.TrunkScale, "leaf": tree.LeafRadius, "leafscale": tree.LeafScale, "angle": tree.LeafAngle, "charge": tree.ChargeDuration, "swing": tree.SwingDuration, "dist": tree.JumpDistance, "jump": tree.JumpDuration},
-		"fist":    map[string]float64{"radius": comet.Radius, "hp": float64(comet.HP), "life": comet.FistDuration},
-		"stone":   map[string]float64{"radius": rock.StoneRadius, "hp": float64(rock.StoneHP), "life": rock.StoneDuration},
+		"tree":    []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
+		"fist":    []map[string]float64{aFist, mFist},
+		"stone":   []map[string]float64{aStone, mStone},
 		"wave":    map[string]float64{"radius": cfg.Gyarados.Wave.Radius, "speed": cfg.Gyarados.Wave.Speed},
 		"tail":    map[string]float64{"angle": cfg.Gyarados.TailWhip.Angle, "length": cfg.Gyarados.TailWhip.Length, "stun": cfg.Gyarados.TailWhip.StunDuration, "charge": cfg.Gyarados.TailWhip.ChargeDuration},
 		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "scale": cfg.Vulpix.FrostField.Scale, "duration": cfg.Vulpix.FrostField.Duration, "ride": cfg.Vulpix.FrostField.SprayDuration},
@@ -651,7 +661,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,
 			"frost": cfg.Vulpix.FrostField.Cooldown, "storm": cfg.Vulpix.IceStorm.Cooldown, "fbeam": cfg.Vulpix.FreezeBeam.Cooldown,
 			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown,
-			"tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
+			"tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "mtree": cfg.Machamp.TreeSlam.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
 	})
 	c.send <- hi
 	r.broadcastLobby() // both players learn who joined

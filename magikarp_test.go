@@ -199,8 +199,8 @@ func TestGyaradosCannotBePickedOnlyMagikarpCan(t *testing.T) {
 func TestATeamSurvivorComesBackAsMagikarpWithoutMoreHPThanItCanHold(t *testing.T) {
 	r := teamRoom()
 	r.setTeam(true)
-	r.setOrder(0, []int{magikarp, 0, 1, 2, 3, 4, 5, machamp})
-	r.setOrder(1, []int{0, 1, 2, 3, 4, 5, 6, 7})
+	r.setOrder(0, []int{magikarp, 0, 1, 2, 3, 4})
+	r.setOrder(1, []int{0, 1, 2, 3, 4, 5})
 	r.g.evolve(0) // it has evolved by the end of the bout
 	r.g.P[0].HP = r.g.cfg.Gyarados.MaxHP - 5
 	now := time.Now()

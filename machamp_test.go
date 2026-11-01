@@ -10,7 +10,7 @@ import (
 
 // mach is Machamp (slot 0, at 300,250, full HP) against foe (slot 1, at 900,250).
 func mach(cfg Config, foe int) *Game {
-	g := duel(cfg, machamp, foe)
+	g := duel(cfg, ash, foe)
 	g.P[0].HP = g.maxHP(0)
 	return g
 }
@@ -49,7 +49,7 @@ func fistCount(g *Game) (n int) {
 
 func TestTreeSlamJumpsTheConfiguredDistanceAndHeightThenHoldsTheTreeUpAndSmashesIt(t *testing.T) {
 	cfg := DefaultConfig()
-	ts := cfg.Machamp.TreeSlam
+	ts := cfg.Ash.TreeSlam
 	g := mach(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 1900, 900 // out of the way
 	x0 := g.P[0].X
@@ -135,7 +135,7 @@ func TestTreeShapeIsATrunkWithACanopyAtItsTip(t *testing.T) {
 
 func TestTreeSmashHurtsOnceAndOnlyWithinItsHeightBandAndCoolsDown(t *testing.T) {
 	cfg := DefaultConfig()
-	ts := cfg.Machamp.TreeSlam
+	ts := cfg.Ash.TreeSlam
 	run := func(foeHeight float64) *Game {
 		g := mach(cfg, snorlax)
 		if foeHeight > 0 {
@@ -165,9 +165,9 @@ func TestTreeSmashHurtsOnceAndOnlyWithinItsHeightBandAndCoolsDown(t *testing.T) 
 
 func TestTreeSlamWithNoChargeComesDownOnTheLandingTick(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Machamp.TreeSlam.ChargeDuration = 0
+	cfg.Ash.TreeSlam.ChargeDuration = 0
 	g := mach(cfg, snorlax)
-	g.P[1].X, g.P[1].Y = 300+cfg.Machamp.TreeSlam.JumpDistance+100, 250
+	g.P[1].X, g.P[1].Y = 300+cfg.Ash.TreeSlam.JumpDistance+100, 250
 	g.P[0].In = Input{Skill: true, DX: 1}
 	for n := 0; n < 40 && g.P[1].HP == g.maxHP(1); n++ {
 		g.Step(dt)
@@ -192,9 +192,9 @@ func TestBeingFrozenCutsAMachampSkillShort(t *testing.T) {
 
 func TestCometPunchRunsAtTheOpponentThrowingEveryFistAheadOfIt(t *testing.T) {
 	cfg := DefaultConfig()
-	cp := cfg.Machamp.CometPunch
-	cfg.Machamp.CometPunch.FistDuration = 100 // they stay, so they can be counted
-	cfg.Machamp.CometPunch.Damage = 0
+	cp := cfg.Ash.CometPunch
+	cfg.Ash.CometPunch.FistDuration = 100 // they stay, so they can be counted
+	cfg.Ash.CometPunch.Damage = 0
 	g := mach(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 1900, 250 // far: the whole run is spent running
 	x0 := g.P[0].X
@@ -217,7 +217,7 @@ func TestCometPunchRunsAtTheOpponentThrowingEveryFistAheadOfIt(t *testing.T) {
 		if b.DX < math.Cos(cp.RandomOffsetAngle*math.Pi/180)-1e-9 {
 			t.Fatalf("a fist heads %v,%v, outside +-%v degrees of the run", b.DX, b.DY, cp.RandomOffsetAngle)
 		}
-		if b.X < 300+cp.ScatterMinDistance-1 || d > cp.Distance+cfg.Machamp.Radius+cp.ScatterMaxDistance+1 {
+		if b.X < 300+cp.ScatterMinDistance-1 || d > cp.Distance+cfg.Ash.Radius+cp.ScatterMaxDistance+1 {
 			t.Fatalf("a fist at %v,%v is not ahead of the runner", b.X, b.Y)
 		}
 		if b.HP != cp.HP {
@@ -228,7 +228,7 @@ func TestCometPunchRunsAtTheOpponentThrowingEveryFistAheadOfIt(t *testing.T) {
 
 func TestCometPunchStopsAtTheOpponentsBodyAndEachFistHurtsOnceThenVanishes(t *testing.T) {
 	cfg := DefaultConfig()
-	cp := cfg.Machamp.CometPunch
+	cp := cfg.Ash.CometPunch
 	g := mach(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 400, 250 // 100 away: closer than the run is long
 	g.P[0].In = Input{Comet: true}
@@ -236,8 +236,8 @@ func TestCometPunchStopsAtTheOpponentsBodyAndEachFistHurtsOnceThenVanishes(t *te
 	g.P[0].In = Input{}
 	steps(g, 90)
 	gap := g.P[1].X - g.P[0].X
-	if math.Abs(gap-(cfg.Machamp.Radius+cfg.Snorlax.Radius)) > 1e-6 {
-		t.Fatalf("stopped %v from the opponent, want its body's edge %v", gap, cfg.Machamp.Radius+cfg.Snorlax.Radius)
+	if math.Abs(gap-(cfg.Ash.Radius+cfg.Snorlax.Radius)) > 1e-6 {
+		t.Fatalf("stopped %v from the opponent, want its body's edge %v", gap, cfg.Ash.Radius+cfg.Snorlax.Radius)
 	}
 	lost := g.maxHP(1) - g.P[1].HP
 	if lost == 0 || lost%cp.Damage != 0 || lost > cp.Quantity*cp.Damage {
@@ -250,7 +250,7 @@ func TestCometPunchStopsAtTheOpponentsBodyAndEachFistHurtsOnceThenVanishes(t *te
 
 func TestCometPunchRootsMachampAndHasItsOwnCooldownAndHeightBand(t *testing.T) {
 	cfg := DefaultConfig()
-	cp := cfg.Machamp.CometPunch
+	cp := cfg.Ash.CometPunch
 	g := mach(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 1900, 900
 	g.P[0].In = Input{Comet: true, DY: 1} // asking to walk down while it runs at the foe
@@ -267,7 +267,7 @@ func TestCometPunchRootsMachampAndHasItsOwnCooldownAndHeightBand(t *testing.T) {
 	}
 	// Above the band a fist passes by.
 	cfg2 := DefaultConfig()
-	g = flyer(cfg2, cfg2.Machamp.CometPunch.MaxHeight+30)
+	g = flyer(cfg2, cfg2.Ash.CometPunch.MaxHeight+30)
 	g.P[1].X, g.P[1].Y = 400, 250
 	g.P[0].In = Input{Comet: true}
 	g.Step(dt)
@@ -283,7 +283,7 @@ func TestAFistIsShotDownLikeAFireBallAndShootsBackAtWhatHitsIt(t *testing.T) {
 	g := mach(cfg, pikachu)
 	g.P[1].X, g.P[1].Y = 1900, 900
 	g.Balls = []Ball{
-		{K: ballFist, Owner: 0, X: 500, Y: 250, DX: 1, HP: cfg.Machamp.CometPunch.HP, Life: 5},
+		{K: ballFist, Owner: 0, X: 500, Y: 250, DX: 1, HP: cfg.Ash.CometPunch.HP, Life: 5},
 		{K: ballElectro, Owner: 1, X: 503, Y: 250, DX: -1, HP: cfg.Pikachu.ElectroBall.HP},
 	}
 	for _, b := range g.Balls {
@@ -291,11 +291,11 @@ func TestAFistIsShotDownLikeAFireBallAndShootsBackAtWhatHitsIt(t *testing.T) {
 	}
 	g.Balls[0].X0, g.Balls[0].Y0, g.Balls[1].X0, g.Balls[1].Y0 = 500, 250, 503, 250
 	g.clashBalls()
-	hurtFist := cfg.Machamp.CometPunch.HP - g.Balls[0].HP
+	hurtFist := cfg.Ash.CometPunch.HP - g.Balls[0].HP
 	if hurtFist != cfg.Pikachu.ElectroBall.ContactDamage {
 		t.Fatalf("the fist lost %d, want the ball's contact damage %d", hurtFist, cfg.Pikachu.ElectroBall.ContactDamage)
 	}
-	if g.Balls[1].HP != cfg.Pikachu.ElectroBall.HP-cfg.Machamp.CometPunch.Damage {
+	if g.Balls[1].HP != cfg.Pikachu.ElectroBall.HP-cfg.Ash.CometPunch.Damage {
 		t.Fatalf("the ball's HP %d, want it worn down by the fist's damage", g.Balls[1].HP)
 	}
 }
@@ -304,8 +304,8 @@ func TestAFistIsShotDownLikeAFireBallAndShootsBackAtWhatHitsIt(t *testing.T) {
 
 func TestRockTombJumpsAndSteersFasterOrSlowerByHalvesAndRaisesTheRingOnLanding(t *testing.T) {
 	cfg := DefaultConfig()
-	rt := cfg.Machamp.RockTomb
-	cfg.Machamp.RockTomb.AirSpeedFirstHalf, cfg.Machamp.RockTomb.AirSpeedSecondHalf = 300, 60
+	rt := cfg.Ash.RockTomb
+	cfg.Ash.RockTomb.AirSpeedFirstHalf, cfg.Ash.RockTomb.AirSpeedSecondHalf = 300, 60
 	g := mach(cfg, snorlax)
 	g.P[0].X, g.P[0].Y = 1000, 500
 	g.P[1].X, g.P[1].Y = 1900, 900
@@ -338,7 +338,7 @@ func TestRockTombJumpsAndSteersFasterOrSlowerByHalvesAndRaisesTheRingOnLanding(t
 		if b.K != ballStone {
 			continue
 		}
-		if d := math.Hypot(b.X-g.P[0].X, b.Y-g.P[0].Y); math.Abs(d-rt.RingRadius) > cfg.Machamp.WalkSpeed*dt+1e-6 { // centred on where it was a tick before it stood
+		if d := math.Hypot(b.X-g.P[0].X, b.Y-g.P[0].Y); math.Abs(d-rt.RingRadius) > cfg.Ash.WalkSpeed*dt+1e-6 { // centred on where it was a tick before it stood
 			t.Fatalf("a stone %v from Machamp, want %v", d, rt.RingRadius)
 		}
 		if b.HP != rt.StoneHP || math.Abs(b.Life-rt.StoneDuration) > dt+1e-9 { // it has already ticked once, on the landing step
@@ -353,9 +353,9 @@ func TestRockTombLeavesOutStonesThatWouldBeOutsideTheCourt(t *testing.T) {
 	g.P[0].X, g.P[0].Y = 100, 500 // near the left wall: the left of the ring is outside
 	g.P[1].X, g.P[1].Y = 1900, 900
 	g.P[0].In = Input{Rock: true}
-	steps(g, int(cfg.Machamp.RockTomb.Duration*tickRate)+2)
+	steps(g, int(cfg.Ash.RockTomb.Duration*tickRate)+2)
 	n := stoneCount(g)
-	if n == 0 || n >= cfg.Machamp.RockTomb.Count {
+	if n == 0 || n >= cfg.Ash.RockTomb.Count {
 		t.Fatalf("%d stones, want some but not all", n)
 	}
 	for _, b := range g.Balls {
@@ -367,7 +367,7 @@ func TestRockTombLeavesOutStonesThatWouldBeOutsideTheCourt(t *testing.T) {
 
 func TestStonesBlockTheOpponentButNotMachampOrWhatFliesOverThem(t *testing.T) {
 	cfg := DefaultConfig()
-	rt := cfg.Machamp.RockTomb
+	rt := cfg.Ash.RockTomb
 	g := mach(cfg, snorlax)
 	g.Balls = []Ball{{K: ballStone, Owner: 0, X: 600, Y: 250, HP: rt.StoneHP, Life: 5}}
 	g.P[1].X, g.P[1].Y = 600+rt.StoneRadius+cfg.Snorlax.Radius+30, 250 // to its right, walking left into it
@@ -376,7 +376,7 @@ func TestStonesBlockTheOpponentButNotMachampOrWhatFliesOverThem(t *testing.T) {
 	if gap := math.Hypot(g.P[1].X-600, g.P[1].Y-250); gap < rt.StoneRadius+cfg.Snorlax.Radius-1e-6 {
 		t.Fatalf("the opponent walked into the stone: %v from its middle", gap)
 	}
-	g.P[0].X, g.P[0].Y = 600+rt.StoneRadius+cfg.Machamp.Radius+30, 250
+	g.P[0].X, g.P[0].Y = 600+rt.StoneRadius+cfg.Ash.Radius+30, 250
 	g.P[0].In = Input{DX: -1}
 	steps(g, 60)
 	if g.P[0].X > 600 {
@@ -395,7 +395,7 @@ func TestStonesBlockTheOpponentButNotMachampOrWhatFliesOverThem(t *testing.T) {
 
 func TestAStoneCrumblesWhenItsTimeIsUpAndIsWornDownByProjectiles(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Machamp.RockTomb.StoneDuration = 1
+	cfg.Ash.RockTomb.StoneDuration = 1
 	g := mach(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 1900, 900
 	g.Balls = []Ball{{K: ballStone, Owner: 0, X: 600, Y: 250, HP: 100, Life: 1}}
@@ -433,41 +433,41 @@ func TestOnlyOneMachampSkillRunsAtATime(t *testing.T) {
 // ---- config, snapshot, picking ----
 
 func TestMachampIsPickableAndGyaradosIsStillOnlyAForm(t *testing.T) {
-	if kinds != 8 || machamp != 7 || gyarados != 8 || forms != 9 {
-		t.Fatalf("kinds %d machamp %d gyarados %d forms %d", kinds, machamp, gyarados, forms)
+	if kinds != 9 || ash != 7 || machamp != 8 || gyarados != 9 || forms != 10 {
+		t.Fatalf("kinds %d ash %d gyarados %d forms %d", kinds, ash, gyarados, forms)
 	}
 	r := teamRoom()
-	if !r.choose(0, machamp) || r.choose(1, gyarados) {
+	if !r.choose(0, ash) || r.choose(1, gyarados) {
 		t.Fatal("Machamp should be pickable and Gyarados not")
 	}
 }
 
 func TestMachampConfigIsValidated(t *testing.T) {
 	for name, mut := range map[string]func(c *Config){
-		"jump distance":    func(c *Config) { c.Machamp.TreeSlam.JumpDistance = 0 },
-		"jump duration":    func(c *Config) { c.Machamp.TreeSlam.JumpDuration = 0 },
-		"trunk length":     func(c *Config) { c.Machamp.TreeSlam.TrunkLength = 0 },
-		"trunk width":      func(c *Config) { c.Machamp.TreeSlam.TrunkWidth = 0 },
-		"leaf radius":      func(c *Config) { c.Machamp.TreeSlam.LeafRadius = 0 },
-		"leaf angle":       func(c *Config) { c.Machamp.TreeSlam.LeafAngle = 361 },
-		"trunk scale":      func(c *Config) { c.Machamp.TreeSlam.TrunkScale = 0 },
-		"fist hp":          func(c *Config) { c.Machamp.CometPunch.HP = 0 },
-		"fist quantity":    func(c *Config) { c.Machamp.CometPunch.Quantity = 0 },
-		"too many fists":   func(c *Config) { c.Machamp.CometPunch.Quantity = 201 },
-		"scatter order":    func(c *Config) { c.Machamp.CometPunch.ScatterMaxDistance = c.Machamp.CometPunch.ScatterMinDistance - 1 },
-		"offset angle":     func(c *Config) { c.Machamp.CometPunch.RandomOffsetAngle = 91 },
-		"fist duration":    func(c *Config) { c.Machamp.CometPunch.FistDuration = 0 },
-		"rock duration":    func(c *Config) { c.Machamp.RockTomb.Duration = 0 },
-		"stone radius":     func(c *Config) { c.Machamp.RockTomb.StoneRadius = 0 },
-		"stone hp":         func(c *Config) { c.Machamp.RockTomb.StoneHP = 0 },
-		"stone duration":   func(c *Config) { c.Machamp.RockTomb.StoneDuration = 0 },
-		"too many stones":  func(c *Config) { c.Machamp.RockTomb.Count = 101 },
-		"stone band":       func(c *Config) { c.Machamp.RockTomb.MaxHeight = -1 },
-		"ring radius":      func(c *Config) { c.Machamp.RockTomb.RingRadius = -1 },
-		"tree band":        func(c *Config) { c.Machamp.TreeSlam.MinHeight = 90 },
-		"machamp max hp":   func(c *Config) { c.Machamp.MaxHP = 0 },
-		"punch cooldown":   func(c *Config) { c.Machamp.CometPunch.Cooldown = -1 },
-		"air speed second": func(c *Config) { c.Machamp.RockTomb.AirSpeedSecondHalf = -1 },
+		"jump distance":    func(c *Config) { c.Ash.TreeSlam.JumpDistance = 0 },
+		"jump duration":    func(c *Config) { c.Ash.TreeSlam.JumpDuration = 0 },
+		"trunk length":     func(c *Config) { c.Ash.TreeSlam.TrunkLength = 0 },
+		"trunk width":      func(c *Config) { c.Ash.TreeSlam.TrunkWidth = 0 },
+		"leaf radius":      func(c *Config) { c.Ash.TreeSlam.LeafRadius = 0 },
+		"leaf angle":       func(c *Config) { c.Ash.TreeSlam.LeafAngle = 361 },
+		"trunk scale":      func(c *Config) { c.Ash.TreeSlam.TrunkScale = 0 },
+		"fist hp":          func(c *Config) { c.Ash.CometPunch.HP = 0 },
+		"fist quantity":    func(c *Config) { c.Ash.CometPunch.Quantity = 0 },
+		"too many fists":   func(c *Config) { c.Ash.CometPunch.Quantity = 201 },
+		"scatter order":    func(c *Config) { c.Ash.CometPunch.ScatterMaxDistance = c.Ash.CometPunch.ScatterMinDistance - 1 },
+		"offset angle":     func(c *Config) { c.Ash.CometPunch.RandomOffsetAngle = 91 },
+		"fist duration":    func(c *Config) { c.Ash.CometPunch.FistDuration = 0 },
+		"rock duration":    func(c *Config) { c.Ash.RockTomb.Duration = 0 },
+		"stone radius":     func(c *Config) { c.Ash.RockTomb.StoneRadius = 0 },
+		"stone hp":         func(c *Config) { c.Ash.RockTomb.StoneHP = 0 },
+		"stone duration":   func(c *Config) { c.Ash.RockTomb.StoneDuration = 0 },
+		"too many stones":  func(c *Config) { c.Ash.RockTomb.Count = 101 },
+		"stone band":       func(c *Config) { c.Ash.RockTomb.MaxHeight = -1 },
+		"ring radius":      func(c *Config) { c.Ash.RockTomb.RingRadius = -1 },
+		"tree band":        func(c *Config) { c.Ash.TreeSlam.MinHeight = 90 },
+		"ash max hp":       func(c *Config) { c.Ash.MaxHP = 0 },
+		"punch cooldown":   func(c *Config) { c.Ash.CometPunch.Cooldown = -1 },
+		"air speed second": func(c *Config) { c.Ash.RockTomb.AirSpeedSecondHalf = -1 },
 	} {
 		c := DefaultConfig()
 		mut(&c)
@@ -530,7 +530,7 @@ func TestTreeSmashesTowardTheOpponentNotTheWayItLeapt(t *testing.T) {
 
 func TestTreeSwingsDownAfterBeingHeldAndHitsOnlyWhenTheSwingEnds(t *testing.T) {
 	cfg := DefaultConfig()
-	ts := cfg.Machamp.TreeSlam
+	ts := cfg.Ash.TreeSlam
 	g := mach(cfg, snorlax)
 	g.P[0].In = Input{Skill: true, DX: 1}
 	g.Step(dt)
@@ -564,7 +564,7 @@ func TestTreeSwingsDownAfterBeingHeldAndHitsOnlyWhenTheSwingEnds(t *testing.T) {
 
 func TestTreeSwingOfZeroHitsRightAfterTheHold(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Machamp.TreeSlam.SwingDuration = 0
+	cfg.Ash.TreeSlam.SwingDuration = 0
 	g := mach(cfg, snorlax)
 	g.P[0].In = Input{Skill: true, DX: 1}
 	hit := 0
@@ -577,5 +577,88 @@ func TestTreeSwingOfZeroHitsRightAfterTheHold(t *testing.T) {
 	}
 	if hit != 1 {
 		t.Fatalf("%d hits, want 1", hit)
+	}
+}
+
+// ---- Machamp: the same moves as Ash, with numbers of its own ----
+
+func TestMachampValidatesItsOwnSectionToo(t *testing.T) {
+	for name, mut := range map[string]func(c *Config){
+		"leaf angle":     func(c *Config) { c.Machamp.TreeSlam.LeafAngle = 361 },
+		"too many fists": func(c *Config) { c.Machamp.CometPunch.Quantity = 201 },
+		"too many rocks": func(c *Config) { c.Machamp.RockTomb.Count = 101 },
+		"max hp":         func(c *Config) { c.Machamp.MaxHP = 0 },
+		"stone hp":       func(c *Config) { c.Machamp.RockTomb.StoneHP = 0 },
+	} {
+		c := DefaultConfig()
+		mut(&c)
+		if err := c.validate(); err == nil || !strings.Contains(err.Error(), "machamp.") {
+			t.Fatalf("%s: error %v, want one naming the machamp section", name, err)
+		}
+	}
+}
+
+func TestMachampIsAshWithNumbersALittleLower(t *testing.T) {
+	c := DefaultConfig()
+	a, m := c.Ash, c.Machamp
+	if !(m.MaxHP < a.MaxHP && m.WalkSpeed < a.WalkSpeed && m.TreeSlam.Damage < a.TreeSlam.Damage && m.TreeSlam.Cooldown > a.TreeSlam.Cooldown &&
+		m.TreeSlam.TrunkLength < a.TreeSlam.TrunkLength && m.CometPunch.Quantity < a.CometPunch.Quantity && m.RockTomb.Count < a.RockTomb.Count &&
+		m.RockTomb.Cooldown > a.RockTomb.Cooldown && m.RockTomb.StoneHP < a.RockTomb.StoneHP) {
+		t.Fatalf("Machamp %+v is not a notch below Ash %+v", m, a)
+	}
+	if c.maxHPOf(machamp) != m.MaxHP || c.maxHPOf(ash) != a.MaxHP || c.walkSpeedOf(machamp) != m.WalkSpeed || c.radiusOf(machamp) != m.Radius {
+		t.Fatal("the HP, speed or size of a Machamp are not its own")
+	}
+}
+
+// Each of the two reads its own section: change one's numbers and only that one's skills change.
+func TestEachBrawlerPlaysByItsOwnNumbers(t *testing.T) {
+	for _, kind := range []int{ash, machamp} {
+		cfg := DefaultConfig()
+		own, other := &cfg.Ash, &cfg.Machamp
+		if kind == machamp {
+			own, other = other, own
+		}
+		own.TreeSlam.Damage, other.TreeSlam.Damage = 11, 77
+		own.CometPunch.Quantity, other.CometPunch.Quantity = 7, 150
+		own.RockTomb.Count, other.RockTomb.Count = 6, 60
+		own.RockTomb.RingRadius, other.RockTomb.RingRadius = 300, 400
+		// the tree
+		g := duel(cfg, kind, snorlax)
+		g.P[0].HP, g.P[1].HP = g.maxHP(0), g.maxHP(1)
+		hp := g.P[1].HP
+		g.P[0].In = Input{Skill: true, DX: 1}
+		for n := 0; n < 200 && g.P[1].HP == hp; n++ {
+			g.Step(dt)
+			g.P[0].In = Input{}
+		}
+		if got := hp - g.P[1].HP; got != 11 {
+			t.Fatalf("kind %d: the tree did %d, want its own 11", kind, got)
+		}
+		// the stones
+		g = duel(cfg, kind, snorlax)
+		g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 700, 500, 5000, 5000
+		g.P[0].In = Input{Rock: true}
+		for n := 0; n < 60; n++ { // jump and land
+			g.Step(dt)
+			g.P[0].In = Input{}
+		}
+		if got := stoneCount(g); got < 1 || got > 6 {
+			t.Fatalf("kind %d: %d stones, want at most its own 6", kind, got)
+		}
+		// the fists
+		g = duel(cfg, kind, snorlax)
+		g.P[0].In = Input{Comet: true}
+		total := 0
+		for n := 0; n < 100; n++ {
+			g.Step(dt)
+			g.P[0].In = Input{}
+			if f := fistCount(g); f > total {
+				total = f
+			}
+		}
+		if total == 0 || total > 7 {
+			t.Fatalf("kind %d: %d fists at most, want up to its own 7", kind, total)
+		}
 	}
 }
