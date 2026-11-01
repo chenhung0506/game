@@ -312,7 +312,7 @@ document.getElementById('mSingle').onclick = () => send({ team: false });
 document.getElementById('mTeam').onclick = () => send({ team: true });
 document.getElementById('sz3').onclick = () => send({ size: 3 });
 document.getElementById('szAll').onclick = () => send({ size: TEAM_BIG });
-const BOT_KINDS = [0, 1, 2, 3, 7]; // the characters the computer can play (the server's botKinds)
+const BOT_KINDS = [0, 1, 2, 3, 7, 9]; // the characters the computer can play (the server's botKinds)
 for (const k of BOT_KINDS) {
   const b = document.createElement('button'); b.dataset.k = k; b.textContent = NAMES[k];
   b.onclick = () => { botOpen = false; send({ bot: k }); showPick(); };

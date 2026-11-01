@@ -13,7 +13,7 @@ import (
 //   - it decides only every botEvery ticks and holds the stick in between (a skill key is pressed for one tick);
 //   - it takes a chance on some moves instead of always making the best one.
 //
-// Everything about how a character plays is in its own function (pikachu, snorlax, chikorita, ash, charizard); the rest here is shared: what
+// Everything about how a character plays is in its own function (pikachu, snorlax, chikorita, ash, charizard, gengar); the rest here is shared: what
 // threatens the bot, where to stand, and the 8-way stick.
 const (
 	botEvery = 4 // ticks between decisions
@@ -21,7 +21,7 @@ const (
 )
 
 // botKinds are the characters a Bot can play so far.
-var botKinds = []int{pikachu, snorlax, chikorita, ash, charizard}
+var botKinds = []int{pikachu, snorlax, chikorita, ash, charizard, gengar}
 
 func botCanPlay(kind int) bool {
 	for _, k := range botKinds {
@@ -81,6 +81,8 @@ func (b *Bot) Decide(g *Game, me int) Input {
 		in = b.ash(c)
 	case charizard:
 		in = b.charizard(c)
+	case gengar:
+		in = b.gengar(c)
 	}
 	b.held = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY}
 	return in
@@ -826,4 +828,64 @@ func (b *Bot) charizard(c *bctx) Input {
 		in.Fire = true // it walks while it breathes
 	}
 	return in
+}
+
+// ---- Gengar ----
+
+// Gengar keeps a middle distance and throws Shadow Balls where the opponent is going to be, with Ghost Fire when it
+// comes close. Shadow Sneak is both its way out (nothing at height 0 can touch it under the ground) and its way in: it
+// slips towards the opponent so that its shadow, which keeps the opponent from starting a skill, falls on it, and comes
+// up beside it to cast.
+func (b *Bot) gengar(c *bctx) Input {
+	g, p, f := c.g, c.p, c.f
+	ss, gf, sb := g.cfg.Gengar.ShadowSneak, g.cfg.Gengar.GhostFire, g.cfg.Gengar.ShadowBall
+	if p.FrozenT > 0 || p.Held || p.StunT > 0 {
+		return c.stay()
+	}
+	if p.SneakT > 0 { // under the ground: it can only walk, and walks at the opponent to put its shadow on it
+		if c.dist > ss.ShadowRadius*0.5 {
+			return c.move(c.ux, c.uy)
+		}
+		return c.move(-c.uy*b.strafe, c.ux*b.strafe)
+	}
+	danger := f.Kind == rowlet && f.ArrowT > 0
+	th := c.th
+	if th.kind != thNone && th.eta <= botHorizon {
+		in := c.move(th.ax, th.ay)
+		if th.eta <= 0.5 && p.SneakCD == 0 && p.Z == 0 {
+			in.Skill = true // under the ground it is out of reach
+		}
+		return in
+	}
+	reach := sb.Speed * sb.Duration
+	if p.GFireCD == 0 && gf.Reach.hits(f) && c.dist <= gf.RingRadius*0.8 && !danger && b.rng.Float64() < 0.6 {
+		in := c.stay()
+		in.GFire = true
+		return in
+	}
+	if p.SBallCD == 0 && sb.Reach.hits(f) && c.dist <= reach && c.dist >= sb.SlamRadius*0.5 && !danger && (c.rootedFor() > 0.3 || b.rng.Float64() < 0.5) {
+		// at where the opponent will be when it lands: the cast is as long as the share of its range
+		x := math.Min(math.Max(c.f.X+c.vx*sb.Duration, 0), g.court.Length)
+		y := math.Min(math.Max(c.f.Y+c.vy*sb.Duration, 0), g.court.Width)
+		in := c.stay()
+		if dx, dy := x-p.X, y-p.Y; math.Hypot(dx, dy) > 1e-9 {
+			share := math.Min(math.Hypot(dx, dy)/reach, 1)
+			n := math.Hypot(dx, dy)
+			in.SBall, in.CastX, in.CastY = true, dx/n*share, dy/n*share
+			return in
+		}
+	}
+	if p.SneakCD == 0 && p.Z == 0 && c.dist > 280 && !danger && b.rng.Float64() < 0.2 {
+		in := c.move(c.ux, c.uy)
+		in.Skill = true // in under the ground to silence it
+		return in
+	}
+	tx, ty := -c.uy*b.strafe, c.ux*b.strafe
+	switch {
+	case c.dist < 160:
+		return c.move(-c.ux+tx*0.6, -c.uy+ty*0.6)
+	case c.dist > 400:
+		return c.move(c.ux+tx*0.3, c.uy+ty*0.3)
+	}
+	return c.move(tx, ty)
 }

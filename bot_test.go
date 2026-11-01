@@ -10,7 +10,7 @@ import (
 // ---- the computer player ----
 
 func hasAct(in Input) bool {
-	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Toss
+	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Toss || in.GFire || in.SBall
 }
 
 // firstAct runs the bot for n ticks on a scene that does not change and returns the first decision that presses a
@@ -426,9 +426,9 @@ func TestTheBotNoticesAThreatOnlyAfterItsReactionTime(t *testing.T) {
 	t.Fatal("it never reacted")
 }
 
-func TestOnlyPikachuSnorlaxCharizardChikoritaAndAshCanBePlayedByTheComputer(t *testing.T) {
+func TestOnlyPikachuSnorlaxCharizardChikoritaAshAndGengarCanBePlayedByTheComputer(t *testing.T) {
 	for k := 0; k < kinds; k++ {
-		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash || k == charizard; got != want {
+		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash || k == charizard || k == gengar; got != want {
 			t.Errorf("botCanPlay(%d) = %v, want %v", k, got, want)
 		}
 	}
@@ -461,7 +461,8 @@ func TestBotsFightToAFinishWithoutGettingStuck(t *testing.T) {
 	}
 	pairs := [][2]int{{pikachu, snorlax}, {snorlax, pikachu}, {pikachu, pikachu}, {snorlax, snorlax},
 		{chikorita, snorlax}, {snorlax, chikorita}, {chikorita, pikachu}, {ash, pikachu}, {pikachu, ash}, {ash, snorlax}, {ash, chikorita}, {chikorita, ash}, {ash, ash}, {chikorita, chikorita},
-		{charizard, pikachu}, {pikachu, charizard}, {charizard, snorlax}, {snorlax, charizard}, {charizard, chikorita}, {ash, charizard}, {charizard, charizard}}
+		{charizard, pikachu}, {pikachu, charizard}, {charizard, snorlax}, {snorlax, charizard}, {charizard, chikorita}, {ash, charizard}, {charizard, charizard},
+		{gengar, pikachu}, {pikachu, gengar}, {gengar, snorlax}, {snorlax, gengar}, {gengar, chikorita}, {gengar, ash}, {gengar, charizard}, {gengar, gengar}}
 	for _, pr := range pairs {
 		wins, timeouts, total := [2]int{}, 0, 0.0
 		const n = 20
@@ -481,7 +482,7 @@ func TestBotsFightToAFinishWithoutGettingStuck(t *testing.T) {
 	}
 }
 
-var NAMEOF = [...]string{"Pikachu", "Snorlax", "Charizard", "Chikorita", "Vulpix", "Rowlet", "Magikarp", "Ash"}
+var NAMEOF = [...]string{"Pikachu", "Snorlax", "Charizard", "Chikorita", "Vulpix", "Rowlet", "Magikarp", "Ash", "Machamp", "Gengar"}
 
 // ---- in a room ----
 
@@ -1171,6 +1172,67 @@ func TestTheBotWalksOutOfBurningGround(t *testing.T) {
 		}
 		if lost := hp - g.P[0].HP; lost > 3*ts.FireDamage {
 			t.Fatalf("%s took %d from the fire, want it to step out within a burn or two", NAMEOF[kind], lost)
+		}
+	}
+}
+
+// ---- Gengar ----
+
+func gengarDuel() *Game {
+	g := duel(DefaultConfig(), gengar, snorlax)
+	g.P[0].X, g.P[1].X = 700, 1000
+	g.P[1].JumpCD = 99
+	return g
+}
+
+func TestGengarLobsAShadowBallAtWhereAMovingOpponentWillBe(t *testing.T) {
+	g := gengarDuel()
+	g.P[0].GFireCD, g.P[0].SneakCD = 99, 99
+	b := newBot(gengar, 1)
+	in, ok := firstAct(b, g, 0, 200)
+	if !ok || !in.SBall {
+		t.Fatalf("decision %+v (pressed %v), want a Shadow Ball", in, ok)
+	}
+	if in.CastX <= 0 || math.Hypot(in.CastX, in.CastY) > 1+1e-9 {
+		t.Fatalf("cast %v,%v: want towards the opponent (+x) and at most as long as 1", in.CastX, in.CastY)
+	}
+}
+
+func TestGengarLetsOutGhostFireOnAnOpponentWithinTheRing(t *testing.T) {
+	g := gengarDuel()
+	g.P[1].X = 700 + 150
+	g.P[0].SBallCD, g.P[0].SneakCD = 99, 99
+	if in, ok := firstAct(newBot(gengar, 1), g, 0, 200); !ok || !in.GFire {
+		t.Fatalf("decision %+v (pressed %v), want Ghost Fire", in, ok)
+	}
+}
+
+func TestGengarGoesUnderTheGroundFromABallAboutToHitIt(t *testing.T) {
+	g := duel(DefaultConfig(), gengar, pikachu)
+	g.P[0].X, g.P[1].X = 700, 1300
+	g.P[0].GFireCD, g.P[0].SBallCD = 99, 99
+	g.Balls = []Ball{{K: ballElectro, Owner: 1, X: 850, Y: 250, DX: -1, HP: g.cfg.Pikachu.ElectroBall.HP}}
+	b := newBot(gengar, 1)
+	for i := 0; i < 8; i++ {
+		if in := b.Decide(g, 0); in.Skill {
+			return
+		}
+	}
+	t.Fatal("it did not slip under the ground from a ball a few steps away")
+}
+
+func TestGengarUnderTheGroundWalksAtTheOpponentAndUsesNoSkill(t *testing.T) {
+	g := gengarDuel()
+	g.P[0].SneakT = 2
+	g.P[0].Z = g.cfg.Gengar.ShadowSneak.Height
+	b := newBot(gengar, 1)
+	for i := 0; i < 40; i++ {
+		in := b.Decide(g, 0)
+		if hasAct(in) {
+			t.Fatalf("decision %+v under the ground, want only the stick", in)
+		}
+		if i > 8 && in.DX <= 0 {
+			t.Fatalf("stick %+v, want it walking at the opponent (+x)", in)
 		}
 	}
 }
