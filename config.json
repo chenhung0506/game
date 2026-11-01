@@ -347,7 +347,7 @@
       "cooldown": 8,
       "mass": 100,
       "ball_knockback": 120,
-      "knockback": 20,
+      "knockback": 100,
       "duration": 3,
       "quantity": 100,
       "random_offset_angle": 80,
@@ -420,7 +420,7 @@
       "air_speed_first_half": 170,
       "air_speed_second_half": 100,
       "count": 20,
-      "stone_radius": 50,
+      "stone_radius": 30,
       "stone_hp": 40,
       "stone_duration": 6
     }
