@@ -9,37 +9,32 @@ import "math"
 // touching the shadow cannot start a skill. It is steered at the shadow's own speeds (first half, second half) meanwhile,
 // and uses no other skill.
 //
-// Ghost Fire (GFire): purple flames fly out all round it, then come back to it wherever it has gone.
+// Ghost Fire (GFire): purple flames fly out all round it, then come back to it wherever it has gone. They are projectiles
+// with HP (the opponent's balls and skills wear them down) and each hurts at most once.
 //
 // Shadow Ball (SBall): a ball is lobbed, and what it does it does where it lands: it hurts, and flames fly out of it that
-// do not come back.
+// do not come back, and the whole burst hurts at most once.
 
 // silenceLinger is how long an opponent stays unable to use a skill after it last touched the shadow.
 const silenceLinger = 0.15
 
-// ghostFire is one purple flame. Gengar's own fly out and come back (ghostOut, then ghostBack); a Shadow Ball's only fly out (ghostSpread).
+// ghostFire is one flame a Shadow Ball sends out where it lands: it flies out and is gone, and has no HP. All the flames of
+// one ball share Hurt, so however many of them touch the opponent it is hurt once. Gengar's own Ghost Fire flames are
+// projectiles in Game.Balls instead (ballGhost).
 type ghostFire struct {
 	Owner int     `json:"o"`
 	X     float64 `json:"x"`
 	Y     float64 `json:"y"`
-	Mode  int     `json:"m"`
 	DX    float64 `json:"-"`
 	DY    float64 `json:"-"`
 	Dist  float64 `json:"-"` // how far it has flown out
 	Max   float64 `json:"-"` // how far out it goes
 	Speed float64 `json:"-"`
-	Back  float64 `json:"-"` // its speed on the way back
 	R     float64 `json:"-"`
 	Dmg   int     `json:"-"`
 	Reach Reach   `json:"-"`
-	Hit   bool    `json:"-"` // it has hurt the opponent already
+	Hurt  *bool   `json:"-"` // set once any flame of its ball has hurt the opponent
 }
-
-const (
-	ghostOut    = iota // flying out, and then it comes back
-	ghostBack          // coming back to its owner
-	ghostSpread        // flying out, and then it is gone
-)
 
 // shadowBall is a Shadow Ball in the air.
 type shadowBall struct {
@@ -113,11 +108,10 @@ func (g *Game) stepGengar(i int, in Input, dt float64) []Event {
 	if in.GFire && p.GFireCD == 0 {
 		p.GFireCD = gf.Cooldown
 		off := g.radius(i) + gf.Radius
-		for n := 0; n < gf.Count; n++ {
+		for n := 0; n < gf.Count && n < maxGhostFires; n++ {
 			a := 2 * math.Pi * float64(n) / float64(gf.Count)
 			ux, uy := math.Cos(a), math.Sin(a)
-			g.addGhost(ghostFire{Owner: i, X: p.X + ux*off, Y: p.Y + uy*off, DX: ux, DY: uy, Dist: off, Max: gf.RingRadius, Speed: gf.SpreadSpeed,
-				Back: gf.ConvergenceSpeed, R: gf.Radius, Dmg: gf.Damage, Reach: gf.Reach, Mode: ghostOut})
+			g.Balls = append(g.Balls, Ball{K: ballGhost, Owner: i, X: p.X + ux*off, Y: p.Y + uy*off, DX: ux, DY: uy, Left: math.Max(0, gf.RingRadius-off), HP: gf.HP})
 		}
 	}
 
@@ -146,36 +140,19 @@ func (g *Game) addGhost(f ghostFire) {
 	}
 }
 
-// stepGhosts flies the flames: out, and for Gengar's own back to it; each hurts the opponent once if it touches it.
+// stepGhosts flies the flames a Shadow Ball sent out; the burst hurts the opponent once if any of them touches it.
 func (g *Game) stepGhosts(dt float64) {
 	kept := g.Ghosts[:0]
 	for _, f := range g.Ghosts {
-		foe, owner := &g.P[1-f.Owner], &g.P[f.Owner]
+		foe := &g.P[1-f.Owner]
 		x0, y0 := f.X, f.Y
-		switch f.Mode {
-		case ghostOut, ghostSpread:
-			step := math.Min(f.Speed*dt, f.Max-f.Dist)
-			f.X, f.Y = f.X+f.DX*step, f.Y+f.DY*step
-			if f.Dist += step; f.Dist >= f.Max-1e-9 {
-				if f.Mode == ghostSpread {
-					f.Mode = -1 // gone, but it still gets to hit on this last step
-				} else {
-					f.Mode = ghostBack
-				}
-			}
-		case ghostBack: // straight at where its owner is now
-			dx, dy := owner.X-f.X, owner.Y-f.Y
-			if d := math.Hypot(dx, dy); d <= g.radius(f.Owner)+f.R+f.Back*dt {
-				f.Mode = -1
-			} else {
-				f.X, f.Y = f.X+dx/d*f.Back*dt, f.Y+dy/d*f.Back*dt
-			}
-		}
-		if !f.Hit && f.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, f.X, f.Y) <= f.R+g.radius(1-f.Owner) {
-			f.Hit = true
+		step := math.Min(f.Speed*dt, f.Max-f.Dist)
+		f.X, f.Y, f.Dist = f.X+f.DX*step, f.Y+f.DY*step, f.Dist+step
+		if !*f.Hurt && f.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, f.X, f.Y) <= f.R+g.radius(1-f.Owner) {
+			*f.Hurt = true
 			g.hit(foe, f.Dmg)
 		}
-		if f.Mode >= 0 {
+		if f.Dist < f.Max-1e-9 { // the last step still gets to hit
 			kept = append(kept, f)
 		}
 	}
@@ -201,11 +178,12 @@ func (g *Game) stepShadowBalls(dt float64) []Event {
 		if sb.Reach.hits(foe) && math.Hypot(foe.X-b.TX, foe.Y-b.TY) <= sb.SlamRadius+g.radius(1-b.Owner) {
 			g.hit(foe, sb.Damage)
 		}
+		hurt := new(bool)
 		for n := 0; n < sb.GhostFireCount; n++ {
 			a := 2 * math.Pi * float64(n) / float64(sb.GhostFireCount)
 			ux, uy := math.Cos(a), math.Sin(a)
 			g.addGhost(ghostFire{Owner: b.Owner, X: b.TX, Y: b.TY, DX: ux, DY: uy, Max: sb.GhostFireSpreadDistance, Speed: sb.GhostFireSpreadSpeed,
-				R: sb.GhostFireRadius, Dmg: sb.GhostFireDamage, Reach: sb.Reach, Mode: ghostSpread})
+				R: sb.GhostFireRadius, Dmg: sb.GhostFireDamage, Reach: sb.Reach, Hurt: hurt})
 		}
 	}
 	g.Shadows = kept

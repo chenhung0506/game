@@ -216,14 +216,27 @@ func TestBurningGroundDoesNotBurnAGengarUnderIt(t *testing.T) {
 
 // ---- Ghost Fire ----
 
+// flames are Gengar's own Ghost Fire flames in the air.
+func flames(g *Game) (n int) {
+	for _, b := range g.Balls {
+		if b.K == ballGhost {
+			n++
+		}
+	}
+	return
+}
+
 func TestGhostFireLetsOutAnEvenRingThatSpreadsToTheRingRadius(t *testing.T) {
 	cfg := DefaultConfig()
 	gf := cfg.Gengar.GhostFire
 	g := gen(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 2000, 900
 	gpress(g, Input{GFire: true})
-	if len(g.Ghosts) != gf.Count {
-		t.Fatalf("%d flames, want %d", len(g.Ghosts), gf.Count)
+	if flames(g) != gf.Count {
+		t.Fatalf("%d flames, want %d", flames(g), gf.Count)
+	}
+	if g.Balls[0].HP != gf.HP {
+		t.Fatalf("flame HP %d, want %d", g.Balls[0].HP, gf.HP)
 	}
 	cx, cy := g.P[0].X, g.P[0].Y
 	var far float64
@@ -231,8 +244,8 @@ func TestGhostFireLetsOutAnEvenRingThatSpreadsToTheRingRadius(t *testing.T) {
 	for n := 0; n < int(((gf.RingRadius-off)/gf.SpreadSpeed)*tickRate)-3; n++ {
 		g.Step(dt)
 	}
-	for _, f := range g.Ghosts {
-		if f.Mode != ghostOut {
+	for _, f := range g.Balls {
+		if f.Back {
 			t.Fatalf("flame %+v already turned back", f)
 		}
 		far = math.Max(far, math.Hypot(f.X-cx, f.Y-cy))
@@ -242,8 +255,8 @@ func TestGhostFireLetsOutAnEvenRingThatSpreadsToTheRingRadius(t *testing.T) {
 	}
 	steps(g, 6)
 	back := 0
-	for _, f := range g.Ghosts {
-		if f.Mode == ghostBack {
+	for _, f := range g.Balls {
+		if f.Back {
 			back++
 		}
 	}
@@ -257,23 +270,56 @@ func TestGhostFiresFollowGengarWhereverItGoesAndAreGoneWhenTheyReachIt(t *testin
 	g := gen(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 2000, 900
 	gpress(g, Input{GFire: true})
-	for n := 0; n < 400 && len(g.Ghosts) > 0; n++ {
+	for n := 0; n < 400 && flames(g) > 0; n++ {
 		g.P[0].In = Input{DY: 1} // it keeps walking
 		g.Step(dt)
 		if g.P[0].Y >= g.court.Width {
 			g.P[0].Y = g.court.Width
 		}
-		for _, f := range g.Ghosts {
-			if f.Mode == ghostBack {
-				d0 := math.Hypot(f.X-g.P[0].X, f.Y-g.P[0].Y)
-				if d0 > 2000 {
-					t.Fatalf("a flame at %v,%v is far from Gengar at %v,%v", f.X, f.Y, g.P[0].X, g.P[0].Y)
-				}
-			}
-		}
 	}
-	if len(g.Ghosts) != 0 {
-		t.Fatalf("%d flames never got back to Gengar", len(g.Ghosts))
+	if flames(g) != 0 {
+		t.Fatalf("%d flames never got back to Gengar", flames(g))
+	}
+}
+
+func TestGhostFireIsWornDownByTheOpponentsBallsAndSkills(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Gengar.GhostFire.HP = 1
+	cfg.Gengar.GhostFire.Count = 1
+	cfg.Pikachu.ElectroBall.ContactDamage = 5
+	// an electro ball meeting the flame clashes with it: the flame is gone
+	g := duel(cfg, gengar, pikachu)
+	g.P[0].HP, g.P[1].HP = g.maxHP(0), g.maxHP(1)
+	g.Balls = []Ball{
+		{K: ballGhost, Owner: 0, X: 600, Y: 250, DX: 1, Left: 500, HP: 1},
+		{K: ballElectro, Owner: 1, X: 600 + cfg.Pikachu.ElectroBall.Radius, Y: 250, DX: -1, HP: cfg.Pikachu.ElectroBall.HP},
+	}
+	steps(g, 2)
+	if flames(g) != 0 {
+		t.Fatal("an electro ball went through a flame")
+	}
+	// a Hyper Beam sweeping over it wears it down too
+	g = duel(cfg, snorlax, gengar)
+	g.P[0].HP, g.P[1].HP = g.maxHP(0), g.maxHP(1)
+	g.Balls = []Ball{{K: ballGhost, Owner: 1, X: 400, Y: 250, DX: 1, Left: 500, HP: 1}}
+	g.P[0].In = Input{Beam: true}
+	for n := 0; n < 200 && flames(g) > 0; n++ {
+		g.Step(dt)
+		g.Balls = append(g.Balls[:0:0], g.Balls...)
+	}
+	if flames(g) != 0 {
+		t.Fatal("a Hyper Beam sweep did not shoot a flame down")
+	}
+}
+
+func TestGhostFireWithHPStaysUntilItIsWornDown(t *testing.T) {
+	cfg := DefaultConfig()
+	g := gen(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 2000, 900
+	g.Balls = []Ball{{K: ballGhost, Owner: 0, X: 500, Y: 250, DX: 1, Left: 300, HP: cfg.Gengar.GhostFire.HP}}
+	steps(g, 5)
+	if flames(g) != 1 {
+		t.Fatal("a flame nobody touched went away")
 	}
 }
 
@@ -375,9 +421,6 @@ func TestShadowBallFlamesSpreadOutAndDoNotComeBack(t *testing.T) {
 	for n := 0; n < int((sb.GhostFireSpreadDistance/sb.GhostFireSpreadSpeed)*tickRate)+5; n++ {
 		g.Step(dt)
 		for _, f := range g.Ghosts {
-			if f.Mode == ghostBack {
-				t.Fatal("a flame of the ball turned back")
-			}
 			if math.Hypot(f.X-tx, f.Y-ty) > sb.GhostFireSpreadDistance+1 {
 				t.Fatalf("a flame went %v out, past %v", math.Hypot(f.X-tx, f.Y-ty), sb.GhostFireSpreadDistance)
 			}
@@ -397,7 +440,7 @@ func TestShadowBallCooldownAndGhostFireCooldownAreTheirOwn(t *testing.T) {
 		t.Fatalf("%d balls: a second one came during the cooldown", len(g.Shadows))
 	}
 	gpress(g, Input{GFire: true}) // the other skill has not been used
-	if len(g.Ghosts) == 0 {
+	if flames(g) == 0 {
 		t.Fatal("Ghost Fire shared the Shadow Ball's cooldown")
 	}
 }
@@ -432,5 +475,19 @@ func TestGengarIsPickableAndItsConfigIsValidated(t *testing.T) {
 	c.Gengar.ShadowSneak.Height = 5
 	if err := c.validate(); err == nil {
 		t.Fatal("a sneak that goes up in the air was accepted")
+	}
+}
+
+func TestAShadowBallsFlamesHurtTheOpponentOnlyOnceBetweenThem(t *testing.T) {
+	cfg := DefaultConfig()
+	sb := &cfg.Gengar.ShadowBall
+	sb.Damage, sb.GhostFireCount, sb.GhostFireRadius, sb.GhostFireDamage = 0, 36, 60, 7
+	g := gen(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 300+300, 250
+	g.Shadows = []shadowBall{{Owner: 0, X: 300, Y: 250, X0: 300, Y0: 250, TX: 300 + 300 - 160, TY: 250}} // lands 160 short of it: outside the blast
+	hp := g.P[1].HP
+	steps(g, int(sb.Duration*tickRate)+int(sb.GhostFireSpreadDistance/sb.GhostFireSpreadSpeed*tickRate)+10)
+	if lost := hp - g.P[1].HP; lost != 7 {
+		t.Fatalf("lost %d, want exactly one hit of 7 from 36 flames that all reached it", lost)
 	}
 }

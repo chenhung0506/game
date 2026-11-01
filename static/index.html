@@ -1132,6 +1132,7 @@ function drawBall(b) {
   if (b.k === 5) { drawTornado(b); return; }
   if (b.k === 6) { drawStone(b); return; }
   if (b.k === 7) { drawCometFist(b); return; }
+  if (b.k === 8) { drawGhostFlame(b.x, b.y, gengarCfg.fire); return; }
   {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
@@ -1780,7 +1781,7 @@ function drawGhostFlame(x, y, r, a = 1) {
   });
 }
 function drawGhostFires() {
-  for (const f of snap.gh || []) drawGhostFlame(f.x, f.y, f.m === 2 ? gengarCfg.sfire : gengarCfg.fire);
+  for (const f of snap.gh || []) drawGhostFlame(f.x, f.y, gengarCfg.sfire);
 }
 // The black shadow that marks a Gengar under the ground: a dark disc with a ragged, wobbling edge, as wide as the shadow that silences.
 function drawSneakShadows() {

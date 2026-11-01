@@ -427,11 +427,14 @@ type Config struct {
 	// `shadow_speed_first_half` then `shadow_speed_second_half`, and a black shadow `shadow_radius` wide marks where it is: an opponent
 	// touching the shadow (at a height inside this skill's own min_height..max_height) cannot start a skill.
 	// Ghost Fire (J) lets out `count` purple flames all round it that fly out `ring_radius` at `spread_speed`, then come
-	// back to it at `convergence_speed`, following it wherever it goes; each hurts the opponent once (`damage`) if it touches it (`radius`).
+	// back to it at `convergence_speed`, following it wherever it goes; each hurts the opponent at most once (`damage`) if it touches it (`radius`).
+	// A flame is a projectile in Game.Balls with `hp` and `mass`: the opponent's balls and skills wear it down and a flame
+	// wears them down by its `damage`, as fire balls do.
 	// Shadow Ball (K, aimed like the Vine Whip) lobs a ball `height` high that takes `duration` seconds to come down, at most
 	// `speed` x `duration` away, on the opponent unless an aim was chosen; where it lands it hurts the opponent in
 	// `slam_radius` (`damage`), and sends `ghost_fire_count` purple flames out `ghost_fire_spread_distance` at `ghost_fire_spread_speed`
-	// that do not come back (`ghost_fire_radius` big, `ghost_fire_damage` each). `ball_scale` only makes the drawn ball bigger.
+	// that do not come back (`ghost_fire_radius` big). They have no HP, and the whole burst hurts the opponent at most once (`ghost_fire_damage`),
+	// however many of them touch it. `ball_scale` only makes the drawn ball bigger.
 	Gengar struct {
 		MaxHP       int     `json:"max_hp"`
 		WalkSpeed   float64 `json:"walk_speed"`
@@ -454,6 +457,8 @@ type Config struct {
 			Damage           int     `json:"damage"`
 			Count            int     `json:"count"`
 			Radius           float64 `json:"radius"`
+			HP               int     `json:"hp"`   // a flame is a projectile: the opponent's balls and skills wear it down
+			Mass             float64 `json:"mass"` // what a beam or a fist has to beat to push it
 		} `json:"ghost_fire"`
 		ShadowBall struct {
 			Reach
@@ -781,6 +786,7 @@ func DefaultConfig() Config {
 	gf := &g.GhostFire
 	gf.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	gf.Cooldown, gf.RingRadius, gf.SpreadSpeed, gf.ConvergenceSpeed, gf.Damage, gf.Count, gf.Radius = 7, 260, 300, 200, 4, 12, 22
+	gf.HP, gf.Mass = 10, 20
 	sb := &g.ShadowBall
 	sb.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	sb.BallScale, sb.Damage, sb.Height, sb.Duration, sb.Cooldown, sb.SlamRadius, sb.Speed = 1, 25, 150, 0.9, 6, 110, 500
@@ -932,6 +938,7 @@ func (c Config) validate() error {
 		{"gengar.ghost_fire.convergence_speed", c.Gengar.GhostFire.ConvergenceSpeed, 0},
 		{"gengar.ghost_fire.count", float64(c.Gengar.GhostFire.Count), 0},
 		{"gengar.ghost_fire.radius", c.Gengar.GhostFire.Radius, 0},
+		{"gengar.ghost_fire.hp", float64(c.Gengar.GhostFire.HP), 0},
 		{"gengar.shadow_ball.ball_scale", c.Gengar.ShadowBall.BallScale, 0},
 		{"gengar.shadow_ball.duration", c.Gengar.ShadowBall.Duration, 0},
 		{"gengar.shadow_ball.slam_radius", c.Gengar.ShadowBall.SlamRadius, 0},
@@ -1130,6 +1137,7 @@ func (c Config) validate() error {
 		{"gengar.shadow_sneak.shadow_speed_second_half", c.Gengar.ShadowSneak.ShadowSpeedSecondHalf},
 		{"gengar.ghost_fire.cooldown", c.Gengar.GhostFire.Cooldown},
 		{"gengar.ghost_fire.damage", float64(c.Gengar.GhostFire.Damage)},
+		{"gengar.ghost_fire.mass", c.Gengar.GhostFire.Mass},
 		{"gengar.shadow_ball.damage", float64(c.Gengar.ShadowBall.Damage)},
 		{"gengar.shadow_ball.height", c.Gengar.ShadowBall.Height},
 		{"gengar.shadow_ball.cooldown", c.Gengar.ShadowBall.Cooldown},

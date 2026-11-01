@@ -278,6 +278,7 @@ const (
 	ballTornado = 5 // Rowlet's tornado: it chases the opponent, carries it up and lets it fall; it is worn down like a projectile
 	ballStone   = 6 // Machamp's rock: it stands where it rose, blocks the other player and is worn down like a projectile (a pillar's way)
 	ballFist    = 7 // one of Machamp's Comet Punch fists: it hangs where it appeared, hits the opponent it touches once and has HP like a fire ball
+	ballGhost   = 8 // one of Gengar's Ghost Fire flames: it flies out, comes back to Gengar and hurts the opponent once; it has HP like a fire ball
 )
 
 // Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
@@ -303,6 +304,8 @@ type Ball struct {
 	GrindCD   float64 `json:"-"`            // pillar: until a tornado may wear it down again (spin_interval)
 	Carried   bool    `json:"-"`            // pillar: a tornado holds it up
 	Z         float64 `json:"z,omitempty"`  // pillar: height above the ground while a tornado carries it
+	Back      bool    `json:"bk,omitempty"` // ghost fire: it has flown out and is coming back to its owner
+	Hit       bool    `json:"-"`            // ghost fire: it has hurt the opponent already
 }
 
 // Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
@@ -430,6 +433,8 @@ func (g *Game) ballRadius(b *Ball) float64 {
 		return g.brawler(b.Owner).RockTomb.StoneRadius
 	case ballFist:
 		return g.brawler(b.Owner).CometPunch.Radius
+	case ballGhost:
+		return g.cfg.Gengar.GhostFire.Radius
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Radius
 	case ballTornado:
@@ -448,6 +453,8 @@ func (g *Game) ballMass(b *Ball) float64 {
 		return pillarMass // a beam or a punch does not push it
 	case ballFist:
 		return g.brawler(b.Owner).CometPunch.Mass
+	case ballGhost:
+		return g.cfg.Gengar.GhostFire.Mass
 	case ballTornado:
 		return g.cfg.Rowlet.Tornado.Mass
 	case ballArrow:
@@ -1031,6 +1038,30 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}
 			continue
 		}
+		if b.K == ballGhost {
+			if b.HP > 0 {
+				gf, owner := g.cfg.Gengar.GhostFire, &g.P[b.Owner]
+				x0, y0 := b.X, b.Y
+				if !b.Back {
+					step := math.Min(gf.SpreadSpeed*dt, b.Left)
+					b.X, b.Y, b.Left = b.X+b.DX*step, b.Y+b.DY*step, b.Left-step
+					b.Back = b.Left <= 1e-9
+				} else { // straight at where its owner is now
+					dx, dy := owner.X-b.X, owner.Y-b.Y
+					d := math.Hypot(dx, dy)
+					if d <= g.radius(b.Owner)+gf.Radius+gf.ConvergenceSpeed*dt {
+						continue // home
+					}
+					b.X, b.Y = b.X+dx/d*gf.ConvergenceSpeed*dt, b.Y+dy/d*gf.ConvergenceSpeed*dt
+				}
+				if !b.Hit && gf.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= gf.Radius+g.radius(1-b.Owner) {
+					b.Hit = true
+					g.hit(foe, gf.Damage)
+				}
+				kept = append(kept, b)
+			}
+			continue
+		}
 		if b.K == ballFire {
 			if b.HP > 0 {
 				x0, y0 := b.X, b.Y
@@ -1133,6 +1164,8 @@ func (g *Game) ballDamage(b *Ball) int {
 		return pillarBlock
 	case ballFist:
 		return g.brawler(b.Owner).CometPunch.Damage
+	case ballGhost:
+		return g.cfg.Gengar.GhostFire.Damage
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Damage
 	case ballTornado:

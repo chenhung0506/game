@@ -355,7 +355,7 @@ func (c *bctx) hazards() []hazard {
 			continue
 		}
 		switch bl.K {
-		case ballPillar:
+		case ballPillar, ballGhost: // a ghost flame turns round, so a straight line is wrong for it; bots still do not dodge them
 		case ballTornado:
 			if !bl.Caught {
 				chase(bl.X, bl.Y, cfg.Rowlet.Tornado.Speed, cfg.Rowlet.Tornado.Radius)

@@ -307,7 +307,9 @@
       "convergence_speed": 250,
       "damage": 15,
       "count": 18,
-      "radius": 15
+      "radius": 15,
+      "hp": 10,
+      "mass": 20
     },
     "shadow_ball": {
       "min_height": 0,
