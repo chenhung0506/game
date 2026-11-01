@@ -491,3 +491,17 @@ func TestAShadowBallsFlamesHurtTheOpponentOnlyOnceBetweenThem(t *testing.T) {
 		t.Fatalf("lost %d, want exactly one hit of 7 from 36 flames that all reached it", lost)
 	}
 }
+
+func TestShadowBallLandsAsFarAsTheAimIsLongAndNoFartherThanItsRange(t *testing.T) {
+	cfg := DefaultConfig()
+	reach := cfg.Gengar.ShadowBall.Speed * cfg.Gengar.ShadowBall.Duration
+	for _, c := range []struct{ cast, share float64 }{{0.5, 0.5}, {0.25, 0.25}, {1, 1}, {3, 1}} {
+		g := gen(cfg, snorlax)
+		g.P[1].X, g.P[1].Y = 300+reach/2, 250 // the opponent stands right in the way: it must not pull the ball
+		g.P[0].X, g.P[0].Y = 300, 250
+		gpress(g, Input{SBall: true, CastX: c.cast, CastY: 0})
+		if want := 300 + reach*c.share; math.Abs(g.Shadows[0].TX-want) > 1e-6 || g.Shadows[0].TY != 250 {
+			t.Fatalf("cast %v lands at %v,%v, want %v,250", c.cast, g.Shadows[0].TX, g.Shadows[0].TY, want)
+		}
+	}
+}

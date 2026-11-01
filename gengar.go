@@ -120,8 +120,9 @@ func (g *Game) stepGengar(i int, in Input, dt float64) []Event {
 		p.SBallCD = sb.Cooldown
 		reach := sb.Speed * sb.Duration
 		var tx, ty float64
-		if n := math.Hypot(in.CastX, in.CastY); n > 1e-9 && !math.IsInf(n, 0) { // an aim was chosen: it lands as far out as it can
-			tx, ty = p.X+in.CastX/n*reach, p.Y+in.CastY/n*reach
+		if n := math.Hypot(in.CastX, in.CastY); n > 1e-9 && !math.IsInf(n, 0) { // an aim was chosen: it lands that far out along it
+			d := reach * math.Min(n, 1) // its length is how far, as a share of the range: a pull of half lands halfway
+			tx, ty = p.X+in.CastX/n*d, p.Y+in.CastY/n*d
 		} else { // a tap: on the opponent, or as near as it can get
 			ux, uy := g.castDir(i, in)
 			d := math.Min(math.Hypot(other.X-p.X, other.Y-p.Y), reach)
