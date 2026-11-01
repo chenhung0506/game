@@ -475,7 +475,7 @@ function buildPad() {
     if (padKind === 0 && name === 'skill') { usesBadge = document.createElement('div'); usesBadge.className = 'uses'; b.append(usesBadge); }
     if (aimed) { // the button turns into a stick while it is held: the way it is dragged is the way the skill goes
       const ring = document.createElement('div'), dot = document.createElement('div'); ring.className = 'aimring'; dot.className = 'aimdot'; b.append(ring, dot);
-      const DEAD = 20, MAXR = 56;
+      const DEAD = name === 'sball' ? 4 : 20, MAXR = 56; // a short pull of the Shadow Ball is a short throw, not a tap that follows the opponent
       const drag = (e) => {
         const r = b.getBoundingClientRect(), vx = e.clientX - (r.left + r.width / 2), vy = e.clientY - (r.top + r.height / 2), len = Math.hypot(vx, vy);
         if (aiming) { aiming.x = len < DEAD ? 0 : vx / len; aiming.y = len < DEAD ? 0 : vy / len; aiming.m = Math.min(len / MAXR, 1); }

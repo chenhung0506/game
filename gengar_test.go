@@ -505,3 +505,15 @@ func TestShadowBallLandsAsFarAsTheAimIsLongAndNoFartherThanItsRange(t *testing.T
 		}
 	}
 }
+
+func TestShadowBallAimedNearTheOpponentStaysWhereAimedAndIsNotPulledOntoIt(t *testing.T) {
+	cfg := DefaultConfig()
+	reach := cfg.Gengar.ShadowBall.Speed * cfg.Gengar.ShadowBall.Duration
+	g := gen(cfg, snorlax)
+	g.P[0].X, g.P[0].Y = 300, 250
+	g.P[1].X, g.P[1].Y = 300+reach/2, 250+40 // a little off the line of the aim
+	gpress(g, Input{SBall: true, CastX: 0.5, CastY: 0})
+	if b := g.Shadows[0]; math.Abs(b.TX-(300+reach/2)) > 1e-6 || b.TY != 250 {
+		t.Fatalf("lands at %v,%v, want %v,250 where it was aimed, not on the opponent", b.TX, b.TY, 300+reach/2)
+	}
+}
