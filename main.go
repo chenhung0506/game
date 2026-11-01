@@ -325,10 +325,13 @@ func (r *room) setBot(idx, kind int) bool {
 	return true
 }
 
+// personCanPick is whether a person may play this character: Ash is the computer's alone (see setBot), and Gyarados is only a form.
+func personCanPick(kind int) bool { return kind >= 0 && kind < kinds && kind != ash }
+
 // choose records slot idx's pick and starts the match once both players have one. It reports whether the
 // pick was taken: an unknown character is refused, and so is any pick while a match is on. Both players may play the same one. Must be called with r.mu held.
 func (r *room) choose(idx, kind int) bool {
-	if r.playing() || r.team || kind < 0 || kind >= kinds {
+	if r.playing() || r.team || !personCanPick(kind) {
 		return false
 	}
 	r.pick[idx] = kind
@@ -370,7 +373,7 @@ func (r *room) setOrder(idx int, order []int) bool {
 	}
 	var seen [kinds]bool
 	for _, k := range order {
-		if k < 0 || k >= kinds || seen[k] {
+		if !personCanPick(k) || seen[k] {
 			return false
 		}
 		seen[k] = true

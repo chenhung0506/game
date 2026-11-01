@@ -227,6 +227,7 @@ const rv = (x, y) => [x * Math.cos(ROT) - y * Math.sin(ROT), x * Math.sin(ROT) +
 function upright(x, y, fn) { ctx.save(); ctx.translate(x, y); ctx.rotate(-ROT); fn(); ctx.restore(); }
 
 // ---- the character choice ----
+const COMPUTER_ONLY = 7; // Ash: only the computer plays him (the server refuses a person's pick of him)
 const cardEls = [];
 function buildCards() {
   const box = document.getElementById('cards');
@@ -234,6 +235,7 @@ function buildCards() {
   cardEls.length = 0;
   NAMES.forEach((name, k) => {
     const el = document.createElement('div'); el.className = 'card';
+    if (k === COMPUTER_ONLY) el.style.display = 'none'; // Ash is the computer's: a person picks Machamp
     const cvs = document.createElement('canvas'); cvs.width = 240; cvs.height = 200; // drawn at 2x
     const b = document.createElement('b'); b.textContent = name;
     const sm = document.createElement('small'); sm.textContent = `HP ${maxHp[k]}　${BLURB[k]}`;

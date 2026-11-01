@@ -438,8 +438,27 @@ func TestMachampIsPickableAndGyaradosIsStillOnlyAForm(t *testing.T) {
 		t.Fatalf("kinds %d ash %d gyarados %d forms %d", kinds, ash, gyarados, forms)
 	}
 	r := teamRoom()
-	if !r.choose(0, ash) || r.choose(1, gyarados) {
+	if !r.choose(0, machamp) || r.choose(1, gyarados) {
 		t.Fatal("Machamp should be pickable and Gyarados not")
+	}
+}
+
+func TestAshIsTheComputersAloneAPersonCannotPickHim(t *testing.T) {
+	r := teamRoom()
+	if r.choose(0, ash) || r.pick[0] != -1 {
+		t.Fatalf("a person picked Ash (%v)", r.pick)
+	}
+	if !r.choose(0, machamp) {
+		t.Fatal("a person could not pick Machamp")
+	}
+	r.setTeam(true)
+	if r.setOrder(0, []int{ash, 0, 1, 2, 3, 4}) {
+		t.Fatal("a person fielded Ash in a team")
+	}
+	// the computer can play him
+	r = botRoom(0)
+	if !r.setBot(0, ash) || r.bot[1] == nil || r.pick[1] != ash {
+		t.Fatalf("the computer could not take Ash (bot %v, picks %v)", r.bot[1] != nil, r.pick)
 	}
 }
 

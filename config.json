@@ -318,7 +318,7 @@
     }
   },
   "ash": {
-    "max_hp": 140,
+    "max_hp": 180,
     "walk_speed": 150,
     "radius": 30,
     "tree_slam": {
@@ -349,7 +349,7 @@
       "ball_knockback": 120,
       "knockback": 10,
       "duration": 2,
-      "quantity": 48,
+      "quantity": 60,
       "random_offset_angle": 60,
       "distance": 500,
       "scatter_min_distance": 10,
@@ -419,7 +419,7 @@
       "cooldown": 13.8,
       "air_speed_first_half": 150,
       "air_speed_second_half": 100,
-      "count": 20,
+      "count": 60,
       "stone_radius": 60,
       "stone_hp": 80,
       "stone_duration": 8

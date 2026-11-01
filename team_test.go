@@ -261,11 +261,11 @@ func TestATeamOfThreeEndsAfterThreeKnockOutsAndReportsItsSize(t *testing.T) {
 func TestAnyCharacterCanBeFieldedInATeamOfSixOrThree(t *testing.T) {
 	r := teamRoom()
 	r.setTeam(true)
-	if !r.setOrder(0, []int{ash, machamp, magikarp, 0, 1, 2}) || r.pick[0] != ash {
+	if !r.setOrder(0, []int{machamp, magikarp, rowlet, 0, 1, 2}) || r.pick[0] != machamp {
 		t.Fatalf("a team of six with the last characters was refused (%v)", r.pick)
 	}
 	r.setSize(3)
-	if !r.setOrder(0, []int{machamp, ash, 0}) || r.pick[0] != machamp {
+	if !r.setOrder(0, []int{machamp, rowlet, 0}) || r.pick[0] != machamp {
 		t.Fatalf("a team of three with the last characters was refused (%v)", r.pick)
 	}
 	if r.setOrder(0, []int{gyarados, 0, 1}) {
