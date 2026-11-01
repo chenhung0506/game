@@ -802,3 +802,40 @@ func TestARingWhoseBandIsHigherThanSnorlaxsJumpKeepsItIn(t *testing.T) {
 		}
 	}
 }
+
+func TestACometPunchWhileBoundOrParalyzedIsThrownInPlace(t *testing.T) {
+	for name, pin := range map[string]func(p *Player){
+		"bound":     func(p *Player) { p.BoundT = 5 },
+		"paralyzed": func(p *Player) { p.ParalyzeT = 5 },
+	} {
+		g := mach(DefaultConfig(), snorlax)
+		g.P[1].X, g.P[1].Y = 900, 250
+		pin(&g.P[0])
+		x0 := g.P[0].X
+		g.P[0].In = Input{Comet: true, DX: 1}
+		fists := 0
+		for n := 0; n < int(DefaultConfig().Ash.CometPunch.Duration*tickRate)+2; n++ {
+			g.Step(dt)
+			g.P[0].In = Input{DX: 1}
+			fists = max(fists, fistCount(g))
+		}
+		if g.P[0].X != x0 {
+			t.Fatalf("%s: moved %v while punching", name, g.P[0].X-x0)
+		}
+		if fists == 0 {
+			t.Fatalf("%s: no fists were thrown", name)
+		}
+	}
+	// free again, it runs as before
+	g := mach(DefaultConfig(), snorlax)
+	g.P[1].X, g.P[1].Y = 900, 250
+	x0 := g.P[0].X
+	g.P[0].In = Input{Comet: true}
+	for n := 0; n < 20; n++ {
+		g.Step(dt)
+		g.P[0].In = Input{}
+	}
+	if g.P[0].X <= x0+50 {
+		t.Fatalf("a free Comet Punch moved only %v", g.P[0].X-x0)
+	}
+}

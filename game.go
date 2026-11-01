@@ -296,6 +296,16 @@ type Ball struct {
 }
 
 // Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
+// FireZone is ground set alight by a Seismic Toss: whoever stands in it (and is not the owner) is burned every so often.
+type FireZone struct {
+	Owner int     `json:"o"`
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	R     float64 `json:"r"`
+	Left  float64 `json:"l"` // seconds before it burns out
+	HitCD float64 `json:"-"` // until it may burn the opponent again
+}
+
 type Frost struct {
 	Owner int     `json:"o"`
 	X     float64 `json:"x"`
@@ -327,6 +337,7 @@ type Game struct {
 	P     [2]Player
 	Balls []Ball
 	Frost []Frost
+	Fires []FireZone // the ground the Seismic Toss set alight
 	Waves []wave     // Gyarados's waves running out over the ground (the client draws them from an event)
 	rng   *rand.Rand // the fire's random spread; tests replace it
 	// Ease is each player's handicap in percent (a multiple of easeStep, at most easeMax): its HP and its
@@ -370,7 +381,7 @@ func (g *Game) Reset() {
 	}
 	g.P[0] = Player{Kind: g.P[0].Kind, X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(0), FX: 1, AimX: 1}
 	g.P[1] = Player{Kind: g.P[1].Kind, X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(1), FX: -1, AimX: -1}
-	g.Balls, g.Frost, g.Waves = nil, nil, nil
+	g.Balls, g.Frost, g.Waves, g.Fires = nil, nil, nil, nil
 	for i := range g.P {
 		if g.P[i].Kind == rowlet {
 			g.P[i].Z = g.cfg.Rowlet.FlyHigh // it is always in the air
@@ -844,6 +855,7 @@ func (g *Game) Step(dt float64) []Event {
 		}
 	}
 	g.tickFrost(dt)
+	g.tickFires(dt)
 	g.stepWaves(dt)
 	events = append(events, g.stepBalls(dt)...)
 	return append(events, g.stepTwirl(dt)...)
@@ -1215,6 +1227,7 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 		} else if p.Z > 0 {
 			if p.Z -= rise * dt; p.Z <= 1e-9 {
 				p.Z, p.FlyCD = 0, cz.Fly.Cooldown
+				g.flyRing(i)
 			}
 		}
 	}
@@ -1285,6 +1298,12 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 			g.hit(other, ts.Damage)
 			other.Held, other.Z = false, 0
 			events = append(events, Event{T: "slam", X: other.X, Y: other.Y, R: ts.Radius}) // the same shock as Snorlax's landing
+			if ts.FireRadius > 0 && ts.FireDuration > 0 {
+				g.Fires = append(g.Fires, FireZone{Owner: i, X: other.X, Y: other.Y, R: ts.FireRadius, Left: ts.FireDuration})
+				if over := len(g.Fires) - maxFires; over > 0 {
+					g.Fires = g.Fires[over:]
+				}
+			}
 		}
 	}
 	if other.Held && p.TossPhase != tossNone { // the caught body hangs in front of Charizard
@@ -1554,4 +1573,38 @@ func closestOnSegment(px, py, x0, y0, x1, y1 float64) (float64, float64) {
 func segDist(px, py, x0, y0, x1, y1 float64) float64 {
 	cx, cy := closestOnSegment(px, py, x0, y0, x1, y1)
 	return math.Hypot(px-cx, py-cy)
+}
+
+// maxFires bounds the burning ground on the court (the oldest goes out first).
+const maxFires = 20
+
+// flyRing is the ring of fire balls Charizard breathes out when it lands from a flight.
+func (g *Game) flyRing(i int) {
+	p, fly, fb := &g.P[i], g.cfg.Charizard.Fly, g.cfg.Charizard.FireBreath
+	off := g.radius(i) + fb.Radius + 1 // starts just clear of the body
+	for n := 0; n < fly.RingCount; n++ {
+		a := 2 * math.Pi * float64(n) / float64(fly.RingCount)
+		ux, uy := math.Cos(a), math.Sin(a)
+		g.Balls = append(g.Balls, Ball{K: ballFire, Owner: i, Left: fly.RingLength, X: p.X + ux*off, Y: p.Y + uy*off, DX: ux, DY: uy, HP: fb.HP})
+	}
+}
+
+// tickFires burns the opponent standing in a fire zone and lets the zones burn out.
+func (g *Game) tickFires(dt float64) {
+	ts := g.cfg.Charizard.SeismicToss
+	kept := g.Fires[:0]
+	for _, z := range g.Fires {
+		foe := &g.P[1-z.Owner]
+		if z.HitCD > 0 {
+			z.HitCD -= dt
+		}
+		if z.HitCD <= 1e-9 && foe.Z <= ts.FireMaxHeight && math.Hypot(foe.X-z.X, foe.Y-z.Y) <= z.R+g.radius(1-z.Owner) {
+			g.hit(foe, ts.FireDamage)
+			z.HitCD = ts.FireInterval
+		}
+		if z.Left -= dt; z.Left > 1e-9 {
+			kept = append(kept, z)
+		}
+	}
+	g.Fires = kept
 }

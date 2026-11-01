@@ -577,15 +577,16 @@ func (r *room) step(now time.Time) []byte {
 		}
 	}
 	msg, _ := json.Marshal(struct {
-		T  string    `json:"t"`
-		P  [2]Player `json:"p"`
-		E  []Event   `json:"e,omitempty"`
-		B  []Ball    `json:"b,omitempty"`
-		F  []Frost   `json:"f,omitempty"`
-		W  int       `json:"w"`
-		TM *teamInfo `json:"tm,omitempty"`
-		EZ [2]int    `json:"ez"`
-	}{"s", r.g.P, events, r.g.Balls, r.g.Frost, r.winner, tm, r.g.Ease})
+		T  string     `json:"t"`
+		P  [2]Player  `json:"p"`
+		E  []Event    `json:"e,omitempty"`
+		B  []Ball     `json:"b,omitempty"`
+		F  []Frost    `json:"f,omitempty"`
+		FZ []FireZone `json:"fz,omitempty"`
+		W  int        `json:"w"`
+		TM *teamInfo  `json:"tm,omitempty"`
+		EZ [2]int     `json:"ez"`
+	}{"s", r.g.P, events, r.g.Balls, r.g.Frost, r.g.Fires, r.winner, tm, r.g.Ease})
 	return msg
 }
 

@@ -500,6 +500,7 @@ func TestSeismicTossCarriesTheOpponentUpAndSlamsItDown(t *testing.T) {
 	cfg := DefaultConfig()
 	ts := &cfg.Charizard.SeismicToss
 	ts.Speed, ts.High, ts.Damage, ts.Radius = 600, 180, 35, 45
+	ts.FireRadius = 0 // the slam alone: the fire it leaves has its own tests
 	g := tossGame(cfg)
 	startToss(g)
 	var victim *Player = &g.P[1]
@@ -605,6 +606,7 @@ func TestSeismicTossMissesAJumpingOpponent(t *testing.T) {
 func TestSeismicTossWorksWhileFlying(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Charizard.Fly.Height = 30
+	cfg.Charizard.SeismicToss.FireRadius = 0 // the slam alone
 	g := tossGame(cfg)
 	g.P[0].In.Skill = true
 	g.Step(dt)
@@ -753,5 +755,165 @@ func TestMirrorFireAndBallsHurtOnlyTheOpponent(t *testing.T) {
 	steps(g, 120)
 	if g.P[1].HP != cfg.Pikachu.MaxHP || g.P[0].HP == cfg.Pikachu.MaxHP {
 		t.Fatalf("HP %d / %d: the ball must hurt slot 0 only", g.P[0].HP, g.P[1].HP)
+	}
+}
+
+// ---- the ring of fire after a flight, and the ground a slam sets alight ----
+
+func TestALandingFromFlightBreathesARingOfFireBallsThatSpreadOut(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Charizard.Fly.Duration, cfg.Charizard.Fly.Height = 0.5, 30
+	cfg.Charizard.Fly.RingCount, cfg.Charizard.Fly.RingLength = 12, 300
+	g := czGame(cfg)
+	g.P[1].X, g.P[1].Y = 2000, 900 // far from the ring
+	g.P[0].In.Skill = true
+	g.Step(dt)
+	g.P[0].In = Input{}
+	for n := 0; n < 200 && fireBalls(g) == 0; n++ {
+		if p := &g.P[0]; p.FlyT == 0 && p.Z == 0 && p.FlyCD > 0 {
+			break
+		}
+		g.Step(dt)
+	}
+	if got := fireBalls(g); got != 12 {
+		t.Fatalf("%d fire balls at the landing, want the ring of 12", got)
+	}
+	cx, cy := g.P[0].X, g.P[0].Y
+	var seen [12]bool
+	for _, b := range g.Balls {
+		a := math.Atan2(b.Y-cy, b.X-cx)
+		k := int(math.Round(a/(2*math.Pi)*12+12)) % 12
+		seen[k] = true
+		if b.Left > 300 || b.Left < 300-2*cfg.Charizard.FireBreath.Speed*dt || math.Abs(math.Hypot(b.DX, b.DY)-1) > 1e-9 { // it has flown a step or two already
+			t.Fatalf("ball %+v: want a unit heading and 300 to go", b)
+		}
+	}
+	for k, ok := range seen {
+		if !ok {
+			t.Fatalf("no ball at direction %d of 12: the ring is not even", k)
+		}
+	}
+	steps(g, 6)
+	for _, b := range g.Balls {
+		if math.Hypot(b.X-cx, b.Y-cy) <= g.radius(0)+cfg.Charizard.FireBreath.Radius+2 {
+			t.Fatalf("a ball is still at the body: it did not spread out")
+		}
+	}
+}
+
+func fireBalls(g *Game) (n int) {
+	for _, b := range g.Balls {
+		if b.K == ballFire {
+			n++
+		}
+	}
+	return n
+}
+
+func TestNoRingWhenRingCountIsZeroOrTheFlightWasCutShort(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Charizard.Fly.Duration, cfg.Charizard.Fly.Height, cfg.Charizard.Fly.RingCount = 0.3, 30, 0
+	g := czGame(cfg)
+	g.P[0].In.Skill = true
+	g.Step(dt)
+	g.P[0].In = Input{}
+	steps(g, 60)
+	if fireBalls(g) != 0 {
+		t.Fatal("a ring of 0 breathed fire balls")
+	}
+	cfg.Charizard.Fly.RingCount = 12
+	g = czGame(cfg)
+	g.P[1].X, g.P[1].Y = 2000, 900
+	g.P[0].In.Skill = true
+	g.Step(dt)
+	g.P[0].In = Input{}
+	steps(g, 5)
+	g.P[0].FrozenT = 1 // frozen out of the sky: nothing is breathed
+	g.P[0].Z, g.P[0].FlyT = 0, 0
+	steps(g, 30)
+	if fireBalls(g) != 0 {
+		t.Fatal("a fire ring came from a flight that did not end by landing")
+	}
+}
+
+// slammed is a Seismic Toss that has just landed on the opponent at (700, 400), with the fire settings given.
+func slammed(cfg Config) *Game {
+	g := czGame(cfg)
+	g.P[1].X, g.P[1].Y = 700, 400
+	g.P[0].X, g.P[0].Y = 500, 400
+	g.P[0].TossPhase, g.P[0].TossDX, g.P[0].TossDY, g.P[0].Z = tossFall, 1, 0, 1
+	g.P[1].Held, g.P[1].Z = true, 1
+	g.Step(dt)
+	return g
+}
+
+func TestASlamSetsTheGroundAlightAndItBurnsWhoeverStandsInIt(t *testing.T) {
+	cfg := DefaultConfig()
+	ts := &cfg.Charizard.SeismicToss
+	ts.Damage, ts.FireRadius, ts.FireDuration, ts.FireDamage, ts.FireInterval = 10, 120, 2, 3, 0.5
+	g := slammed(cfg)
+	if len(g.Fires) != 1 || g.Fires[0].X != 700 || g.Fires[0].R != 120 {
+		t.Fatalf("fires %+v, want one disc of 120 where the opponent landed", g.Fires)
+	}
+	hp := g.P[1].HP
+	burns := 0
+	for n := 0; n < int(2*tickRate)+3; n++ {
+		before := g.P[1].HP
+		g.Step(dt)
+		if g.P[1].HP < before {
+			burns++
+		}
+	}
+	// it stands in the fire the whole time: the first burn came with the slam, then one every 0.5 s while it burns for 2 s
+	if burns < 3 || burns > 4 || g.P[1].HP > hp-3*3 {
+		t.Fatalf("%d burns, HP %d -> %d, want about one every half second", burns, hp, g.P[1].HP)
+	}
+	if len(g.Fires) != 0 {
+		t.Fatalf("fires %+v, want it burnt out", g.Fires)
+	}
+}
+
+func TestStandingOutsideOrAboveTheFireIsSafeAndTheOwnerIsNeverBurned(t *testing.T) {
+	cfg := DefaultConfig()
+	ts := &cfg.Charizard.SeismicToss
+	ts.FireRadius, ts.FireDuration, ts.FireDamage, ts.FireInterval, ts.FireMaxHeight = 100, 5, 3, 0.2, 12
+	g := slammed(cfg)
+	g.P[1].X = 700 + ts.FireRadius + g.radius(1) + 5 // just outside
+	hp, own := g.P[1].HP, g.P[0].HP
+	steps(g, 30)
+	if g.P[1].HP != hp {
+		t.Fatalf("burned outside the fire: %d -> %d", hp, g.P[1].HP)
+	}
+	g.P[1].X, g.P[1].Z = 700, 40 // over it, in the air
+	for n := 0; n < 20; n++ {
+		g.P[1].Z = 40
+		g.Step(dt)
+	}
+	if g.P[1].HP != hp {
+		t.Fatalf("burned in the air above the fire: %d -> %d", hp, g.P[1].HP)
+	}
+	g.P[1].X, g.P[1].Y, g.P[1].Z = 1500, 800, 0 // out of the way
+	g.P[0].X, g.P[0].Y = 700, 400               // the owner walks into it
+	steps(g, 20)
+	if g.P[0].HP != own {
+		t.Fatalf("the owner was burned: %d -> %d", own, g.P[0].HP)
+	}
+}
+
+func TestNoFireWhenItsRadiusOrDurationIsZeroAndAResetPutsItOut(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Charizard.SeismicToss.FireRadius = 0
+	if g := slammed(cfg); len(g.Fires) != 0 {
+		t.Fatal("a fire of radius 0 was lit")
+	}
+	cfg = DefaultConfig()
+	cfg.Charizard.SeismicToss.FireDuration = 0
+	if g := slammed(cfg); len(g.Fires) != 0 {
+		t.Fatal("a fire that burns for 0 seconds was lit")
+	}
+	g := slammed(DefaultConfig())
+	g.Reset()
+	if len(g.Fires) != 0 {
+		t.Fatal("a fire survived the reset")
 	}
 }

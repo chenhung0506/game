@@ -102,6 +102,9 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		}
 		step := math.Min(dt, p.CometT)
 		adv := math.Min(cp.Distance/cp.Duration*step, math.Max(0, dist(p, other)-g.radius(i)-g.radius(1-i)))
+		if p.BoundT > 0 || p.ParalyzeT > 0 { // pinned by a vine or paralyzed: the fists are thrown from where it stands
+			adv = 0
+		}
 		p.X = math.Min(math.Max(p.X+fx*adv, 0), g.court.Length)
 		p.Y = math.Min(math.Max(p.Y+fy*adv, 0), g.court.Width)
 		if p.CometT -= step; p.CometT < 1e-9 {

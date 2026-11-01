@@ -1720,6 +1720,29 @@ const seeded = (n) => { const v = Math.sin(n * 127.1) * 43758.5453; return v - M
 
 // Frost Field: patches of ice on the ground. Cyan rim for the viewer's own frost (it speeds them up), violet for the other's (it slows).
 // A patch grows in over a quarter of a second and fades out over its last second and a half.
+// The ground a Seismic Toss set alight: a glowing red-orange disc with flames flickering up all over it, dying down as it burns out.
+function drawFireZones() {
+  const now = performance.now() / 1000;
+  for (const z of snap.fz || []) {
+    const a = Math.min(1, z.l / 0.8), sd = z.x * 0.31 + z.y * 0.77;
+    ctx.save();
+    const g = ctx.createRadialGradient(z.x, z.y, 0, z.x, z.y, z.r);
+    g.addColorStop(0, `rgba(255,200,70,${0.55 * a})`); g.addColorStop(0.65, `rgba(240,90,25,${0.45 * a})`); g.addColorStop(1, 'rgba(200,40,10,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(255,120,40,${0.7 * a})`; ctx.lineWidth = 2.5; ctx.setLineDash([10, 8]); ctx.beginPath(); ctx.arc(z.x, z.y, z.r * 0.97, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    const n = Math.max(8, Math.round(z.r / 9));
+    for (let k = 0; k < n; k++) { // a flame at a fixed spot, flickering up and down
+      const ang = seeded(sd + k) * 6.283, rr = Math.sqrt(seeded(sd + k * 7.3)) * z.r * 0.92, fx = z.x + Math.cos(ang) * rr, fy = z.y + Math.sin(ang) * rr;
+      const fk = 0.7 + 0.3 * Math.sin(now * (9 + seeded(sd + k * 2.1) * 8) + k), h = (26 + 22 * seeded(sd + k * 4.7)) * fk * a, w = 9 + 6 * seeded(sd + k * 1.9);
+      upright(fx, fy, () => {
+        ctx.fillStyle = `rgba(255,110,25,${0.85 * a})`; ctx.beginPath(); ctx.moveTo(-w, 0); ctx.quadraticCurveTo(-w * 0.9, -h * 0.6, 0, -h); ctx.quadraticCurveTo(w * 0.9, -h * 0.6, w, 0); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = `rgba(255,220,90,${0.9 * a})`; ctx.beginPath(); ctx.moveTo(-w * 0.5, 0); ctx.quadraticCurveTo(-w * 0.45, -h * 0.4, 0, -h * 0.65); ctx.quadraticCurveTo(w * 0.45, -h * 0.4, w * 0.5, 0); ctx.closePath(); ctx.fill();
+      });
+    }
+    ctx.restore();
+  }
+}
+
 function drawFrost() {
   for (const f of snap.f || []) {
     const age = frostCfg.duration - f.l, grow = Math.min(1, age / 0.25), a = Math.min(1, f.l / 1.5) * grow, R = (f.r || frostCfg.radius) * (0.5 + 0.5 * grow * (2 - grow));
@@ -2212,6 +2235,7 @@ function frame() {
     drawArrowAims();
     drawTornadoWarnings();
     drawFrost();
+    drawFireZones();
     drawShadow();
     drawStorms();
     drawBalls();

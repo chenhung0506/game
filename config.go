@@ -141,6 +141,11 @@ type Config struct {
 			Cooldown float64 `json:"cooldown"` // starts when it has landed
 			Speed    float64 `json:"speed"`    // walking speed while flying
 			Height   float64 `json:"height"`
+			// When the flight ends (Charizard is back on the ground) it breathes a ring of `ring_count` fire balls
+			// that spread out from it, `ring_length` far; each is a fire ball of fire_breath (speed, size, HP, damage).
+			// 0 balls = no ring.
+			RingCount  int     `json:"ring_count"`
+			RingLength float64 `json:"ring_length"`
 		} `json:"fly"`
 		// Fire Breath: for `duration` seconds Charizard spits `quantity` fire balls, evenly spaced, each at the
 		// opponent's position when it leaves the mouth, turned by a random angle within +-random_offset_angle.
@@ -171,6 +176,15 @@ type Config struct {
 			Length   float64 `json:"length"`
 			High     float64 `json:"high"`
 			Mass     float64 `json:"mass"` // against another skill running at the same time, see pikachu.volt_tackle.mass
+			// The slam sets the ground on fire where the opponent landed: a disc of `fire_radius` (plus the body of
+			// whoever stands in it) that burns for `fire_duration` seconds. An opponent standing in it, no higher off
+			// the ground than `fire_max_height`, takes `fire_damage` at once and again every `fire_interval` seconds.
+			// A radius or duration of 0 = no fire.
+			FireRadius    float64 `json:"fire_radius"`
+			FireDuration  float64 `json:"fire_duration"`
+			FireDamage    int     `json:"fire_damage"`
+			FireInterval  float64 `json:"fire_interval"`
+			FireMaxHeight float64 `json:"fire_max_height"`
 		} `json:"seismic_toss"`
 	} `json:"charizard"`
 	Chikorita struct {
@@ -550,6 +564,7 @@ func DefaultConfig() Config {
 	c.Charizard.Fly.Cooldown = 8
 	c.Charizard.Fly.Speed = 260
 	c.Charizard.Fly.Height = 90
+	c.Charizard.Fly.RingCount, c.Charizard.Fly.RingLength = 16, 350
 	c.Charizard.FireBreath.Speed = 450
 	c.Charizard.FireBreath.Radius = 10
 	c.Charizard.FireBreath.HP = 10
@@ -567,6 +582,8 @@ func DefaultConfig() Config {
 	c.Charizard.SeismicToss.Length = 300
 	c.Charizard.SeismicToss.High = 180
 	c.Charizard.SeismicToss.Mass = 100
+	c.Charizard.SeismicToss.FireRadius, c.Charizard.SeismicToss.FireDuration, c.Charizard.SeismicToss.FireDamage = 130, 6, 2
+	c.Charizard.SeismicToss.FireInterval, c.Charizard.SeismicToss.FireMaxHeight = 0.5, groundZ
 	c.Chikorita.MaxHP = 110
 	c.Chikorita.WalkSpeed = 170
 	c.Chikorita.Radius = 18
@@ -788,6 +805,7 @@ func (c Config) validate() error {
 		{"charizard.fly.duration", c.Charizard.Fly.Duration, 0},
 		{"charizard.fly.speed", c.Charizard.Fly.Speed, 0},
 		{"charizard.fly.height", c.Charizard.Fly.Height, 0},
+		{"charizard.fly.ring_length", c.Charizard.Fly.RingLength, 0},
 		{"charizard.fire_breath.speed", c.Charizard.FireBreath.Speed, 0},
 		{"charizard.fire_breath.radius", c.Charizard.FireBreath.Radius, 0},
 		{"charizard.fire_breath.hp", float64(c.Charizard.FireBreath.HP), 0},
@@ -958,6 +976,12 @@ func (c Config) validate() error {
 		{"charizard.fire_breath.mass", c.Charizard.FireBreath.Mass},
 		{"charizard.seismic_toss.damage", float64(c.Charizard.SeismicToss.Damage)},
 		{"charizard.seismic_toss.cooldown", c.Charizard.SeismicToss.Cooldown},
+		{"charizard.fly.ring_count", float64(c.Charizard.Fly.RingCount)},
+		{"charizard.seismic_toss.fire_radius", c.Charizard.SeismicToss.FireRadius},
+		{"charizard.seismic_toss.fire_duration", c.Charizard.SeismicToss.FireDuration},
+		{"charizard.seismic_toss.fire_damage", float64(c.Charizard.SeismicToss.FireDamage)},
+		{"charizard.seismic_toss.fire_interval", c.Charizard.SeismicToss.FireInterval},
+		{"charizard.seismic_toss.fire_max_height", c.Charizard.SeismicToss.FireMaxHeight},
 		{"chikorita.leaf_slash.jump_height", c.Chikorita.LeafSlash.JumpHeight},
 		{"chikorita.leaf_slash.slash_step", c.Chikorita.LeafSlash.SlashStep},
 		{"chikorita.leaf_slash.damage", float64(c.Chikorita.LeafSlash.Damage)},
