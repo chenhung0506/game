@@ -24,6 +24,10 @@ type Reach struct {
 	MaxHeight float64 `json:"max_height"`
 }
 
+// minHeightFloor is how far below the ground a skill's min_height may be set: Gengar's Shadow Sneak puts it underground (a height below 0), and a skill whose
+// band starts at -10 or lower is the one kind that can reach it.
+const minHeightFloor = 1000
+
 // hits is whether the skill can hurt p at the height it is at now.
 func (r Reach) hits(p *Player) bool { return p.Z >= r.MinHeight && p.Z <= r.MaxHeight }
 
@@ -418,6 +422,55 @@ type Config struct {
 	// Ash (Pallet Town) and Machamp use the same skills, each with its own numbers (Machamp's a little lower).
 	Ash     BrawlerCfg `json:"ash"`
 	Machamp BrawlerCfg `json:"machamp"`
+	// Gengar: Shadow Sneak (the main button) slips into the ground for `duration` seconds at `height` (negative: below it), so
+	// that no skill whose band (min_height..max_height) does not reach down that far can touch it; it steers at
+	// `shadow_speed_first_half` then `shadow_speed_second_half`, and a black shadow `shadow_radius` wide marks where it is: an opponent
+	// touching the shadow (at a height inside this skill's own min_height..max_height) cannot start a skill.
+	// Ghost Fire (J) lets out `count` purple flames all round it that fly out `ring_radius` at `spread_speed`, then come
+	// back to it at `convergence_speed`, following it wherever it goes; each hurts the opponent once (`damage`) if it touches it (`radius`).
+	// Shadow Ball (K, aimed like the Vine Whip) lobs a ball `height` high that takes `duration` seconds to come down, at most
+	// `speed` x `duration` away, on the opponent unless an aim was chosen; where it lands it hurts the opponent in
+	// `slam_radius` (`damage`), and sends `ghost_fire_count` purple flames out `ghost_fire_spread_distance` at `ghost_fire_spread_speed`
+	// that do not come back (`ghost_fire_radius` big, `ghost_fire_damage` each). `ball_scale` only makes the drawn ball bigger.
+	Gengar struct {
+		MaxHP       int     `json:"max_hp"`
+		WalkSpeed   float64 `json:"walk_speed"`
+		Radius      float64 `json:"radius"`
+		ShadowSneak struct {
+			Reach
+			Height                float64 `json:"height"`
+			Duration              float64 `json:"duration"`
+			Cooldown              float64 `json:"cooldown"` // counted from the start
+			ShadowSpeedFirstHalf  float64 `json:"shadow_speed_first_half"`
+			ShadowSpeedSecondHalf float64 `json:"shadow_speed_second_half"`
+			ShadowRadius          float64 `json:"shadow_radius"`
+		} `json:"shadow_sneak"`
+		GhostFire struct {
+			Reach
+			Cooldown         float64 `json:"cooldown"`
+			RingRadius       float64 `json:"ring_radius"`
+			SpreadSpeed      float64 `json:"spread_speed"`
+			ConvergenceSpeed float64 `json:"convergence_speed"`
+			Damage           int     `json:"damage"`
+			Count            int     `json:"count"`
+			Radius           float64 `json:"radius"`
+		} `json:"ghost_fire"`
+		ShadowBall struct {
+			Reach
+			BallScale               float64 `json:"ball_scale"`
+			Damage                  int     `json:"damage"`
+			Height                  float64 `json:"height"`
+			Duration                float64 `json:"duration"`
+			Cooldown                float64 `json:"cooldown"`
+			SlamRadius              float64 `json:"slam_radius"`
+			Speed                   float64 `json:"speed"`
+			GhostFireSpreadSpeed    float64 `json:"ghost_fire_spread_speed"`
+			GhostFireRadius         float64 `json:"ghost_fire_radius"`
+			GhostFireSpreadDistance float64 `json:"ghost_fire_spread_distance"`
+			GhostFireCount          int     `json:"ghost_fire_count"`
+			GhostFireDamage         int     `json:"ghost_fire_damage"`
+		} `json:"shadow_ball"`
+	} `json:"gengar"`
 }
 
 // BrawlerCfg is the numbers of one of the two brawlers (Ash and Machamp): the tree slam, the comet punch and the rock tomb.
@@ -720,6 +773,18 @@ func DefaultConfig() Config {
 	rt.RingRadius, rt.Height, rt.Duration, rt.Cooldown = 500, 80, 0.8, 12
 	rt.AirSpeedFirstHalf, rt.AirSpeedSecondHalf = 150, 100
 	rt.Count, rt.StoneRadius, rt.StoneHP, rt.StoneDuration = 24, 60, 100, 8
+	g := &c.Gengar
+	g.MaxHP, g.WalkSpeed, g.Radius = 110, 155, 18
+	ss := &g.ShadowSneak
+	ss.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	ss.Height, ss.Duration, ss.Cooldown, ss.ShadowSpeedFirstHalf, ss.ShadowSpeedSecondHalf, ss.ShadowRadius = -10, 2.5, 8, 260, 180, 90
+	gf := &g.GhostFire
+	gf.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	gf.Cooldown, gf.RingRadius, gf.SpreadSpeed, gf.ConvergenceSpeed, gf.Damage, gf.Count, gf.Radius = 7, 260, 300, 200, 4, 12, 22
+	sb := &g.ShadowBall
+	sb.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	sb.BallScale, sb.Damage, sb.Height, sb.Duration, sb.Cooldown, sb.SlamRadius, sb.Speed = 1, 25, 150, 0.9, 6, 110, 500
+	sb.GhostFireSpreadSpeed, sb.GhostFireRadius, sb.GhostFireSpreadDistance, sb.GhostFireCount, sb.GhostFireDamage = 260, 20, 220, 10, 5
 	c.Machamp = c.Ash // the same moves a notch weaker: less health and reach, fewer and frailer fists and stones, longer waits
 	c.Machamp.MaxHP, c.Machamp.WalkSpeed = 125, 130
 	c.Machamp.TreeSlam.TrunkLength, c.Machamp.TreeSlam.LeafRadius, c.Machamp.TreeSlam.Damage, c.Machamp.TreeSlam.Cooldown = 270, 160, 30, 9
@@ -857,6 +922,24 @@ func (c Config) validate() error {
 		{"machamp.walk_speed", c.Machamp.WalkSpeed, 0},
 		{"ash.walk_speed", c.Ash.WalkSpeed, 0},
 		{"machamp.radius", c.Machamp.Radius, 0},
+		{"gengar.max_hp", float64(c.Gengar.MaxHP), 0},
+		{"gengar.walk_speed", c.Gengar.WalkSpeed, 0},
+		{"gengar.radius", c.Gengar.Radius, 0},
+		{"gengar.shadow_sneak.duration", c.Gengar.ShadowSneak.Duration, 0},
+		{"gengar.shadow_sneak.shadow_radius", c.Gengar.ShadowSneak.ShadowRadius, 0},
+		{"gengar.ghost_fire.ring_radius", c.Gengar.GhostFire.RingRadius, 0},
+		{"gengar.ghost_fire.spread_speed", c.Gengar.GhostFire.SpreadSpeed, 0},
+		{"gengar.ghost_fire.convergence_speed", c.Gengar.GhostFire.ConvergenceSpeed, 0},
+		{"gengar.ghost_fire.count", float64(c.Gengar.GhostFire.Count), 0},
+		{"gengar.ghost_fire.radius", c.Gengar.GhostFire.Radius, 0},
+		{"gengar.shadow_ball.ball_scale", c.Gengar.ShadowBall.BallScale, 0},
+		{"gengar.shadow_ball.duration", c.Gengar.ShadowBall.Duration, 0},
+		{"gengar.shadow_ball.slam_radius", c.Gengar.ShadowBall.SlamRadius, 0},
+		{"gengar.shadow_ball.speed", c.Gengar.ShadowBall.Speed, 0},
+		{"gengar.shadow_ball.ghost_fire_spread_speed", c.Gengar.ShadowBall.GhostFireSpreadSpeed, 0},
+		{"gengar.shadow_ball.ghost_fire_radius", c.Gengar.ShadowBall.GhostFireRadius, 0},
+		{"gengar.shadow_ball.ghost_fire_spread_distance", c.Gengar.ShadowBall.GhostFireSpreadDistance, 0},
+		{"gengar.shadow_ball.ghost_fire_count", float64(c.Gengar.ShadowBall.GhostFireCount), 0},
 		{"ash.radius", c.Ash.Radius, 0},
 		{"machamp.tree_slam.jump_distance", c.Machamp.TreeSlam.JumpDistance, 0},
 		{"ash.tree_slam.jump_distance", c.Ash.TreeSlam.JumpDistance, 0},
@@ -1042,6 +1125,15 @@ func (c Config) validate() error {
 		{"machamp.comet_punch.cooldown", c.Machamp.CometPunch.Cooldown},
 		{"ash.comet_punch.cooldown", c.Ash.CometPunch.Cooldown},
 		{"machamp.comet_punch.mass", c.Machamp.CometPunch.Mass},
+		{"gengar.shadow_sneak.cooldown", c.Gengar.ShadowSneak.Cooldown},
+		{"gengar.shadow_sneak.shadow_speed_first_half", c.Gengar.ShadowSneak.ShadowSpeedFirstHalf},
+		{"gengar.shadow_sneak.shadow_speed_second_half", c.Gengar.ShadowSneak.ShadowSpeedSecondHalf},
+		{"gengar.ghost_fire.cooldown", c.Gengar.GhostFire.Cooldown},
+		{"gengar.ghost_fire.damage", float64(c.Gengar.GhostFire.Damage)},
+		{"gengar.shadow_ball.damage", float64(c.Gengar.ShadowBall.Damage)},
+		{"gengar.shadow_ball.height", c.Gengar.ShadowBall.Height},
+		{"gengar.shadow_ball.cooldown", c.Gengar.ShadowBall.Cooldown},
+		{"gengar.shadow_ball.ghost_fire_damage", float64(c.Gengar.ShadowBall.GhostFireDamage)},
 		{"ash.comet_punch.mass", c.Ash.CometPunch.Mass},
 		{"machamp.comet_punch.ball_knockback", c.Machamp.CometPunch.BallKnockback},
 		{"ash.comet_punch.ball_knockback", c.Ash.CometPunch.BallKnockback},
@@ -1093,10 +1185,13 @@ func (c Config) validate() error {
 		"machamp.comet_punch":    c.Machamp.CometPunch.Reach,
 		"ash.comet_punch":        c.Ash.CometPunch.Reach,
 		"machamp.rock_tomb":      c.Machamp.RockTomb.Reach,
+		"gengar.shadow_sneak":    c.Gengar.ShadowSneak.Reach,
+		"gengar.ghost_fire":      c.Gengar.GhostFire.Reach,
+		"gengar.shadow_ball":     c.Gengar.ShadowBall.Reach,
 		"ash.rock_tomb":          c.Ash.RockTomb.Reach,
 	} {
-		if !(r.MinHeight >= 0 && r.MaxHeight >= r.MinHeight) { // also rejects NaN
-			return fmt.Errorf("%s: need 0 <= min_height <= max_height, got %v and %v", name, r.MinHeight, r.MaxHeight)
+		if !(r.MinHeight >= -minHeightFloor && r.MaxHeight >= r.MinHeight) { // also rejects NaN
+			return fmt.Errorf("%s: need %v <= min_height <= max_height, got %v and %v", name, -minHeightFloor, r.MinHeight, r.MaxHeight)
 		}
 	}
 	for name, a := range map[string]float64{"snorlax": c.Snorlax.HyperBeam.SweepAngle, "gyarados": c.Gyarados.HyperBeam.SweepAngle} {
@@ -1136,6 +1231,9 @@ func (c Config) validate() error {
 	if err := c.Machamp.validate("machamp"); err != nil {
 		return err
 	}
+	if h := c.Gengar.ShadowSneak.Height; !(h <= 0 && h >= -minHeightFloor) { // below the ground (0 = just on it)
+		return fmt.Errorf("gengar.shadow_sneak.height must be between %v and 0, got %v", -minHeightFloor, h)
+	}
 	if a := c.Charizard.FireBreath.RandomOffsetAngle; !(a >= 0 && a <= 90) { // 0 = every fire ball flies straight at the target
 		return fmt.Errorf("charizard.fire_breath.random_offset_angle must be between 0 and 90, got %v", a)
 	}
@@ -1169,6 +1267,8 @@ func (c Config) maxHPOf(kind int) int {
 		return c.Ash.MaxHP
 	case machamp:
 		return c.Machamp.MaxHP
+	case gengar:
+		return c.Gengar.MaxHP
 	case gyarados:
 		return c.Gyarados.MaxHP
 	}
@@ -1193,6 +1293,8 @@ func (c Config) walkSpeedOf(kind int) float64 {
 		return c.Ash.WalkSpeed
 	case machamp:
 		return c.Machamp.WalkSpeed
+	case gengar:
+		return c.Gengar.WalkSpeed
 	case gyarados:
 		return c.Gyarados.WalkSpeed
 	}
@@ -1217,6 +1319,8 @@ func (c Config) radiusOf(kind int) float64 {
 		return c.Ash.Radius
 	case machamp:
 		return c.Machamp.Radius
+	case gengar:
+		return c.Gengar.Radius
 	case gyarados:
 		return c.Gyarados.Radius
 	}

@@ -577,16 +577,18 @@ func (r *room) step(now time.Time) []byte {
 		}
 	}
 	msg, _ := json.Marshal(struct {
-		T  string     `json:"t"`
-		P  [2]Player  `json:"p"`
-		E  []Event    `json:"e,omitempty"`
-		B  []Ball     `json:"b,omitempty"`
-		F  []Frost    `json:"f,omitempty"`
-		FZ []FireZone `json:"fz,omitempty"`
-		W  int        `json:"w"`
-		TM *teamInfo  `json:"tm,omitempty"`
-		EZ [2]int     `json:"ez"`
-	}{"s", r.g.P, events, r.g.Balls, r.g.Frost, r.g.Fires, r.winner, tm, r.g.Ease})
+		T  string       `json:"t"`
+		P  [2]Player    `json:"p"`
+		E  []Event      `json:"e,omitempty"`
+		B  []Ball       `json:"b,omitempty"`
+		F  []Frost      `json:"f,omitempty"`
+		FZ []FireZone   `json:"fz,omitempty"`
+		GH []ghostFire  `json:"gh,omitempty"`
+		SB []shadowBall `json:"sb,omitempty"`
+		W  int          `json:"w"`
+		TM *teamInfo    `json:"tm,omitempty"`
+		EZ [2]int       `json:"ez"`
+	}{"s", r.g.P, events, r.g.Balls, r.g.Frost, r.g.Fires, r.g.Ghosts, r.g.Shadows, r.winner, tm, r.g.Ease})
 	return msg
 }
 
@@ -632,13 +634,17 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	tree, comet, rock := cfg.Ash.TreeSlam, cfg.Ash.CometPunch, cfg.Ash.RockTomb
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
-		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp and the gyarados magikarp becomes
-		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gyarados.Radius},
-		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gyarados.MaxHP},
-		"evolve":  cfg.Magikarp.EvolveHops,
-		"tree":    []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
-		"fist":    []map[string]float64{aFist, mFist},
-		"stone":   []map[string]float64{aStone, mStone},
+		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp, gengar and the gyarados magikarp becomes
+		"radius": []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Gyarados.Radius},
+		"maxhp":  []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gengar.MaxHP, cfg.Gyarados.MaxHP},
+		"evolve": cfg.Magikarp.EvolveHops,
+		"tree":   []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
+		"fist":   []map[string]float64{aFist, mFist},
+		"stone":  []map[string]float64{aStone, mStone},
+		"gengar": map[string]float64{"shadow": cfg.Gengar.ShadowSneak.ShadowRadius, "depth": cfg.Gengar.ShadowSneak.Height, "sneak": cfg.Gengar.ShadowSneak.Duration,
+			"fire": cfg.Gengar.GhostFire.Radius, "ring": cfg.Gengar.GhostFire.RingRadius,
+			"scale": cfg.Gengar.ShadowBall.BallScale, "slam": cfg.Gengar.ShadowBall.SlamRadius, "range": cfg.Gengar.ShadowBall.Speed * cfg.Gengar.ShadowBall.Duration,
+			"flight": cfg.Gengar.ShadowBall.Duration, "lob": cfg.Gengar.ShadowBall.Height, "sfire": cfg.Gengar.ShadowBall.GhostFireRadius},
 		"wave":    map[string]float64{"radius": cfg.Gyarados.Wave.Radius, "speed": cfg.Gyarados.Wave.Speed},
 		"tail":    map[string]float64{"angle": cfg.Gyarados.TailWhip.Angle, "length": cfg.Gyarados.TailWhip.Length, "stun": cfg.Gyarados.TailWhip.StunDuration, "charge": cfg.Gyarados.TailWhip.ChargeDuration},
 		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "scale": cfg.Vulpix.FrostField.Scale, "duration": cfg.Vulpix.FrostField.Duration, "ride": cfg.Vulpix.FrostField.SprayDuration},
@@ -665,7 +671,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,
 			"frost": cfg.Vulpix.FrostField.Cooldown, "storm": cfg.Vulpix.IceStorm.Cooldown, "fbeam": cfg.Vulpix.FreezeBeam.Cooldown,
 			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown,
-			"tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "mtree": cfg.Machamp.TreeSlam.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
+			"tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "mtree": cfg.Machamp.TreeSlam.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
 	})
 	c.send <- hi
 	r.broadcastLobby() // both players learn who joined

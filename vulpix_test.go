@@ -893,7 +893,7 @@ func TestVulpixConfigLoadsAndRefusesBadValues(t *testing.T) {
 		"vulpix.freeze_beam.length":           func(c *Config) { c.Vulpix.FreezeBeam.Length = 0 },
 		"vulpix.freeze_beam.start_distance":   func(c *Config) { c.Vulpix.FreezeBeam.StartDistance = c.Vulpix.FreezeBeam.Length + 1 },
 		"vulpix.freeze_beam":                  func(c *Config) { c.Vulpix.FreezeBeam.MinHeight, c.Vulpix.FreezeBeam.MaxHeight = 50, 10 },
-		"vulpix.ice_storm":                    func(c *Config) { c.Vulpix.IceStorm.MinHeight = -1 },
+		"vulpix.ice_storm":                    func(c *Config) { c.Vulpix.IceStorm.MinHeight = -minHeightFloor - 1 },
 	} {
 		c := good
 		mut(&c)

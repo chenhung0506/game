@@ -284,6 +284,48 @@
       "air_speed_second_half": 30
     }
   },
+  "gengar": {
+    "max_hp": 110,
+    "walk_speed": 155,
+    "radius": 18,
+    "shadow_sneak": {
+      "min_height": 0,
+      "max_height": 60,
+      "height": -10,
+      "duration": 2.5,
+      "cooldown": 8,
+      "shadow_speed_first_half": 260,
+      "shadow_speed_second_half": 180,
+      "shadow_radius": 90
+    },
+    "ghost_fire": {
+      "min_height": 0,
+      "max_height": 60,
+      "cooldown": 7,
+      "ring_radius": 260,
+      "spread_speed": 300,
+      "convergence_speed": 200,
+      "damage": 4,
+      "count": 12,
+      "radius": 22
+    },
+    "shadow_ball": {
+      "min_height": 0,
+      "max_height": 60,
+      "ball_scale": 1,
+      "damage": 25,
+      "height": 150,
+      "duration": 0.9,
+      "cooldown": 6,
+      "slam_radius": 110,
+      "speed": 500,
+      "ghost_fire_spread_speed": 260,
+      "ghost_fire_radius": 20,
+      "ghost_fire_spread_distance": 220,
+      "ghost_fire_count": 10,
+      "ghost_fire_damage": 5
+    }
+  },
   "gyarados": {
     "max_hp": 600,
     "walk_speed": 130,

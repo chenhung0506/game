@@ -40,7 +40,7 @@ func TestOrderMustBeSixOrThreeDifferentCharactersOutOfAllOfThem(t *testing.T) {
 		t.Fatal("an order was taken outside team mode")
 	}
 	r.setTeam(true)
-	for _, bad := range [][]int{{0, 1, 2, 3, 4}, {0, 1, 2, 3, 4, 4}, {0, 1, 2, 3, 4, 9}, {-1, 1, 2, 3, 4, 5}, {0, 1, 2, 3, 4, 5, 6}, nil} {
+	for _, bad := range [][]int{{0, 1, 2, 3, 4}, {0, 1, 2, 3, 4, 4}, {0, 1, 2, 3, 4, 10}, {-1, 1, 2, 3, 4, 5}, {0, 1, 2, 3, 4, 5, 6}, nil} {
 		if r.setOrder(0, bad) {
 			t.Errorf("order %v was taken", bad)
 		}
@@ -224,7 +224,7 @@ func TestTeamSizeIsThreeOrAllAndChangingItMakesEveryoneChooseAgain(t *testing.T)
 	if !r.setSize(3) || r.teamN() != 3 || r.pick != [2]int{-1, -1} {
 		t.Fatalf("size %d, picks %v after choosing 3: want everyone to choose again", r.teamN(), r.pick)
 	}
-	if r.setOrder(0, []int{0, 1, 2, 3, 4, 5}) || r.setOrder(0, []int{0, 1}) || r.setOrder(0, []int{0, 1, 1}) || r.setOrder(0, []int{0, 1, 9}) {
+	if r.setOrder(0, []int{0, 1, 2, 3, 4, 5}) || r.setOrder(0, []int{0, 1}) || r.setOrder(0, []int{0, 1, 1}) || r.setOrder(0, []int{0, 1, 10}) {
 		t.Fatal("a bad order for a team of 3 was taken")
 	}
 	if !r.setOrder(0, []int{5, 0, 3}) || r.pick[0] != 5 {

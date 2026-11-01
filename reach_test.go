@@ -252,7 +252,7 @@ func TestHeightBandsAndContactDamageLoadFromConfig(t *testing.T) {
 func TestInvalidHeightBandsAreRefused(t *testing.T) {
 	for name, body := range map[string]string{
 		"min above max":  `{"snorlax":{"hyper_beam":{"min_height":60,"max_height":50}}}`,
-		"negative min":   `{"charizard":{"fire_breath":{"min_height":-1}}}`,
+		"too low a min":  `{"charizard":{"fire_breath":{"min_height":-1001}}}`,
 		"max below min":  `{"pikachu":{"thunder":{"min_height":5,"max_height":2}}}`,
 		"negative blast": `{"pikachu":{"electro_ball":{"contact_damage":-1}}}`,
 	} {

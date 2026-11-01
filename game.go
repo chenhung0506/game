@@ -33,9 +33,10 @@ const (
 	magikarp  = 6
 	ash       = 7
 	machamp   = 8
+	gengar    = 9
 	// kinds is how many characters a player can pick. Gyarados is not one of them: it is what Magikarp becomes, so it
 	// is a kind a player can be in (Player.Kind, and everything indexed by kind) but never chooses.
-	kinds    = 9
+	kinds    = 10
 	gyarados = kinds
 	forms    = kinds + 1 // every kind a player can be in
 )
@@ -61,6 +62,8 @@ type Input struct {
 	Tail    bool `json:"tail"`    // Gyarados only: Tail whip
 	Comet   bool `json:"comet"`   // Machamp only: Comet Punch
 	Rock    bool `json:"rock"`    // Machamp only: Rock Tomb
+	GFire   bool `json:"gfire"`   // Gengar only: Ghost Fire
+	SBall   bool `json:"sball"`   // Gengar only: Shadow Ball (aimed like the Vine Whip, see CastX)
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
@@ -240,6 +243,13 @@ type Player struct {
 	CometCD   float64 `json:"cpcd"`
 	RockT     float64 `json:"rkt"`
 	RockCD    float64 `json:"rkcd"`
+	// Gengar: seconds left under the ground (the shadow shows), the three cooldowns, and how much longer it cannot start a skill
+	// (an opponent's shadow is on it).
+	SneakT  float64 `json:"gnt"`
+	SneakCD float64 `json:"gncd"`
+	GFireCD float64 `json:"gfcd"`
+	SBallCD float64 `json:"sbcd"`
+	SilentT float64 `json:"sil"`
 }
 
 // Leaf Slash phases.
@@ -332,14 +342,16 @@ const (
 )
 
 type Game struct {
-	cfg   Config
-	court CourtSize
-	P     [2]Player
-	Balls []Ball
-	Frost []Frost
-	Fires []FireZone // the ground the Seismic Toss set alight
-	Waves []wave     // Gyarados's waves running out over the ground (the client draws them from an event)
-	rng   *rand.Rand // the fire's random spread; tests replace it
+	cfg     Config
+	court   CourtSize
+	P       [2]Player
+	Balls   []Ball
+	Frost   []Frost
+	Fires   []FireZone   // the ground the Seismic Toss set alight
+	Ghosts  []ghostFire  // Gengar's purple flames
+	Shadows []shadowBall // Shadow Balls in the air
+	Waves   []wave       // Gyarados's waves running out over the ground (the client draws them from an event)
+	rng     *rand.Rand   // the fire's random spread; tests replace it
 	// Ease is each player's handicap in percent (a multiple of easeStep, at most easeMax): its HP and its
 	// walking speed are cut by that much. It survives Reset.
 	Ease [2]int
@@ -381,7 +393,7 @@ func (g *Game) Reset() {
 	}
 	g.P[0] = Player{Kind: g.P[0].Kind, X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(0), FX: 1, AimX: 1}
 	g.P[1] = Player{Kind: g.P[1].Kind, X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(1), FX: -1, AimX: -1}
-	g.Balls, g.Frost, g.Waves, g.Fires = nil, nil, nil, nil
+	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows = nil, nil, nil, nil, nil, nil
 	for i := range g.P {
 		if g.P[i].Kind == rowlet {
 			g.P[i].Z = g.cfg.Rowlet.FlyHigh // it is always in the air
@@ -538,6 +550,7 @@ func (g *Game) Step(dt float64) []Event {
 			g.dropToss(i)                         // a Charizard caught mid-toss lets go
 			g.dropLeaf(i)                         // a Chikorita mid-hop or mid-slash is stopped
 			g.dropMachamp(i)                      // so is a Machamp mid-jump, mid-smash or mid-flurry
+			g.dropGengar(i)                       // and a Gengar comes up out of the ground
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
 			p.FrostT, p.FBeamT = 0, 0                              // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
 			p.DriftT, p.TwistT, p.TwistRecT, p.ArrowT = 0, 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
@@ -547,7 +560,10 @@ func (g *Game) Step(dt float64) []Event {
 		if p.BoundT > 0 || p.ParalyzeT > 0 {
 			in.DX, in.DY, in.Skill, in.Punch, in.Toss = 0, 0, false, false, false
 		}
-		for _, t := range []*float64{&p.BoundT, &p.ParalyzeT, &p.SlowT} {
+		if p.SilentT > 0 { // under a Gengar's shadow: it can walk, but no skill starts
+			in = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY, CastX: in.CastX, CastY: in.CastY}
+		}
+		for _, t := range []*float64{&p.BoundT, &p.ParalyzeT, &p.SlowT, &p.SilentT} {
 			if *t > 0 {
 				if *t -= dt; *t < 1e-9 {
 					*t = 0
@@ -706,6 +722,10 @@ func (g *Game) Step(dt float64) []Event {
 			events = append(events, ev...)
 		}
 
+		if p.Kind == gengar {
+			events = append(events, g.stepGengar(i, in, dt)...)
+		}
+
 		if p.Kind == rowlet {
 			var ev []Event
 			ev, casting = g.stepRowlet(i, in, dt) // the drift moves it itself; the tornado's charge and recovery root it
@@ -807,6 +827,9 @@ func (g *Game) Step(dt float64) []Event {
 			if isBrawler(p.Kind) && p.RockT > 0 {
 				v = g.machampAirSpeed(i)
 			}
+			if p.Kind == gengar && p.SneakT > 0 {
+				v = g.sneakSpeed(p)
+			}
 			if p.Kind == snorlax && p.Z > 0 {
 				v = g.cfg.Snorlax.Jump.AirSpeedSecondHalf
 				if p.VZ > 0 {
@@ -856,6 +879,8 @@ func (g *Game) Step(dt float64) []Event {
 	}
 	g.tickFrost(dt)
 	g.tickFires(dt)
+	g.stepGhosts(dt)
+	events = append(events, g.stepShadowBalls(dt)...)
 	g.stepWaves(dt)
 	events = append(events, g.stepBalls(dt)...)
 	return append(events, g.stepTwirl(dt)...)
@@ -1598,7 +1623,7 @@ func (g *Game) tickFires(dt float64) {
 		if z.HitCD > 0 {
 			z.HitCD -= dt
 		}
-		if z.HitCD <= 1e-9 && foe.Z <= ts.FireMaxHeight && math.Hypot(foe.X-z.X, foe.Y-z.Y) <= z.R+g.radius(1-z.Owner) {
+		if z.HitCD <= 1e-9 && foe.Z >= 0 && foe.Z <= ts.FireMaxHeight && math.Hypot(foe.X-z.X, foe.Y-z.Y) <= z.R+g.radius(1-z.Owner) {
 			g.hit(foe, ts.FireDamage)
 			z.HitCD = ts.FireInterval
 		}
