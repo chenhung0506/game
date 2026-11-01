@@ -319,7 +319,7 @@
   },
   "machamp": {
     "max_hp": 140,
-    "walk_speed": 140,
+    "walk_speed": 150,
     "radius": 30,
     "tree_slam": {
       "min_height": 0,
@@ -332,9 +332,9 @@
       "trunk_scale": 1,
       "trunk_length": 300,
       "trunk_width": 70,
-      "leaf_scale": 1.2,
-      "leaf_radius": 260,
-      "leaf_angle": 260,
+      "leaf_scale": 1,
+      "leaf_radius": 220,
+      "leaf_angle": 220,
       "damage": 35,
       "cooldown": 8
     },
