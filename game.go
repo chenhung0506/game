@@ -934,6 +934,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 				cp := g.brawler(b.Owner).CometPunch
 				if cp.Reach.hits(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= cp.Radius+g.radius(1-b.Owner) {
 					g.hit(foe, cp.Damage)
+					if !foe.Held { // a body pinned by a tornado stays where it is held
+						g.knockBack(b.X, b.Y, foe, cp.Knockback, b.DX, b.DY)
+					}
 					events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
 					continue
 				}
@@ -1112,6 +1115,11 @@ func solid(k int) bool { return k == ballPillar || k == ballStone }
 // Chikorita has not been shot yet and clashes with nothing.
 func (g *Game) clashBalls() {
 	hurt := make([]int, len(g.Balls))
+	type shove struct {
+		ball       int
+		fx, fy, by float64
+	}
+	var shoves []shove // a fist pushing a projectile back, applied once every clash is judged
 	for i := range g.Balls {
 		a := &g.Balls[i]
 		if a.HP <= 0 || a.Wait {
@@ -1127,8 +1135,23 @@ func (g *Game) clashBalls() {
 			if segDist(b.X0, b.Y0, a.X0, a.Y0, a.X0+rx, a.Y0+ry) <= g.ballRadius(a)+g.ballRadius(b) {
 				hurt[i] += g.ballDamage(b)
 				hurt[j] += g.ballDamage(a)
+				for _, p := range [2][2]*Ball{{a, b}, {b, a}} {
+					if fist, other := p[0], p[1]; fist.K == ballFist && other.K != ballFist && !solid(other.K) {
+						idx := j
+						if other == a {
+							idx = i
+						}
+						if by := g.fistShove(fist, other); by > 0 {
+							shoves = append(shoves, shove{idx, fist.X, fist.Y, by})
+						}
+					}
+				}
 			}
 		}
+	}
+	for _, s := range shoves {
+		b := &g.Balls[s.ball]
+		b.X, b.Y = g.pushedAway(b.X, b.Y, s.fx, s.fy, s.by, b.DX, b.DY)
 	}
 	kept := g.Balls[:0]
 	for i, b := range g.Balls {
@@ -1139,6 +1162,16 @@ func (g *Game) clashBalls() {
 		kept = append(kept, b)
 	}
 	g.Balls = kept
+}
+
+// fistShove is how far a Comet Punch fist pushes an opponent's projectile that it meets: `ball_knockback` times the share
+// of the fist's mass the projectile does not have, so one as heavy as the fist is not moved at all.
+func (g *Game) fistShove(fist, ball *Ball) float64 {
+	cp := g.brawler(fist.Owner).CometPunch
+	if cp.Mass <= 0 {
+		return 0
+	}
+	return cp.BallKnockback * math.Max(0, cp.Mass-g.ballMass(ball)) / cp.Mass
 }
 
 // stepCharizard runs Charizard's three skills.

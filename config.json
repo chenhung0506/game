@@ -346,6 +346,8 @@
       "damage": 4,
       "cooldown": 8,
       "mass": 100,
+      "ball_knockback": 120,
+      "knockback": 10,
       "duration": 2,
       "quantity": 48,
       "random_offset_angle": 60,
@@ -366,7 +368,7 @@
       "count": 24,
       "stone_radius": 60,
       "stone_hp": 100,
-      "stone_duration": 8
+      "stone_duration": 10
     }
   },
   "machamp": {
@@ -398,6 +400,8 @@
       "damage": 3,
       "cooldown": 9.2,
       "mass": 100,
+      "ball_knockback": 100,
+      "knockback": 8,
       "duration": 2,
       "quantity": 41,
       "random_offset_angle": 60,
@@ -418,7 +422,7 @@
       "count": 20,
       "stone_radius": 60,
       "stone_hp": 80,
-      "stone_duration": 6.8
+      "stone_duration": 8
     }
   }
 }

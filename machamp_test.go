@@ -228,6 +228,7 @@ func TestCometPunchRunsAtTheOpponentThrowingEveryFistAheadOfIt(t *testing.T) {
 
 func TestCometPunchStopsAtTheOpponentsBodyAndEachFistHurtsOnceThenVanishes(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Ash.CometPunch.Knockback = 0 // the opponent stays put, so the stop at its body can be measured
 	cp := cfg.Ash.CometPunch
 	g := mach(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 400, 250 // 100 away: closer than the run is long
@@ -660,5 +661,94 @@ func TestEachBrawlerPlaysByItsOwnNumbers(t *testing.T) {
 		if total == 0 || total > 7 {
 			t.Fatalf("kind %d: %d fists at most, want up to its own 7", kind, total)
 		}
+	}
+}
+
+// ---- a fist shoves the opponent's projectiles back ----
+
+// shoved puts a fist of slot 0 and a projectile of slot 1 on top of each other and says how far the projectile ends up from where it was.
+func shoved(cfg Config, kind int, owner int) float64 {
+	g := mach(cfg, snorlax)
+	g.Balls = []Ball{
+		{K: ballFist, Owner: 0, X: 500, Y: 300, X0: 500, Y0: 300, HP: 20},
+		{K: kind, Owner: owner, X: 510, Y: 300, X0: 530, Y0: 300, HP: 1000, DX: -1},
+	}
+	g.clashBalls()
+	return g.Balls[1].X - 510
+}
+
+func TestFistShovesProjectilesByTheMassItHasOverThemAndTheConfiguredDistance(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.ElectroBall.Mass, cfg.Charizard.FireBreath.Mass, cfg.Chikorita.RazorLeaf.Mass, cfg.Rowlet.Arrows.Mass = 50, 20, 20, 20 // as in config.json
+	cfg.Machamp.CometPunch.Mass, cfg.Machamp.CometPunch.BallKnockback = 100, 120
+	cfg.Ash.CometPunch.Mass, cfg.Ash.CometPunch.BallKnockback = 100, 120
+	for name, c := range map[string]struct {
+		kind int
+		mass float64
+	}{
+		"electro ball": {ballElectro, cfg.Pikachu.ElectroBall.Mass},
+		"razor leaf":   {ballLeaf, cfg.Chikorita.RazorLeaf.Mass},
+		"fire ball":    {ballFire, cfg.Charizard.FireBreath.Mass},
+		"arrow":        {ballArrow, cfg.Rowlet.Arrows.Mass},
+	} {
+		want := 120 * (100 - c.mass) / 100
+		if got := shoved(cfg, c.kind, 1); math.Abs(got-want) > 1e-6 {
+			t.Fatalf("%s: shoved %v, want %v", name, got, want)
+		}
+	}
+	// the distance is the setting: double it and the shove doubles
+	cfg.Ash.CometPunch.BallKnockback = 240
+	if want := 240 * (100 - cfg.Pikachu.ElectroBall.Mass) / 100; math.Abs(shoved(cfg, ballElectro, 1)-want) > 1e-6 {
+		t.Fatalf("with 240: shoved %v, want %v", shoved(cfg, ballElectro, 1), want)
+	}
+}
+
+func TestFistDoesNotShoveWhatIsNotLighterOrIsItsOwn(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.ElectroBall.Mass, cfg.Charizard.FireBreath.Mass = 50, 20
+	cfg.Ash.CometPunch.BallKnockback = 120
+	cfg.Ash.CometPunch.Mass = cfg.Pikachu.ElectroBall.Mass // as heavy as the ball
+	if got := shoved(cfg, ballElectro, 1); got != 0 {
+		t.Fatalf("an equally heavy fist shoved the ball %v", got)
+	}
+	cfg.Ash.CometPunch.Mass = 100
+	cfg.Ash.CometPunch.BallKnockback = 0
+	if got := shoved(cfg, ballElectro, 1); got != 0 {
+		t.Fatalf("ball_knockback 0 still shoved %v", got)
+	}
+	cfg.Ash.CometPunch.BallKnockback = 120
+	if got := shoved(cfg, ballElectro, 0); got != 0 { // its own player's ball: no clash at all
+		t.Fatalf("a fist shoved its own player's ball %v", got)
+	}
+	cfg.Ash.CometPunch.Mass = 10 // the default: lighter than every projectile
+	if got := shoved(cfg, ballFire, 1); got != 0 {
+		t.Fatalf("a light fist shoved a fire ball %v", got)
+	}
+}
+
+func TestAFistThatLandsPushesTheOpponentBackByTheConfiguredDistance(t *testing.T) {
+	for _, kb := range []float64{10, 40} {
+		cfg := DefaultConfig()
+		cfg.Ash.CometPunch.Knockback = kb
+		g := mach(cfg, snorlax)
+		g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 300, 250, 400, 250
+		g.Balls = []Ball{{K: ballFist, Owner: 0, X: 380, Y: 250, DX: 1, HP: 20, Life: 1}}
+		hp := g.P[1].HP
+		g.stepBalls(dt)
+		if g.P[1].HP >= hp {
+			t.Fatal("the fist did not hurt")
+		}
+		if got := g.P[1].X - 400; math.Abs(got-kb) > 1e-6 || g.P[1].Y != 250 {
+			t.Fatalf("knockback %v: pushed %v, want it straight away from the fist", kb, got)
+		}
+	}
+	cfg := DefaultConfig()
+	g := mach(cfg, snorlax)
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 300, 250, 400, 250
+	g.P[1].Held = true // pinned by a tornado: it stays where it is held
+	g.Balls = []Ball{{K: ballFist, Owner: 0, X: 380, Y: 250, DX: 1, HP: 20, Life: 1}}
+	g.stepBalls(dt)
+	if g.P[1].X != 400 {
+		t.Fatalf("a held body was pushed to %v", g.P[1].X)
 	}
 }

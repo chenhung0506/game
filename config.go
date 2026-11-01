@@ -437,8 +437,10 @@ type BrawlerCfg struct {
 	// Comet Punch (J): for `duration` seconds Machamp runs at the opponent (`distance` in all, stopping at its body)
 	// throwing `quantity` fists, evenly spaced in time. Each fist appears ahead of it, `scatter_min_distance` to
 	// `scatter_max_distance` beyond its body and up to `random_offset_angle` degrees either side of its heading, hangs
-	// there for `fist_duration` seconds and hurts the opponent it touches once (`damage`). A fist has `hp` and is worn
-	// down like a fire ball (`mass`: see hyper_beam.mass).
+	// there for `fist_duration` seconds and hurts the opponent it touches once (`damage`) and pushes it `knockback` away from the fist. A fist has `hp` and is worn
+	// down like a fire ball (`mass`: see hyper_beam.mass). A fist also shoves the opponent's projectiles (electro balls, leaves, fire balls,
+	// arrows) back, away from itself, by `ball_knockback` x (mass - the projectile's mass) / mass: none for one as heavy as the fist, nearly the whole
+	// of `ball_knockback` for a light one.
 	CometPunch struct {
 		Reach
 		Radius             float64 `json:"radius"`
@@ -446,6 +448,8 @@ type BrawlerCfg struct {
 		Damage             int     `json:"damage"`
 		Cooldown           float64 `json:"cooldown"` // counted from the start
 		Mass               float64 `json:"mass"`
+		Knockback          float64 `json:"knockback"`      // how far each fist that lands pushes the opponent, away from the fist
+		BallKnockback      float64 `json:"ball_knockback"` // how far a fist shoves an opponent's projectile it meets: this much, times the share of the fist's mass the projectile lacks
 		Duration           float64 `json:"duration"`
 		Quantity           int     `json:"quantity"`
 		RandomOffsetAngle  float64 `json:"random_offset_angle"`
@@ -691,6 +695,7 @@ func DefaultConfig() Config {
 	cp := &c.Ash.CometPunch
 	cp.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	cp.Radius, cp.HP, cp.Damage, cp.Cooldown, cp.Mass = 22, 20, 2, 8, 10
+	cp.BallKnockback, cp.Knockback = 120, 10
 	cp.Duration, cp.Quantity, cp.RandomOffsetAngle, cp.Distance = 1.5, 24, 40, 300
 	cp.ScatterMinDistance, cp.ScatterMaxDistance, cp.FistDuration = 20, 90, 0.2
 	rt := &c.Ash.RockTomb
@@ -701,7 +706,8 @@ func DefaultConfig() Config {
 	c.Machamp = c.Ash // the same moves a notch weaker: less health and reach, fewer and frailer fists and stones, longer waits
 	c.Machamp.MaxHP, c.Machamp.WalkSpeed = 125, 130
 	c.Machamp.TreeSlam.TrunkLength, c.Machamp.TreeSlam.LeafRadius, c.Machamp.TreeSlam.Damage, c.Machamp.TreeSlam.Cooldown = 270, 160, 30, 9
-	c.Machamp.CometPunch.Quantity, c.Machamp.CometPunch.HP, c.Machamp.CometPunch.Cooldown = 20, 16, 9
+	c.Machamp.CometPunch.Quantity, c.Machamp.CometPunch.HP, c.Machamp.CometPunch.Cooldown, c.Machamp.CometPunch.BallKnockback = 20, 16, 9, 100
+	c.Machamp.CometPunch.Knockback = 8
 	c.Machamp.RockTomb.RingRadius, c.Machamp.RockTomb.Count, c.Machamp.RockTomb.StoneHP, c.Machamp.RockTomb.StoneDuration, c.Machamp.RockTomb.Cooldown = 450, 20, 80, 7, 14
 	return c
 }
@@ -1013,6 +1019,10 @@ func (c Config) validate() error {
 		{"ash.comet_punch.cooldown", c.Ash.CometPunch.Cooldown},
 		{"machamp.comet_punch.mass", c.Machamp.CometPunch.Mass},
 		{"ash.comet_punch.mass", c.Ash.CometPunch.Mass},
+		{"machamp.comet_punch.ball_knockback", c.Machamp.CometPunch.BallKnockback},
+		{"ash.comet_punch.ball_knockback", c.Ash.CometPunch.BallKnockback},
+		{"machamp.comet_punch.knockback", c.Machamp.CometPunch.Knockback},
+		{"ash.comet_punch.knockback", c.Ash.CometPunch.Knockback},
 		{"machamp.comet_punch.distance", c.Machamp.CometPunch.Distance},
 		{"ash.comet_punch.distance", c.Ash.CometPunch.Distance},
 		{"machamp.comet_punch.scatter_min_distance", c.Machamp.CometPunch.ScatterMinDistance},
