@@ -302,11 +302,11 @@
       "min_height": 0,
       "max_height": 60,
       "cooldown": 7,
-      "ring_radius": 260,
+      "ring_radius": 290,
       "spread_speed": 400,
       "convergence_speed": 250,
       "damage": 15,
-      "count": 18,
+      "count": 14,
       "radius": 15,
       "hp": 10,
       "mass": 20
@@ -315,9 +315,9 @@
       "min_height": 0,
       "max_height": 60,
       "ball_scale": 1.2,
-      "damage": 25,
+      "damage": 20,
       "height": 150,
-      "duration": 0.9,
+      "duration": 1.2,
       "cooldown": 6,
       "slam_radius": 130,
       "speed": 500,
@@ -325,7 +325,7 @@
       "ghost_fire_radius": 20,
       "ghost_fire_spread_distance": 220,
       "ghost_fire_count": 10,
-      "ghost_fire_damage": 10
+      "ghost_fire_damage": 15
     }
   },
   "gyarados": {
