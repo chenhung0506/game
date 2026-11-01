@@ -10,7 +10,7 @@ import (
 // ---- the computer player ----
 
 func hasAct(in Input) bool {
-	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock
+	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Toss
 }
 
 // firstAct runs the bot for n ticks on a scene that does not change and returns the first decision that presses a
@@ -426,9 +426,9 @@ func TestTheBotNoticesAThreatOnlyAfterItsReactionTime(t *testing.T) {
 	t.Fatal("it never reacted")
 }
 
-func TestOnlyPikachuSnorlaxChikoritaAndAshCanBePlayedByTheComputer(t *testing.T) {
+func TestOnlyPikachuSnorlaxCharizardChikoritaAndAshCanBePlayedByTheComputer(t *testing.T) {
 	for k := 0; k < kinds; k++ {
-		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash; got != want {
+		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash || k == charizard; got != want {
 			t.Errorf("botCanPlay(%d) = %v, want %v", k, got, want)
 		}
 	}
@@ -460,7 +460,8 @@ func TestBotsFightToAFinishWithoutGettingStuck(t *testing.T) {
 		t.Fatal(err)
 	}
 	pairs := [][2]int{{pikachu, snorlax}, {snorlax, pikachu}, {pikachu, pikachu}, {snorlax, snorlax},
-		{chikorita, snorlax}, {snorlax, chikorita}, {chikorita, pikachu}, {ash, pikachu}, {pikachu, ash}, {ash, snorlax}, {ash, chikorita}, {chikorita, ash}, {ash, ash}, {chikorita, chikorita}}
+		{chikorita, snorlax}, {snorlax, chikorita}, {chikorita, pikachu}, {ash, pikachu}, {pikachu, ash}, {ash, snorlax}, {ash, chikorita}, {chikorita, ash}, {ash, ash}, {chikorita, chikorita},
+		{charizard, pikachu}, {pikachu, charizard}, {charizard, snorlax}, {snorlax, charizard}, {charizard, chikorita}, {ash, charizard}, {charizard, charizard}}
 	for _, pr := range pairs {
 		wins, timeouts, total := [2]int{}, 0, 0.0
 		const n = 20
@@ -531,7 +532,7 @@ func TestTheComputerCanTakeEitherSlot(t *testing.T) {
 
 func TestTheComputerIsRefusedWhereItCannotPlay(t *testing.T) {
 	r := botRoom(0)
-	if r.setBot(0, charizard) || r.bot[1] != nil {
+	if r.setBot(0, vulpix) || r.bot[1] != nil {
 		t.Fatal("a character it cannot play was accepted")
 	}
 	r.c[1] = &client{send: make(chan []byte, 8)}
@@ -1095,5 +1096,81 @@ func TestAshBotKeepsStillWhileItsSkillsMoveIt(t *testing.T) {
 	}
 	if got := in.ash(in.look(g, 0)); got.DX != 0 || got.DY != 0 || hasAct(got) {
 		t.Fatalf("decision = %+v while the flurry runs", got)
+	}
+}
+
+// ---- Charizard ----
+
+func charizardDuel() *Game {
+	g := duel(DefaultConfig(), charizard, snorlax)
+	g.P[0].X, g.P[1].X = 700, 950
+	g.P[1].JumpCD = 99
+	return g
+}
+
+func TestCharizardTossesAnOpponentWithinTheRunsReach(t *testing.T) {
+	g := charizardDuel()
+	g.P[0].BreathCD, g.P[0].FlyCD = 99, 99
+	in, ok := firstAct(newBot(charizard, 1), g, 0, 200)
+	if !hasToss(in) || !ok {
+		t.Fatalf("decision = %+v (pressed %v), want the Seismic Toss", in, ok)
+	}
+	if in.AimX <= 0 {
+		t.Fatalf("aim %v,%v: it should be at the opponent (+x)", in.AimX, in.AimY)
+	}
+}
+
+func hasToss(in Input) bool { return in.Toss }
+
+func TestCharizardDoesNotTossAnOpponentOutOfTheRunsReach(t *testing.T) {
+	g := charizardDuel()
+	g.P[1].X = 700 + g.cfg.Charizard.SeismicToss.Length + 300
+	g.P[0].BreathCD, g.P[0].FlyCD = 99, 99
+	b := newBot(charizard, 1)
+	for i := 0; i < 80; i++ {
+		if in := b.Decide(g, 0); in.Toss {
+			t.Fatal("it tossed at an opponent the run cannot reach")
+		}
+	}
+}
+
+func TestCharizardBreathesFireFromADistanceAndKeepsWalking(t *testing.T) {
+	g := charizardDuel()
+	g.P[1].X = 700 + 400
+	g.P[0].TossCD, g.P[0].FlyCD = 99, 99
+	b := newBot(charizard, 1)
+	for i := 0; i < 200; i++ {
+		if in := b.Decide(g, 0); in.Fire {
+			if in.DX == 0 && in.DY == 0 {
+				t.Fatalf("decision %+v: it should walk while it breathes", in)
+			}
+			return
+		}
+	}
+	t.Fatal("it never breathed fire at an opponent 400 away")
+}
+
+func TestTheBotWalksOutOfBurningGround(t *testing.T) {
+	cfg := DefaultConfig()
+	ts := cfg.Charizard.SeismicToss
+	for _, kind := range []int{pikachu, snorlax, chikorita, charizard} {
+		g := duel(cfg, kind, charizard)
+		g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 800, 450, 1600, 450
+		g.Fires = []FireZone{{Owner: 1, X: 800, Y: 450, R: ts.FireRadius, Left: 6}}
+		b := newBot(kind, 1)
+		for i := 0; i < 8; i++ {
+			b.observe(g, 0)
+		}
+		if th := b.look(g, 0).th; th.kind != thFire {
+			t.Fatalf("%s: threat %+v, want burning ground", NAMEOF[kind], th)
+		}
+		hp := g.P[0].HP
+		survive(g, b, 0, 4)
+		if math.Hypot(g.P[0].X-800, g.P[0].Y-450) <= ts.FireRadius {
+			t.Fatalf("%s is still standing in the fire", NAMEOF[kind])
+		}
+		if lost := hp - g.P[0].HP; lost > 3*ts.FireDamage {
+			t.Fatalf("%s took %d from the fire, want it to step out within a burn or two", NAMEOF[kind], lost)
+		}
 	}
 }

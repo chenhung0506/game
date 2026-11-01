@@ -13,7 +13,7 @@ import (
 //   - it decides only every botEvery ticks and holds the stick in between (a skill key is pressed for one tick);
 //   - it takes a chance on some moves instead of always making the best one.
 //
-// Everything about how a character plays is in its own function (pikachu, snorlax, chikorita, ash); the rest here is shared: what
+// Everything about how a character plays is in its own function (pikachu, snorlax, chikorita, ash, charizard); the rest here is shared: what
 // threatens the bot, where to stand, and the 8-way stick.
 const (
 	botEvery = 4 // ticks between decisions
@@ -21,7 +21,7 @@ const (
 )
 
 // botKinds are the characters a Bot can play so far.
-var botKinds = []int{pikachu, snorlax, chikorita, ash}
+var botKinds = []int{pikachu, snorlax, chikorita, ash, charizard}
 
 func botCanPlay(kind int) bool {
 	for _, k := range botKinds {
@@ -79,6 +79,8 @@ func (b *Bot) Decide(g *Game, me int) Input {
 		in = b.chikorita(c)
 	case ash:
 		in = b.ash(c)
+	case charizard:
+		in = b.charizard(c)
 	}
 	b.held = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY}
 	return in
@@ -145,6 +147,7 @@ const (
 	thLand   // near where a jumping Snorlax will come down
 	thShadow // under a Thunder shadow
 	thRush   // Pikachu is in the middle of a Volt Tackle chain (only Snorlax minds it)
+	thFire   // standing on ground a Seismic Toss set alight
 	thTree   // inside the shape (trunk and canopy) of a tree that is held up or coming down
 )
 
@@ -267,6 +270,14 @@ func (c *bctx) findThreat() threat {
 		if hits(p.X, p.Y) {
 			ax, ay := c.wayOutOf(hits)
 			consider(threat{thTree, math.Max(0, eta-lag), ax, ay})
+		}
+	}
+
+	for _, z := range g.Fires { // burning ground: it burns whoever stands in it every half second, so get out of it
+		if z.Owner != c.me && p.Z <= cfg.Charizard.SeismicToss.FireMaxHeight && math.Hypot(p.X-z.X, p.Y-z.Y) <= z.R+c.pr+10 {
+			zz := z
+			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-zz.X, y-zz.Y) <= zz.R+c.pr+10 })
+			consider(threat{thFire, 0.2, ax, ay})
 		}
 	}
 
@@ -771,4 +782,48 @@ func (b *Bot) ash(c *bctx) Input {
 		return c.move(c.ux, c.uy)
 	}
 	return c.stay()
+}
+
+// ---- Charizard ----
+
+// Charizard breathes fire while it walks, which costs it nothing, so it does that from a distance; its Seismic Toss
+// is the big hit and has to run into the opponent, so it closes in for it when it is ready. A flight is a fast way
+// to cross the court, and ends in a ring of fire balls, so it is taken now and then, not only to run.
+func (b *Bot) charizard(c *bctx) Input {
+	g, p, f := c.g, c.p, c.f
+	ts, fb, fly := g.cfg.Charizard.SeismicToss, g.cfg.Charizard.FireBreath, g.cfg.Charizard.Fly
+	if p.FrozenT > 0 || p.Held || p.TossPhase != tossNone {
+		return c.stay() // rooted, or the run (and the lift) moves it
+	}
+	th := c.th
+	danger := f.Kind == rowlet && f.ArrowT > 0
+	var in Input
+	if th.kind != thNone && th.eta <= botHorizon {
+		in = c.move(th.ax, th.ay)
+	} else {
+		tossRange := ts.Length + g.radius(1-c.me) - 30
+		tx, ty := -c.uy*b.strafe, c.ux*b.strafe
+		switch {
+		case p.TossCD == 0 && ts.Reach.hits(f) && c.dist <= tossRange && !danger && (c.rootedFor() > 0.3 || b.rng.Float64() < 0.6):
+			in = c.stay()
+			in.Toss = true
+			in.AimX, in.AimY = c.lead(c.dist / ts.Speed)
+			return in
+		case p.TossCD == 0 && ts.Reach.hits(f):
+			in = c.move(c.ux+tx*0.3, c.uy+ty*0.3) // close in for the toss
+		case c.dist < 200:
+			in = c.move(-c.ux+tx*0.6, -c.uy+ty*0.6)
+		case c.dist > 450:
+			in = c.move(c.ux+tx*0.3, c.uy+ty*0.3)
+		default:
+			in = c.move(tx, ty)
+		}
+	}
+	if p.FlyCD == 0 && p.FlyT == 0 && p.Z == 0 && fly.RingCount > 0 && th.kind == thNone && c.dist < fly.RingLength*0.7 && b.rng.Float64() < 0.15 {
+		in.Skill = true // up, and a ring of fire where it comes down
+	}
+	if p.BreathCD == 0 && p.BreathT == 0 && fb.Reach.hits(f) && c.dist >= 150 && b.rng.Float64() < 0.7 {
+		in.Fire = true // it walks while it breathes
+	}
+	return in
 }

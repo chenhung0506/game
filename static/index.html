@@ -42,10 +42,11 @@
   .card b { display: block; margin-top: 6px; font-size: 16px; }
   .card small { display: block; margin-top: 4px; opacity: .75; line-height: 1.5; text-align: left; font-size: 12px; }
   .card.mine { border-color: #6fd36f; background: #243026; }
-  #easebox { margin: 0 0 12px; text-align: center; line-height: 1.6; }
+  #easebox { margin: 0 0 12px; text-align: center; line-height: 1.6; display: none; }
   #easebox input { width: 220px; vertical-align: middle; }
   #easemsg { font-size: 12px; opacity: .75; }
-  #modes, #teambar, #botbar { display: flex; gap: 10px; margin: 0 0 12px; }
+  #modes, #teambar, #tools, #botpick { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 0 0 12px; }
+  #botpick { display: none; }
   #teambar { margin: 12px 0 0; }
   #pick button, #repick { font: bold 15px system-ui; padding: 9px 16px; border-radius: 10px; border: 2px solid #3d4a40; background: #1b1f27; color: #eee; cursor: pointer; }
   #pick button.on { border-color: #6fd36f; background: #243026; }
@@ -62,7 +63,7 @@
 <body>
 <div id="bar"></div>
 <div id="rooms"><h2>選擇房間</h2><div id="roomlist"></div><button id="newroom">開新房間</button><div class="hint">灰色表示對方可能已斷線；沒有人等待時會自動開房</div></div>
-<div id="pick"><h2>選擇你的寶可夢</h2><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="botbar"><button id="bot0">單機：對皮卡丘</button><button id="bot1">單機：對卡比獸</button><button id="bot3">單機：對菊草葉</button><button id="bot7">單機：對小智</button><button id="botOff">改和真人對戰</button></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="tools"><button id="botMain">單機對戰</button><button id="botOff">改和真人對戰</button><button id="easeBtn">放水 0%</button></div><div id="botpick"></div><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
@@ -260,6 +261,9 @@ function showPick() {
     ord.textContent = n + 1;
   });
   if (document.activeElement !== easeEl) { easeEl.value = ease[you]; document.getElementById('easeval').textContent = ease[you] + '%'; }
+  document.getElementById('easeBtn').textContent = `放水 ${ease[you]}%${easeOpen ? ' ▲' : ' ▼'}`;
+  document.getElementById('easeBtn').classList.toggle('on', ease[you] > 0);
+  document.getElementById('easebox').style.display = easeOpen ? 'block' : 'none';
   document.getElementById('easemsg').textContent = `你的血量和移動速度減少 ${ease[you]}%` + (ease[1 - you] ? `　對手放水 ${ease[1 - you]}%` : '') + '（開打前設定）';
   document.getElementById('mSingle').classList.toggle('on', !teamMode);
   document.getElementById('mTeam').classList.toggle('on', teamMode);
@@ -267,9 +271,16 @@ function showPick() {
   document.getElementById('szAll').textContent = `${TEAM_BIG} 隻`;
   for (const n of [3, TEAM_BIG]) { const b = document.getElementById(n === 3 ? 'sz3' : 'szAll'); b.style.display = teamMode ? '' : 'none'; b.classList.toggle('on', teamSize === n); }
   const vsComputer = bots[1 - you] >= 0, personHere = here[1 - you] && !vsComputer; // a computer can stand in for the opponent when no person is there
-  document.getElementById('botbar').style.display = teamMode || personHere ? 'none' : 'flex';
-  for (const k of [0, 1, 3, 7]) document.getElementById('bot' + k).classList.toggle('on', bots[1 - you] === k);
-  document.getElementById('botOff').style.display = vsComputer ? '' : 'none';
+  const canBot = !(teamMode || personHere); // the computer can only stand in where no person is, and not in a team match
+  if (!canBot) botOpen = false;
+  const botMain = document.getElementById('botMain');
+  botMain.style.display = canBot ? '' : 'none';
+  botMain.textContent = vsComputer ? `單機：電腦玩${NAMES[bots[1 - you]]}（換對手）` : `單機對戰${botOpen ? ' ▲' : ' ▼'}`;
+  botMain.classList.toggle('on', vsComputer);
+  document.getElementById('botOff').style.display = canBot && vsComputer ? '' : 'none';
+  const bp = document.getElementById('botpick');
+  bp.style.display = canBot && botOpen ? 'flex' : 'none';
+  bp.querySelectorAll('button').forEach((el) => el.classList.toggle('on', bots[1 - you] === +el.dataset.k));
   document.getElementById('tOk').disabled = myOrder.length !== teamSize || myOrder.join() === sentOrder;
   document.getElementById('tClear').disabled = !myOrder.length;
   const mine = picks[you], theirs = picks[1 - you];
@@ -289,6 +300,7 @@ function showPick() {
   else if (here[1 - you] && theirs < 0) lines.push('點一隻寶可夢開始');
   document.getElementById('pickmsg').innerHTML = lines.join('<br>');
 }
+let botOpen = false, easeOpen = false; // the opponent list and the handicap slider are folded away until their button is pressed
 const send = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const easeEl = document.getElementById('ease');
 easeEl.oninput = () => { document.getElementById('easeval').textContent = easeEl.value + '%'; };
@@ -297,11 +309,15 @@ document.getElementById('mSingle').onclick = () => send({ team: false });
 document.getElementById('mTeam').onclick = () => send({ team: true });
 document.getElementById('sz3').onclick = () => send({ size: 3 });
 document.getElementById('szAll').onclick = () => send({ size: TEAM_BIG });
-document.getElementById('bot0').onclick = () => send({ bot: 0 });
-document.getElementById('bot1').onclick = () => send({ bot: 1 });
-document.getElementById('bot3').onclick = () => send({ bot: 3 });
-document.getElementById('bot7').onclick = () => send({ bot: 7 });
-document.getElementById('botOff').onclick = () => send({ bot: -1 });
+const BOT_KINDS = [0, 1, 2, 3, 7]; // the characters the computer can play (the server's botKinds)
+for (const k of BOT_KINDS) {
+  const b = document.createElement('button'); b.dataset.k = k; b.textContent = NAMES[k];
+  b.onclick = () => { botOpen = false; send({ bot: k }); showPick(); };
+  document.getElementById('botpick').append(b);
+}
+document.getElementById('botMain').onclick = () => { botOpen = !botOpen; showPick(); }; // the list of opponents opens only when asked for
+document.getElementById('easeBtn').onclick = () => { easeOpen = !easeOpen; showPick(); }; // so does the handicap slider
+document.getElementById('botOff').onclick = () => { botOpen = false; send({ bot: -1 }); };
 document.getElementById('tClear').onclick = () => { myOrder = []; showPick(); };
 document.getElementById('tOk').onclick = () => { send({ order: myOrder }); sentOrder = myOrder.join(); showPick(); };
 document.getElementById('repick').onclick = () => send({ repick: true });
@@ -1116,18 +1132,32 @@ function drawBall(b) {
   }
 }
 
-// A fire ball: a hot white-yellow core in a flickering orange flame; a bar shows its HP once it has been hurt.
+// A fire ball: a flame like the ones that burn on the ground a Seismic Toss lit (an orange flame with a yellow heart), but with
+// a belly under the middle too, since this one hangs in the air; a bar shows its HP once it has been hurt.
+function flameDrawing(w, up, down) {
+  const side = (s) => { ctx.bezierCurveTo(s * w * 0.3, -up * 0.6, s * w, -up * 0.3, s * w, 0); };
+  ctx.beginPath(); ctx.moveTo(0, -up);
+  ctx.bezierCurveTo(w * 0.3, -up * 0.6, w, -up * 0.3, w, 0); // down the right side to the widest part
+  ctx.bezierCurveTo(w, down * 0.65, w * 0.55, down, 0, down); // the round belly
+  ctx.bezierCurveTo(-w * 0.55, down, -w, down * 0.65, -w, 0);
+  ctx.bezierCurveTo(-w, -up * 0.3, -w * 0.3, -up * 0.6, 0, -up); // and up the left side to the tip
+  ctx.closePath();
+}
 function drawFireBall(b) {
-  const r = fireCfg.radius, f = 0.85 + 0.3 * Math.random(), R = r * 1.9 * f;
-  const gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, R);
-  gr.addColorStop(0, '#fff6c0'); gr.addColorStop(0.35, '#ffb030'); gr.addColorStop(0.7, 'rgba(255,90,20,0.7)'); gr.addColorStop(1, 'rgba(255,60,10,0)');
-  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, 7); ctx.fill();
-  if (b.hp < fireCfg.hp) {
-    upright(b.x, b.y, () => {
-      ctx.fillStyle = '#000a'; ctx.fillRect(-9, -r - 10, 18, 3);
-      ctx.fillStyle = '#ffb030'; ctx.fillRect(-9, -r - 10, 18 * Math.max(b.hp, 0) / fireCfg.hp, 3);
-    });
-  }
+  const r = fireCfg.radius, f = 0.85 + 0.3 * Math.random();
+  const gl = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 2.2); // a soft glow so it reads over the court
+  gl.addColorStop(0, 'rgba(255,170,50,0.4)'); gl.addColorStop(1, 'rgba(255,60,10,0)');
+  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(b.x, b.y, r * 2.2, 0, 7); ctx.fill();
+  upright(b.x, b.y, () => {
+    const w = r * 1.15, up = r * 2.5 * f, down = r * 1.0;
+    ctx.lineJoin = 'round';
+    flameDrawing(w, up, down); ctx.fillStyle = 'rgba(255,110,25,0.95)'; ctx.fill(); ctx.strokeStyle = 'rgba(210,60,10,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+    flameDrawing(w * 0.55, up * 0.62, down * 0.6); ctx.fillStyle = 'rgba(255,225,95,0.95)'; ctx.fill();
+    if (b.hp < fireCfg.hp) {
+      ctx.fillStyle = '#000a'; ctx.fillRect(-9, -up - 8, 18, 3);
+      ctx.fillStyle = '#ffb030'; ctx.fillRect(-9, -up - 8, 18 * Math.max(b.hp, 0) / fireCfg.hp, 3);
+    }
+  });
 }
 
 // Seismic Toss: while it runs Charizard is wrapped in flame, shedding flames behind it; while it carries
