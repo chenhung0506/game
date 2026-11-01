@@ -1,0 +1,510 @@
+package main
+
+import (
+	"encoding/json"
+	"math"
+	"reflect"
+	"strings"
+	"testing"
+)
+
+// mach is Machamp (slot 0, at 300,250, full HP) against foe (slot 1, at 900,250).
+func mach(cfg Config, foe int) *Game {
+	g := duel(cfg, machamp, foe)
+	g.P[0].HP = g.maxHP(0)
+	return g
+}
+
+// flyer makes slot 1 a Charizard in the air at `height` (it stays there: the flight is long).
+func flyer(cfg Config, height float64) *Game {
+	cfg.Charizard.Fly.Height = height
+	cfg.Charizard.Fly.Duration = 100
+	g := mach(cfg, charizard)
+	g.P[1].In.Skill = true
+	g.Step(dt)
+	g.P[1].In = Input{}
+	steps(g, 20)
+	return g
+}
+
+func stoneCount(g *Game) (n int) {
+	for _, b := range g.Balls {
+		if b.K == ballStone {
+			n++
+		}
+	}
+	return n
+}
+
+func fistCount(g *Game) (n int) {
+	for _, b := range g.Balls {
+		if b.K == ballFist {
+			n++
+		}
+	}
+	return n
+}
+
+// ---- Tree slam ----
+
+func TestTreeSlamJumpsTheConfiguredDistanceAndHeightThenHoldsTheTreeUpAndSmashesIt(t *testing.T) {
+	cfg := DefaultConfig()
+	ts := cfg.Machamp.TreeSlam
+	g := mach(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 1900, 900 // out of the way
+	x0 := g.P[0].X
+	g.P[0].In = Input{Skill: true, DX: 1}
+	g.Step(dt)
+	g.P[0].In = Input{}
+	peak := g.P[0].Z
+	n := 1
+	for g.P[0].TreePhase == treeJump {
+		g.Step(dt)
+		n++
+		peak = math.Max(peak, g.P[0].Z)
+	}
+	if got := g.P[0].X - x0; math.Abs(got-ts.JumpDistance) > 1e-6 {
+		t.Fatalf("jumped %v, want %v", got, ts.JumpDistance)
+	}
+	if want := int(math.Round(ts.JumpDuration * tickRate)); n != want {
+		t.Fatalf("jump took %d ticks, want %d", n, want)
+	}
+	if math.Abs(peak-ts.JumpHeight) > ts.JumpHeight*0.05 {
+		t.Fatalf("peak %v, want about %v", peak, ts.JumpHeight)
+	}
+	if g.P[0].Z != 0 || g.P[0].TreePhase != treeSmash {
+		t.Fatalf("Z %v phase %d after landing, want the tree held up", g.P[0].Z, g.P[0].TreePhase)
+	}
+	// Held up: rooted, and the smash comes when the charge has run out.
+	g.P[0].In = Input{DX: 1}
+	x1 := g.P[0].X
+	smashes := 0
+	for tick := 0; tick < int(ts.ChargeDuration*tickRate)+2 && smashes == 0; tick++ {
+		smashes += count(g.Step(dt), "tree") // it is still rooted on the tick of the smash
+	}
+	if g.P[0].X != x1 {
+		t.Fatalf("walked %v while holding the tree", g.P[0].X-x1)
+	}
+	if smashes != 1 || g.P[0].TreePhase != treeNone {
+		t.Fatalf("%d smashes, phase %d, want one and the tree down", smashes, g.P[0].TreePhase)
+	}
+}
+
+func TestTreeSlamGoesTheWayHeldElseTheWayItFaces(t *testing.T) {
+	g := mach(DefaultConfig(), snorlax)
+	g.P[0].FX, g.P[0].FY = 0, 1 // faces down
+	g.P[0].In = Input{Skill: true}
+	g.Step(dt)
+	if g.P[0].TreeX != 0 || g.P[0].TreeY != 1 {
+		t.Fatalf("direction %v,%v, want 0,1: the way it faces", g.P[0].TreeX, g.P[0].TreeY)
+	}
+}
+
+func TestTreeShapeIsATrunkWithACanopyAtItsTip(t *testing.T) {
+	const length, width, leaf, angle = 300.0, 70.0, 180.0, 180.0
+	for _, c := range []struct {
+		name   string
+		bx, by float64 // the body, from the foot of the trunk, the tree pointing right
+		hit    bool
+	}{
+		{"on the trunk", 150, 0, true},
+		{"beside the trunk, inside its width", 150, 30, true},
+		{"beside the trunk, outside it", 150, 70, false},
+		{"just behind the foot", -5, 0, true},
+		{"well behind the foot", -40, 0, false},
+		{"canopy, straight past the tip", 300 + 150, 0, true},
+		{"canopy, far edge", 300 + 190, 0, true},
+		{"canopy, too far", 300 + 220, 0, false},
+		{"canopy, off to the side", 300, 170, true},
+		{"canopy, off to the side too far", 300, 210, false},
+		{"beside the trunk but past the canopy diameter line, out of the trunk", 250, 120, false},
+	} {
+		if got := treeHits(0, 0, 1, 0, c.bx, c.by, 20, length, width, leaf, angle); got != c.hit {
+			t.Errorf("%s: hit = %v, want %v", c.name, got, c.hit)
+		}
+	}
+	// A narrower canopy: 90 degrees leaves the sides out.
+	if treeHits(0, 0, 1, 0, 300, 170, 5, length, width, leaf, 90) {
+		t.Error("a 90 degree canopy reached sideways")
+	}
+	// It points where it is told: down.
+	if !treeHits(0, 0, 0, 1, 0, 150, 20, length, width, leaf, angle) || treeHits(0, 0, 0, 1, 150, 0, 20, length, width, leaf, angle) {
+		t.Error("a tree smashed down the screen hit sideways")
+	}
+}
+
+func TestTreeSmashHurtsOnceAndOnlyWithinItsHeightBandAndCoolsDown(t *testing.T) {
+	cfg := DefaultConfig()
+	ts := cfg.Machamp.TreeSlam
+	run := func(foeHeight float64) *Game {
+		g := mach(cfg, snorlax)
+		if foeHeight > 0 {
+			g = flyer(cfg, foeHeight)
+		}
+		g.P[0].X, g.P[0].Y = 300, 250
+		g.P[1].X, g.P[1].Y = 300+ts.JumpDistance+150, 250 // on the trunk once it has landed
+		g.P[0].In = Input{Skill: true, DX: 1}
+		steps(g, 1)
+		g.P[0].In = Input{}
+		steps(g, 60)
+		return g
+	}
+	if g := run(0); g.P[1].HP != g.maxHP(1)-ts.Damage {
+		t.Fatalf("HP %d, want %d: one smash, one hit", g.P[1].HP, g.maxHP(1)-ts.Damage)
+	}
+	if g := run(ts.MaxHeight + 20); g.P[1].HP != cfg.Charizard.MaxHP {
+		t.Fatalf("HP %d: the tree hit something above its band", g.P[1].HP)
+	}
+	g := run(0)
+	g.P[0].In = Input{Skill: true, DX: 1}
+	g.Step(dt)
+	if g.P[0].TreePhase != treeNone || g.P[0].Z != 0 {
+		t.Fatal("a second tree slam started during the cooldown")
+	}
+}
+
+func TestTreeSlamWithNoChargeComesDownOnTheLandingTick(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Machamp.TreeSlam.ChargeDuration = 0
+	g := mach(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 300+cfg.Machamp.TreeSlam.JumpDistance+100, 250
+	g.P[0].In = Input{Skill: true, DX: 1}
+	for n := 0; n < 40 && g.P[1].HP == g.maxHP(1); n++ {
+		g.Step(dt)
+	}
+	if g.P[1].HP == g.maxHP(1) || g.P[0].TreePhase != treeNone {
+		t.Fatal("no smash on landing with charge_duration 0")
+	}
+}
+
+func TestBeingFrozenCutsAMachampSkillShort(t *testing.T) {
+	g := mach(DefaultConfig(), snorlax)
+	g.P[0].In = Input{Skill: true, DX: 1}
+	steps(g, 5)
+	g.P[0].FrozenT = 1
+	g.Step(dt)
+	if p := g.P[0]; p.TreePhase != treeNone || p.Z != 0 || p.TreeT != 0 {
+		t.Fatalf("phase %d Z %v after being frozen mid-jump", p.TreePhase, p.Z)
+	}
+}
+
+// ---- Comet Punch ----
+
+func TestCometPunchRunsAtTheOpponentThrowingEveryFistAheadOfIt(t *testing.T) {
+	cfg := DefaultConfig()
+	cp := cfg.Machamp.CometPunch
+	cfg.Machamp.CometPunch.FistDuration = 100 // they stay, so they can be counted
+	cfg.Machamp.CometPunch.Damage = 0
+	g := mach(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 1900, 250 // far: the whole run is spent running
+	x0 := g.P[0].X
+	g.P[0].In = Input{Comet: true}
+	g.Step(dt)
+	g.P[0].In = Input{}
+	steps(g, int(cp.Duration*tickRate)+3)
+	if got := g.P[0].X - x0; math.Abs(got-cp.Distance) > 1e-6 {
+		t.Fatalf("ran %v, want %v", got, cp.Distance)
+	}
+	if n := fistCount(g); n != cp.Quantity {
+		t.Fatalf("%d fists, want %d", n, cp.Quantity)
+	}
+	for _, b := range g.Balls {
+		if b.K != ballFist {
+			continue
+		}
+		// ahead of the body edge, in the scatter band, within the offset angle of the heading (to the right)
+		d := math.Hypot(b.X-300, b.Y-250) // from where the run began is close enough: the band is wide, the run long
+		if b.DX < math.Cos(cp.RandomOffsetAngle*math.Pi/180)-1e-9 {
+			t.Fatalf("a fist heads %v,%v, outside +-%v degrees of the run", b.DX, b.DY, cp.RandomOffsetAngle)
+		}
+		if b.X < 300+cp.ScatterMinDistance-1 || d > cp.Distance+cfg.Machamp.Radius+cp.ScatterMaxDistance+1 {
+			t.Fatalf("a fist at %v,%v is not ahead of the runner", b.X, b.Y)
+		}
+		if b.HP != cp.HP {
+			t.Fatalf("fist HP %d, want %d", b.HP, cp.HP)
+		}
+	}
+}
+
+func TestCometPunchStopsAtTheOpponentsBodyAndEachFistHurtsOnceThenVanishes(t *testing.T) {
+	cfg := DefaultConfig()
+	cp := cfg.Machamp.CometPunch
+	g := mach(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 400, 250 // 100 away: closer than the run is long
+	g.P[0].In = Input{Comet: true}
+	g.Step(dt)
+	g.P[0].In = Input{}
+	steps(g, 90)
+	gap := g.P[1].X - g.P[0].X
+	if math.Abs(gap-(cfg.Machamp.Radius+cfg.Snorlax.Radius)) > 1e-6 {
+		t.Fatalf("stopped %v from the opponent, want its body's edge %v", gap, cfg.Machamp.Radius+cfg.Snorlax.Radius)
+	}
+	lost := g.maxHP(1) - g.P[1].HP
+	if lost == 0 || lost%cp.Damage != 0 || lost > cp.Quantity*cp.Damage {
+		t.Fatalf("lost %d HP, want a whole number of fists' damage (%d each, at most %d fists)", lost, cp.Damage, cp.Quantity)
+	}
+	if fistCount(g) != 0 {
+		t.Fatalf("%d fists left after they hit or ran out", fistCount(g))
+	}
+}
+
+func TestCometPunchRootsMachampAndHasItsOwnCooldownAndHeightBand(t *testing.T) {
+	cfg := DefaultConfig()
+	cp := cfg.Machamp.CometPunch
+	g := mach(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 1900, 900
+	g.P[0].In = Input{Comet: true, DY: 1} // asking to walk down while it runs at the foe
+	steps(g, 10)
+	if g.P[0].Y > 250+1e-9 && g.P[1].Y < g.P[0].Y {
+		t.Fatalf("Y %v: it walked where it was steered instead of running at the opponent", g.P[0].Y)
+	}
+	g.P[0].In = Input{}
+	steps(g, int(cp.Duration*tickRate)+2)
+	g.P[0].In = Input{Comet: true}
+	g.Step(dt)
+	if g.P[0].CometT != 0 {
+		t.Fatal("a second flurry started during the cooldown")
+	}
+	// Above the band a fist passes by.
+	cfg2 := DefaultConfig()
+	g = flyer(cfg2, cfg2.Machamp.CometPunch.MaxHeight+30)
+	g.P[1].X, g.P[1].Y = 400, 250
+	g.P[0].In = Input{Comet: true}
+	g.Step(dt)
+	g.P[0].In = Input{}
+	steps(g, 90)
+	if g.P[1].HP != cfg2.Charizard.MaxHP {
+		t.Fatalf("HP %d: fists hit something above their band", g.P[1].HP)
+	}
+}
+
+func TestAFistIsShotDownLikeAFireBallAndShootsBackAtWhatHitsIt(t *testing.T) {
+	cfg := DefaultConfig()
+	g := mach(cfg, pikachu)
+	g.P[1].X, g.P[1].Y = 1900, 900
+	g.Balls = []Ball{
+		{K: ballFist, Owner: 0, X: 500, Y: 250, DX: 1, HP: cfg.Machamp.CometPunch.HP, Life: 5},
+		{K: ballElectro, Owner: 1, X: 503, Y: 250, DX: -1, HP: cfg.Pikachu.ElectroBall.HP},
+	}
+	for _, b := range g.Balls {
+		_ = b
+	}
+	g.Balls[0].X0, g.Balls[0].Y0, g.Balls[1].X0, g.Balls[1].Y0 = 500, 250, 503, 250
+	g.clashBalls()
+	hurtFist := cfg.Machamp.CometPunch.HP - g.Balls[0].HP
+	if hurtFist != cfg.Pikachu.ElectroBall.ContactDamage {
+		t.Fatalf("the fist lost %d, want the ball's contact damage %d", hurtFist, cfg.Pikachu.ElectroBall.ContactDamage)
+	}
+	if g.Balls[1].HP != cfg.Pikachu.ElectroBall.HP-cfg.Machamp.CometPunch.Damage {
+		t.Fatalf("the ball's HP %d, want it worn down by the fist's damage", g.Balls[1].HP)
+	}
+}
+
+// ---- Rock Tomb ----
+
+func TestRockTombJumpsAndSteersFasterOrSlowerByHalvesAndRaisesTheRingOnLanding(t *testing.T) {
+	cfg := DefaultConfig()
+	rt := cfg.Machamp.RockTomb
+	cfg.Machamp.RockTomb.AirSpeedFirstHalf, cfg.Machamp.RockTomb.AirSpeedSecondHalf = 300, 60
+	g := mach(cfg, snorlax)
+	g.P[0].X, g.P[0].Y = 1000, 500
+	g.P[1].X, g.P[1].Y = 1900, 900
+	g.P[0].In = Input{Rock: true, DX: 1}
+	var first, second, peak float64
+	ticks := int(math.Round(rt.Duration * tickRate))
+	for n := 1; n <= ticks; n++ {
+		x := g.P[0].X
+		g.Step(dt)
+		peak = math.Max(peak, g.P[0].Z)
+		if d := g.P[0].X - x; n <= ticks/2-1 {
+			first = d / dt
+		} else if n > ticks/2+1 && n < ticks {
+			second = d / dt
+		}
+	}
+	if math.Abs(first-300) > 1e-6 || math.Abs(second-60) > 1e-6 {
+		t.Fatalf("air speeds %v then %v, want 300 then 60", first, second)
+	}
+	if math.Abs(peak-rt.Height) > rt.Height*0.05 {
+		t.Fatalf("peak %v, want about %v", peak, rt.Height)
+	}
+	if g.P[0].Z != 0 || g.P[0].RockT != 0 {
+		t.Fatalf("Z %v RockT %v after the jump", g.P[0].Z, g.P[0].RockT)
+	}
+	if n := stoneCount(g); n != rt.Count {
+		t.Fatalf("%d stones, want %d", n, rt.Count)
+	}
+	for _, b := range g.Balls {
+		if b.K != ballStone {
+			continue
+		}
+		if d := math.Hypot(b.X-g.P[0].X, b.Y-g.P[0].Y); math.Abs(d-rt.RingRadius) > cfg.Machamp.WalkSpeed*dt+1e-6 { // centred on where it was a tick before it stood
+			t.Fatalf("a stone %v from Machamp, want %v", d, rt.RingRadius)
+		}
+		if b.HP != rt.StoneHP || math.Abs(b.Life-rt.StoneDuration) > dt+1e-9 { // it has already ticked once, on the landing step
+			t.Fatalf("stone HP %d life %v, want %d and %v", b.HP, b.Life, rt.StoneHP, rt.StoneDuration)
+		}
+	}
+}
+
+func TestRockTombLeavesOutStonesThatWouldBeOutsideTheCourt(t *testing.T) {
+	cfg := DefaultConfig()
+	g := mach(cfg, snorlax)
+	g.P[0].X, g.P[0].Y = 100, 500 // near the left wall: the left of the ring is outside
+	g.P[1].X, g.P[1].Y = 1900, 900
+	g.P[0].In = Input{Rock: true}
+	steps(g, int(cfg.Machamp.RockTomb.Duration*tickRate)+2)
+	n := stoneCount(g)
+	if n == 0 || n >= cfg.Machamp.RockTomb.Count {
+		t.Fatalf("%d stones, want some but not all", n)
+	}
+	for _, b := range g.Balls {
+		if b.K == ballStone && (b.X < 0 || b.X > g.court.Length || b.Y < 0 || b.Y > g.court.Width) {
+			t.Fatalf("a stone outside the court at %v,%v", b.X, b.Y)
+		}
+	}
+}
+
+func TestStonesBlockTheOpponentButNotMachampOrWhatFliesOverThem(t *testing.T) {
+	cfg := DefaultConfig()
+	rt := cfg.Machamp.RockTomb
+	g := mach(cfg, snorlax)
+	g.Balls = []Ball{{K: ballStone, Owner: 0, X: 600, Y: 250, HP: rt.StoneHP, Life: 5}}
+	g.P[1].X, g.P[1].Y = 600+rt.StoneRadius+cfg.Snorlax.Radius+30, 250 // to its right, walking left into it
+	g.P[1].In = Input{DX: -1}
+	steps(g, 60)
+	if gap := math.Hypot(g.P[1].X-600, g.P[1].Y-250); gap < rt.StoneRadius+cfg.Snorlax.Radius-1e-6 {
+		t.Fatalf("the opponent walked into the stone: %v from its middle", gap)
+	}
+	g.P[0].X, g.P[0].Y = 600+rt.StoneRadius+cfg.Machamp.Radius+30, 250
+	g.P[0].In = Input{DX: -1}
+	steps(g, 60)
+	if g.P[0].X > 600 {
+		t.Fatalf("Machamp is held by its own stone at %v", g.P[0].X)
+	}
+	// Above the band a body passes over.
+	g = flyer(cfg, rt.MaxHeight+20)
+	g.Balls = []Ball{{K: ballStone, Owner: 0, X: 600, Y: 250, HP: rt.StoneHP, Life: 5}}
+	g.P[1].X, g.P[1].Y = 600+rt.StoneRadius+cfg.Charizard.Radius+30, 250
+	g.P[1].In = Input{DX: -1}
+	steps(g, 60)
+	if g.P[1].X > 600 {
+		t.Fatal("the stone held something above its band")
+	}
+}
+
+func TestAStoneCrumblesWhenItsTimeIsUpAndIsWornDownByProjectiles(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Machamp.RockTomb.StoneDuration = 1
+	g := mach(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 1900, 900
+	g.Balls = []Ball{{K: ballStone, Owner: 0, X: 600, Y: 250, HP: 100, Life: 1}}
+	steps(g, tickRate+2)
+	if stoneCount(g) != 0 {
+		t.Fatal("the stone outlived stone_duration")
+	}
+	// A projectile that runs into it is spent, and the stone loses that projectile's damage.
+	g = mach(cfg, pikachu)
+	g.Balls = []Ball{
+		{K: ballStone, Owner: 0, X: 600, Y: 250, HP: 100, Life: 5},
+		{K: ballElectro, Owner: 1, X: 603, Y: 250, DX: -1, HP: cfg.Pikachu.ElectroBall.HP},
+	}
+	g.Balls[0].X0, g.Balls[0].Y0, g.Balls[1].X0, g.Balls[1].Y0 = 600, 250, 603, 250
+	g.clashBalls()
+	if g.Balls[0].HP != 100-cfg.Pikachu.ElectroBall.ContactDamage {
+		t.Fatalf("stone HP %d, want it to lose the ball's damage", g.Balls[0].HP)
+	}
+	if g.Balls[1].HP > 0 {
+		t.Fatalf("the ball kept %d HP after hitting a stone", g.Balls[1].HP)
+	}
+}
+
+func TestOnlyOneMachampSkillRunsAtATime(t *testing.T) {
+	g := mach(DefaultConfig(), snorlax)
+	g.P[1].X, g.P[1].Y = 1900, 900
+	g.P[0].In = Input{Skill: true, Comet: true, Rock: true, DX: 1}
+	g.Step(dt)
+	p := g.P[0]
+	if p.TreePhase != treeJump || p.CometT != 0 || p.RockT != 0 {
+		t.Fatalf("tree %d comet %v rock %v: the main skill should have the tick and the others wait", p.TreePhase, p.CometT, p.RockT)
+	}
+}
+
+// ---- config, snapshot, picking ----
+
+func TestMachampIsPickableAndGyaradosIsStillOnlyAForm(t *testing.T) {
+	if kinds != 8 || machamp != 7 || gyarados != 8 || forms != 9 {
+		t.Fatalf("kinds %d machamp %d gyarados %d forms %d", kinds, machamp, gyarados, forms)
+	}
+	r := teamRoom()
+	if !r.choose(0, machamp) || r.choose(1, gyarados) {
+		t.Fatal("Machamp should be pickable and Gyarados not")
+	}
+}
+
+func TestMachampConfigIsValidated(t *testing.T) {
+	for name, mut := range map[string]func(c *Config){
+		"jump distance":    func(c *Config) { c.Machamp.TreeSlam.JumpDistance = 0 },
+		"jump duration":    func(c *Config) { c.Machamp.TreeSlam.JumpDuration = 0 },
+		"trunk length":     func(c *Config) { c.Machamp.TreeSlam.TrunkLength = 0 },
+		"trunk width":      func(c *Config) { c.Machamp.TreeSlam.TrunkWidth = 0 },
+		"leaf radius":      func(c *Config) { c.Machamp.TreeSlam.LeafRadius = 0 },
+		"leaf angle":       func(c *Config) { c.Machamp.TreeSlam.LeafAngle = 361 },
+		"trunk scale":      func(c *Config) { c.Machamp.TreeSlam.TrunkScale = 0 },
+		"fist hp":          func(c *Config) { c.Machamp.CometPunch.HP = 0 },
+		"fist quantity":    func(c *Config) { c.Machamp.CometPunch.Quantity = 0 },
+		"too many fists":   func(c *Config) { c.Machamp.CometPunch.Quantity = 201 },
+		"scatter order":    func(c *Config) { c.Machamp.CometPunch.ScatterMaxDistance = c.Machamp.CometPunch.ScatterMinDistance - 1 },
+		"offset angle":     func(c *Config) { c.Machamp.CometPunch.RandomOffsetAngle = 91 },
+		"fist duration":    func(c *Config) { c.Machamp.CometPunch.FistDuration = 0 },
+		"rock duration":    func(c *Config) { c.Machamp.RockTomb.Duration = 0 },
+		"stone radius":     func(c *Config) { c.Machamp.RockTomb.StoneRadius = 0 },
+		"stone hp":         func(c *Config) { c.Machamp.RockTomb.StoneHP = 0 },
+		"stone duration":   func(c *Config) { c.Machamp.RockTomb.StoneDuration = 0 },
+		"too many stones":  func(c *Config) { c.Machamp.RockTomb.Count = 101 },
+		"stone band":       func(c *Config) { c.Machamp.RockTomb.MaxHeight = -1 },
+		"ring radius":      func(c *Config) { c.Machamp.RockTomb.RingRadius = -1 },
+		"tree band":        func(c *Config) { c.Machamp.TreeSlam.MinHeight = 90 },
+		"machamp max hp":   func(c *Config) { c.Machamp.MaxHP = 0 },
+		"punch cooldown":   func(c *Config) { c.Machamp.CometPunch.Cooldown = -1 },
+		"air speed second": func(c *Config) { c.Machamp.RockTomb.AirSpeedSecondHalf = -1 },
+	} {
+		c := DefaultConfig()
+		mut(&c)
+		if c.validate() == nil {
+			t.Errorf("%s: a bad value was accepted", name)
+		}
+	}
+	if err := DefaultConfig().validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEveryPlayerFieldHasItsOwnJSONKey(t *testing.T) {
+	seen := map[string]string{}
+	ty := reflect.TypeOf(Player{})
+	for i := 0; i < ty.NumField(); i++ {
+		tag := strings.Split(ty.Field(i).Tag.Get("json"), ",")[0]
+		if tag == "" || tag == "-" {
+			continue
+		}
+		if other, dup := seen[tag]; dup {
+			t.Errorf("%s and %s share the JSON key %q: encoding/json would drop both", ty.Field(i).Name, other, tag)
+		}
+		seen[tag] = ty.Field(i).Name
+	}
+}
+
+func TestMachampStateReachesTheSnapshot(t *testing.T) {
+	g := mach(DefaultConfig(), snorlax)
+	g.P[0].In = Input{Skill: true, DX: 1}
+	g.Step(dt)
+	b, _ := json.Marshal(g.P[0])
+	var m map[string]any
+	json.Unmarshal(b, &m)
+	for _, k := range []string{"trp", "trt", "trx", "try", "trcd", "cpt", "cpcd", "rkt", "rkcd"} {
+		if _, ok := m[k]; !ok {
+			t.Errorf("snapshot has no %q", k)
+		}
+	}
+}

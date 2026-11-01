@@ -95,8 +95,8 @@ func TestTwoPlayersMatchAndTheThirdWaitsInARoomOfItsOwn(t *testing.T) {
 	if arena, ok := hi["arena"].(map[string]any); !ok || arena["w"] != float64(2000) || arena["h"] != float64(1000) {
 		t.Fatalf("hi.arena = %v, want 2000x1000", hi["arena"])
 	}
-	if rd, ok := hi["radius"].([]any); !ok || len(rd) != 8 || rd[0] != float64(16) || rd[1] != float64(24) || rd[2] != float64(26) || rd[3] != float64(18) || rd[4] != float64(14) || rd[5] != float64(13) || rd[6] != float64(10) || rd[7] != float64(36) {
-		t.Fatalf("hi.radius = %v, want [16 24 26 18 14 13 10 36]: the client draws each body at its size, indexed by kind (Magikarp, then the Gyarados it becomes)", hi["radius"])
+	if rd, ok := hi["radius"].([]any); !ok || len(rd) != 9 || rd[0] != float64(16) || rd[1] != float64(24) || rd[2] != float64(26) || rd[3] != float64(18) || rd[4] != float64(14) || rd[5] != float64(13) || rd[6] != float64(10) || rd[7] != float64(30) || rd[8] != float64(36) {
+		t.Fatalf("hi.radius = %v, want [16 24 26 18 14 13 10 30 36]: the client draws each body at its size, indexed by kind (Magikarp, then the Gyarados it becomes)", hi["radius"])
 	}
 	if pu, ok := hi["punch"].(map[string]any); !ok || pu["charge"] != float64(0.4) || pu["radius"] != float64(40) || pu["freeze"] != float64(1.5) {
 		t.Fatalf("hi.punch = %v, want charge 0.4 / radius 40 / freeze 1.5", hi["punch"])
@@ -110,8 +110,8 @@ func TestTwoPlayersMatchAndTheThirdWaitsInARoomOfItsOwn(t *testing.T) {
 	if cd, ok := hi["cooldown"].(map[string]any); !ok || cd["punch"] != float64(5) {
 		t.Fatalf("hi.cooldown.punch = %v, want 5", hi["cooldown"])
 	}
-	if mh, ok := hi["maxhp"].([]any); !ok || len(mh) != 8 || mh[0] != float64(100) || mh[1] != float64(100) || mh[2] != float64(120) || mh[3] != float64(110) || mh[4] != float64(100) || mh[5] != float64(100) || mh[6] != float64(70) || mh[7] != float64(170) {
-		t.Fatalf("hi.maxhp = %v, want [100 100 120 110 100 100 70 170]: the client scales the HP bars with it", hi["maxhp"])
+	if mh, ok := hi["maxhp"].([]any); !ok || len(mh) != 9 || mh[0] != float64(100) || mh[1] != float64(100) || mh[2] != float64(120) || mh[3] != float64(110) || mh[4] != float64(100) || mh[5] != float64(100) || mh[6] != float64(70) || mh[7] != float64(140) || mh[8] != float64(170) {
+		t.Fatalf("hi.maxhp = %v, want [100 100 120 110 100 100 70 140 170]: the client scales the HP bars with it", hi["maxhp"])
 	}
 	if lf, ok := hi["leaf"].(map[string]any); !ok || lf["radius"] != float64(90) || lf["scale"] != float64(2.5) {
 		t.Fatalf("hi.leaf = %v, want the Leaf Slash radius 90 and leaf scale 2.5", hi["leaf"])
@@ -174,7 +174,7 @@ func TestPickingCharactersStartsTheMatch(t *testing.T) {
 
 	pick(t, a, snorlax)
 	lobbyWith(t, b, [2]int{snorlax, -1}) // the opponent sees what was picked
-	pick(t, b, 7)                        // no such character
+	pick(t, b, 8)                        // no such character (8 is Gyarados, which is only ever a form)
 	pick(t, b, -1)
 	lobbyWith(t, b, [2]int{snorlax, -1})
 
@@ -301,8 +301,8 @@ func TestTeamMatchOverTheWire(t *testing.T) {
 			t.Fatal("the lobby never said team")
 		}
 	}
-	a.WriteMessage(websocket.TextMessage, []byte(`{"order":[1,0,2,3,4,5,6]}`))
-	b.WriteMessage(websocket.TextMessage, []byte(`{"order":[0,1,2,3,4,5,6]}`))
+	a.WriteMessage(websocket.TextMessage, []byte(`{"order":[1,0,2,3,4,5,6,7]}`))
+	b.WriteMessage(websocket.TextMessage, []byte(`{"order":[0,1,2,3,4,5,6,7]}`))
 	s := next(t, a, "s")
 	tm, ok := s["tm"].(map[string]any)
 	if !ok || tm["o"] != false {

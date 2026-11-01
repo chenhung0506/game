@@ -215,21 +215,25 @@ func (g *Game) tickFrost(dt float64) {
 	g.Frost = kept
 }
 
-// blockByPillars pushes slot i out of the other player's pillars it overlaps: a pillar is a solid disc for anyone
-// but its owner, at the heights of the beam's band. Two passes, so being pushed out of one into the next is
-// settled; a body walled in by a ring of pillars is simply held until one melts or breaks.
+// blockByPillars pushes slot i out of the other player's pillars and stones it overlaps: each is a solid disc for anyone
+// but its owner, at the heights of its own skill's band. Two passes, so being pushed out of one into the next is
+// settled; a body walled in by a ring of them is simply held until one melts or breaks.
 func (g *Game) blockByPillars(i int) {
-	p, fb := &g.P[i], g.cfg.Vulpix.FreezeBeam
-	if !fb.Reach.hits(p) {
-		return
-	}
+	p, fb, rt := &g.P[i], g.cfg.Vulpix.FreezeBeam, g.cfg.Machamp.RockTomb
 	for pass := 0; pass < 2; pass++ {
 		for j := range g.Balls {
 			b := &g.Balls[j]
-			if b.K != ballPillar || b.Owner == i || b.HP <= 0 || b.Z > 0 { // one in the air (a tornado has it) blocks nothing
+			if !solid(b.K) || b.Owner == i || b.HP <= 0 || b.Z > 0 { // one in the air (a tornado has it) blocks nothing
 				continue
 			}
-			if gap := g.radius(i) + fb.PillarRadius; math.Hypot(p.X-b.X, p.Y-b.Y) < gap {
+			reach, r := fb.Reach, fb.PillarRadius
+			if b.K == ballStone {
+				reach, r = rt.Reach, rt.StoneRadius
+			}
+			if !reach.hits(p) {
+				continue
+			}
+			if gap := g.radius(i) + r; math.Hypot(p.X-b.X, p.Y-b.Y) < gap {
 				p.X, p.Y = g.pushedAway(p.X, p.Y, b.X, b.Y, gap-math.Hypot(p.X-b.X, p.Y-b.Y), 1, 0)
 			}
 		}

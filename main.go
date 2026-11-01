@@ -615,12 +615,16 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	r.mu.Lock()
 	cfg := r.g.cfg
 	hb, gb, th, fb, ts := cfg.Snorlax.HyperBeam, cfg.Gyarados.HyperBeam, cfg.Pikachu.Thunder, cfg.Charizard.FireBreath, cfg.Charizard.SeismicToss // tunable, so the client takes them from here instead of hard-coding
+	tree, comet, rock := cfg.Machamp.TreeSlam, cfg.Machamp.CometPunch, cfg.Machamp.RockTomb
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
-		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp and the gyarados it becomes
-		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Gyarados.Radius},
-		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Gyarados.MaxHP},
+		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, machamp and the gyarados magikarp becomes
+		"radius":  []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Machamp.Radius, cfg.Gyarados.Radius},
+		"maxhp":   []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Machamp.MaxHP, cfg.Gyarados.MaxHP},
 		"evolve":  cfg.Magikarp.EvolveHops,
+		"tree":    map[string]float64{"len": tree.TrunkLength, "w": tree.TrunkWidth, "scale": tree.TrunkScale, "leaf": tree.LeafRadius, "leafscale": tree.LeafScale, "angle": tree.LeafAngle, "charge": tree.ChargeDuration, "dist": tree.JumpDistance, "jump": tree.JumpDuration},
+		"fist":    map[string]float64{"radius": comet.Radius, "hp": float64(comet.HP), "life": comet.FistDuration},
+		"stone":   map[string]float64{"radius": rock.StoneRadius, "hp": float64(rock.StoneHP), "life": rock.StoneDuration},
 		"wave":    map[string]float64{"radius": cfg.Gyarados.Wave.Radius, "speed": cfg.Gyarados.Wave.Speed},
 		"tail":    map[string]float64{"angle": cfg.Gyarados.TailWhip.Angle, "length": cfg.Gyarados.TailWhip.Length, "stun": cfg.Gyarados.TailWhip.StunDuration, "charge": cfg.Gyarados.TailWhip.ChargeDuration},
 		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "scale": cfg.Vulpix.FrostField.Scale, "duration": cfg.Vulpix.FrostField.Duration, "ride": cfg.Vulpix.FrostField.SprayDuration},
@@ -647,7 +651,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,
 			"frost": cfg.Vulpix.FrostField.Cooldown, "storm": cfg.Vulpix.IceStorm.Cooldown, "fbeam": cfg.Vulpix.FreezeBeam.Cooldown,
 			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown,
-			"hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
+			"tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
 	})
 	c.send <- hi
 	r.broadcastLobby() // both players learn who joined

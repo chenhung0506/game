@@ -401,6 +401,71 @@ type Config struct {
 		// Its Hyper Beam (J): the same skill as Snorlax's, with numbers of its own.
 		HyperBeam HyperBeamCfg `json:"hyper_beam"`
 	} `json:"gyarados"`
+	Machamp struct {
+		MaxHP     int     `json:"max_hp"`
+		WalkSpeed float64 `json:"walk_speed"`
+		Radius    float64 `json:"radius"`
+		// Tree slam (the main button): Machamp jumps `jump_distance` along the direction held (else the way it faces) in
+		// `jump_duration` seconds, `jump_height` up; on landing it pulls a tree out of the ground and holds it up for
+		// `charge_duration` seconds (rooted, with the shape it will smash down drawn on the ground for the opponent), then
+		// smashes it down along the jump. The tree is a trunk, `trunk_length` long and `trunk_width` wide from Machamp's
+		// feet, and a canopy at its tip: a sector `leaf_radius` out, `leaf_angle` degrees wide (180 = a half circle facing
+		// away from Machamp). The opponent touching either, at a height inside min_height..max_height, takes `damage`
+		// once. `trunk_scale` and `leaf_scale` only make the drawn tree bigger; what it hits is the lengths and radius.
+		TreeSlam struct {
+			Reach
+			JumpDistance   float64 `json:"jump_distance"`
+			JumpDuration   float64 `json:"jump_duration"`
+			JumpHeight     float64 `json:"jump_height"`
+			ChargeDuration float64 `json:"charge_duration"`
+			TrunkScale     float64 `json:"trunk_scale"`
+			TrunkLength    float64 `json:"trunk_length"`
+			TrunkWidth     float64 `json:"trunk_width"`
+			LeafScale      float64 `json:"leaf_scale"`
+			LeafRadius     float64 `json:"leaf_radius"`
+			LeafAngle      float64 `json:"leaf_angle"`
+			Damage         int     `json:"damage"`
+			Cooldown       float64 `json:"cooldown"`
+		} `json:"tree_slam"`
+		// Comet Punch (J): for `duration` seconds Machamp runs at the opponent (`distance` in all, stopping at its body)
+		// throwing `quantity` fists, evenly spaced in time. Each fist appears ahead of it, `scatter_min_distance` to
+		// `scatter_max_distance` beyond its body and up to `random_offset_angle` degrees either side of its heading, hangs
+		// there for `fist_duration` seconds and hurts the opponent it touches once (`damage`). A fist has `hp` and is worn
+		// down like a fire ball (`mass`: see hyper_beam.mass).
+		CometPunch struct {
+			Reach
+			Radius             float64 `json:"radius"`
+			HP                 int     `json:"hp"`
+			Damage             int     `json:"damage"`
+			Cooldown           float64 `json:"cooldown"` // counted from the start
+			Mass               float64 `json:"mass"`
+			Duration           float64 `json:"duration"`
+			Quantity           int     `json:"quantity"`
+			RandomOffsetAngle  float64 `json:"random_offset_angle"`
+			Distance           float64 `json:"distance"`
+			ScatterMinDistance float64 `json:"scatter_min_distance"`
+			ScatterMaxDistance float64 `json:"scatter_max_distance"`
+			FistDuration       float64 `json:"fist_duration"`
+		} `json:"comet_punch"`
+		// Rock Tomb (K): Machamp jumps `height` up for `duration` seconds, steered in the air at `air_speed_first_half`
+		// then `air_speed_second_half`, and the landing raises `count` stones in a ring `ring_radius` from where it lands
+		// (those that would be outside the court are left out). A stone is a solid disc of `stone_radius` for the
+		// opponent (not for Machamp) at heights inside min_height..max_height, has `stone_hp`, and is worn down like a
+		// projectile; it crumbles after `stone_duration` seconds.
+		RockTomb struct {
+			Reach
+			RingRadius         float64 `json:"ring_radius"`
+			Height             float64 `json:"height"`
+			Duration           float64 `json:"duration"`
+			Cooldown           float64 `json:"cooldown"` // counted from the take-off
+			AirSpeedFirstHalf  float64 `json:"air_speed_first_half"`
+			AirSpeedSecondHalf float64 `json:"air_speed_second_half"`
+			Count              int     `json:"count"`
+			StoneRadius        float64 `json:"stone_radius"`
+			StoneHP            int     `json:"stone_hp"`
+			StoneDuration      float64 `json:"stone_duration"`
+		} `json:"rock_tomb"`
+	} `json:"machamp"`
 }
 
 func DefaultConfig() Config {
@@ -611,6 +676,22 @@ func DefaultConfig() Config {
 	c.Gyarados.TailWhip.Angle, c.Gyarados.TailWhip.Length, c.Gyarados.TailWhip.Knockback = 90, 180, 200
 	c.Gyarados.TailWhip.StunDuration, c.Gyarados.TailWhip.Cooldown = 1.2, 6
 	c.Gyarados.TailWhip.ChargeDuration = 0.5
+	c.Machamp.MaxHP, c.Machamp.WalkSpeed, c.Machamp.Radius = 140, 140, 30
+	ts := &c.Machamp.TreeSlam
+	ts.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	ts.JumpDistance, ts.JumpDuration, ts.JumpHeight, ts.ChargeDuration = 250, 0.5, 50, 0.6
+	ts.TrunkScale, ts.TrunkLength, ts.TrunkWidth, ts.LeafScale, ts.LeafRadius, ts.LeafAngle = 1, 300, 70, 1, 180, 180
+	ts.Damage, ts.Cooldown = 35, 8
+	cp := &c.Machamp.CometPunch
+	cp.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	cp.Radius, cp.HP, cp.Damage, cp.Cooldown, cp.Mass = 22, 20, 2, 8, 10
+	cp.Duration, cp.Quantity, cp.RandomOffsetAngle, cp.Distance = 1.5, 24, 40, 300
+	cp.ScatterMinDistance, cp.ScatterMaxDistance, cp.FistDuration = 20, 90, 0.2
+	rt := &c.Machamp.RockTomb
+	rt.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	rt.RingRadius, rt.Height, rt.Duration, rt.Cooldown = 500, 80, 0.8, 12
+	rt.AirSpeedFirstHalf, rt.AirSpeedSecondHalf = 150, 100
+	rt.Count, rt.StoneRadius, rt.StoneHP, rt.StoneDuration = 24, 60, 100, 8
 	return c
 }
 
@@ -736,6 +817,26 @@ func (c Config) validate() error {
 		{"gyarados.wave.speed", c.Gyarados.Wave.Speed, 0},
 		{"gyarados.wave.jump_duration", c.Gyarados.Wave.JumpDuration, 0},
 		{"gyarados.tail_whip.length", c.Gyarados.TailWhip.Length, 0},
+		{"machamp.max_hp", float64(c.Machamp.MaxHP), 0},
+		{"machamp.walk_speed", c.Machamp.WalkSpeed, 0},
+		{"machamp.radius", c.Machamp.Radius, 0},
+		{"machamp.tree_slam.jump_distance", c.Machamp.TreeSlam.JumpDistance, 0},
+		{"machamp.tree_slam.jump_duration", c.Machamp.TreeSlam.JumpDuration, 0},
+		{"machamp.tree_slam.trunk_scale", c.Machamp.TreeSlam.TrunkScale, 0},
+		{"machamp.tree_slam.trunk_length", c.Machamp.TreeSlam.TrunkLength, 0},
+		{"machamp.tree_slam.trunk_width", c.Machamp.TreeSlam.TrunkWidth, 0},
+		{"machamp.tree_slam.leaf_scale", c.Machamp.TreeSlam.LeafScale, 0},
+		{"machamp.tree_slam.leaf_radius", c.Machamp.TreeSlam.LeafRadius, 0},
+		{"machamp.comet_punch.radius", c.Machamp.CometPunch.Radius, 0},
+		{"machamp.comet_punch.hp", float64(c.Machamp.CometPunch.HP), 0},
+		{"machamp.comet_punch.duration", c.Machamp.CometPunch.Duration, 0},
+		{"machamp.comet_punch.quantity", float64(c.Machamp.CometPunch.Quantity), 0},
+		{"machamp.comet_punch.fist_duration", c.Machamp.CometPunch.FistDuration, 0},
+		{"machamp.rock_tomb.duration", c.Machamp.RockTomb.Duration, 0},
+		{"machamp.rock_tomb.count", float64(c.Machamp.RockTomb.Count), 0},
+		{"machamp.rock_tomb.stone_radius", c.Machamp.RockTomb.StoneRadius, 0},
+		{"machamp.rock_tomb.stone_hp", float64(c.Machamp.RockTomb.StoneHP), 0},
+		{"machamp.rock_tomb.stone_duration", c.Machamp.RockTomb.StoneDuration, 0},
 		{"rowlet.fly_high", c.Rowlet.FlyHigh, 0},
 		{"rowlet.tailwind.radius", c.Rowlet.Tailwind.Radius, 0},
 		{"rowlet.tailwind.speed", c.Rowlet.Tailwind.Speed, 0},
@@ -865,6 +966,20 @@ func (c Config) validate() error {
 		{"gyarados.tail_whip.stun_duration", c.Gyarados.TailWhip.StunDuration},
 		{"gyarados.tail_whip.cooldown", c.Gyarados.TailWhip.Cooldown},
 		{"gyarados.tail_whip.charge_duration", c.Gyarados.TailWhip.ChargeDuration},
+		{"machamp.tree_slam.jump_height", c.Machamp.TreeSlam.JumpHeight},
+		{"machamp.tree_slam.charge_duration", c.Machamp.TreeSlam.ChargeDuration},
+		{"machamp.tree_slam.damage", float64(c.Machamp.TreeSlam.Damage)},
+		{"machamp.tree_slam.cooldown", c.Machamp.TreeSlam.Cooldown},
+		{"machamp.comet_punch.damage", float64(c.Machamp.CometPunch.Damage)},
+		{"machamp.comet_punch.cooldown", c.Machamp.CometPunch.Cooldown},
+		{"machamp.comet_punch.mass", c.Machamp.CometPunch.Mass},
+		{"machamp.comet_punch.distance", c.Machamp.CometPunch.Distance},
+		{"machamp.comet_punch.scatter_min_distance", c.Machamp.CometPunch.ScatterMinDistance},
+		{"machamp.rock_tomb.ring_radius", c.Machamp.RockTomb.RingRadius},
+		{"machamp.rock_tomb.height", c.Machamp.RockTomb.Height},
+		{"machamp.rock_tomb.cooldown", c.Machamp.RockTomb.Cooldown},
+		{"machamp.rock_tomb.air_speed_first_half", c.Machamp.RockTomb.AirSpeedFirstHalf},
+		{"machamp.rock_tomb.air_speed_second_half", c.Machamp.RockTomb.AirSpeedSecondHalf},
 		{"vulpix.frost_field.explosion_radius", c.Vulpix.FrostField.ExplosionRadius},
 		{"vulpix.frost_field.explosion_damage", float64(c.Vulpix.FrostField.ExplosionDamage)},
 	} {
@@ -892,6 +1007,9 @@ func (c Config) validate() error {
 		"rowlet.tornado":         c.Rowlet.Tornado.Reach,
 		"gyarados.wave":          c.Gyarados.Wave.Reach,
 		"gyarados.tail_whip":     c.Gyarados.TailWhip.Reach,
+		"machamp.tree_slam":      c.Machamp.TreeSlam.Reach,
+		"machamp.comet_punch":    c.Machamp.CometPunch.Reach,
+		"machamp.rock_tomb":      c.Machamp.RockTomb.Reach,
 	} {
 		if !(r.MinHeight >= 0 && r.MaxHeight >= r.MinHeight) { // also rejects NaN
 			return fmt.Errorf("%s: need 0 <= min_height <= max_height, got %v and %v", name, r.MinHeight, r.MaxHeight)
@@ -928,6 +1046,19 @@ func (c Config) validate() error {
 	if a := c.Gyarados.TailWhip.Angle; !(a > 0 && a <= 360) {
 		return fmt.Errorf("gyarados.tail_whip.angle must be between 0 (exclusive) and 360, got %v", a)
 	}
+	if a := c.Machamp.TreeSlam.LeafAngle; !(a > 0 && a <= 360) {
+		return fmt.Errorf("machamp.tree_slam.leaf_angle must be between 0 (exclusive) and 360, got %v", a)
+	}
+	if cp := c.Machamp.CometPunch; cp.Quantity > 200 {
+		return fmt.Errorf("machamp.comet_punch.quantity must be at most 200, got %d", cp.Quantity)
+	} else if !(cp.ScatterMaxDistance >= cp.ScatterMinDistance) {
+		return fmt.Errorf("machamp.comet_punch.scatter_max_distance must be >= scatter_min_distance, got %v and %v", cp.ScatterMaxDistance, cp.ScatterMinDistance)
+	} else if !(cp.RandomOffsetAngle >= 0 && cp.RandomOffsetAngle <= 90) {
+		return fmt.Errorf("machamp.comet_punch.random_offset_angle must be between 0 and 90, got %v", cp.RandomOffsetAngle)
+	}
+	if n := c.Machamp.RockTomb.Count; n > 100 {
+		return fmt.Errorf("machamp.rock_tomb.count must be at most 100, got %d", n)
+	}
 	if a := c.Charizard.FireBreath.RandomOffsetAngle; !(a >= 0 && a <= 90) { // 0 = every fire ball flies straight at the target
 		return fmt.Errorf("charizard.fire_breath.random_offset_angle must be between 0 and 90, got %v", a)
 	}
@@ -957,6 +1088,8 @@ func (c Config) maxHPOf(kind int) int {
 		return c.Rowlet.MaxHP
 	case magikarp:
 		return c.Magikarp.MaxHP
+	case machamp:
+		return c.Machamp.MaxHP
 	case gyarados:
 		return c.Gyarados.MaxHP
 	}
@@ -977,6 +1110,8 @@ func (c Config) walkSpeedOf(kind int) float64 {
 		return c.Rowlet.WalkSpeed
 	case magikarp:
 		return c.Magikarp.WalkSpeed
+	case machamp:
+		return c.Machamp.WalkSpeed
 	case gyarados:
 		return c.Gyarados.WalkSpeed
 	}
@@ -997,6 +1132,8 @@ func (c Config) radiusOf(kind int) float64 {
 		return c.Rowlet.Radius
 	case magikarp:
 		return c.Magikarp.Radius
+	case machamp:
+		return c.Machamp.Radius
 	case gyarados:
 		return c.Gyarados.Radius
 	}

@@ -31,9 +31,10 @@ const (
 	vulpix    = 4
 	rowlet    = 5
 	magikarp  = 6
+	machamp   = 7
 	// kinds is how many characters a player can pick. Gyarados is not one of them: it is what Magikarp becomes, so it
 	// is a kind a player can be in (Player.Kind, and everything indexed by kind) but never chooses.
-	kinds    = 7
+	kinds    = 8
 	gyarados = kinds
 	forms    = kinds + 1 // every kind a player can be in
 )
@@ -57,6 +58,8 @@ type Input struct {
 	Arrow   bool `json:"arrow"`   // Rowlet only: Arrows
 	Twister bool `json:"twister"` // Rowlet only: Tornado
 	Tail    bool `json:"tail"`    // Gyarados only: Tail whip
+	Comet   bool `json:"comet"`   // Machamp only: Comet Punch
+	Rock    bool `json:"rock"`    // Machamp only: Rock Tomb
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
@@ -222,6 +225,20 @@ type Player struct {
 	TailY float64 `json:"tly"`
 	// StunT is seconds left stunned (by the tail whip): like being frozen, it can neither move nor act.
 	StunT float64 `json:"sn"`
+
+	// Machamp. Tree slam: its phase (treeNone, treeJump, treeSmash), the seconds left in it, the way it was started
+	// (unit vector; the tree is smashed down along it) and the cooldown. Comet Punch: seconds of flurry left, how many
+	// fists have been thrown, and the cooldown. Rock Tomb: seconds of the jump left, and the cooldown.
+	TreePhase int     `json:"trp"`
+	TreeT     float64 `json:"trt"`
+	TreeX     float64 `json:"trx"`
+	TreeY     float64 `json:"try"`
+	TreeCD    float64 `json:"trcd"`
+	CometT    float64 `json:"cpt"`
+	CometN    int     `json:"-"`
+	CometCD   float64 `json:"cpcd"`
+	RockT     float64 `json:"rkt"`
+	RockCD    float64 `json:"rkcd"`
 }
 
 // Leaf Slash phases.
@@ -248,6 +265,8 @@ const (
 	ballPillar  = 3 // Vulpix's ice pillar: it stands where it rose, blocks the other player and is worn down like a projectile
 	ballArrow   = 4 // Rowlet's arrow: it hurts and slows what it touches
 	ballTornado = 5 // Rowlet's tornado: it chases the opponent, carries it up and lets it fall; it is worn down like a projectile
+	ballStone   = 6 // Machamp's rock: it stands where it rose, blocks the other player and is worn down like a projectile (a pillar's way)
+	ballFist    = 7 // one of Machamp's Comet Punch fists: it hangs where it appeared, hits the opponent it touches once and has HP like a fire ball
 )
 
 // Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
@@ -381,6 +400,10 @@ func (g *Game) ballRadius(b *Ball) float64 {
 		return g.cfg.Chikorita.RazorLeaf.Radius
 	case ballPillar:
 		return g.cfg.Vulpix.FreezeBeam.PillarRadius
+	case ballStone:
+		return g.cfg.Machamp.RockTomb.StoneRadius
+	case ballFist:
+		return g.cfg.Machamp.CometPunch.Radius
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Radius
 	case ballTornado:
@@ -395,8 +418,10 @@ func (g *Game) ballMass(b *Ball) float64 {
 		return g.cfg.Charizard.FireBreath.Mass
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Mass
-	case ballPillar:
+	case ballPillar, ballStone:
 		return pillarMass // a beam or a punch does not push it
+	case ballFist:
+		return g.cfg.Machamp.CometPunch.Mass
 	case ballTornado:
 		return g.cfg.Rowlet.Tornado.Mass
 	case ballArrow:
@@ -498,6 +523,7 @@ func (g *Game) Step(dt float64) []Event {
 			p.DashT, p.BallT, p.BreathT = 0, 0, 0 // a dash, a charge or a breath in progress is cut short
 			g.dropToss(i)                         // a Charizard caught mid-toss lets go
 			g.dropLeaf(i)                         // a Chikorita mid-hop or mid-slash is stopped
+			g.dropMachamp(i)                      // so is a Machamp mid-jump, mid-smash or mid-flurry
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
 			p.FrostT, p.FBeamT = 0, 0                              // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
 			p.DriftT, p.TwistT, p.TwistRecT, p.ArrowT = 0, 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
@@ -660,6 +686,12 @@ func (g *Game) Step(dt float64) []Event {
 			events = append(events, ev...)
 		}
 
+		if p.Kind == machamp {
+			var ev []Event
+			ev, casting = g.stepMachamp(i, in, dt) // the tree jump and the flurry move it themselves; the smash roots it
+			events = append(events, ev...)
+		}
+
 		if p.Kind == rowlet {
 			var ev []Event
 			ev, casting = g.stepRowlet(i, in, dt) // the drift moves it itself; the tornado's charge and recovery root it
@@ -757,6 +789,9 @@ func (g *Game) Step(dt float64) []Event {
 			}
 			if p.Kind == magikarp && p.HopLeft > 0 {
 				v = g.magikarpAirSpeed(p)
+			}
+			if p.Kind == machamp && p.RockT > 0 {
+				v = g.machampAirSpeed(p)
 			}
 			if p.Kind == snorlax && p.Z > 0 {
 				v = g.cfg.Snorlax.Jump.AirSpeedSecondHalf
@@ -879,11 +914,25 @@ func (g *Game) stepBalls(dt float64) []Event {
 	for _, b := range g.Balls {
 		foe := &g.P[1-b.Owner]
 		b.X0, b.Y0 = b.X, b.Y
-		if b.K == ballPillar {
+		if b.K == ballPillar || b.K == ballStone {
 			if b.HP > 0 {
 				b.GrindCD = math.Max(0, b.GrindCD-dt)
 				if !b.Carried && b.Z > 0 { // let go: it comes back down
 					b.Z = math.Max(0, b.Z-g.cfg.Rowlet.Tornado.LiftHeight/twirlFallTime*dt)
+				}
+				if b.Life -= dt; b.Life > 1e-9 {
+					kept = append(kept, b)
+				}
+			}
+			continue
+		}
+		if b.K == ballFist {
+			if b.HP > 0 {
+				cp := g.cfg.Machamp.CometPunch
+				if cp.Reach.hits(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= cp.Radius+g.radius(1-b.Owner) {
+					g.hit(foe, cp.Damage)
+					events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
+					continue
 				}
 				if b.Life -= dt; b.Life > 1e-9 {
 					kept = append(kept, b)
@@ -1037,8 +1086,10 @@ func (g *Game) ballDamage(b *Ball) int {
 		return g.cfg.Charizard.FireBreath.Damage
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Damage
-	case ballPillar:
+	case ballPillar, ballStone:
 		return pillarBlock
+	case ballFist:
+		return g.cfg.Machamp.CometPunch.Damage
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Damage
 	case ballTornado:
@@ -1046,6 +1097,9 @@ func (g *Game) ballDamage(b *Ball) int {
 	}
 	return g.cfg.Pikachu.ElectroBall.ContactDamage
 }
+
+// solid is whether a ball is a standing obstacle (a pillar or a stone), which other balls and tornadoes pass through.
+func solid(k int) bool { return k == ballPillar || k == ballStone }
 
 // clashBalls makes projectiles of opposite owners hurt each other: each takes the other's damage off its HP. A
 // fire ball or leaf that runs out of HP is gone at once; an Electro Ball that does explodes on the next step, like
@@ -1062,7 +1116,7 @@ func (g *Game) clashBalls() {
 		}
 		for j := i + 1; j < len(g.Balls); j++ {
 			b := &g.Balls[j]
-			if b.HP <= 0 || b.Wait || a.Owner == b.Owner || (a.K == ballPillar && (b.K == ballPillar || b.K == ballTornado)) || (a.K == ballTornado && b.K == ballPillar) {
+			if b.HP <= 0 || b.Wait || a.Owner == b.Owner || (solid(a.K) && (solid(b.K) || b.K == ballTornado)) || (a.K == ballTornado && solid(b.K)) {
 				continue
 			}
 			// b stands still at its start; a moves by the difference of their moves.
