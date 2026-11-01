@@ -130,7 +130,9 @@ type Player struct {
 
 	// Electro Ball: BallT is the charge time left (0 = not charging).
 	BallT    float64 `json:"kt"`
-	BallLock bool    `json:"-"`   // the throw goes the way the player chose, not after the opponent
+	BallLock bool    `json:"-"` // the throw goes the way the player chose, not after the opponent
+	BallDX   float64 `json:"-"` // that way: the left stick does not turn it while it charges
+	BallDY   float64 `json:"-"`
 	BallCD   float64 `json:"ecd"` // counted from the moment the charge starts
 
 	// Charizard. Fly: seconds of flight left (the height follows in Z) and the cooldown, which starts on landing.
@@ -790,12 +792,14 @@ func (g *Game) Step(dt float64) []Event {
 				p.DashT = 0 // charging roots Pikachu at once
 				p.BallLock = false
 				if n := math.Hypot(in.CastX, in.CastY); n > 1e-9 && !math.IsInf(n, 0) {
-					p.AimX, p.AimY, p.BallLock = in.CastX/n, in.CastY/n, true
+					p.BallDX, p.BallDY, p.BallLock = in.CastX/n, in.CastY/n, true
 				}
 			}
 			if p.BallT > 0 {
-				casting = true                                                                    // rooted through the tick of the throw, free from the next
-				if dx, dy := other.X-p.X, other.Y-p.Y; !p.BallLock && math.Hypot(dx, dy) > 1e-9 { // on top of it there is no direction: the aim stays
+				casting = true  // rooted through the tick of the throw, free from the next
+				if p.BallLock { // the aim chosen at the cast, whatever the stick says meanwhile
+					p.AimX, p.AimY = p.BallDX, p.BallDY
+				} else if dx, dy := other.X-p.X, other.Y-p.Y; math.Hypot(dx, dy) > 1e-9 { // on top of it there is no direction: the aim stays
 					n := math.Hypot(dx, dy)
 					p.AimX, p.AimY = dx/n, dy/n
 				}
