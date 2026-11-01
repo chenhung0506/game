@@ -625,8 +625,8 @@ function artSnorlax(c, x, y, t, pose) {
     ov(c, -11, 17 - Math.max(0, sw) * 3, 7, 4.3, C); ov(c, 11, 17 - Math.max(0, -sw) * 3, 7, 4.3, C);
     ov(c, 0, 3, 22, 18, D);
     if (back) ov(c, 0, 3, 14, 11, DD, 0, null); else ov(c, 0, 6, 15, 12, C, 0, null);
-    ov(c, -21, 4 + sw * 2, 6, 10, D, 0.25); ov(c, 21, 4 - sw * 2, 6, 10, D, -0.25);
-    if (!back) { ov(c, -22.5, 12 + sw * 2, 4, 3, C, 0, null); ov(c, 22.5, 12 - sw * 2, 4, 3, C, 0, null); }
+    ov(c, -18.6, 5.4 + sw * 2, 6, 11, D, 0.38); ov(c, 18.6, 5.4 - sw * 2, 6, 11, D, -0.38); // from the shoulders by the neck, angled out: the belly is too big for them to hang straight
+    if (!back) { ov(c, -23.2, 15.4 + sw * 2, 4, 3, C, 0, null); ov(c, 23.2, 15.4 - sw * 2, 4, 3, C, 0, null); }
     poly(c, [[-15, -20], [-13, -31], [-6, -24]], D); poly(c, [[15, -20], [13, -31], [6, -24]], D);
     ov(c, 0, -13, 16, 12.5, D);
     if (!back) {
@@ -646,7 +646,7 @@ function artSnorlax(c, x, y, t, pose) {
     c.strokeStyle = K; c.lineWidth = 1.5; c.lineCap = 'round'; c.beginPath(); c.moveTo(9, -12.5); c.lineTo(14, -12.5); c.stroke();
     ov(c, 16, -9.5, 0.6, 0.6, K, 0, null);
     c.lineWidth = 1; c.beginPath(); c.arc(12.5, -7.5, 2.8, 0.1 * Math.PI, 0.75 * Math.PI); c.stroke();
-    ov(c, 0 + sw * 3, 5, 5.5, 9, DD, 0.1); ov(c, 0.5 + sw * 3, 12, 3.8, 3, C, 0, null);
+    ov(c, 1 + sw * 3, 4, 5.5, 10, DD, 0.1); ov(c, 1.6 + sw * 3, 12.6, 3.8, 3, C, 0, null);
   }
   c.restore();
 }
@@ -743,8 +743,8 @@ function artVulpix(c, x, y, t, pose) {
     ov(c, 0, 8, 10.5, 9, W);
     if (!back) { ov(c, 0, 11, 6, 5.5, '#fff', 0, null); poly(c, [[-4, 5], [0, 10], [4, 5], [0, 7.5]], BL, null); } // a blue chest tuft
     ov(c, -7, 15 - Math.max(0, sw) * 3, 3.3, 3.9, W); ov(c, 7, 15 - Math.max(0, -sw) * 3, 3.3, 3.9, W);
-    poly(c, [[-9, -9], [-12, -26], [-2, -14]], W); poly(c, [[9, -9], [12, -26], [2, -14]], W); // ears
-    if (!back) { poly(c, [[-8.4, -11], [-10.6, -22], [-4, -14]], BL, null); poly(c, [[8.4, -11], [10.6, -22], [4, -14]], BL, null); }
+    ov(c, -8.5, -17, 4.4, 7.4, W, -0.3); ov(c, 8.5, -17, 4.4, 7.4, W, 0.3); // ears, rounded at the tip
+    if (!back) { ov(c, -8.5, -16.2, 2.4, 4.6, BL, -0.3, null); ov(c, 8.5, -16.2, 2.4, 4.6, BL, 0.3, null); }
     ov(c, 0, -5, 11.5, 9.5, W);
     if (!back) {
       ov(c, -9.4, 0, 3, 3.6, WD, 0.6, null); ov(c, 9.4, 0, 3, 3.6, WD, 0.6, null); // cheek fur
@@ -758,9 +758,9 @@ function artVulpix(c, x, y, t, pose) {
     [-0.7, -1.0, -1.3, -1.6, -1.9, -2.2].forEach((ang, k) => tail(-9, 5, ang, 21 - k * 0.5, k));
     pikaLimb(c, 6, 12, 6, -a, 3, WD); pikaLimb(c, -8, 12, 6, a, 3, WD); // the far legs
     ov(c, -2, 7, 13, 7.5 + 0.8 * mv, W, -0.04 * mv); ov(c, 3, 11, 7, 3.4, '#fff', 0, null);
-    poly(c, [[5, -7], [3, -22], [12, -11]], WD); // far ear
+    ov(c, 6.4, -14.5 + 1.5 * mv, 3.8, 7, WD, -0.12); // far ear
     ov(c, 10, -1 + 1.5 * mv, 9, 8.6, W);
-    poly(c, [[8, -8], [7, -25], [15, -10]], W); poly(c, [[9.4, -10], [8.6, -21], [13.4, -11]], BL, null); // near ear
+    ov(c, 10.4, -16 + 1.5 * mv, 4.2, 7.6, W, 0.1); ov(c, 10.4, -15.2 + 1.5 * mv, 2.3, 4.6, BL, 0.1, null); // near ear
     ov(c, 17.5, 1.5 + 1.5 * mv, 4.6, 3.2, W);
     ov(c, 21, 0.9 + 1.5 * mv, 1.4, 1.2, NOSE, 0, null);
     ov(c, 6.5, 3.5 + 1.5 * mv, 3, 3.8, WD, 0.4, null); // cheek fur
@@ -786,9 +786,9 @@ function artRowlet(c, x, y, t, pose) {
     const back = dir === 1;
     if (back) { wing(-8, 1, -1, 0.3 + flap); wing(8, 1, 1, 0.3 + flap); }
     ov(c, 0, 12.5, 4.5, 2.4, BD, 0, null); // tail feathers
-    ov(c, 0, 4, 10, 11, BR);
-    if (!back) { ov(c, 0, 7, 6.2, 7, WL, 0, null); for (const fy of [4.5, 8, 11.5]) { c.strokeStyle = '#b79b6a'; c.lineWidth = 0.7; c.beginPath(); c.arc(0, fy, 2.4, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke(); } }
-    ov(c, 0, -3.5, 11.2, 10, BR);
+    ov(c, 0, 4.5, 11.6, 11.6, BR);
+    if (!back) { ov(c, 0, 7.4, 7, 7.4, WL, 0, null); for (const fy of [4.5, 8, 11.5]) { c.strokeStyle = '#b79b6a'; c.lineWidth = 0.7; c.beginPath(); c.arc(0, fy, 2.4, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke(); } }
+    ov(c, 0, -3.5, 11.4, 10.8, BR);
     poly(c, [[-9.5, -9], [-8, -17], [-3.4, -11.6]], BD); poly(c, [[9.5, -9], [8, -17], [3.4, -11.6]], BD); // ear tufts
     if (!back) {
       ov(c, -4.7, -3.2, 5.4, 5.8, '#f7f2e4'); ov(c, 4.7, -3.2, 5.4, 5.8, '#f7f2e4', 0, null); ov(c, 0, -5.2, 3.2, 3, '#f7f2e4', 0, null); // the heart-shaped face
@@ -804,8 +804,8 @@ function artRowlet(c, x, y, t, pose) {
     c.save(); c.translate(-3, 2); c.rotate(-0.5 - flap * 0.6); // the far wing, behind the body
     ov(c, -7, 0, 9, 6.4, BD); c.restore();
     ov(c, -12, 8, 5.6, 2.5, BD, -0.3, null); // tail
-    ov(c, -1, 4, 11, 9.6, BR); ov(c, 3.5, 7, 6, 6, WL, 0, null);
-    ov(c, 4, -3, 10, 9.6, BR);
+    ov(c, -1, 4.5, 11.4, 11, BR); ov(c, 3.5, 7.4, 6.4, 6.6, WL, 0, null);
+    ov(c, 4, -3, 10.4, 10.4, BR);
     poly(c, [[-1.5, -9], [-1, -17.5], [4, -11.5]], BD);
     ov(c, 7.6, -2.6, 5, 5.8, '#f7f2e4', 0, null); eye(c, 8.6, -3.4, 2.4, 2.9);
     poly(c, [[12, -1.6], [16.5, 0.4], [12, 2]], BEAK);
@@ -832,8 +832,8 @@ function artMachamp(c, x, y, t, pose) {
   ov(c, 0, 17, 17, 4.5, BLK); // the belt
   for (const m of [-1, 1]) { // the lower arms hang, the upper ones are raised with fists up
     const swing = sw * m * 3;
-    ov(c, m * 22, 10 + swing, 5.5, 11, B, m * 0.18); ov(c, m * 24, 20 + swing, 6, 5.5, BD);
-    ov(c, m * 24, -6 - swing, 6, 12, B, -m * 0.35); ov(c, m * 29, -17 - swing, 6.5, 6, BD);
+    ov(c, m * 18, 8 + swing, 5.5, 11, B, m * 0.18); ov(c, m * 21, 18.5 + swing, 6, 5.5, BD); // the lower arms start at the shoulders, just under the neck
+    ov(c, m * 17.6, -7 - swing, 5.8, 11, B, -m * 0.45); ov(c, m * 23.6, -17.5 - swing, 6.5, 6, BD); // the upper ones too, raised from the same place
   }
   for (const m of [-1, 0, 1]) poly(c, [[m * 6 - 3, -14], [m * 6, -27 - (m === 0 ? 4 : 0)], [m * 6 + 3, -14]], BD); // the head ridges
   ov(c, 0, -13, 11.5, 10, B); // head
@@ -861,7 +861,7 @@ function artAsh(c, x, y, t, pose) {
   ov(c, 0, 17, 13, 3.5, JEAND); // the belt line
   for (const m of [-1, 1]) { // arms swing against the legs; white sleeves, black gloves
     const swing = sw * m * 4;
-    ov(c, m * 16, 6 + swing, 4.5, 10, WHITE, m * 0.15); ov(c, m * 17, 17 + swing, 4, 4, BLK);
+    ov(c, m * 13.6, 3.6 + swing, 4.5, 10, WHITE, m * 0.12); ov(c, m * 14.6, 14.6 + swing, 4, 4, BLK); // the shoulders sit by the neck
   }
   ov(c, 0, -11, 11, 10.5, SKIN); // head
   if (back) ov(c, 0, -13, 11.5, 10.5, BLK); // the hair, all there is to see from behind
@@ -965,8 +965,9 @@ function artCharizard(c, x, y, t, flap) {
   c.beginPath(); c.moveTo(x - 6, y - 22); c.lineTo(x - 13, y - 33); c.lineTo(x - 2, y - 25); c.closePath(); c.fill();
   c.beginPath(); c.moveTo(x + 6, y - 22); c.lineTo(x + 13, y - 33); c.lineTo(x + 2, y - 25); c.closePath(); c.fill();
   el(c, x, y - 16, 11.5, 10, '#f08030');
-  el(c, x, y - 11.5, 6.5, 4.8, '#f59a58');
-  el(c, x - 2.3, y - 12.5, 0.9, 1.1, '#6b2a10'); el(c, x + 2.3, y - 12.5, 0.9, 1.1, '#6b2a10');
+  c.strokeStyle = '#8a3a14'; c.lineWidth = 1; c.beginPath(); // a tiny pair of nostril slits and a small mouth, instead of a flat pink muzzle
+  c.moveTo(x - 1.9, y - 13.4); c.lineTo(x - 1.5, y - 12.2); c.moveTo(x + 1.9, y - 13.4); c.lineTo(x + 1.5, y - 12.2);
+  c.moveTo(x - 4, y - 8.6); c.quadraticCurveTo(x, y - 6.8, x + 4, y - 8.6); c.stroke();
   el(c, x - 5.2, y - 19, 2.7, 3.1, '#fff'); el(c, x + 5.2, y - 19, 2.7, 3.1, '#fff');
   el(c, x - 5.2, y - 18.4, 1.4, 2, '#1b5e8c'); el(c, x + 5.2, y - 18.4, 1.4, 2, '#1b5e8c');
   c.restore();
@@ -1095,7 +1096,7 @@ function drawBall(b) {
   if (b.k === 4) { drawArrow(b); return; }
   if (b.k === 5) { drawTornado(b); return; }
   if (b.k === 6) { drawStone(b); return; }
-  if (b.k === 7) { drawFist(b); return; }
+  if (b.k === 7) { drawCometFist(b); return; }
   {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
@@ -1554,13 +1555,15 @@ function drawTreeSlam(f) {
 }
 // One Comet Punch fist: a clenched fist pointing the way Machamp is running, swelling as it lands and fading as its time runs out;
 // it has a small HP bar like a fire ball.
-function drawFist(b) {
+function drawCometFist(b) {
   const fistCfg = fistCfgs[ownerIdx(b.sd)], r = fistCfg.radius, age = fistCfg.life - b.lf, grow = Math.min(1, age / 0.06), a = Math.min(1, b.lf / 0.08 + 0.2), ang = Math.atan2(b.dy || 0, b.dx || 0);
   ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang); ctx.globalAlpha = a; ctx.scale(0.4 + 0.6 * grow, 0.4 + 0.6 * grow);
   ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.moveTo(-r * 2.6, -r * 0.5); ctx.lineTo(-r * 0.6, -r * 0.8); ctx.lineTo(-r * 0.6, r * 0.8); ctx.lineTo(-r * 2.6, r * 0.5); ctx.closePath(); ctx.fill(); // the streak behind
-  ctx.fillStyle = '#9fb0cb'; ctx.strokeStyle = '#4d5d78'; ctx.lineWidth = 2.2; ctx.lineJoin = 'round';
+  const ashFist = ownerIdx(b.sd) === 0, black = ashFist && ((Math.floor(b.x) * 31 + Math.floor(b.y) * 17) & 1) === 0; // Ash's: black or white, by where it appeared
+  const fill = !ashFist ? '#9fb0cb' : black ? '#2a2a32' : '#f4f4f6', line = !ashFist ? '#4d5d78' : black ? '#0c0c10' : '#8f93a0';
+  ctx.fillStyle = fill; ctx.strokeStyle = line; ctx.lineWidth = 2.2; ctx.lineJoin = 'round';
   ctx.beginPath(); ctx.roundRect(-r * 0.8, -r * 0.85, r * 1.7, r * 1.7, r * 0.45); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = '#4d5d78'; ctx.lineWidth = 1.6; ctx.beginPath(); // the knuckles
+  ctx.strokeStyle = line; ctx.lineWidth = 1.6; ctx.beginPath(); // the knuckles
   for (const f of [-0.45, 0, 0.45]) { ctx.moveTo(r * 0.55, r * f); ctx.lineTo(r * 0.9, r * f); }
   ctx.stroke(); ctx.restore();
   upright(b.x, b.y, () => { ctx.fillStyle = '#000a'; ctx.fillRect(-9, -r - 12, 18, 3); ctx.fillStyle = '#9fb0cb'; ctx.fillRect(-9, -r - 12, 18 * Math.max(b.hp, 0) / fistCfg.hp, 3); });
