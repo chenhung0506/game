@@ -278,7 +278,7 @@ func (c *bctx) findThreat() threat {
 		}
 	}
 
-	if f.Kind == ash && f.MegaT > 0 { // a Megaton Punch gathering: the line it will fly along is on the ground, and does not follow
+	if f.Kind == ash && f.MegaT > 0 { // a Megaton Punch gathering: the line it will fly along is on the ground; a person may still turn it with the stick, so it is read afresh every tick
 		mp := cfg.Ash.MegatonPunch
 		if segDist(p.X, p.Y, f.X, f.Y, f.X+f.MegaX*mp.Distance, f.Y+f.MegaY*mp.Distance) < mp.Radius+c.pr+15 {
 			ax, ay := c.sideOf(f.X, f.Y, f.MegaX, f.MegaY, p.X, p.Y)

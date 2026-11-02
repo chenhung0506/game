@@ -299,13 +299,11 @@ func TestMegatonPunchLeapsAlongTheStickAndOnlyGathersOnceItHasLanded(t *testing.
 	if g.P[0].MegaT <= 0 {
 		t.Fatal("the charge did not begin on landing")
 	}
-	// the fist is aimed from where it landed, at the opponent there
-	if want := unitX(900-300, 250-g.P[0].Y); math.Abs(g.P[0].MegaX-want) > 1e-9 {
-		t.Fatalf("aim x %v, want %v", g.P[0].MegaX, want)
+	// the stick was still held (left) as it landed, and it turns the fist
+	if g.P[0].MegaX != -1 || g.P[0].MegaY != 0 {
+		t.Fatalf("aim %v,%v, want the stick's way", g.P[0].MegaX, g.P[0].MegaY)
 	}
 }
-
-func unitX(x, y float64) float64 { ux, _ := unit(x, y); return ux }
 
 func TestMegatonPunchWithoutTheStickLeapsOnTheSpotAndNoLeapGathersAtOnce(t *testing.T) {
 	cfg := DefaultConfig()
@@ -378,5 +376,34 @@ func TestAPersonsAshHasNoCometPunchButTheComputersDoes(t *testing.T) {
 	press(g, 0, Input{Comet: true})
 	if g.P[0].CometT == 0 {
 		t.Fatal("the game itself must still let Ash use it, for the computer")
+	}
+}
+
+func TestTheStickTurnsTheMegatonFistWhileItGathersAndLettingGoKeepsTheWay(t *testing.T) {
+	cfg := DefaultConfig()
+	g := megaDuel(cfg, 300) // the opponent is straight ahead, on the right
+	press(g, 0, Input{Mega: true})
+	if g.P[0].MegaX != 1 || g.P[0].MegaY != 0 {
+		t.Fatalf("starts aimed at %v,%v, want the opponent", g.P[0].MegaX, g.P[0].MegaY)
+	}
+	g.P[0].In = Input{DY: 1}
+	g.Step(dt)
+	if g.P[0].MegaX != 0 || g.P[0].MegaY != 1 {
+		t.Fatalf("aim %v,%v after the stick went down", g.P[0].MegaX, g.P[0].MegaY)
+	}
+	g.P[0].In = Input{}
+	g.Step(dt)
+	if g.P[0].MegaY != 1 {
+		t.Fatal("letting go of the stick turned it back")
+	}
+	if g.P[0].X != 300 || g.P[0].Y != 250 {
+		t.Fatal("turning the fist walked Ash")
+	}
+	steps(g, int(cfg.Ash.MegatonPunch.ChargeDuration/dt)+2)
+	if g.P[1].HP != g.maxHP(1) {
+		t.Fatal("the fist hit the opponent it was turned away from")
+	}
+	if g.P[0].Y <= 250 {
+		t.Fatal("Ash did not lunge the way it was turned")
 	}
 }

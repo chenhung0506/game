@@ -176,6 +176,9 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	}
 	if p.MegaT > 0 {
 		rooted = true
+		if ax, ay := unit(float64(in.DX), float64(in.DY)); ax != 0 || ay != 0 {
+			p.MegaX, p.MegaY = ax, ay // the stick turns the fist while it gathers (let go, it keeps the last way)
+		}
 		if p.MegaT -= dt; p.MegaT < 1e-9 {
 			p.MegaT = 0
 			events = append(events, g.megatonPunch(i)...)
