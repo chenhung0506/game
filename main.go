@@ -675,13 +675,14 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
 		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp, gengar and the gyarados magikarp becomes
-		"radius": []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Gyarados.Radius, cfg.Dummy.Radius},
-		"maxhp":  []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gengar.MaxHP, cfg.Gyarados.MaxHP, cfg.Dummy.MaxHP},
-		"evolve": cfg.Magikarp.EvolveHops,
-		"tree":   []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
-		"fist":   []map[string]float64{aFist, mFist},
-		"mega":   map[string]float64{"charge": cfg.Ash.MegatonPunch.ChargeDuration, "dist": cfg.Ash.MegatonPunch.Distance, "radius": cfg.Ash.MegatonPunch.Radius, "cscale": cfg.Ash.MegatonPunch.ChargeScale, "fscale": cfg.Ash.MegatonPunch.FistScale, "iscale": cfg.Ash.MegatonPunch.ImpactScale, "warn": b2f(cfg.Ash.MegatonPunch.ShowWarning), "text": b2f(cfg.Ash.MegatonPunch.ShowText), "fstart": cfg.Ash.MegatonPunch.FistStart, "fend": cfg.Ash.MegatonPunch.FistEnd},
-		"stone":  []map[string]float64{aStone, mStone},
+		"radius":   []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Gyarados.Radius, cfg.Dummy.Radius},
+		"maxhp":    []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gengar.MaxHP, cfg.Gyarados.MaxHP, cfg.Dummy.MaxHP},
+		"evolve":   cfg.Magikarp.EvolveHops,
+		"tree":     []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
+		"fist":     []map[string]float64{aFist, mFist},
+		"kickwarn": map[string]float64{"ash": b2f(cfg.Ash.HighJumpKick.ShowWarning), "machamp": b2f(cfg.Machamp.HighJumpKick.ShowWarning)},
+		"mega":     map[string]float64{"charge": cfg.Ash.MegatonPunch.ChargeDuration, "dist": cfg.Ash.MegatonPunch.Distance, "radius": cfg.Ash.MegatonPunch.Radius, "cscale": cfg.Ash.MegatonPunch.ChargeScale, "fscale": cfg.Ash.MegatonPunch.FistScale, "iscale": cfg.Ash.MegatonPunch.ImpactScale, "warn": b2f(cfg.Ash.MegatonPunch.ShowWarning), "text": b2f(cfg.Ash.MegatonPunch.ShowText), "fstart": cfg.Ash.MegatonPunch.FistStart, "fend": cfg.Ash.MegatonPunch.FistEnd},
+		"stone":    []map[string]float64{aStone, mStone},
 		"gengar": map[string]float64{"shadow": cfg.Gengar.ShadowSneak.ShadowRadius, "depth": cfg.Gengar.ShadowSneak.Height, "sneak": cfg.Gengar.ShadowSneak.Duration,
 			"fire": cfg.Gengar.GhostFire.Radius, "ring": cfg.Gengar.GhostFire.RingRadius,
 			"scale": cfg.Gengar.ShadowBall.BallScale, "slam": cfg.Gengar.ShadowBall.SlamRadius, "range": cfg.Gengar.ShadowBall.Speed * cfg.Gengar.ShadowBall.Duration,

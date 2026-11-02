@@ -388,7 +388,8 @@
       "damage": 20,
       "stun_duration": 1,
       "knockback": 300,
-      "cooldown": 8
+      "cooldown": 8,
+      "show_warning": true
     },
     "tree_slam": {
       "min_height": 0,
@@ -479,7 +480,8 @@
       "damage": 35,
       "stun_duration": 1.2,
       "knockback": 300,
-      "cooldown": 7
+      "cooldown": 7,
+      "show_warning": false
     },
     "tree_slam": {
       "min_height": 0,

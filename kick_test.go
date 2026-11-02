@@ -340,3 +340,17 @@ func TestAMachampBotFightsAndLandsBlowsOnAnOpponentThatStandsStill(t *testing.T)
 		}
 	}
 }
+
+func TestShowWarningOfTheKickIsSentToThePageAndIsOnForAshOnlyByDefault(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.Ash.HighJumpKick.ShowWarning || cfg.Machamp.HighJumpKick.ShowWarning {
+		t.Fatal("defaults: the names are for Ash's kick, not Machamp's")
+	}
+	cfg.Ash.HighJumpKick.ShowWarning, cfg.Machamp.HighJumpKick.ShowWarning = false, true
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	kw := next(t, dialPlay(t, srv, "dummy"), "hi")["kickwarn"].(map[string]any)
+	if kw["ash"] != float64(0) || kw["machamp"] != float64(1) {
+		t.Fatalf("kickwarn = %v", kw)
+	}
+}

@@ -530,6 +530,7 @@ type BrawlerCfg struct {
 		StunDuration  float64 `json:"stun_duration"`
 		Knockback     float64 `json:"knockback"`
 		Cooldown      float64 `json:"cooldown"`
+		ShowWarning   bool    `json:"show_warning"` // true: the name of the move is shown over whoever is doing it ("閃身步" for the slide, "浪子踢球" for the kick)
 	} `json:"high_jump_kick"`
 	// Comet Punch (J): for `duration` seconds Machamp runs at the opponent (`distance` in all, stopping at its body)
 	// throwing `quantity` fists, evenly spaced in time. Each fist appears ahead of it, `scatter_min_distance` to
@@ -863,6 +864,7 @@ func DefaultConfig() Config {
 	hk.SlideDistance, hk.SlideDuration, hk.KickDistance, hk.KickSpeed, hk.KickHeight = 180, 0.25, 450, 1000, 40
 	hk.Radius, hk.Damage, hk.StunDuration, hk.Knockback, hk.Cooldown = 10, 35, 1.2, 300, 9
 	c.Ash.HighJumpKick = *hk // the computer's Ash kicks as well, a notch harder
+	c.Ash.HighJumpKick.ShowWarning = true
 	c.Ash.HighJumpKick.SlideDistance, c.Ash.HighJumpKick.KickDistance, c.Ash.HighJumpKick.Damage, c.Ash.HighJumpKick.Cooldown = 200, 500, 40, 8
 	c.Machamp.CometPunch.Quantity, c.Machamp.CometPunch.HP, c.Machamp.CometPunch.Cooldown, c.Machamp.CometPunch.BallKnockback = 20, 16, 9, 100
 	c.Machamp.CometPunch.Knockback = 8
