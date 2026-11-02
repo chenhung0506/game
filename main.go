@@ -361,8 +361,8 @@ func (r *room) setBot(idx, kind int) bool {
 	return true
 }
 
-// canPick is whether a person may play this character here: Ash is the computer's, except in a practice room, and Gyarados and the dummy are only forms.
-func (r *room) canPick(kind int) bool { return kind >= 0 && kind < kinds && (kind != ash || r.dummy) }
+// canPick is whether a person may play this character: Gyarados and the dummy are only forms.
+func (r *room) canPick(kind int) bool { return kind >= 0 && kind < kinds }
 
 // choose records slot idx's pick and starts the match once both players have one. It reports whether the
 // pick was taken: an unknown character is refused, and so is any pick while a match is on. Both players may play the same one. Must be called with r.mu held.
@@ -764,6 +764,9 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		}
 		in := m.Input
 		in.DX, in.DY = clampDir(in.DX), clampDir(in.DY)
+		if r.g.P[idx].Kind == ash {
+			in.Comet = false // a person's Ash has the same three skills as Machamp's: the Comet Punch is the computer's
+		}
 		r.g.P[idx].In = in
 		r.mu.Unlock()
 	}

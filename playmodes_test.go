@@ -64,13 +64,10 @@ func TestThePracticeRoomHoldsADummyAshMayBePlayedAndNobodyElseGetsIn(t *testing.
 	}
 	h := newHub(cfg)
 	r := h.open(modeWeb)
-	if r.canPick(ash) {
-		t.Fatal("a person may play Ash outside the practice room")
+	if !r.canPick(ash) || r.canPick(dummy) || r.canPick(gyarados) {
+		t.Fatal("a person may play Ash and nothing but the characters")
 	}
 	r.dummy = true
-	if !r.canPick(ash) || r.canPick(dummy) || r.canPick(gyarados) {
-		t.Fatal("the practice room lets a person play Ash and nothing but the characters")
-	}
 	if r.setBot(0, snorlax) {
 		t.Fatal("the dummy was swapped for another opponent")
 	}
@@ -78,6 +75,7 @@ func TestThePracticeRoomHoldsADummyAshMayBePlayedAndNobodyElseGetsIn(t *testing.
 
 func TestADummyIsNotMovedByAKnockbackButTakesTheHit(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Ash.MegatonPunch.JumpDuration = 0
 	g := duel(cfg, ash, dummy)
 	g.P[1].HP = g.maxHP(1)
 	g.P[1].X = 600

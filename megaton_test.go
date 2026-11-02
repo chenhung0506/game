@@ -2,11 +2,15 @@ package main
 
 import (
 	"math"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/gorilla/websocket"
 )
 
 // megaDuel is Ash (slot 0, at 300,250) against a Snorlax (slot 1) `d` ahead of it on the same line.
 func megaDuel(cfg Config, d float64) *Game {
+	cfg.Ash.MegatonPunch.JumpDuration = 0 // the tests that use it are about the gather and the fist; the leap has its own tests
 	g := mach(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 300+d, 250
 	return g
@@ -71,6 +75,7 @@ func TestMegatonPunchFliesTheLineLockedAtTheStartSoSteppingAsideDodgesIt(t *test
 
 func TestMegatonPunchHasItsHeightBandAndCooldownAndBelongsToAshAlone(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Ash.MegatonPunch.JumpDuration = 0
 	mp := cfg.Ash.MegatonPunch
 	g := flyer(cfg, mp.MaxHeight+30)
 	g.P[1].X, g.P[1].Y = 600, 250
@@ -196,6 +201,7 @@ func TestAshBotThrowsTheMegatonPunchAtAnOpponentThatCannotMove(t *testing.T) {
 
 func TestTheBotStepsOutOfTheLineOfAMegatonPunch(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Ash.MegatonPunch.JumpDuration = 0
 	mp := cfg.Ash.MegatonPunch
 	for _, kind := range []int{pikachu, snorlax, chikorita, ash, gengar} {
 		for seed := uint64(1); seed <= 5; seed++ {
@@ -259,5 +265,118 @@ func TestTheBotKeepsOutOfGhostFireFarBetterThanOneThatWalksStraightAtGengar(t *t
 		if dodged*2 > walked {
 			t.Errorf("%s: lost %d HP, against %d for walking straight at it: it hardly dodges", NAMEOF[kind], dodged, walked)
 		}
+	}
+}
+
+// ---- the leap before the gather ----
+
+func TestMegatonPunchLeapsAlongTheStickAndOnlyGathersOnceItHasLanded(t *testing.T) {
+	cfg := DefaultConfig()
+	mp := cfg.Ash.MegatonPunch
+	g := mach(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 900, 250
+	press(g, 0, Input{Mega: true, DX: 0, DY: 1}) // stick down, the opponent is to the right
+	peak := 0.0
+	n := 1
+	for g.P[0].MegaJT > 0 {
+		if g.P[0].MegaT != 0 {
+			t.Fatal("it was gathering in the air")
+		}
+		peak = math.Max(peak, g.P[0].Z)
+		g.P[0].In = Input{DX: -1} // the stick moved on: the leap keeps the direction it began with
+		g.Step(dt)
+		n++
+	}
+	if want := int(math.Ceil(mp.JumpDuration / dt)); n != want {
+		t.Fatalf("leap took %d ticks, want %d", n, want)
+	}
+	if g.P[0].X != 300 || math.Abs(g.P[0].Y-(250+mp.JumpDistance)) > 1e-6 || g.P[0].Z != 0 {
+		t.Fatalf("landed at %v,%v z=%v, want 300,%v on the ground", g.P[0].X, g.P[0].Y, g.P[0].Z, 250+mp.JumpDistance)
+	}
+	if peak < mp.JumpHeight*0.9 {
+		t.Fatalf("it only rose %v of %v", peak, mp.JumpHeight)
+	}
+	if g.P[0].MegaT <= 0 {
+		t.Fatal("the charge did not begin on landing")
+	}
+	// the fist is aimed from where it landed, at the opponent there
+	if want := unitX(900-300, 250-g.P[0].Y); math.Abs(g.P[0].MegaX-want) > 1e-9 {
+		t.Fatalf("aim x %v, want %v", g.P[0].MegaX, want)
+	}
+}
+
+func unitX(x, y float64) float64 { ux, _ := unit(x, y); return ux }
+
+func TestMegatonPunchWithoutTheStickLeapsOnTheSpotAndNoLeapGathersAtOnce(t *testing.T) {
+	cfg := DefaultConfig()
+	g := megaDuelLeap(cfg, 300)
+	press(g, 0, Input{Mega: true})
+	steps(g, int(cfg.Ash.MegatonPunch.JumpDuration/dt)+1)
+	if g.P[0].X != 300 || g.P[0].Y != 250 || g.P[0].MegaT <= 0 {
+		t.Fatalf("at %v,%v charge %v", g.P[0].X, g.P[0].Y, g.P[0].MegaT)
+	}
+	cfg.Ash.MegatonPunch.JumpDuration = 0
+	g = megaDuelLeap(cfg, 300)
+	press(g, 0, Input{Mega: true, DX: 1})
+	if g.P[0].MegaJT != 0 || g.P[0].MegaT <= 0 || g.P[0].X != 300 {
+		t.Fatal("with no leap it should gather where it stands")
+	}
+}
+
+func megaDuelLeap(cfg Config, d float64) *Game {
+	g := mach(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 300+d, 250
+	return g
+}
+
+func TestTheLeapStaysInTheCourtAndCannotBeStartedOrSkippedBySomethingElse(t *testing.T) {
+	g := megaDuelLeap(DefaultConfig(), 300)
+	g.P[0].X = 5
+	press(g, 0, Input{Mega: true, DX: -1})
+	steps(g, 40)
+	if g.P[0].X < 0 {
+		t.Fatalf("left the court: x = %v", g.P[0].X)
+	}
+	cfg := DefaultConfig()
+	cfg.Ash.MegatonPunch.JumpHeight = 0 // flat leap: only the leap's own state keeps the others out
+	g = megaDuelLeap(cfg, 300)
+	press(g, 0, Input{Mega: true})
+	press(g, 0, Input{Skill: true, Comet: true, Rock: true})
+	if g.P[0].TreePhase != treeNone || g.P[0].CometT != 0 || g.P[0].RockT != 0 {
+		t.Fatal("another skill started in the middle of the leap")
+	}
+}
+
+func TestBeingStunnedInTheMiddleOfTheLeapBringsItDownAndCancelsThePunch(t *testing.T) {
+	g := megaDuelLeap(DefaultConfig(), 300)
+	press(g, 0, Input{Mega: true, DX: 1})
+	steps(g, 3)
+	if g.P[0].Z <= 0 {
+		t.Fatal("not in the air")
+	}
+	g.P[0].StunT = 0.5
+	steps(g, 3)
+	if g.P[0].MegaJT != 0 || g.P[0].MegaT != 0 || g.P[0].Z != 0 {
+		t.Fatalf("leap %v charge %v z %v after the stun", g.P[0].MegaJT, g.P[0].MegaT, g.P[0].Z)
+	}
+}
+
+func TestAPersonsAshHasNoCometPunchButTheComputersDoes(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	c := dialPlay(t, srv, "dummy")
+	next(t, c, "hi")
+	pick(t, c, ash)
+	c.WriteMessage(websocket.TextMessage, []byte(`{"comet":true}`))
+	for i := 0; i < 30; i++ {
+		p := next(t, c, "s")["p"].([]any)[0].(map[string]any)
+		if p["cpt"] != nil && p["cpt"].(float64) > 0 || p["cpcd"] != nil && p["cpcd"].(float64) > 0 {
+			t.Fatalf("a person's Ash threw the Comet Punch: %v", p)
+		}
+	}
+	g := duel(DefaultConfig(), ash, snorlax)
+	press(g, 0, Input{Comet: true})
+	if g.P[0].CometT == 0 {
+		t.Fatal("the game itself must still let Ash use it, for the computer")
 	}
 }

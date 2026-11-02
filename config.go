@@ -556,6 +556,9 @@ type BrawlerCfg struct {
 		Knockback      float64 `json:"knockback"`
 		Cooldown       float64 `json:"cooldown"` // counted from the start
 		LungeDistance  float64 `json:"lunge_distance"`
+		JumpDistance   float64 `json:"jump_distance"` // the leap along the stick before it gathers (0 = none: it gathers where it stands)
+		JumpDuration   float64 `json:"jump_duration"`
+		JumpHeight     float64 `json:"jump_height"`
 		ShowWarning    bool    `json:"show_warning"`
 		ShowText       bool    `json:"show_text"`
 		FistStart      float64 `json:"fist_start"`
@@ -806,6 +809,7 @@ func DefaultConfig() Config {
 	mp.ChargeDuration, mp.Distance, mp.Radius, mp.Damage, mp.StunDuration, mp.Knockback, mp.Cooldown = 1, 420, 45, 40, 1.5, 250, 14
 	mp.ChargeScale, mp.FistScale, mp.ImpactScale = 1, 1, 1
 	mp.LungeDistance, mp.ShowWarning, mp.ShowText = 120, true, true
+	mp.JumpDistance, mp.JumpDuration, mp.JumpHeight = 200, 0.4, 50
 	mp.FistStart, mp.FistEnd = 24, mp.Distance
 	c.Dummy.MaxHP, c.Dummy.Radius = 100000, 28
 	cp := &c.Ash.CometPunch
@@ -1181,6 +1185,9 @@ func (c Config) validate() error {
 		{"ash.megaton_punch.stun_duration", c.Ash.MegatonPunch.StunDuration},
 		{"ash.megaton_punch.knockback", c.Ash.MegatonPunch.Knockback},
 		{"ash.megaton_punch.lunge_distance", c.Ash.MegatonPunch.LungeDistance},
+		{"ash.megaton_punch.jump_distance", c.Ash.MegatonPunch.JumpDistance},
+		{"ash.megaton_punch.jump_duration", c.Ash.MegatonPunch.JumpDuration},
+		{"ash.megaton_punch.jump_height", c.Ash.MegatonPunch.JumpHeight},
 		{"ash.megaton_punch.cooldown", c.Ash.MegatonPunch.Cooldown},
 		{"machamp.tree_slam.cooldown", c.Machamp.TreeSlam.Cooldown},
 		{"ash.tree_slam.cooldown", c.Ash.TreeSlam.Cooldown},

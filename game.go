@@ -247,8 +247,11 @@ type Player struct {
 	CometN    int     `json:"-"`
 	CometCD   float64 `json:"cpcd"`
 	RockT     float64 `json:"rkt"`
-	// Megaton Punch (Ash): seconds of the charge left, the unit direction it was locked on as it began, and the cooldown.
+	// Megaton Punch (Ash): it leaps first, then gathers: seconds of the charge left, the unit direction it was locked on as it began, and the cooldown.
 	MegaT  float64 `json:"mgt"`
+	MegaJT float64 `json:"-"` // seconds of the jump before the charge left
+	MegaJX float64 `json:"-"` // the unit direction it leaps along
+	MegaJY float64 `json:"-"`
 	MegaX  float64 `json:"mgx"`
 	MegaY  float64 `json:"mgy"`
 	MegaCD float64 `json:"mgcd"`

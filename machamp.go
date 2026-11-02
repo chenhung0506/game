@@ -24,10 +24,11 @@ func (g *Game) brawler(i int) *BrawlerCfg {
 // dropMachamp ends whatever Machamp was doing (it was frozen, stunned or caught).
 func (g *Game) dropMachamp(i int) {
 	p := &g.P[i]
-	if (p.TreePhase == treeJump || p.RockT > 0) && !p.Held {
+	if (p.TreePhase == treeJump || p.RockT > 0 || p.MegaJT > 0) && !p.Held {
 		p.Z = 0
 	}
 	p.TreePhase, p.TreeT, p.CometT, p.CometN, p.RockT, p.MegaT = treeNone, 0, 0, 0, 0, 0
+	p.MegaJT = 0
 }
 
 // machampAirSpeed is how fast Machamp is steered in the Rock Tomb jump: the first speed until the middle, the second after.
@@ -54,7 +55,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 			}
 		}
 	}
-	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.Z == 0
+	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.Z == 0
 
 	// ---- Tree slam: jump, then pull up a tree and smash it down ----
 	if in.Skill && idle && p.TreeCD == 0 {
@@ -149,16 +150,29 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		}
 	}
 
-	// ---- Megaton Punch (Ash only): stand and gather, then one huge fist ----
+	// ---- Megaton Punch (Ash only): leap along the stick, then stand and gather, then one huge fist ----
 	if in.Mega && p.Kind == ash && idle && p.MegaCD == 0 {
-		p.MegaX, p.MegaY = unit(other.X-p.X, other.Y-p.Y)
-		if p.MegaX == 0 && p.MegaY == 0 {
-			p.MegaX, p.MegaY = unit(float64(p.FX), float64(p.FY))
+		p.MegaCD = mp.Cooldown
+		if mp.JumpDuration > 0 {
+			p.MegaJX, p.MegaJY = unit(float64(in.DX), float64(in.DY)) // no stick: it leaps on the spot
+			p.MegaJT = mp.JumpDuration
+		} else {
+			events = append(events, g.megatonGather(i)...)
 		}
-		p.MegaT, p.MegaCD = mp.ChargeDuration, mp.Cooldown
-		if p.MegaT == 0 {
-			events = append(events, g.megatonPunch(i)...)
+	}
+	if p.MegaJT > 0 {
+		step := math.Min(dt, p.MegaJT) // the last step is clipped so the distance is exact
+		v := mp.JumpDistance / mp.JumpDuration
+		p.X = math.Min(math.Max(p.X+p.MegaJX*v*step, 0), g.court.Length)
+		p.Y = math.Min(math.Max(p.Y+p.MegaJY*v*step, 0), g.court.Width)
+		if p.MegaJT -= step; p.MegaJT < 1e-9 {
+			p.MegaJT, p.Z = 0, 0
+			events = append(events, g.megatonGather(i)...) // the fist is aimed from where it landed
+		} else {
+			u := 1 - p.MegaJT/mp.JumpDuration
+			p.Z = 4 * mp.JumpHeight * u * (1 - u)
 		}
+		rooted = true
 	}
 	if p.MegaT > 0 {
 		rooted = true
@@ -168,6 +182,19 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		}
 	}
 	return events, rooted
+}
+
+// megatonGather locks the direction of the punch on the opponent and starts the charge (a charge of zero throws it at once).
+func (g *Game) megatonGather(i int) []Event {
+	p, other, mp := &g.P[i], &g.P[1-i], g.brawler(i).MegatonPunch
+	p.MegaX, p.MegaY = unit(other.X-p.X, other.Y-p.Y)
+	if p.MegaX == 0 && p.MegaY == 0 {
+		p.MegaX, p.MegaY = unit(float64(p.FX), float64(p.FY))
+	}
+	if p.MegaT = mp.ChargeDuration; p.MegaT == 0 {
+		return g.megatonPunch(i)
+	}
+	return nil
 }
 
 // megatonPunch throws the fist along the direction locked when the charge began: it hurts, stuns and knocks back the
