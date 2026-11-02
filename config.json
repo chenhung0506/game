@@ -142,13 +142,13 @@
       "jump_distance": 280,
       "jump_duration": 0.35,
       "jump_height": 40,
-      "slashes": 5,
-      "slash_interval": 0.3,
-      "slash_step": 70,
-      "slash_radius": 120,
+      "slashes": 6,
+      "slash_interval": 0.25,
+      "slash_step": 75,
+      "slash_radius": 140,
       "leaf_scale": 3,
-      "damage": 7,
-      "cooldown": 6
+      "damage": 6,
+      "cooldown": 5
     },
     "razor_leaf": {
       "min_height": 0,
@@ -168,7 +168,7 @@
     "vine_whip": {
       "min_height": 0,
       "max_height": 12,
-      "charge_duration": 0.5,
+      "charge_duration": 0.35,
       "recharge_duration": 0.1,
       "length": 230,
       "width": 24,
