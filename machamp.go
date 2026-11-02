@@ -10,6 +10,13 @@ const (
 	treeSwing // the tree coming down like an axe; it hits when the swing ends
 )
 
+// High Jump Kick phases.
+const (
+	kickNone  = iota
+	kickSlide // sliding along the stick
+	kickFly   // leaping at the opponent
+)
+
 // isBrawler is whether kind is one of the two that fight with the tree, the fists and the rocks.
 func isBrawler(kind int) bool { return kind == ash || kind == machamp }
 
@@ -24,11 +31,12 @@ func (g *Game) brawler(i int) *BrawlerCfg {
 // dropMachamp ends whatever Machamp was doing (it was frozen, stunned or caught).
 func (g *Game) dropMachamp(i int) {
 	p := &g.P[i]
-	if (p.TreePhase == treeJump || p.RockT > 0 || p.MegaJT > 0) && !p.Held {
+	if (p.TreePhase == treeJump || p.RockT > 0 || p.MegaJT > 0 || p.KickPhase == kickFly) && !p.Held {
 		p.Z = 0
 	}
 	p.TreePhase, p.TreeT, p.CometT, p.CometN, p.RockT, p.MegaT = treeNone, 0, 0, 0, 0, 0
 	p.MegaJT = 0
+	p.KickPhase, p.KickT = kickNone, 0
 }
 
 // machampAirSpeed is how fast Machamp is steered in the Rock Tomb jump: the first speed until the middle, the second after.
@@ -47,18 +55,18 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
 	p, other := &g.P[i], &g.P[1-i]
 	ts, cp, rt := g.brawler(i).TreeSlam, g.brawler(i).CometPunch, g.brawler(i).RockTomb
-	mp := g.brawler(i).MegatonPunch
-	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD} {
+	mp, hk := g.brawler(i).MegatonPunch, g.brawler(i).HighJumpKick
+	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD, &p.KickCD} {
 		if *cd > 0 {
 			if *cd -= dt; *cd < 1e-9 {
 				*cd = 0
 			}
 		}
 	}
-	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.Z == 0
+	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.KickPhase == kickNone && p.Z == 0
 
 	// ---- Tree slam: jump, then pull up a tree and smash it down ----
-	if in.Skill && idle && p.TreeCD == 0 {
+	if in.Skill && idle && p.TreeCD == 0 && p.Kind != machamp { // Machamp kicks instead
 		dx, dy := float64(in.DX), float64(in.DY)
 		if dx == 0 && dy == 0 {
 			dx, dy = float64(p.FX), float64(p.FY)
@@ -90,6 +98,41 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		}
 	}
 	rooted := p.TreePhase != treeNone || len(events) > 0 // through the tick of the smash, free from the next
+
+	// ---- High Jump Kick (Machamp): slide along the stick, then leap at the opponent ----
+	if in.Skill && p.Kind == machamp && idle && p.KickCD == 0 {
+		dx, dy := float64(in.DX), float64(in.DY)
+		if dx == 0 && dy == 0 {
+			dx, dy = float64(p.FX), float64(p.FY)
+		}
+		p.KickX, p.KickY = unit(dx, dy)
+		p.KickPhase, p.KickT, p.KickCD = kickSlide, hk.SlideDuration, hk.Cooldown
+		if hk.SlideDuration == 0 || hk.SlideDistance == 0 {
+			p.KickT = 0
+		}
+		idle = false
+	}
+	flying := p.KickPhase == kickFly // the kick leaves on the tick after the slide ends
+	if p.KickPhase == kickSlide {
+		step := math.Min(dt, p.KickT) // the last step is clipped so the distance is exact
+		if p.KickT > 0 {
+			v := hk.SlideDistance / hk.SlideDuration
+			p.X = math.Min(math.Max(p.X+p.KickX*v*step, 0), g.court.Length)
+			p.Y = math.Min(math.Max(p.Y+p.KickY*v*step, 0), g.court.Width)
+		}
+		if p.KickT -= step; p.KickT < 1e-9 {
+			p.KickT, p.KickPhase, p.KickD = 0, kickFly, 0
+			if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
+				p.KickX, p.KickY = ux, uy // the kick goes at where the opponent stands as the slide ends
+			}
+		}
+	}
+	if flying {
+		events = append(events, g.kickStep(i, dt)...)
+	}
+	if p.KickPhase != kickNone {
+		rooted = true
+	}
 
 	// ---- Comet Punch: run at the opponent, throwing fists ahead ----
 	if in.Comet && idle && p.CometCD == 0 {
@@ -195,6 +238,40 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		}
 	}
 	return events, rooted
+}
+
+// kickStep flies the kick on one tick along the direction it was aimed: it stops at the opponent's body, which it hurts,
+// stuns and kicks away, or at the end of its distance.
+func (g *Game) kickStep(i int, dt float64) []Event {
+	p, other, hk := &g.P[i], &g.P[1-i], g.brawler(i).HighJumpKick
+	s := math.Min(hk.KickSpeed*dt, hk.KickDistance-p.KickD)
+	// The first moment, along the path, that the bodies (and the leg's `radius`) touch: where the circle round the opponent
+	// of that size meets the line.
+	R := g.radius(i) + g.radius(1-i) + hk.Radius
+	rx, ry := other.X-p.X, other.Y-p.Y
+	along, side := rx*p.KickX+ry*p.KickY, math.Abs(rx*p.KickY-ry*p.KickX)
+	hit := false
+	if hk.Reach.hits(other) && along > 0 && side <= R {
+		if c := along - math.Sqrt(R*R-side*side); c <= s {
+			s, hit = math.Max(c, 0), true
+		}
+	}
+	p.X = math.Min(math.Max(p.X+p.KickX*s, 0), g.court.Length)
+	p.Y = math.Min(math.Max(p.Y+p.KickY*s, 0), g.court.Width)
+	p.KickD += s
+	if hit || p.KickD >= hk.KickDistance-1e-9 {
+		p.KickPhase, p.Z = kickNone, 0
+	} else {
+		u := p.KickD / hk.KickDistance
+		p.Z = 4 * hk.KickHeight * u * (1 - u)
+	}
+	if !hit {
+		return nil
+	}
+	g.hit(other, hk.Damage)
+	other.StunT = math.Max(other.StunT, hk.StunDuration)
+	g.knockBack(p.X, p.Y, other, hk.Knockback, p.KickX, p.KickY)
+	return []Event{{T: "kickhit", X: other.X, Y: other.Y, DX: p.KickX, DY: p.KickY}}
 }
 
 // megatonGather locks the direction of the punch on the opponent and starts the charge (a charge of zero throws it at once).

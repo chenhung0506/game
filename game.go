@@ -256,6 +256,14 @@ type Player struct {
 	MegaY  float64 `json:"mgy"`
 	MegaCD float64 `json:"mgcd"`
 	RockCD float64 `json:"rkcd"`
+	// High Jump Kick (Machamp): its phase (kickNone, kickSlide, kickFly), the seconds of the slide left, the unit direction it is going
+	// along, how far the kick has flown and the cooldown.
+	KickPhase int     `json:"kkp"`
+	KickT     float64 `json:"kkt"`
+	KickX     float64 `json:"kkx"`
+	KickY     float64 `json:"kky"`
+	KickD     float64 `json:"-"`
+	KickCD    float64 `json:"kkcd"`
 	// Gengar: seconds left under the ground (the shadow shows), the three cooldowns, and how much longer it cannot start a skill
 	// (an opponent's shadow is on it).
 	SneakT  float64 `json:"gnt"`

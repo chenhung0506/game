@@ -136,13 +136,9 @@ func TestMegatonPunchWithNoChargeLandsOnTheTickItIsPressed(t *testing.T) {
 }
 
 func TestTheTreeStunsWhatItLandsOnForTheConfiguredTime(t *testing.T) {
-	for _, kind := range []int{ash, machamp} {
+	for _, kind := range []int{ash} { // Machamp kicks instead of felling a tree
 		cfg := DefaultConfig()
-		if kind == ash {
-			cfg.Ash.TreeSlam.StunDuration = 1.7
-		} else {
-			cfg.Machamp.TreeSlam.StunDuration = 1.7
-		}
+		cfg.Ash.TreeSlam.StunDuration = 1.7
 		ts := cfg.brawlerOf(kind).TreeSlam
 		g := duel(cfg, kind, snorlax)
 		g.P[1].X, g.P[1].Y = 300+ts.JumpDistance+150, 250 // on the trunk once it has landed

@@ -640,7 +640,7 @@ func TestEachBrawlerPlaysByItsOwnNumbers(t *testing.T) {
 		own.CometPunch.Quantity, other.CometPunch.Quantity = 7, 150
 		own.RockTomb.Count, other.RockTomb.Count = 6, 60
 		own.RockTomb.RingRadius, other.RockTomb.RingRadius = 300, 400
-		// the tree
+		// the tree (Ash's) or the kick (Machamp's)
 		g := duel(cfg, kind, snorlax)
 		g.P[0].HP, g.P[1].HP = g.maxHP(0), g.maxHP(1)
 		hp := g.P[1].HP
@@ -649,8 +649,12 @@ func TestEachBrawlerPlaysByItsOwnNumbers(t *testing.T) {
 			g.Step(dt)
 			g.P[0].In = Input{}
 		}
-		if got := hp - g.P[1].HP; got != 11 {
-			t.Fatalf("kind %d: the tree did %d, want its own 11", kind, got)
+		want := 11
+		if kind == machamp {
+			want = cfg.Machamp.HighJumpKick.Damage
+		}
+		if got := hp - g.P[1].HP; got != want {
+			t.Fatalf("kind %d: the skill did %d, want its own %d", kind, got, want)
 		}
 		// the stones
 		g = duel(cfg, kind, snorlax)

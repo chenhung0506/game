@@ -90,7 +90,7 @@ const HELP = [
   '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝滑翔（朝按住的方向衝出一道半月形弧線，彎向敵人那一側）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
   '你是真新鎮小智　移動 WASD　空白鍵＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）　L＝百萬噸拳擊（朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
-  '你是怪力　移動 WASD　空白鍵＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　J＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
+  '你是怪力　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
   '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才丟；輕點就丟向敵人；球飛在空中，落地才爆炸傷人，並向外炸出一圈不會回頭的紫色火焰）',
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
@@ -191,6 +191,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'tree') shake = 18;
       if (ev.t === 'mega') shake = 14;
       if (ev.t === 'megahit') shake = 30;
+      if (ev.t === 'kickhit') shake = 24;
       if (ev.t === 'evolve') shake = 14;
       if (ev.t === 'leaf') shake = 6;
       if (ev.t === 'freeze') shake = 10;
@@ -448,7 +449,7 @@ const PAD = [
   { main: ['滑翔', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
   { main: ['拔樹', 'skill'], small: [['岩石陣', 'rock'], ['百萬噸', 'mega']] }, // Ash: the Comet Punch is the computer's, so a person has three skills like the others
-  { main: ['拔樹', 'skill'], small: [['百裂拳', 'comet'], ['岩石陣', 'rock']] }, // Machamp, the same three as Ash
+  { main: ['飛膝踢', 'skill'], small: [['百裂拳', 'comet'], ['岩石陣', 'rock']] }, // Machamp: the kick in place of the tree
   { main: ['暗影潛行', 'skill'], small: [['鬼火', 'gfire'], ['影子球', 'sball', true]] }, // Gengar
   { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
 ];
@@ -476,7 +477,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['trcd', 'tree'], rock: ['rkcd', 'rock'], mega: ['mgcd', 'mega'] }, { skill: ['trcd', 'mtree'], comet: ['cpcd', 'mcomet'], rock: ['rkcd', 'mrock'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['trcd', 'tree'], rock: ['rkcd', 'rock'], mega: ['mgcd', 'mega'] }, { skill: ['kkcd', 'kick'], comet: ['cpcd', 'mcomet'], rock: ['rkcd', 'mrock'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
   const hold = (b, label, name, aimed) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -1741,6 +1742,37 @@ function drawMegaImpact(f) {
     ctx.lineWidth = 8; ctx.strokeStyle = `rgba(0,0,0,${a})`; ctx.strokeText('轟！', 0, -70 * s); ctx.fillStyle = black ? `rgba(255,232,90,${a})` : `rgba(255,255,255,${a})`; ctx.fillText('轟！', 0, -70 * s); ctx.restore();
   });
 }
+// High Jump Kick. While it slides, speed lines trail behind Machamp; in the leap a boot is thrust out ahead, with a streak behind it.
+function drawKickLeg(p, d, bs) {
+  const [ax, ay] = rv(p.kkx, p.kky), fly = p.kkp === 2, top = -d.z;
+  upright(d.x, d.y, () => {
+    ctx.lineCap = 'round';
+    for (let n = 0; n < (fly ? 7 : 4); n++) { // streaks behind it
+      const off = (n - 3) * 5 * bs, L = (fly ? 90 : 55) * bs * (0.6 + 0.4 * Math.abs(Math.sin(n * 2.3 + performance.now() / 60)));
+      const sx = -ay * off, sy = ax * off;
+      ctx.strokeStyle = `rgba(255,255,255,${fly ? 0.7 : 0.45})`; ctx.lineWidth = 2.5 * bs;
+      ctx.beginPath(); ctx.moveTo(sx - ax * 14 * bs, top + sy - ay * 14 * bs); ctx.lineTo(sx - ax * (14 * bs + L), top + sy - ay * (14 * bs + L)); ctx.stroke();
+    }
+    if (!fly) return;
+    const bx = ax * 30 * bs, by = top + 6 * bs + ay * 30 * bs; // the boot, a thick leg out ahead
+    ctx.strokeStyle = '#5d6e8a'; ctx.lineWidth = 11 * bs; ctx.beginPath(); ctx.moveTo(ax * 6 * bs, top + 6 * bs + ay * 6 * bs); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.fillStyle = '#2b2f3a'; ctx.beginPath(); ctx.ellipse(bx + ax * 6 * bs, by + ay * 6 * bs, 10 * bs, 8 * bs, Math.atan2(ay, ax), 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,240,150,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(bx + ax * 8 * bs, by + ay * 8 * bs, 15 * bs, 0, 7); ctx.stroke();
+  });
+}
+// Where the kick lands: a white flash, a ring and lines thrown along the kick.
+function drawKickImpact(f) {
+  const k = f.age / 0.5, a = 1 - k, ang = Math.atan2(f.dy || 0, f.dx || 1);
+  ctx.save(); ctx.translate(f.x, f.y); ctx.lineCap = 'round';
+  ctx.fillStyle = `rgba(255,255,255,${0.8 * a})`; ctx.beginPath(); ctx.arc(0, 0, 60 * (0.4 + 0.6 * Math.min(1, k * 4)), 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,200,60,${a})`; ctx.lineWidth = 5 * a + 1; ctx.beginPath(); ctx.arc(0, 0, 20 + 130 * k, 0, 7); ctx.stroke();
+  for (let i = 0; i < 12; i++) {
+    const t = ang + Math.sin(i * 7.3) * 0.9, r0 = 30 + 30 * k, r1 = r0 + 60 + 90 * k * Math.abs(Math.sin(i * 3.1));
+    ctx.strokeStyle = i % 2 ? `rgba(255,232,90,${a})` : `rgba(255,255,255,${a})`; ctx.lineWidth = 4 * a + 1;
+    ctx.beginPath(); ctx.moveTo(Math.cos(t) * r0, Math.sin(t) * r0); ctx.lineTo(Math.cos(t) * r1, Math.sin(t) * r1); ctx.stroke();
+  }
+  ctx.restore();
+}
 // One Comet Punch fist: a clenched fist pointing the way Machamp is running, swelling as it lands and fading as its time runs out;
 // it has a small HP bar like a fire ball.
 function drawCometFist(b) {
@@ -2423,6 +2455,7 @@ function drawPlayer(i, p) {
   if (p.k === 4 && p.yt > 0) drawIceberg(d, p);
   drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose, p.tw === 1 ? performance.now() / 1000 * 14 : 0); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
+  if (p.k === 8 && p.kkp > 0) drawKickLeg(p, d, bs);
   if (p.bd > 0) drawBound(d, p);
   if (p.pz > 0) drawParalyzed(d, p);
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.
@@ -2548,7 +2581,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? 0.5 : f.t === 'megahit' ? 0.65 : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? 0.5 : f.t === 'megahit' ? 0.65 : f.t === 'kickhit' ? 0.5 : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -2560,6 +2593,7 @@ function frame() {
       else if (f.t === 'tree') drawTreeSlam(f);
       else if (f.t === 'mega') drawMegaFist(f);
       else if (f.t === 'megahit') drawMegaImpact(f);
+      else if (f.t === 'kickhit') drawKickImpact(f);
       else if (f.t === 'gslam') drawGhostSlam(f);
       else if (f.t === 'evolve') drawEvolve(f);
       else if (f.t === 'storm') drawStormStrike(f);

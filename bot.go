@@ -278,6 +278,23 @@ func (c *bctx) findThreat() threat {
 		}
 	}
 
+	if f.Kind == machamp && f.KickPhase != kickNone { // a High Jump Kick: the line it flies along is fixed once the slide ends, at where the bot stands now
+		hk := cfg.Machamp.HighJumpKick
+		sx, sy, kx, ky, left, eta := f.X, f.Y, f.KickX, f.KickY, hk.KickDistance-f.KickD, 0.0
+		if f.KickPhase == kickSlide { // not yet aimed: it will kick from where the slide ends, straight at the bot
+			if hk.SlideDuration > 0 {
+				sx, sy = sx+f.KickX*hk.SlideDistance*f.KickT/hk.SlideDuration, sy+f.KickY*hk.SlideDistance*f.KickT/hk.SlideDuration
+			}
+			kx, ky = unit(p.X-sx, p.Y-sy)
+			left, eta = hk.KickDistance, f.KickT
+		}
+		if d := math.Hypot(p.X-sx, p.Y-sy); (kx != 0 || ky != 0) && d > 0 && eta+d/hk.KickSpeed >= 0 &&
+			segDist(p.X, p.Y, sx, sy, sx+kx*left, sy+ky*left) < hk.Radius+c.pr+c.fr+15 {
+			ax, ay := c.sideOf(sx, sy, kx, ky, p.X, p.Y)
+			consider(threat{thPunch, eta + d/hk.KickSpeed, ax, ay})
+		}
+	}
+
 	if f.Kind == ash && f.MegaT > 0 { // a Megaton Punch gathering: the line it will fly along is on the ground and follows the target (or the stick of a person), so it is read afresh every tick
 		mp := cfg.Ash.MegatonPunch
 		if segDist(p.X, p.Y, f.X, f.Y, f.X+f.MegaX*mp.Distance, f.Y+f.MegaY*mp.Distance) < mp.Radius+c.pr+15 {

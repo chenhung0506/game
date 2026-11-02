@@ -453,6 +453,20 @@
     "max_hp": 130,
     "walk_speed": 140,
     "radius": 30,
+    "high_jump_kick": {
+      "min_height": 0,
+      "max_height": 60,
+      "slide_distance": 180,
+      "slide_duration": 0.25,
+      "kick_distance": 450,
+      "kick_speed": 1000,
+      "kick_height": 40,
+      "radius": 10,
+      "damage": 35,
+      "stun_duration": 1.2,
+      "knockback": 300,
+      "cooldown": 9
+    },
     "tree_slam": {
       "min_height": 0,
       "max_height": 60,

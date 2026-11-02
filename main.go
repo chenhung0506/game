@@ -712,7 +712,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,
 			"frost": cfg.Vulpix.FrostField.Cooldown, "storm": cfg.Vulpix.IceStorm.Cooldown, "fbeam": cfg.Vulpix.FreezeBeam.Cooldown,
 			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown,
-			"mega": cfg.Ash.MegatonPunch.Cooldown, "tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "mtree": cfg.Machamp.TreeSlam.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
+			"mega": cfg.Ash.MegatonPunch.Cooldown, "tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "kick": cfg.Machamp.HighJumpKick.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
 	})
 	c.send <- hi
 	r.broadcastLobby() // both players learn who joined
