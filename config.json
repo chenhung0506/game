@@ -404,7 +404,7 @@
       "random_offset_angle": 80,
       "distance": 450,
       "scatter_min_distance": 0,
-      "scatter_max_distance": 90,
+      "scatter_max_distance": 100,
       "fist_duration": 0.2
     },
     "rock_tomb": {
@@ -454,11 +454,11 @@
       "ball_knockback": 100,
       "knockback": 12,
       "duration": 3,
-      "quantity": 90,
+      "quantity": 110,
       "random_offset_angle": 80,
-      "distance": 400,
+      "distance": 350,
       "scatter_min_distance": 0,
-      "scatter_max_distance": 90,
+      "scatter_max_distance": 100,
       "fist_duration": 0.2
     },
     "rock_tomb": {
@@ -471,7 +471,7 @@
       "air_speed_first_half": 170,
       "air_speed_second_half": 100,
       "count": 20,
-      "stone_radius": 30,
+      "stone_radius": 35,
       "stone_hp": 40,
       "stone_duration": 6
     }
