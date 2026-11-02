@@ -70,7 +70,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 | 木木梟 | J / 小按鈕「箭雨」 | 箭雨：一次射出 `count` 支箭（`K=ballArrow`），以對手方向為中心、相鄰 `angle` 度、速度 `speed`；碰到對手（半徑 `radius`、高度在 `min_height`～`max_height`）扣 `damage`、`SlowT` 設為 `slow_duration`（走路／飛行／空中操控速度 ×(1−`slow`)，與冰霜、放水疊乘）並用掉，沒打中的飛到牆邊；箭有 `hp`，和其他投射物互相扣對方傷害（同 `clashBalls`）；蓄／放龍捲風時不能射；冷卻從施放算 |
 | 木木梟 | K / 小按鈕「龍捲風」 | 龍捲風（`radius` 是判定範圍，`scale` 只放大畫面上的漏斗，兩者分開調）：先定身蓄力 `charge_duration`，龍捲風（`K=ballTornado`，`hp`、半徑 `radius`）出現在木木梟瞄準方向前方（身體半徑＋龍捲風半徑處），再定身 `recharge_duration`（龍捲風已經放出，之後自己跑）；它像冰風暴一樣以 `speed` 追著對手、不會衝過頭，累計走 `distance` 或活滿 `duration` 秒就消失；冷卻從蓄力開始算。碰到對手（半徑＋對手身體、高度在帶內、對手沒被別的東西抓住）就把它**抓住**：龍捲風停在原地、`Life` 變成 `spin_duration`（旋轉剩餘時間），對手 `Held`＋`Twirl=twirlSpin`（不能動不能出招）、位置釘在龍捲風中心、高度在旋轉一半時間內升到 `lift_height`，每 `spin_interval` 秒受 `spin_damage`（`stepTwirl`，在投射物之後跑所以高度以它為準）。旋轉時間到或龍捲風被打壞（HP≤0，或被投射物對撞用掉）就 `twirlFall`：`twirlFallTime`（0.4 秒）內落地，落地受 `landing_damage` 並發 `slam` 事件（和卡比獸落地同一個特效，半徑＝龍捲風半徑）。龍捲風和投射物同一套會被死光、落地震波、急凍拳、電球爆炸、冰風暴打掉血量，有自己的 `mass`（同 `hyper_beam.mass`：死光／急凍拳比它重就依質量差推開它，被抓的人跟著動；不比它重就推不動），和對手投射物對撞時扣對方 `spin_damage`；和冰柱互相穿過（`clashBalls` 特例），但會把碰到的對手冰柱**捲上天**（`grindPillars`）：冰柱升到 `lift_height`（速度＝落下速度 `lift_height/twirlFallTime`）、跟著龍捲風一起移動，在天上時不擋人（`blockByPillars` 跳過 `Z>0`）；碰到當下扣 `spin_damage`，之後只要龍捲風還抓著它就每 `spin_interval` 秒再扣一次，直到冰柱壞掉；龍捲風消失或被打壞就放開，冰柱落回地面（`Ball.Z`、`Carried`）。龍捲風自己不受傷、自己的冰柱不受影響。被冰凍會中斷蓄力，已放出的照跑。被抓的是木木梟時，落地後會自己爬回 `fly_high` |
 | 小智 | 空白鍵 / 主按鈕「拔樹」 | 拔樹（`machamp.go` `stepMachamp`，`Input.Skill`）：朝按住的方向（沒按就是朝向）跳 `jump_distance`（`jump_duration` 秒、`jump_height` 高，`treeJump`），落地後像劈柴一樣：先高舉大樹 `charge_duration` 秒（`treeSmash`，定身，畫面上樹慢慢立起、微微顫抖，地上畫出**警示形狀**給對手看：`tree` 的 `trx/try` 是落地那一刻朝對手所在位置鎖定的方向、`trt` 剩餘時間），再用 `swing_duration` 秒（`treeSwing`，仍定身，越揮越快）朝下劈，**揮到底那一刻才判定傷害**（`advanceTree`；階段時間為 0 就跳過），警示形狀從舉樹到揮到底都在。樹＝樹幹（長 `trunk_length`、寬 `trunk_width`，矩形，從腳邊出發）加樹冠（樹幹尖端為圓心、半徑 `leaf_radius`、角度 `leaf_angle`，180＝朝外的半圓）；對手身體碰到任一個、高度在 `min_height..max_height` 就受 `damage` 一次（`treeHits` 是精確的矩形距離加扇形）；`trunk_scale`/`leaf_scale` 只放大畫面上的樹，不影響判定。砸下時發 `tree` 事件（`dx/dy` 方向）。冷卻從起跳算 |
-| 怪力 | 空白鍵 / 主按鈕「飛膝踢」 | 飛膝踢（`machamp.go` `stepMachamp` / `kickStep`，`Input.Skill`，設定 `machamp.high_jump_kick`，**取代怪力原本的拔樹**；小智仍是拔樹）：先朝搖桿方向（沒按就是朝向）滑步 `slide_distance`（`slide_duration` 秒，`kickSlide`，滑步中方向不再改），滑完的下一個 tick 起朝**那時**對手站的位置飛踢（`kickFly`，方向此後固定，所以對手側走就能閃），每秒 `kick_speed`、最遠 `kick_distance`，中途升高 `kick_height`；對手（高度在 `min_height..max_height`）的身體進到 `radius`＋兩人半徑內就是踢中：受 `damage`、暈 `stun_duration`、沿踢的方向被踢飛 `knockback`，怪力停在對手身體外；沒踢中就飛到 `kick_distance` 為止。被暈／凍／抓會被打下來（`dropMachamp`）。事件 `kickhit`。電腦躲它：滑步時預測落點線、飛踢時用固定線，往旁邊閃（慢的角色來不及）。冷卻 `cooldown`。`machamp.tree_slam` 的設定還在但已經沒人用。畫面：滑步和飛踢身後有速度線、飛踢伸出一隻腳，踢中有閃光環。
+| 怪力 | 空白鍵 / 主按鈕「飛膝踢」 | 飛膝踢（`machamp.go` `stepMachamp` / `kickStep`，`Input.Skill`，設定 `machamp.high_jump_kick`，**取代怪力原本的拔樹**；小智仍是拔樹）：先朝搖桿方向（沒按就是朝向）滑步 `slide_distance`（`slide_duration` 秒，`kickSlide`，滑步中方向不再改），滑完的下一個 tick 起朝**那時**對手站的位置飛踢（`kickFly`，方向此後固定，所以對手側走就能閃），每秒 `kick_speed`、最遠 `kick_distance`，中途升高 `kick_height`；對手（高度在 `min_height..max_height`）的身體進到 `radius`＋兩人半徑內就是踢中：受 `damage`、暈 `stun_duration`、沿踢的方向被踢飛 `knockback`，怪力停在對手身體外；沒踢中就飛到 `kick_distance` 為止。被暈／凍／抓會被打下來（`dropMachamp`）。事件 `kickhit`。電腦躲它：滑步時預測落點線、飛踢時用固定線，往旁邊閃（慢的角色來不及）。冷卻 `cooldown`。`machamp.tree_slam` 的設定還在但已經沒人用。**電腦的小智也會飛膝踢**（`Input.Kick`，設定 `ash.high_jump_kick`，數值比怪力的強一點；`Input.Kick` 只對小智有用，真人送來的會被 `main.go` 丟掉，所以真人的小智仍只有拔樹、岩石陣、百萬噸拳擊三招，怪力的真人用 `Skill`）。電腦玩怪力（`botKinds`，和小智共用 `bot.go` 的 `ash()`：怪力沒有拔樹和百萬噸拳擊，用飛膝踢；在岩石陣圈住對手時近身用百裂拳或飛膝踢，平常距離拉開時有機率滑步飛踢）。畫面：滑步和飛踢身後有速度線、飛踢伸出一隻腳，踢中有閃光環。
 
 小智／怪力補充；樹砸中時再讓對手**暈眩** `stun_duration` 秒（`StunT`，和擺尾同一個狀態，沒砸中不暈）。
 
@@ -176,7 +176,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 
 ## 單機（電腦對手）
 
-大廳在沒有真人對手時多一顆「單機對戰」按鈕，按了才展開選電腦玩哪隻（皮卡丘、卡比獸、噴火龍、菊草葉、小智、梗鬼，`BOT_KINDS`，要和伺服器 `botKinds` 一致；`{"bot":0|1|2|3|7|9}`，`{"bot":-1}` 改回等真人）。電腦佔住空的那個 slot
+大廳在沒有真人對手時多一顆「單機對戰」按鈕，按了才展開選電腦玩哪隻（皮卡丘、卡比獸、噴火龍、菊草葉、小智、怪力、梗鬼，`BOT_KINDS`，要和伺服器 `botKinds` 一致；`{"bot":0|1|2|3|7|8|9}`，`{"bot":-1}` 改回等真人）。電腦佔住空的那個 slot
 （`room.bot[i]`，`present(i)` = 真人或電腦），真人選好角色就開打；有第二個真人進房時電腦讓位；真人離開房間就刪掉（電腦不撐房間）。
 單場對戰才有，死鬥拒絕（`setTeam(true)` 在有電腦時回 false）；大廳的 `lobby` 帶 `bot`（每個 slot 電腦玩的角色，沒有是 -1），`here` 把電腦算進去。
 
@@ -200,7 +200,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 - 卡比獸的死光：冰拳打中（對手冰凍中）就一定放，不管距離：離得近就貼臉再放；來不及在對手解凍前走到 150 內，就站在原地放（死光長度內）；
   超出死光長度才先走近。
 - `bot_test.go`：每個決策一個測試（場景凍結、直接看 `Decide` 的輸出），加上兩隻電腦打到分出勝負的模擬（用 `config.json` 的數字，
-  確認不會卡死、勝負不是一面倒；目前皮卡丘對卡比獸約 3:1）。電腦會玩**皮卡丘、卡比獸、噴火龍、菊草葉、小智、梗鬼**（`botKinds`），不認得其他角色的招式（對手是噴火龍等時，
+  確認不會卡死、勝負不是一面倒；目前皮卡丘對卡比獸約 3:1）。電腦會玩**皮卡丘、卡比獸、噴火龍、菊草葉、小智、怪力、梗鬼**（`botKinds`），不認得其他角色的招式（對手是噴火龍等時，
   只會躲投射物與已知的招式）。
 - 噴火龍（`charizard`）：遠的時候邊走邊噴火（噴火不定身）、近到上投的射程就先用上投（瞄準對手的預判位置），上投冷卻時靠近、否則維持距離繞圈；偶爾飛行（落地會噴火球環）。躲對手的火區（`thFire`，所有電腦都會躲）。
 - 菊草葉（`chikorita`）：保持中距離繞圈，遠的灑飛葉、近的用藤鞭（輕點＝朝對手；有東西飛來時不放，因為會定身）、中距離機率跳葉刃連斬。

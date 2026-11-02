@@ -322,7 +322,7 @@ document.getElementById('mSingle').onclick = () => send({ team: false });
 document.getElementById('mTeam').onclick = () => send({ team: true });
 document.getElementById('sz3').onclick = () => send({ size: 3 });
 document.getElementById('szAll').onclick = () => send({ size: TEAM_BIG });
-const BOT_KINDS = [0, 1, 2, 3, 7, 9]; // the characters the computer can play (the server's botKinds)
+const BOT_KINDS = [0, 1, 2, 3, 7, 8, 9]; // the characters the computer can play (the server's botKinds)
 for (const k of BOT_KINDS) {
   const b = document.createElement('button'); b.dataset.k = k; b.textContent = NAMES[k];
   b.onclick = () => { botOpen = false; send({ bot: k }); showPick(); };
@@ -2455,7 +2455,7 @@ function drawPlayer(i, p) {
   if (p.k === 4 && p.yt > 0) drawIceberg(d, p);
   drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose, p.tw === 1 ? performance.now() / 1000 * 14 : 0); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
-  if (p.k === 8 && p.kkp > 0) drawKickLeg(p, d, bs);
+  if (p.kkp > 0) drawKickLeg(p, d, bs);
   if (p.bd > 0) drawBound(d, p);
   if (p.pz > 0) drawParalyzed(d, p);
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.

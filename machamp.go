@@ -99,8 +99,8 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	}
 	rooted := p.TreePhase != treeNone || len(events) > 0 // through the tick of the smash, free from the next
 
-	// ---- High Jump Kick (Machamp): slide along the stick, then leap at the opponent ----
-	if in.Skill && p.Kind == machamp && idle && p.KickCD == 0 {
+	// ---- High Jump Kick (Machamp's Skill; Ash's Kick, for the computer): slide along the stick, then leap at the opponent ----
+	if ((in.Skill && p.Kind == machamp) || (in.Kick && p.Kind == ash)) && idle && p.KickCD == 0 {
 		dx, dy := float64(in.DX), float64(in.DY)
 		if dx == 0 && dy == 0 {
 			dx, dy = float64(p.FX), float64(p.FY)

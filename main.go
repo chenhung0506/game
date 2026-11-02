@@ -764,8 +764,9 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		}
 		in := m.Input
 		in.DX, in.DY = clampDir(in.DX), clampDir(in.DY)
+		in.Kick = false // the kick key is the computer's Ash's; Machamp's person kicks with Skill
 		if r.g.P[idx].Kind == ash {
-			in.Comet = false // a person's Ash has the same three skills as Machamp's: the Comet Punch is the computer's
+			in.Comet = false // a person's Ash has three skills, like the others: the Comet Punch (and the kick) are the computer's
 		}
 		r.g.P[idx].In = in
 		r.mu.Unlock()

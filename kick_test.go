@@ -2,7 +2,10 @@ package main
 
 import (
 	"math"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/gorilla/websocket"
 )
 
 // kickDuel is Machamp (slot 0, at 300,250) against a Snorlax (slot 1) `d` ahead of it on the same line.
@@ -236,6 +239,104 @@ func TestTheBotKeepsOutOfTheLineOfAHighJumpKickFarBetterThanOneThatStandsStill(t
 		}
 		if dodged*2 > stood {
 			t.Errorf("%s: lost %d HP, against %d for standing still: it hardly dodges", NAMEOF[kind], dodged, stood)
+		}
+	}
+}
+
+// ---- the computer plays Machamp, and the computer's Ash kicks too ----
+
+func TestTheComputersAshKicksWithItsOwnNumbersAndAPersonsKeyForItIsDropped(t *testing.T) {
+	cfg := DefaultConfig()
+	hk := cfg.Ash.HighJumpKick
+	g := duel(cfg, ash, snorlax)
+	g.P[1].HP = g.maxHP(1)
+	press(g, 0, Input{Kick: true, DX: 1})
+	if g.P[0].KickPhase != kickSlide || g.P[0].TreePhase != treeNone {
+		t.Fatalf("Kick: kick phase %d tree phase %d", g.P[0].KickPhase, g.P[0].TreePhase)
+	}
+	g.P[1].X, g.P[1].Y = 300+hk.SlideDistance+200, 250
+	steps(g, 100)
+	if g.P[1].HP != g.maxHP(1)-hk.Damage {
+		t.Fatalf("HP %d, want Ash's own damage %d", g.maxHP(1)-g.P[1].HP, hk.Damage)
+	}
+	// Machamp's key is Skill, and the kick key does nothing for it
+	m := duel(cfg, machamp, snorlax)
+	press(m, 0, Input{Kick: true})
+	if m.P[0].KickPhase != kickNone {
+		t.Fatal("Machamp kicked with the computer's key")
+	}
+
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	c := dialPlay(t, srv, "dummy")
+	next(t, c, "hi")
+	pick(t, c, ash)
+	c.WriteMessage(websocket.TextMessage, []byte(`{"kick":true,"skill":false}`))
+	for i := 0; i < 30; i++ {
+		p := next(t, c, "s")["p"].([]any)[0].(map[string]any)
+		if p["kkp"].(float64) > 0 || p["kkcd"].(float64) > 0 {
+			t.Fatalf("a person's Ash kicked: %v", p["kkp"])
+		}
+	}
+}
+
+func TestTheMachampBotKicksAtAFarOpponentAndNeverReachesForTheTreeOrAKeyItDoesNotHave(t *testing.T) {
+	cfg := DefaultConfig()
+	kicked := 0
+	for seed := uint64(1); seed <= 20; seed++ {
+		g := duel(cfg, machamp, snorlax)
+		g.P[1].X, g.P[1].Y = 700, 250
+		g.P[1].JumpCD = 99
+		g.P[0].CometCD, g.P[0].RockCD = 99, 99
+		b := newBot(machamp, seed)
+		for i := 0; i < 90; i++ {
+			in := b.Decide(g, 0)
+			if in.Mega || in.Kick || in.Thunder || in.Beam {
+				t.Fatalf("Machamp's bot pressed a key that is not its: %+v", in)
+			}
+			if in.Skill {
+				kicked++
+				break
+			}
+		}
+	}
+	if kicked < 5 {
+		t.Fatalf("it kicked in %d of 20 scenes", kicked)
+	}
+}
+
+func TestTheAshBotKicksToo(t *testing.T) {
+	cfg := DefaultConfig()
+	kicked := 0
+	for seed := uint64(1); seed <= 20; seed++ {
+		g := duel(cfg, ash, snorlax)
+		g.P[1].X, g.P[1].Y = 700, 250
+		g.P[1].JumpCD = 99
+		g.P[0].CometCD, g.P[0].RockCD, g.P[0].TreeCD, g.P[0].MegaCD = 99, 99, 99, 99
+		b := newBot(ash, seed)
+		for i := 0; i < 90; i++ {
+			if in := b.Decide(g, 0); in.Kick {
+				kicked++
+				break
+			}
+		}
+	}
+	if kicked < 5 {
+		t.Fatalf("it kicked in %d of 20 scenes", kicked)
+	}
+}
+
+func TestAMachampBotFightsAndLandsBlowsOnAnOpponentThatStandsStill(t *testing.T) {
+	for _, kind := range []int{ash, machamp} {
+		g := duel(DefaultConfig(), kind, snorlax)
+		g.P[1].JumpCD = 99
+		b := newBot(kind, 3)
+		for range 30 * 30 {
+			g.P[0].In = b.Decide(g, 0)
+			g.Step(dt)
+		}
+		if g.P[1].HP >= g.maxHP(1) {
+			t.Fatalf("%s's bot did no harm in 30 seconds", NAMEOF[kind])
 		}
 	}
 }

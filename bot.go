@@ -13,7 +13,7 @@ import (
 //   - it decides only every botEvery ticks and holds the stick in between (a skill key is pressed for one tick);
 //   - it takes a chance on some moves instead of always making the best one.
 //
-// Everything about how a character plays is in its own function (pikachu, snorlax, chikorita, ash, charizard, gengar); the rest here is shared: what
+// Everything about how a character plays is in its own function (pikachu, snorlax, chikorita, ash and machamp, charizard, gengar); the rest here is shared: what
 // threatens the bot, where to stand, and the 8-way stick.
 const (
 	botEvery = 4 // ticks between decisions
@@ -21,7 +21,7 @@ const (
 )
 
 // botKinds are the characters a Bot can play so far.
-var botKinds = []int{pikachu, snorlax, chikorita, ash, charizard, gengar}
+var botKinds = []int{pikachu, snorlax, chikorita, ash, machamp, charizard, gengar}
 
 func botCanPlay(kind int) bool {
 	for _, k := range botKinds {
@@ -77,14 +77,14 @@ func (b *Bot) Decide(g *Game, me int) Input {
 		in = b.snorlax(c)
 	case chikorita:
 		in = b.chikorita(c)
-	case ash:
+	case ash, machamp:
 		in = b.ash(c)
 	case charizard:
 		in = b.charizard(c)
 	case gengar:
 		in = b.gengar(c)
 	}
-	if (in.DX != 0 || in.DY != 0) && !in.Skill && c.th.kind == thNone && c.walksIntoFlames(in) {
+	if (in.DX != 0 || in.DY != 0) && !in.Skill && !in.Kick && c.th.kind == thNone && c.walksIntoFlames(in) {
 		in.DX, in.DY = 0, 0 // no threat where it stands, but where it is going there is: let the flames pass
 	}
 	b.held = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY}
@@ -278,8 +278,8 @@ func (c *bctx) findThreat() threat {
 		}
 	}
 
-	if f.Kind == machamp && f.KickPhase != kickNone { // a High Jump Kick: the line it flies along is fixed once the slide ends, at where the bot stands now
-		hk := cfg.Machamp.HighJumpKick
+	if isBrawler(f.Kind) && f.KickPhase != kickNone { // a High Jump Kick: the line it flies along is fixed once the slide ends, at where the bot stands now
+		hk := cfg.brawlerOf(f.Kind).HighJumpKick
 		sx, sy, kx, ky, left, eta := f.X, f.Y, f.KickX, f.KickY, hk.KickDistance-f.KickD, 0.0
 		if f.KickPhase == kickSlide { // not yet aimed: it will kick from where the slide ends, straight at the bot
 			if hk.SlideDuration > 0 {
@@ -822,7 +822,7 @@ func (b *Bot) ash(c *bctx) Input {
 	g, p, f := c.g, c.p, c.f
 	bc := g.brawler(c.me)
 	ts, cp, rt := bc.TreeSlam, bc.CometPunch, bc.RockTomb
-	if p.FrozenT > 0 || p.Held || p.StunT > 0 || p.TreePhase != treeNone || p.CometT > 0 || p.MegaT > 0 || p.MegaJT > 0 {
+	if p.FrozenT > 0 || p.Held || p.StunT > 0 || p.TreePhase != treeNone || p.CometT > 0 || p.MegaT > 0 || p.MegaJT > 0 || p.KickPhase != kickNone {
 		return c.stay() // rooted, or it moves itself
 	}
 	if p.RockT > 0 {
@@ -857,7 +857,18 @@ func (b *Bot) ash(c *bctx) Input {
 		return Input{Mega: true}
 	}
 	punch := p.CometCD == 0 && cp.Reach.hits(f) && c.dist <= cp.Distance+cp.ScatterMaxDistance+c.fr
-	smash := p.TreeCD == 0 && p.Z == 0 && ts.Reach.hits(f) && c.dist <= ts.JumpDistance+ts.TrunkLength*0.8
+	smash := p.Kind == ash && p.TreeCD == 0 && p.Z == 0 && ts.Reach.hits(f) && c.dist <= ts.JumpDistance+ts.TrunkLength*0.8 // Machamp has no tree
+	hk := bc.HighJumpKick
+	kick := p.KickCD == 0 && p.Z == 0 && hk.Reach.hits(f) && c.dist <= hk.SlideDistance+hk.KickDistance*0.8
+	kickIn := func() Input { // slides at the opponent, then kicks it; Machamp's key for it is Skill, Ash's is Kick
+		in := c.move(c.ux, c.uy)
+		if p.Kind == machamp {
+			in.Skill = true
+		} else {
+			in.Kick = true
+		}
+		return in
+	}
 	if trapped {
 		switch {
 		case punch && !danger:
@@ -868,6 +879,8 @@ func (b *Bot) ash(c *bctx) Input {
 			in := c.move(c.ux, c.uy)
 			in.Skill = true // the jump takes it onto the opponent, and the tree comes down on it
 			return in
+		case kick && !danger && c.dist > 120 && c.dist <= hk.SlideDistance+hk.KickDistance*0.6: // in the ring the opponent cannot step out of the way
+			return kickIn()
 		case c.dist > 100:
 			return c.move(c.ux, c.uy) // the ring is its to walk in: close in while the skills are charging
 		}
@@ -887,6 +900,9 @@ func (b *Bot) ash(c *bctx) Input {
 		in := c.move(c.ux, c.uy)
 		in.Skill = true
 		return in
+	}
+	if kick && !danger && c.dist > 150 && b.rng.Float64() < 0.3 {
+		return kickIn()
 	}
 	if c.dist > 110 {
 		return c.move(c.ux, c.uy)

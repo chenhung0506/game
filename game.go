@@ -65,6 +65,7 @@ type Input struct {
 	Comet   bool `json:"comet"`   // Machamp only: Comet Punch
 	Rock    bool `json:"rock"`    // Machamp only: Rock Tomb
 	Mega    bool `json:"mega"`    // Ash only: Megaton Punch
+	Kick    bool `json:"kick"`    // Ash only, and only the computer's (a person's is dropped on the way in): High Jump Kick, which is Machamp's Skill
 	GFire   bool `json:"gfire"`   // Gengar only: Ghost Fire
 	SBall   bool `json:"sball"`   // Gengar only: Shadow Ball (aimed like the Vine Whip, see CastX)
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this

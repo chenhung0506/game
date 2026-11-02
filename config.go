@@ -513,7 +513,7 @@ type BrawlerCfg struct {
 		StunDuration   float64 `json:"stun_duration"` // seconds the opponent it lands on is stunned (can neither move nor act); 0 = none
 		Cooldown       float64 `json:"cooldown"`
 	} `json:"tree_slam"`
-	// High Jump Kick (Machamp's main skill; Ash has the tree instead): Machamp slides `slide_distance` along the stick (the way it faces
+	// High Jump Kick (Machamp's main skill; a person's Ash has the tree instead, the computer's Ash has both, with `ash.high_jump_kick`): Machamp slides `slide_distance` along the stick (the way it faces
 	// without one) in `slide_duration` seconds, then leaps at the opponent, aimed as the slide ends, flying `kick_speed` per second
 	// for up to `kick_distance` and rising `kick_height` at the top of the leap. The opponent (at a height inside min_height..max_height)
 	// whose body comes within `radius` of its path takes `damage`, is stunned `stun_duration` seconds and is kicked `knockback` away;
@@ -862,6 +862,8 @@ func DefaultConfig() Config {
 	hk.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	hk.SlideDistance, hk.SlideDuration, hk.KickDistance, hk.KickSpeed, hk.KickHeight = 180, 0.25, 450, 1000, 40
 	hk.Radius, hk.Damage, hk.StunDuration, hk.Knockback, hk.Cooldown = 10, 35, 1.2, 300, 9
+	c.Ash.HighJumpKick = *hk // the computer's Ash kicks as well, a notch harder
+	c.Ash.HighJumpKick.SlideDistance, c.Ash.HighJumpKick.KickDistance, c.Ash.HighJumpKick.Damage, c.Ash.HighJumpKick.Cooldown = 200, 500, 40, 8
 	c.Machamp.CometPunch.Quantity, c.Machamp.CometPunch.HP, c.Machamp.CometPunch.Cooldown, c.Machamp.CometPunch.BallKnockback = 20, 16, 9, 100
 	c.Machamp.CometPunch.Knockback = 8
 	c.Machamp.RockTomb.RingRadius, c.Machamp.RockTomb.Count, c.Machamp.RockTomb.StoneHP, c.Machamp.RockTomb.StoneDuration, c.Machamp.RockTomb.Cooldown = 450, 20, 80, 7, 14
@@ -1019,6 +1021,8 @@ func (c Config) validate() error {
 		{"machamp.tree_slam.jump_distance", c.Machamp.TreeSlam.JumpDistance, 0},
 		{"machamp.high_jump_kick.kick_distance", c.Machamp.HighJumpKick.KickDistance, 0},
 		{"machamp.high_jump_kick.kick_speed", c.Machamp.HighJumpKick.KickSpeed, 0},
+		{"ash.high_jump_kick.kick_distance", c.Ash.HighJumpKick.KickDistance, 0},
+		{"ash.high_jump_kick.kick_speed", c.Ash.HighJumpKick.KickSpeed, 0},
 		{"ash.tree_slam.jump_distance", c.Ash.TreeSlam.JumpDistance, 0},
 		{"ash.megaton_punch.distance", c.Ash.MegatonPunch.Distance, 0},
 		{"dummy.max_hp", float64(c.Dummy.MaxHP), 0},
@@ -1217,6 +1221,14 @@ func (c Config) validate() error {
 		{"machamp.high_jump_kick.stun_duration", c.Machamp.HighJumpKick.StunDuration},
 		{"machamp.high_jump_kick.knockback", c.Machamp.HighJumpKick.Knockback},
 		{"machamp.high_jump_kick.cooldown", c.Machamp.HighJumpKick.Cooldown},
+		{"ash.high_jump_kick.slide_distance", c.Ash.HighJumpKick.SlideDistance},
+		{"ash.high_jump_kick.slide_duration", c.Ash.HighJumpKick.SlideDuration},
+		{"ash.high_jump_kick.kick_height", c.Ash.HighJumpKick.KickHeight},
+		{"ash.high_jump_kick.radius", c.Ash.HighJumpKick.Radius},
+		{"ash.high_jump_kick.damage", float64(c.Ash.HighJumpKick.Damage)},
+		{"ash.high_jump_kick.stun_duration", c.Ash.HighJumpKick.StunDuration},
+		{"ash.high_jump_kick.knockback", c.Ash.HighJumpKick.Knockback},
+		{"ash.high_jump_kick.cooldown", c.Ash.HighJumpKick.Cooldown},
 		{"ash.megaton_punch.jump_distance", c.Ash.MegatonPunch.JumpDistance},
 		{"ash.megaton_punch.jump_duration", c.Ash.MegatonPunch.JumpDuration},
 		{"ash.megaton_punch.jump_height", c.Ash.MegatonPunch.JumpHeight},
@@ -1266,6 +1278,7 @@ func (c Config) validate() error {
 	}
 	for name, r := range map[string]Reach{
 		"machamp.high_jump_kick": c.Machamp.HighJumpKick.Reach,
+		"ash.high_jump_kick":     c.Ash.HighJumpKick.Reach,
 		"pikachu.volt_tackle":    c.Pikachu.VoltTackle.Reach,
 		"pikachu.thunder":        c.Pikachu.Thunder.Reach,
 		"pikachu.electro_ball":   c.Pikachu.ElectroBall.Reach,

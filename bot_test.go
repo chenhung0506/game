@@ -10,7 +10,7 @@ import (
 // ---- the computer player ----
 
 func hasAct(in Input) bool {
-	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Mega || in.Toss || in.GFire || in.SBall
+	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Mega || in.Kick || in.Toss || in.GFire || in.SBall
 }
 
 // firstAct runs the bot for n ticks on a scene that does not change and returns the first decision that presses a
@@ -428,7 +428,7 @@ func TestTheBotNoticesAThreatOnlyAfterItsReactionTime(t *testing.T) {
 
 func TestOnlyPikachuSnorlaxCharizardChikoritaAshAndGengarCanBePlayedByTheComputer(t *testing.T) {
 	for k := 0; k < kinds; k++ {
-		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash || k == charizard || k == gengar; got != want {
+		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash || k == machamp || k == charizard || k == gengar; got != want {
 			t.Errorf("botCanPlay(%d) = %v, want %v", k, got, want)
 		}
 	}
