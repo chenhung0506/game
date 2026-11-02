@@ -176,8 +176,18 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	}
 	if p.MegaT > 0 {
 		rooted = true
-		if ax, ay := unit(float64(in.DX), float64(in.DY)); ax != 0 || ay != 0 {
-			p.MegaX, p.MegaY = ax, ay // the stick turns the fist while it gathers (let go, it keeps the last way)
+		// the stick turns the fist while it gathers, to any angle the pad gives; with no stick it follows the opponent
+		ax, ay := 0.0, 0.0
+		if n := math.Hypot(in.AimX, in.AimY); n > 1e-9 && !math.IsInf(n, 0) {
+			ax, ay = in.AimX/n, in.AimY/n
+		} else {
+			ax, ay = unit(float64(in.DX), float64(in.DY))
+		}
+		if ax == 0 && ay == 0 {
+			ax, ay = unit(other.X-p.X, other.Y-p.Y)
+		}
+		if ax != 0 || ay != 0 {
+			p.MegaX, p.MegaY = ax, ay
 		}
 		if p.MegaT -= dt; p.MegaT < 1e-9 {
 			p.MegaT = 0

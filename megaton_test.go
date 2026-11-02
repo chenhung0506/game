@@ -55,13 +55,16 @@ func TestMegatonPunchGathersRootedThenHurtsStunsAndKnocksBackWhatItReaches(t *te
 	}
 }
 
-func TestMegatonPunchFliesTheLineLockedAtTheStartSoSteppingAsideDodgesIt(t *testing.T) {
+func TestMegatonPunchFliesTheLineTheStickHoldsSoABodyBesideItIsMissed(t *testing.T) {
 	cfg := DefaultConfig()
 	mp := cfg.Ash.MegatonPunch
 	g := megaDuel(cfg, 300)
-	press(g, 0, Input{Mega: true})
-	g.P[1].Y = 250 + mp.Radius + g.radius(1) + 10 // out of the line
-	steps(g, int(mp.ChargeDuration/dt)+2)
+	press(g, 0, Input{Mega: true, AimX: 1})
+	g.P[1].Y = 250 + mp.Radius + g.radius(1) + 10 // out of the line the stick holds
+	for range int(mp.ChargeDuration/dt) + 2 {
+		g.P[0].In = Input{AimX: 1}
+		g.Step(dt)
+	}
 	if g.P[1].HP != g.maxHP(1) || g.P[1].StunT > 0 {
 		t.Fatal("hit a body that was beside the line")
 	}
@@ -199,7 +202,8 @@ func TestAshBotThrowsTheMegatonPunchAtAnOpponentThatCannotMove(t *testing.T) {
 	}
 }
 
-func TestTheBotStepsOutOfTheLineOfAMegatonPunch(t *testing.T) {
+// The fist follows its target, so stepping aside is no use: the computer runs out of its reach instead.
+func TestTheBotRunsAwayFromAMegatonPunchThatIsGathering(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Ash.MegatonPunch.JumpDuration = 0
 	mp := cfg.Ash.MegatonPunch
@@ -217,8 +221,10 @@ func TestTheBotStepsOutOfTheLineOfAMegatonPunch(t *testing.T) {
 			if th := b.look(g, 0).th; th.kind != thPunch {
 				t.Fatalf("%s: threat %+v, want the punch", NAMEOF[kind], th)
 			}
-			if lost := survive(g, b, 0, mp.ChargeDuration+0.5); lost > 0 {
-				t.Fatalf("%s seed %d: lost %d HP standing in the line of the punch", NAMEOF[kind], seed, lost)
+			x0 := g.P[0].X
+			survive(g, b, 0, mp.ChargeDuration*0.9)
+			if x0-g.P[0].X < 30 {
+				t.Fatalf("%s seed %d: moved %v away from the fist", NAMEOF[kind], seed, x0-g.P[0].X)
 			}
 		}
 	}
@@ -379,7 +385,7 @@ func TestAPersonsAshHasNoCometPunchButTheComputersDoes(t *testing.T) {
 	}
 }
 
-func TestTheStickTurnsTheMegatonFistWhileItGathersAndLettingGoKeepsTheWay(t *testing.T) {
+func TestTheStickTurnsTheMegatonFistWhileItGathersAndWithoutItTheFistFollowsTheOpponent(t *testing.T) {
 	cfg := DefaultConfig()
 	g := megaDuel(cfg, 300) // the opponent is straight ahead, on the right
 	press(g, 0, Input{Mega: true})
@@ -391,10 +397,21 @@ func TestTheStickTurnsTheMegatonFistWhileItGathersAndLettingGoKeepsTheWay(t *tes
 	if g.P[0].MegaX != 0 || g.P[0].MegaY != 1 {
 		t.Fatalf("aim %v,%v after the stick went down", g.P[0].MegaX, g.P[0].MegaY)
 	}
-	g.P[0].In = Input{}
+	g.P[0].In = Input{AimX: 0.9239, AimY: 0.3827} // 22.5 degrees: the pad is not limited to eight ways
 	g.Step(dt)
-	if g.P[0].MegaY != 1 {
-		t.Fatal("letting go of the stick turned it back")
+	if math.Abs(g.P[0].MegaX-0.9239) > 1e-3 || math.Abs(g.P[0].MegaY-0.3827) > 1e-3 {
+		t.Fatalf("aim %v,%v, want 22.5 degrees", g.P[0].MegaX, g.P[0].MegaY)
+	}
+	g.P[0].In = Input{}
+	g.P[1].Y = 450 // the opponent moves; with no stick the fist follows it
+	g.Step(dt)
+	if want := 200 / math.Hypot(300, 200); math.Abs(g.P[0].MegaY-want) > 1e-6 || g.P[0].MegaX <= 0 {
+		t.Fatalf("aim %v,%v does not follow the opponent", g.P[0].MegaX, g.P[0].MegaY)
+	}
+	g.P[0].In = Input{DY: 1}
+	g.Step(dt)
+	if g.P[0].MegaX != 0 || g.P[0].MegaY != 1 {
+		t.Fatal("the keyboard's way did not turn it")
 	}
 	if g.P[0].X != 300 || g.P[0].Y != 250 {
 		t.Fatal("turning the fist walked Ash")
