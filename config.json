@@ -406,10 +406,11 @@
       "cooldown": 14,
       "lunge_distance": 250,
       "show_warning": false,
-      "fist_start": -40,
-      "fist_end": 400,
-      "charge_scale": 1,
-      "fist_scale": 1,
+      "show_text": false,
+      "fist_start": -60,
+      "fist_end": 380,
+      "charge_scale": 1.2,
+      "fist_scale": 1.2,
       "impact_scale": 1
     },
     "comet_punch": {

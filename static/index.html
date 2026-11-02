@@ -98,7 +98,7 @@ const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, range: 450, flight: 0.9, lob: 150, sfire: 20 }; // Gengar's, from 'hi'
-let megaCfg = { charge: 1, dist: 420, radius: 45, cscale: 1, fscale: 1, iscale: 1, warn: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
+let megaCfg = { charge: 1, dist: 420, radius: 45, cscale: 1, fscale: 1, iscale: 1, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
 const beamCfgOf = (k) => (k === 10 ? gbeamCfg : beamCfg);
@@ -1738,7 +1738,7 @@ function drawMegaImpact(f) {
     ctx.beginPath(); ctx.moveTo(Math.cos(t) * r0, Math.sin(t) * r0); ctx.lineTo(Math.cos(t) * r1, Math.sin(t) * r1); ctx.stroke();
   }
   ctx.restore();
-  if (a > 0.3) upright(f.x, f.y, () => {
+  if (megaCfg.text && a > 0.3) upright(f.x, f.y, () => {
     ctx.save(); ctx.rotate(-0.18); ctx.font = `900 ${Math.round(46 * s * (0.8 + 0.5 * Math.min(1, k * 5)))}px system-ui`; ctx.textAlign = 'center';
     ctx.lineWidth = 8; ctx.strokeStyle = `rgba(0,0,0,${a})`; ctx.strokeText('轟！', 0, -70 * s); ctx.fillStyle = black ? `rgba(255,232,90,${a})` : `rgba(255,255,255,${a})`; ctx.fillText('轟！', 0, -70 * s); ctx.restore();
   });

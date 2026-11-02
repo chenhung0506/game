@@ -123,6 +123,19 @@ func TestTheFistsDrawnStartAndEndAreSentToTheClient(t *testing.T) {
 	}
 }
 
+func TestTheHitTextCanBeSwitchedOff(t *testing.T) {
+	for _, on := range []bool{true, false} {
+		cfg := DefaultConfig()
+		cfg.Ash.MegatonPunch.ShowText = on
+		srv := httptest.NewServer(newMux(cfg))
+		hi := next(t, dialPlay(t, srv, "dummy"), "hi")
+		if got := hi["mega"].(map[string]any)["text"] == float64(1); got != on {
+			t.Fatalf("show_text %v: client sent %v", on, hi["mega"])
+		}
+		srv.Close()
+	}
+}
+
 func TestTheWarningLineCanBeSwitchedOffInTheConfigTheClientIsSent(t *testing.T) {
 	for _, on := range []bool{true, false} {
 		cfg := DefaultConfig()
