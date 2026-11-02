@@ -84,6 +84,9 @@ func (b *Bot) Decide(g *Game, me int) Input {
 	case gengar:
 		in = b.gengar(c)
 	}
+	if (in.DX != 0 || in.DY != 0) && !in.Skill && c.th.kind == thNone && c.walksIntoFlames(in) {
+		in.DX, in.DY = 0, 0 // no threat where it stands, but where it is going there is: let the flames pass
+	}
 	b.held = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY}
 	return in
 }
@@ -275,6 +278,28 @@ func (c *bctx) findThreat() threat {
 		}
 	}
 
+	if f.Kind == ash && f.MegaT > 0 { // a Megaton Punch gathering: the line it will fly along is on the ground, and does not follow
+		mp := cfg.Ash.MegatonPunch
+		if segDist(p.X, p.Y, f.X, f.Y, f.X+f.MegaX*mp.Distance, f.Y+f.MegaY*mp.Distance) < mp.Radius+c.pr+15 {
+			ax, ay := c.sideOf(f.X, f.Y, f.MegaX, f.MegaY, p.X, p.Y)
+			consider(threat{thPunch, f.MegaT, ax, ay})
+		}
+	}
+
+	if fl := c.flames(); len(fl) > 0 { // Ghost Fire: the first moment one of them reaches where the bot stands
+		gf := cfg.Gengar.GhostFire
+	soon:
+		for t := 0.0; t <= botHorizon+1e-9; t += 0.05 {
+			for _, bl := range fl {
+				if x, y := c.flameAt(bl, t+lag); math.Hypot(p.X-x, p.Y-y) <= gf.Radius+c.pr+25 {
+					ax, ay := c.safeDir(hz)
+					consider(threat{thBall, t, ax, ay})
+					break soon
+				}
+			}
+		}
+	}
+
 	for _, z := range g.Fires { // burning ground: it burns whoever stands in it every half second, so get out of it
 		if z.Owner != c.me && p.Z <= cfg.Charizard.SeismicToss.FireMaxHeight && math.Hypot(p.X-z.X, p.Y-z.Y) <= z.R+c.pr+10 {
 			zz := z
@@ -305,6 +330,58 @@ func (c *bctx) findThreat() threat {
 		consider(threat{thRush, 0.3, ax, ay})
 	}
 	return best
+}
+
+// flames is the opponent's Ghost Fire flames that can still hurt the bot.
+func (c *bctx) flames() []*Ball {
+	var fl []*Ball
+	for i := range c.balls {
+		if bl := &c.balls[i]; bl.K == ballGhost && bl.Owner != c.me && bl.HP > 0 && !bl.Hit {
+			fl = append(fl, bl)
+		}
+	}
+	return fl
+}
+
+// flameAt is where a Ghost Fire flame will be t seconds on: straight out until it has flown its distance, then straight
+// at its owner, taken to stay where it is.
+func (c *bctx) flameAt(bl *Ball, t float64) (float64, float64) {
+	gf := c.g.cfg.Gengar.GhostFire
+	x, y := bl.X, bl.Y
+	if !bl.Back {
+		out := math.Min(gf.SpreadSpeed*t, bl.Left)
+		x, y = x+bl.DX*out, y+bl.DY*out
+		t -= out / gf.SpreadSpeed
+		if t <= 0 {
+			return x, y
+		}
+	}
+	ux, uy := unit(c.f.X-x, c.f.Y-y)
+	back := math.Min(gf.ConvergenceSpeed*t, math.Hypot(c.f.X-x, c.f.Y-y))
+	return x + ux*back, y + uy*back
+}
+
+// walksIntoFlames is whether walking the way the stick says puts the bot in the way of a Ghost Fire flame within the next
+// half second.
+func (c *bctx) walksIntoFlames(in Input) bool {
+	fl := c.flames()
+	if len(fl) == 0 {
+		return false
+	}
+	gf := c.g.cfg.Gengar.GhostFire
+	ux, uy := unit(float64(in.DX), float64(in.DY))
+	speed := c.g.cfg.walkSpeedOf(c.p.Kind)
+	lag := botReact * dtBot
+	for t := 0.0; t <= 0.5+1e-9; t += 0.05 {
+		x := math.Min(math.Max(c.p.X+ux*speed*t, 0), c.g.court.Length)
+		y := math.Min(math.Max(c.p.Y+uy*speed*t, 0), c.g.court.Width)
+		for _, bl := range fl {
+			if fx, fy := c.flameAt(bl, t+lag); math.Hypot(x-fx, y-fy) <= gf.Radius+c.pr+25 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // wayOutOf is the 8-way stick step that gets the bot out of an area soonest (inside(x, y) says where it is), walking at
@@ -357,7 +434,7 @@ func (c *bctx) hazards() []hazard {
 			continue
 		}
 		switch bl.K {
-		case ballPillar, ballGhost: // a ghost flame turns round, so a straight line is wrong for it; bots still do not dodge them
+		case ballPillar, ballGhost: // a ghost flame turns round, so a straight line is wrong for it: see flames
 		case ballTornado:
 			if !bl.Caught {
 				chase(bl.X, bl.Y, cfg.Rowlet.Tornado.Speed, cfg.Rowlet.Tornado.Radius)
@@ -384,6 +461,7 @@ func (c *bctx) safeDir(hz []hazard) (float64, float64) {
 	lag := botReact * dtBot
 	bestScore, bx, by := math.Inf(-1), 0.0, 0.0
 	pos := make([][2]float64, len(hz))
+	fl := c.flames()
 	for k := -1; k < 8; k++ {
 		var ux, uy float64
 		if k >= 0 {
@@ -406,6 +484,12 @@ func (c *bctx) safeDir(hz []hazard) (float64, float64) {
 				cx, cy := closestOnSegment(x, y, pos[i][0], pos[i][1], nx, ny)
 				score = math.Min(score, math.Hypot(x-cx, y-cy)-h.r-c.pr)
 				pos[i] = [2]float64{nx, ny}
+			}
+			for _, bl := range fl {
+				x0, y0 := c.flameAt(bl, t-step+lag)
+				x1, y1 := c.flameAt(bl, t+lag)
+				cx, cy := closestOnSegment(x, y, x0, y0, x1, y1)
+				score = math.Min(score, math.Hypot(x-cx, y-cy)-c.g.cfg.Gengar.GhostFire.Radius-c.pr)
 			}
 		}
 		if k < 0 {
@@ -721,7 +805,7 @@ func (b *Bot) ash(c *bctx) Input {
 	g, p, f := c.g, c.p, c.f
 	bc := g.brawler(c.me)
 	ts, cp, rt := bc.TreeSlam, bc.CometPunch, bc.RockTomb
-	if p.FrozenT > 0 || p.Held || p.TreePhase != treeNone || p.CometT > 0 {
+	if p.FrozenT > 0 || p.Held || p.StunT > 0 || p.TreePhase != treeNone || p.CometT > 0 || p.MegaT > 0 {
 		return c.stay() // rooted, or it moves itself
 	}
 	if p.RockT > 0 {
@@ -748,6 +832,13 @@ func (b *Bot) ash(c *bctx) Input {
 		trapped = math.Hypot(f.X-mx, f.Y-my)+c.fr < rt.RingRadius-rt.StoneRadius*0.5
 	}
 
+	// The Megaton Punch goes where the opponent is as it starts: it is for one that cannot move out of the way, and now and then for one that may not.
+	mp := bc.MegatonPunch
+	mega := p.Kind == ash && p.MegaCD == 0 && mp.Reach.hits(f) && c.dist <= mp.Distance*0.8 && !danger &&
+		(c.rootedFor() >= mp.ChargeDuration*0.8 || b.rng.Float64() < 0.15)
+	if mega {
+		return Input{Mega: true}
+	}
 	punch := p.CometCD == 0 && cp.Reach.hits(f) && c.dist <= cp.Distance+cp.ScatterMaxDistance+c.fr
 	smash := p.TreeCD == 0 && p.Z == 0 && ts.Reach.hits(f) && c.dist <= ts.JumpDistance+ts.TrunkLength*0.8
 	if trapped {

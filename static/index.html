@@ -98,6 +98,7 @@ const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, range: 450, flight: 0.9, lob: 150, sfire: 20 }; // Gengar's, from 'hi'
+let megaCfg = { charge: 1, dist: 420, radius: 45, cscale: 1, fscale: 1, iscale: 1 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
 const beamCfgOf = (k) => (k === 10 ? gbeamCfg : beamCfg);
@@ -149,7 +150,7 @@ const beamSlots = () => (snap ? [0, 1].filter((i) => hasBeam(snap.p[i].k)) : [])
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
     if (teamSize !== (m.size || TEAM_BIG)) { teamSize = m.size || TEAM_BIG; myOrder = []; sentOrder = ''; } // another team size: choose again
@@ -174,6 +175,7 @@ ws.onmessage = (e) => {
       if (st > 0 && !(prevSt > 0)) shake = 14; // the sweep begins
       if (!(st > 0) && prevSt > 0 && beamLook[i].ang !== null) beamLook[i].tail = { x: disp[i].x, y: disp[i].y - 6, ang: beamLook[i].ang, age: 0, bc: beamCfgOf(m.p[i].k) };
     }
+    if (old) for (const i of slotsOf(7)) { const o = old.p[i].mgt, n = m.p[i].mgt, half = megaCfg.charge / 2; if (o > half && n <= half && n > 0) shake = Math.max(shake, 12); } // the thunder of the charge
     for (const ev of m.e || []) {
       fx.push({ ...ev, age: 0 });
       if (ev.t === 'slam') shake = 16;
@@ -183,6 +185,8 @@ ws.onmessage = (e) => {
       if (ev.t === 'iceburst') shake = 12;
       if (ev.t === 'wave') shake = 16;
       if (ev.t === 'tree') shake = 18;
+      if (ev.t === 'mega') shake = 14;
+      if (ev.t === 'megahit') shake = 30;
       if (ev.t === 'evolve') shake = 14;
       if (ev.t === 'leaf') shake = 6;
       if (ev.t === 'freeze') shake = 10;
@@ -1020,6 +1024,7 @@ function drawTelegraph() {
   for (const si of beamSlots()) drawFan(snap.p[si], disp[si]);
   for (const si of slotsOf(10)) drawTailWarning(snap.p[si], disp[si]);
   for (const si of [...slotsOf(7), ...slotsOf(8)]) drawTreeWarning(snap.p[si], disp[si]);
+  for (const si of slotsOf(7)) drawMegaCharge(snap.p[si], disp[si]);
   if (aiming && AIMED[snap.p[you].k] === aiming.name) drawAimFan(snap.p[you], disp[you]);
 }
 // The fan of an aimed skill the player is choosing, drawn for them only (the opponent's page never gets it; it is not sent) until the cast, when the
@@ -1603,6 +1608,117 @@ function drawTreeSlam(f) {
   const k = f.age / 0.6, base = Math.atan2(f.dy || 0, f.dx || 0), bounce = Math.max(0, 0.12 - f.age) * 2.5; // a small rebound off the ground
   drawTreeArt(f.x, f.y, base, bounce, 1 - Math.max(0, k - 0.5) * 2, treeCfgs[brawlerIdx(f.k)]);
   ctx.save(); ctx.strokeStyle = `rgba(255,235,200,${(1 - k) * 0.8})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(f.x, f.y, 30 + 160 * k, 0, 7); ctx.stroke(); ctx.restore();
+}
+// ---- Ash's Megaton Punch ----
+// The fist and the charge flicker black and white; `on` is which of the two it is this instant.
+const megaBlack = (ms) => (Math.floor(performance.now() / ms) & 1) === 0;
+// A jagged line from (x0, y0) to (x1, y1) in `n` pieces, each knocked sideways by up to `amp`.
+function jagPath(x0, y0, x1, y1, n, amp) {
+  const ux = x1 - x0, uy = y1 - y0, len = Math.hypot(ux, uy) || 1, nx = -uy / len, ny = ux / len;
+  ctx.beginPath(); ctx.moveTo(x0, y0);
+  for (let i = 1; i < n; i++) { const t = i / n, o = (Math.random() - 0.5) * 2 * amp; ctx.lineTo(x0 + ux * t + nx * o, y0 + uy * t + ny * o); }
+  ctx.lineTo(x1, y1);
+}
+// Lightning inside a disc of radius R at the origin: bolts from the middle to the rim, bright on a black disc and dark on a white one.
+function discLightning(R, black, bolts) {
+  ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.clip(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  for (let i = 0; i < bolts; i++) {
+    const a = Math.random() * Math.PI * 2, ex = Math.cos(a) * R * 1.05, ey = Math.sin(a) * R * 1.05;
+    for (const [w, col] of black ? [[R * 0.2, 'rgba(120,170,255,.5)'], [R * 0.07, '#fff'], [R * 0.025, '#ffe85a']] : [[R * 0.2, 'rgba(255,230,90,.55)'], [R * 0.08, '#2b3bd0'], [R * 0.03, '#000']]) {
+      ctx.strokeStyle = col; ctx.lineWidth = Math.max(w, 1); jagPath(0, 0, ex, ey, 6, R * 0.22); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+// While Ash gathers. The ground shows the line the fist will fly along (it does not follow). The first half is Thunder's warning: rings close
+// in on the hand and, when they are as small as they go, lightning strikes it. The second half: the whole hand becomes a flickering
+// black and white disc that swells, with lightning crackling inside it.
+function drawMegaCharge(p, d) {
+  if (!(p.mgt > 0)) return;
+  const cs = megaCfg.cscale, k = Math.min(Math.max(1 - p.mgt / Math.max(megaCfg.charge, 1e-6), 0), 1), base = Math.atan2(p.mgy, p.mgx);
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
+  ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(base);
+  ctx.fillStyle = `rgba(255,50,40,${0.1 + 0.3 * k})`; ctx.strokeStyle = `rgba(255,${120 + 80 * pulse | 0},60,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.rect(0, -megaCfg.radius, megaCfg.dist, megaCfg.radius * 2); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  const hx = d.x + Math.cos(base) * 24, hy = d.y + Math.sin(base) * 24;
+  if (k < 0.5) {
+    const u = k / 0.5;
+    ctx.save(); ctx.lineWidth = 3;
+    for (let j = 0; j < 3; j++) { // three rings, one after another, each closing in to the least it goes
+      const v = Math.min(Math.max(u * 1.5 - j * 0.25, 0), 1), r = (150 * (1 - v) + 10) * cs;
+      ctx.strokeStyle = `rgba(255,235,90,${0.25 + 0.7 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r, 0, 7); ctx.stroke();
+      ctx.strokeStyle = `rgba(20,20,40,${0.2 + 0.4 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r + 4, 0, 7); ctx.stroke();
+    }
+    ctx.fillStyle = `rgba(10,10,40,${0.15 + 0.35 * u})`; ctx.beginPath(); ctx.arc(hx, hy, 18 * cs, 0, 7); ctx.fill();
+    ctx.restore();
+    return;
+  }
+  const v = (k - 0.5) / 0.5, since = (k - 0.5) * megaCfg.charge, black = megaBlack(55), R = (16 + 30 * v) * cs;
+  if (since < 0.22) { // the bolt from the sky onto the hand, and the flash it makes
+    const a = 1 - since / 0.22, sy = screenY(hx, hy);
+    upright(hx, hy, () => {
+      ctx.fillStyle = `rgba(255,248,190,${0.6 * a})`; ctx.beginPath(); ctx.arc(0, 0, 70 * cs, 0, 7); ctx.fill();
+      ctx.lineJoin = 'round';
+      for (const [w, col] of [[16, `rgba(255,225,70,${0.5 * a})`], [6, `rgba(255,255,255,${a})`]]) { ctx.strokeStyle = col; ctx.lineWidth = w; jagPath((Math.random() - 0.5) * 24, -sy - 10, 0, 0, Math.max(4, sy / 38 | 0), 22); ctx.stroke(); }
+    });
+  }
+  ctx.save(); ctx.translate(hx, hy);
+  const glow = ctx.createRadialGradient(0, 0, R * 0.6, 0, 0, R * 2.2);
+  glow.addColorStop(0, black ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.45)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, R * 2.2, 0, 7); ctx.fill();
+  ctx.fillStyle = black ? '#0a0a0f' : '#fafafa'; ctx.strokeStyle = black ? '#fff' : '#000'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill(); ctx.stroke();
+  discLightning(R, black, 6);
+  ctx.strokeStyle = black ? 'rgba(255,255,255,.7)' : 'rgba(0,0,0,.6)'; ctx.lineWidth = 2; ctx.setLineDash([8, 7]); ctx.lineDashOffset = -performance.now() / 20;
+  ctx.beginPath(); ctx.arc(0, 0, R * 1.35, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.restore();
+}
+// The punch itself: a big black and white fist that flashes out along the line, trailing afterimages and crackling with lightning, then fades.
+function drawMegaFist(f) {
+  const FLY = 0.14, u = Math.min(f.age / FLY, 1), ang = Math.atan2(f.dy || 0, f.dx || 0), R = megaCfg.radius * megaCfg.fscale * 1.3;
+  const fade = f.age < FLY ? 1 : Math.max(0, 1 - (f.age - FLY) / 0.3);
+  if (fade <= 0) return;
+  const at = (t) => 24 + (f.r - 24) * t;
+  ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(ang);
+  ctx.fillStyle = `rgba(255,255,255,${0.35 * fade})`; ctx.fillRect(0, -megaCfg.radius * 0.7, at(u), megaCfg.radius * 1.4); // the streak it left
+  for (let n = 5; n >= 0; n--) { // afterimages, then the fist
+    const t = Math.max(0, u - n * 0.09), head = n === 0, black = megaBlack(45) !== (n % 2 === 1);
+    ctx.save(); ctx.translate(at(t), 0); ctx.globalAlpha = (head ? 1 : 0.5 - n * 0.07) * fade;
+    ctx.fillStyle = black ? '#0b0b10' : '#fafafa'; ctx.strokeStyle = black ? '#fff' : '#000'; ctx.lineWidth = 3.5; ctx.lineJoin = 'round';
+    const w = head ? 1 + 0.25 * (1 - u) : 1;
+    ctx.beginPath(); ctx.roundRect(-R * 0.8 * w, -R * 0.85, R * 1.7 * w, R * 1.7, R * 0.45); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = black ? '#fff' : '#000'; ctx.lineWidth = 2.4; ctx.beginPath(); // the knuckles
+    for (const g of [-0.45, 0, 0.45]) { ctx.moveTo(R * 0.55, R * g); ctx.lineTo(R * 0.9, R * g); }
+    ctx.stroke();
+    if (head) { ctx.save(); ctx.beginPath(); ctx.roundRect(-R * 0.8, -R * 0.85, R * 1.7, R * 1.7, R * 0.45); ctx.clip(); ctx.translate(R * 0.05, 0); discLightning(R * 1.2, black, 4); ctx.restore(); }
+    ctx.restore();
+  }
+  ctx.restore();
+}
+// Where it lands: a flash that flickers black and white, shock rings, a spiky burst, lines thrown out along the punch and the sound of it.
+function drawMegaImpact(f) {
+  const k = f.age / 0.65, a = 1 - k, s = megaCfg.iscale, ang = Math.atan2(f.dy || 0, f.dx || 1), black = megaBlack(45);
+  ctx.save(); ctx.translate(f.x, f.y);
+  ctx.fillStyle = black ? `rgba(0,0,0,${0.85 * a})` : `rgba(255,255,255,${0.95 * a})`; ctx.beginPath(); ctx.arc(0, 0, 110 * s * (0.4 + 0.6 * Math.min(1, k * 4)), 0, 7); ctx.fill();
+  ctx.lineWidth = 6 * a + 1;
+  for (const [sc, col] of [[1, black ? '#fff' : '#000'], [0.62, '#ffe85a']]) { ctx.strokeStyle = col; ctx.globalAlpha = a; ctx.beginPath(); ctx.arc(0, 0, (30 + 230 * k) * s * sc, 0, 7); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  const spikes = 14, rr = (40 + 90 * Math.min(1, k * 3)) * s; // the comic burst
+  ctx.fillStyle = black ? `rgba(255,255,255,${0.9 * a})` : `rgba(0,0,0,${0.9 * a})`; ctx.beginPath();
+  for (let i = 0; i < spikes * 2; i++) { const t = i / (spikes * 2) * Math.PI * 2 + k * 0.6, r = i % 2 ? rr * 0.55 : rr * (0.9 + 0.3 * Math.sin(i * 12.9)); ctx.lineTo(Math.cos(t) * r, Math.sin(t) * r); }
+  ctx.closePath(); ctx.fill();
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 16; i++) { // lines flung out, thrown most along the punch
+    const t = ang + (Math.sin(i * 7.3) * 1.2) * (i % 2 ? 1 : 0.4) + (i % 4 === 0 ? Math.PI : 0), r0 = (60 + 40 * k) * s, r1 = r0 + (80 + 120 * k) * s * (0.5 + 0.5 * Math.abs(Math.sin(i * 3.1)));
+    ctx.strokeStyle = i % 3 ? `rgba(255,232,90,${a})` : (black ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${a})`); ctx.lineWidth = 4 * a + 1;
+    ctx.beginPath(); ctx.moveTo(Math.cos(t) * r0, Math.sin(t) * r0); ctx.lineTo(Math.cos(t) * r1, Math.sin(t) * r1); ctx.stroke();
+  }
+  ctx.restore();
+  if (a > 0.3) upright(f.x, f.y, () => {
+    ctx.save(); ctx.rotate(-0.18); ctx.font = `900 ${Math.round(46 * s * (0.8 + 0.5 * Math.min(1, k * 5)))}px system-ui`; ctx.textAlign = 'center';
+    ctx.lineWidth = 8; ctx.strokeStyle = `rgba(0,0,0,${a})`; ctx.strokeText('轟！', 0, -70 * s); ctx.fillStyle = black ? `rgba(255,232,90,${a})` : `rgba(255,255,255,${a})`; ctx.fillText('轟！', 0, -70 * s); ctx.restore();
+  });
 }
 // One Comet Punch fist: a clenched fist pointing the way Machamp is running, swelling as it lands and fading as its time runs out;
 // it has a small HP bar like a fire ball.
@@ -2410,7 +2526,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? 0.5 : f.t === 'megahit' ? 0.65 : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -2420,6 +2536,8 @@ function frame() {
       else if (f.t === 'wave') drawWave(f);
       else if (f.t === 'tail') drawTailWhip(f);
       else if (f.t === 'tree') drawTreeSlam(f);
+      else if (f.t === 'mega') drawMegaFist(f);
+      else if (f.t === 'megahit') drawMegaImpact(f);
       else if (f.t === 'gslam') drawGhostSlam(f);
       else if (f.t === 'evolve') drawEvolve(f);
       else if (f.t === 'storm') drawStormStrike(f);

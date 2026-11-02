@@ -504,6 +504,7 @@ type BrawlerCfg struct {
 		LeafRadius     float64 `json:"leaf_radius"`
 		LeafAngle      float64 `json:"leaf_angle"`
 		Damage         int     `json:"damage"`
+		StunDuration   float64 `json:"stun_duration"` // seconds the opponent it lands on is stunned (can neither move nor act); 0 = none
 		Cooldown       float64 `json:"cooldown"`
 	} `json:"tree_slam"`
 	// Comet Punch (J): for `duration` seconds Machamp runs at the opponent (`distance` in all, stopping at its body)
@@ -530,6 +531,25 @@ type BrawlerCfg struct {
 		ScatterMaxDistance float64 `json:"scatter_max_distance"`
 		FistDuration       float64 `json:"fist_duration"`
 	} `json:"comet_punch"`
+	// Megaton Punch (Ash only: Machamp never throws it): Ash stands rooted for `charge_duration` seconds, the direction locked
+	// on the opponent as it begins, with a warning on the ground (the line the fist will fly along) and circles closing in on
+	// its hand; then it throws a fist `distance` ahead, `radius` either side of the line. The opponent it touches (at a height
+	// inside min_height..max_height) takes `damage` once, is stunned `stun_duration` seconds and is knocked `knockback` away
+	// along the punch. `charge_scale`, `fist_scale` and `impact_scale` only make the drawn charge-up circles, fist and impact
+	// bigger; what it hits is `distance` and `radius`.
+	MegatonPunch struct {
+		Reach
+		ChargeDuration float64 `json:"charge_duration"`
+		Distance       float64 `json:"distance"`
+		Radius         float64 `json:"radius"`
+		Damage         int     `json:"damage"`
+		StunDuration   float64 `json:"stun_duration"`
+		Knockback      float64 `json:"knockback"`
+		Cooldown       float64 `json:"cooldown"` // counted from the start
+		ChargeScale    float64 `json:"charge_scale"`
+		FistScale      float64 `json:"fist_scale"`
+		ImpactScale    float64 `json:"impact_scale"`
+	} `json:"megaton_punch"`
 	// Rock Tomb (K): Machamp jumps `height` up for `duration` seconds, steered in the air at `air_speed_first_half`
 	// then `air_speed_second_half`, and the landing raises `count` stones in a ring `ring_radius` from where it lands
 	// (those that would be outside the court are left out). A stone is a solid disc of `stone_radius` for the
@@ -766,7 +786,11 @@ func DefaultConfig() Config {
 	ts.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	ts.JumpDistance, ts.JumpDuration, ts.JumpHeight, ts.ChargeDuration, ts.SwingDuration = 250, 0.5, 50, 0.6, 0.25
 	ts.TrunkScale, ts.TrunkLength, ts.TrunkWidth, ts.LeafScale, ts.LeafRadius, ts.LeafAngle = 1, 300, 70, 1, 180, 180
-	ts.Damage, ts.Cooldown = 35, 8
+	ts.Damage, ts.Cooldown, ts.StunDuration = 35, 8, 1
+	mp := &c.Ash.MegatonPunch
+	mp.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	mp.ChargeDuration, mp.Distance, mp.Radius, mp.Damage, mp.StunDuration, mp.Knockback, mp.Cooldown = 1, 420, 45, 40, 1.5, 250, 14
+	mp.ChargeScale, mp.FistScale, mp.ImpactScale = 1, 1, 1
 	cp := &c.Ash.CometPunch
 	cp.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	cp.Radius, cp.HP, cp.Damage, cp.Cooldown, cp.Mass = 22, 20, 2, 8, 10
@@ -794,6 +818,7 @@ func DefaultConfig() Config {
 	c.Machamp = c.Ash // the same moves a notch weaker: less health and reach, fewer and frailer fists and stones, longer waits
 	c.Machamp.MaxHP, c.Machamp.WalkSpeed = 125, 130
 	c.Machamp.TreeSlam.TrunkLength, c.Machamp.TreeSlam.LeafRadius, c.Machamp.TreeSlam.Damage, c.Machamp.TreeSlam.Cooldown = 270, 160, 30, 9
+	c.Machamp.TreeSlam.StunDuration = 0.8
 	c.Machamp.CometPunch.Quantity, c.Machamp.CometPunch.HP, c.Machamp.CometPunch.Cooldown, c.Machamp.CometPunch.BallKnockback = 20, 16, 9, 100
 	c.Machamp.CometPunch.Knockback = 8
 	c.Machamp.RockTomb.RingRadius, c.Machamp.RockTomb.Count, c.Machamp.RockTomb.StoneHP, c.Machamp.RockTomb.StoneDuration, c.Machamp.RockTomb.Cooldown = 450, 20, 80, 7, 14
@@ -950,6 +975,11 @@ func (c Config) validate() error {
 		{"ash.radius", c.Ash.Radius, 0},
 		{"machamp.tree_slam.jump_distance", c.Machamp.TreeSlam.JumpDistance, 0},
 		{"ash.tree_slam.jump_distance", c.Ash.TreeSlam.JumpDistance, 0},
+		{"ash.megaton_punch.distance", c.Ash.MegatonPunch.Distance, 0},
+		{"ash.megaton_punch.radius", c.Ash.MegatonPunch.Radius, 0},
+		{"ash.megaton_punch.charge_scale", c.Ash.MegatonPunch.ChargeScale, 0},
+		{"ash.megaton_punch.fist_scale", c.Ash.MegatonPunch.FistScale, 0},
+		{"ash.megaton_punch.impact_scale", c.Ash.MegatonPunch.ImpactScale, 0},
 		{"machamp.tree_slam.jump_duration", c.Machamp.TreeSlam.JumpDuration, 0},
 		{"ash.tree_slam.jump_duration", c.Ash.TreeSlam.JumpDuration, 0},
 		{"machamp.tree_slam.trunk_scale", c.Machamp.TreeSlam.TrunkScale, 0},
@@ -1125,6 +1155,13 @@ func (c Config) validate() error {
 		{"ash.tree_slam.swing_duration", c.Ash.TreeSlam.SwingDuration},
 		{"machamp.tree_slam.damage", float64(c.Machamp.TreeSlam.Damage)},
 		{"ash.tree_slam.damage", float64(c.Ash.TreeSlam.Damage)},
+		{"machamp.tree_slam.stun_duration", c.Machamp.TreeSlam.StunDuration},
+		{"ash.tree_slam.stun_duration", c.Ash.TreeSlam.StunDuration},
+		{"ash.megaton_punch.charge_duration", c.Ash.MegatonPunch.ChargeDuration},
+		{"ash.megaton_punch.damage", float64(c.Ash.MegatonPunch.Damage)},
+		{"ash.megaton_punch.stun_duration", c.Ash.MegatonPunch.StunDuration},
+		{"ash.megaton_punch.knockback", c.Ash.MegatonPunch.Knockback},
+		{"ash.megaton_punch.cooldown", c.Ash.MegatonPunch.Cooldown},
 		{"machamp.tree_slam.cooldown", c.Machamp.TreeSlam.Cooldown},
 		{"ash.tree_slam.cooldown", c.Ash.TreeSlam.Cooldown},
 		{"machamp.comet_punch.damage", float64(c.Machamp.CometPunch.Damage)},
@@ -1192,6 +1229,7 @@ func (c Config) validate() error {
 		"ash.tree_slam":          c.Ash.TreeSlam.Reach,
 		"machamp.comet_punch":    c.Machamp.CometPunch.Reach,
 		"ash.comet_punch":        c.Ash.CometPunch.Reach,
+		"ash.megaton_punch":      c.Ash.MegatonPunch.Reach,
 		"machamp.rock_tomb":      c.Machamp.RockTomb.Reach,
 		"gengar.shadow_sneak":    c.Gengar.ShadowSneak.Reach,
 		"gengar.ghost_fire":      c.Gengar.GhostFire.Reach,

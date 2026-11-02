@@ -387,7 +387,22 @@
       "leaf_radius": 220,
       "leaf_angle": 220,
       "damage": 35,
+      "stun_duration": 1,
       "cooldown": 8
+    },
+    "megaton_punch": {
+      "min_height": 0,
+      "max_height": 60,
+      "charge_duration": 1,
+      "distance": 420,
+      "radius": 45,
+      "damage": 40,
+      "stun_duration": 1.5,
+      "knockback": 250,
+      "cooldown": 14,
+      "charge_scale": 1,
+      "fist_scale": 1,
+      "impact_scale": 1
     },
     "comet_punch": {
       "min_height": 0,
@@ -441,6 +456,7 @@
       "leaf_radius": 190,
       "leaf_angle": 190,
       "damage": 30,
+      "stun_duration": 0.8,
       "cooldown": 9.2
     },
     "comet_punch": {

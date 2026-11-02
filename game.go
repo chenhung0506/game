@@ -62,6 +62,7 @@ type Input struct {
 	Tail    bool `json:"tail"`    // Gyarados only: Tail whip
 	Comet   bool `json:"comet"`   // Machamp only: Comet Punch
 	Rock    bool `json:"rock"`    // Machamp only: Rock Tomb
+	Mega    bool `json:"mega"`    // Ash only: Megaton Punch
 	GFire   bool `json:"gfire"`   // Gengar only: Ghost Fire
 	SBall   bool `json:"sball"`   // Gengar only: Shadow Ball (aimed like the Vine Whip, see CastX)
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
@@ -244,7 +245,12 @@ type Player struct {
 	CometN    int     `json:"-"`
 	CometCD   float64 `json:"cpcd"`
 	RockT     float64 `json:"rkt"`
-	RockCD    float64 `json:"rkcd"`
+	// Megaton Punch (Ash): seconds of the charge left, the unit direction it was locked on as it began, and the cooldown.
+	MegaT  float64 `json:"mgt"`
+	MegaX  float64 `json:"mgx"`
+	MegaY  float64 `json:"mgy"`
+	MegaCD float64 `json:"mgcd"`
+	RockCD float64 `json:"rkcd"`
 	// Gengar: seconds left under the ground (the shadow shows), the three cooldowns, and how much longer it cannot start a skill
 	// (an opponent's shadow is on it).
 	SneakT  float64 `json:"gnt"`

@@ -27,7 +27,7 @@ func (g *Game) dropMachamp(i int) {
 	if (p.TreePhase == treeJump || p.RockT > 0) && !p.Held {
 		p.Z = 0
 	}
-	p.TreePhase, p.TreeT, p.CometT, p.CometN, p.RockT = treeNone, 0, 0, 0, 0
+	p.TreePhase, p.TreeT, p.CometT, p.CometN, p.RockT, p.MegaT = treeNone, 0, 0, 0, 0, 0
 }
 
 // machampAirSpeed is how fast Machamp is steered in the Rock Tomb jump: the first speed until the middle, the second after.
@@ -46,14 +46,15 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
 	p, other := &g.P[i], &g.P[1-i]
 	ts, cp, rt := g.brawler(i).TreeSlam, g.brawler(i).CometPunch, g.brawler(i).RockTomb
-	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD} {
+	mp := g.brawler(i).MegatonPunch
+	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD} {
 		if *cd > 0 {
 			if *cd -= dt; *cd < 1e-9 {
 				*cd = 0
 			}
 		}
 	}
-	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.Z == 0
+	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.Z == 0
 
 	// ---- Tree slam: jump, then pull up a tree and smash it down ----
 	if in.Skill && idle && p.TreeCD == 0 {
@@ -147,7 +148,40 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 			p.Z = 4 * rt.Height * u * (1 - u)
 		}
 	}
+
+	// ---- Megaton Punch (Ash only): stand and gather, then one huge fist ----
+	if in.Mega && p.Kind == ash && idle && p.MegaCD == 0 {
+		p.MegaX, p.MegaY = unit(other.X-p.X, other.Y-p.Y)
+		if p.MegaX == 0 && p.MegaY == 0 {
+			p.MegaX, p.MegaY = unit(float64(p.FX), float64(p.FY))
+		}
+		p.MegaT, p.MegaCD = mp.ChargeDuration, mp.Cooldown
+		if p.MegaT == 0 {
+			events = append(events, g.megatonPunch(i)...)
+		}
+	}
+	if p.MegaT > 0 {
+		rooted = true
+		if p.MegaT -= dt; p.MegaT < 1e-9 {
+			p.MegaT = 0
+			events = append(events, g.megatonPunch(i)...)
+		}
+	}
 	return events, rooted
+}
+
+// megatonPunch throws the fist along the direction locked when the charge began: it hurts, stuns and knocks back the
+// opponent it touches, once.
+func (g *Game) megatonPunch(i int) []Event {
+	p, other, mp := &g.P[i], &g.P[1-i], g.brawler(i).MegatonPunch
+	events := []Event{{T: "mega", X: p.X, Y: p.Y, R: mp.Distance, DX: p.MegaX, DY: p.MegaY}}
+	if mp.Reach.hits(other) && segDist(other.X, other.Y, p.X, p.Y, p.X+p.MegaX*mp.Distance, p.Y+p.MegaY*mp.Distance) <= mp.Radius+g.radius(1-i) {
+		g.hit(other, mp.Damage)
+		other.StunT = math.Max(other.StunT, mp.StunDuration)
+		g.knockBack(p.X, p.Y, other, mp.Knockback, p.MegaX, p.MegaY)
+		events = append(events, Event{T: "megahit", X: other.X, Y: other.Y, DX: p.MegaX, DY: p.MegaY})
+	}
+	return events
 }
 
 // advanceTree moves the tree on from a phase whose time is up (and past any that last no time): held up, then swung
@@ -172,6 +206,7 @@ func (g *Game) smashTree(i int) []Event {
 	p, other, ts := &g.P[i], &g.P[1-i], g.brawler(i).TreeSlam
 	if ts.Reach.hits(other) && treeHits(p.X, p.Y, p.TreeX, p.TreeY, other.X, other.Y, g.radius(1-i), ts.TrunkLength, ts.TrunkWidth, ts.LeafRadius, ts.LeafAngle) {
 		g.hit(other, ts.Damage)
+		other.StunT = math.Max(other.StunT, ts.StunDuration)
 	}
 	return []Event{{T: "tree", X: p.X, Y: p.Y, R: ts.TrunkLength, DX: p.TreeX, DY: p.TreeY, K: p.Kind}}
 }

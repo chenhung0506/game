@@ -10,7 +10,7 @@ import (
 // ---- the computer player ----
 
 func hasAct(in Input) bool {
-	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Toss || in.GFire || in.SBall
+	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Mega || in.Toss || in.GFire || in.SBall
 }
 
 // firstAct runs the bot for n ticks on a scene that does not change and returns the first decision that presses a

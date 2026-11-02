@@ -640,6 +640,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"evolve": cfg.Magikarp.EvolveHops,
 		"tree":   []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
 		"fist":   []map[string]float64{aFist, mFist},
+		"mega":   map[string]float64{"charge": cfg.Ash.MegatonPunch.ChargeDuration, "dist": cfg.Ash.MegatonPunch.Distance, "radius": cfg.Ash.MegatonPunch.Radius, "cscale": cfg.Ash.MegatonPunch.ChargeScale, "fscale": cfg.Ash.MegatonPunch.FistScale, "iscale": cfg.Ash.MegatonPunch.ImpactScale},
 		"stone":  []map[string]float64{aStone, mStone},
 		"gengar": map[string]float64{"shadow": cfg.Gengar.ShadowSneak.ShadowRadius, "depth": cfg.Gengar.ShadowSneak.Height, "sneak": cfg.Gengar.ShadowSneak.Duration,
 			"fire": cfg.Gengar.GhostFire.Radius, "ring": cfg.Gengar.GhostFire.RingRadius,
