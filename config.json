@@ -229,7 +229,7 @@
     "radius": 13,
     "fly_high": 30,
     "tailwind": {
-      "radius": 300,
+      "radius": 380,
       "speed": 650,
       "duration": 0.5,
       "cooldown": 3.5
@@ -242,7 +242,7 @@
       "hp": 2,
       "damage": 20,
       "count": 5,
-      "angle": 14,
+      "angle": 13,
       "slow_duration": 5,
       "slow": 0.8,
       "cooldown": 4,
