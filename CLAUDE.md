@@ -73,7 +73,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 
 小智／怪力補充；樹砸中時再讓對手**暈眩** `stun_duration` 秒（`StunT`，和擺尾同一個狀態，沒砸中不暈）。
 
-**百萬噸拳擊（只有小智，怪力沒有；小智只有電腦玩，所以沒有按鈕）**（`machamp.go` `stepMachamp` / `megatonPunch`，`Input.Mega`，設定 `ash.megaton_punch`）：定身蓄力 `charge_duration` 秒（方向在開始那刻鎖定朝對手，之後不跟著動，側走就能躲；地上畫出整條拳路給對手看），然後朝前打出長 `distance`、半寬 `radius` 的拳；高度在 `min_height..max_height` 的對手受 `damage` 一次、暈 `stun_duration` 秒、沿拳路被擊飛 `knockback`。事件 `mega`（出拳）與 `megahit`（打中）。特效縮放 `charge_scale`（蓄力圈與手上的圓）、`fist_scale`（大拳頭）、`impact_scale`（擊中特效）只影響畫面。畫面（`drawMegaCharge`/`drawMegaFist`/`drawMegaImpact`）：前半蓄力是打雷預警式的圈往手收縮、縮到最小時雷打在手上；後半手變成黑白閃爍的圓、圈內有閃電；出拳變成黑白閃爍的大拳頭加殘影；打中時對手身上有黑白閃光、衝擊波、爆炸星形、「轟！」與強烈震動。冷卻從開始算。
+**百萬噸拳擊（只有小智，怪力沒有；小智只有電腦玩，所以沒有按鈕）**（`machamp.go` `stepMachamp` / `megatonPunch`，`Input.Mega`，設定 `ash.megaton_punch`）：定身蓄力 `charge_duration` 秒（方向在開始那刻鎖定朝對手，之後不跟著動，側走就能躲；地上畫出整條拳路給對手看），然後朝前打出長 `distance`、半寬 `radius` 的拳；高度在 `min_height..max_height` 的對手受 `damage` 一次、暈 `stun_duration` 秒、沿拳路被擊飛 `knockback`。事件 `mega`（出拳）與 `megahit`（打中）。特效縮放 `charge_scale`（蓄力圈與手上的圓）、`fist_scale`（大拳頭）、`impact_scale`（擊中特效）只影響畫面。畫面（`drawMegaCharge`/`drawMegaFist`/`drawMegaImpact`）：前半蓄力是打雷預警式的圈往手收縮、縮到最小時雷打在手上；後半手變成黑白閃爍的圓、圈內有閃電；出拳變成黑白閃爍的大拳頭加殘影；打中時對手身上有黑白閃光、衝擊波、爆炸星形、「轟！」與強烈震動。冷卻從開始算。`lunge_distance`：出拳那一刻小智被帶著往前衝這麼遠（遇到對手身體就停，0＝原地），拳頭從原位飛出；`show_warning` 設 false 就不畫地上的拳路警示（圈圈與蓄力照常，電腦照樣躲）。
 | 小智／怪力 | J / 小按鈕「百裂拳」 | 百裂拳（`Input.Comet`）：`duration` 秒內一直朝對手衝（總共最多 `distance`，貼到對方身體邊就停；定身以外的招不能用），平均丟出 `quantity` 個拳頭（`Ball.K=ballFist`）：出現在前進方向前面，離身體邊緣 `scatter_min_distance`～`scatter_max_distance`、偏離方向最多 `random_offset_angle` 度，停在原地 `fist_duration` 秒，碰到對手（`radius`、高度在帶內）就打 `damage` 一次、把對手從拳頭往外推 `knockback`（被龍捲風抓住的不推），然後消失。拳頭有 `hp`、`mass`，和火球一樣被其他招式打掉、和投射物對撞（`clashBalls`）；對撞時還會把對手的投射物（電球、飛葉、火球、箭）從拳頭中心往外推 `ball_knockback`×(拳頭 `mass`−投射物 mass)/拳頭 `mass`（`fistShove`；一樣重或更重的不動，`ball_knockback` 0 就不推；推完投射物照原方向繼續飛，拳頭還在的話下一步可能再被推一次）。前端只在前進方向前面畫拳頭 |
 | 小智／怪力 | K / 小按鈕「岩石陣」 | 岩石陣（`Input.Rock`）：跳 `height` 高、`duration` 秒，空中照 WASD 移動（前半 `air_speed_first_half`、後半 `air_speed_second_half`），落地時在周圍 `ring_radius` 處排一圈 `count` 顆岩石（`Ball.K=ballStone`，超出場地的不生成；以落地前一個 tick 的位置為圓心）。岩石是對手的固態圓盤（`blockByPillars` 和冰柱同一套，半徑 `stone_radius`、高度在帶內才擋；怪力自己穿得過），有 `stone_hp`，被投射物和技能打壞，`stone_duration` 秒後崩塌；撞上它的投射物當場用掉（`pillarBlock`），龍捲風穿過它不受傷。冷卻從起跳算 |
 | 梗鬼 | 空白鍵 / 主按鈕「暗影潛行」 | 暗影潛行（`Input.Skill`）：潛進地面 `duration` 秒，`Player.Z`＝`shadow_sneak.height`（**負數**，預設 -10），所以**任何高度帶 `min_height` 是 0 的招式都打不到它**（`Reach.hits` 是 `min ≤ Z ≤ max`；要打得到得把那招的 `min_height` 設成 -10 或更低，驗證允許到 -1000，`minHeightFloor`）；等於這段時間無敵。**例外要自己擋**：地面火區（`tickFires`）寫了 `foe.Z >= 0`。潛行中用 `shadow_speed_first_half`／`second_half` 的速度（前後半段）照方向鍵移動，不能用其他招；被冰凍／抓住／擊暈會浮上來（`dropGengar`）；被藤鞭纏住時按不出來（位移招）。地上一片 `shadow_radius` 的黑影標出位置（前端 `drawSneakShadows`，雙方都看得到）：**對手碰到黑影（身體碰到半徑，且高度在 `shadow_sneak` 的 `min_height`～`max_height` 內）就 `SilentT`＝0.15 秒不能開始任何招**（`Step` 把 `in` 的技能鍵清掉，方向鍵照用；已經在跑的招不受影響），畫面上方有個禁止符號。冷卻從開始算 |
@@ -207,3 +207,11 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 - **躲鬼火**：梗鬼的鬼火（`ballGhost`）先直線飛出再飛回梗鬼，電腦用 `flameAt` 預測每顆在 t 秒後的位置，擋在路上就用 `safeDir`（把鬼火也算進去）往縫隙走；沒有威脅時也不會往鬼火的路上走（`walksIntoFlames`）。**躲百萬噸拳擊**：蓄力中算拳路（`thPunch`），往側邊走出去。小智對動不了的對手（`rootedFor` ≥ 蓄力時間的 0.8）才一定出百萬噸拳擊，否則 15% 機率。
 - **躲拔樹**（`thTree`）：對手的樹舉起（`treeSmash`）或揮下（`treeSwing`）時，整個形狀（樹幹矩形＋樹冠扇形，用 `treeHits` 判，加上身體半徑與 15 的餘裕）都算危險區，往最快走出去的八向方向（`wayOutOf`）走，皮卡丘則用伏特攻擊衝出去。跳躍中的樹還沒決定方向（落地才朝對手鎖定），所以不躲。
 - 梗鬼（`gengar`）：維持中距離（160～400）繞圈；影子球用 `lead` 的方式預判對手 `duration` 秒後的位置，**施放向量的長度＝距離占射程的比例**（`CastX/CastY`）；對手在鬼火環內就放鬼火；離得遠時機率性潛進地面朝對手走，讓黑影罩住它（封印）；有東西快打到自己（0.5 秒內）而潛行可用時就潛進地面躲（高度帶 0 起跳的招式都打不到）。潛行中只走路、不用其他招。**電腦不躲梗鬼的鬼火、影子球與黑影**。
+
+
+## 三種玩法與木樁
+
+頁面網址 `?play=computer|player|dummy`（不帶＝打電腦；舊頁面連線完全不帶 `play` 時，伺服器仍走原本的選單／自動配對，`main.go` `seatFor`）。選角畫面最上面有三個按鈕，按了就換網址重連，因為各是不同種類的房間：
+- **打電腦**（預設）：自己開一間房，電腦隨機玩一隻（`botKinds`），選好角色立刻開打，可用「單機對戰」換對手。這間房仍會出現在「打玩家」的選單裡（標「對電腦中」），對方選它就取代電腦。
+- **打玩家**：原本的流程，有人在等就出選單（可開新房），沒人就等。
+- **打木樁**（`r.dummy`）：自己開一間房，對手是木樁（kind 11 `dummy`，只存在這種房間，設定 `dummy.{max_hp,radius}`，預設 100000 血、不會動不會還手、`knockBack` 對它無效）；**只有這間房的人可以選小智**（`room.canPick`），可以用百萬噸拳擊（按鈕在小智的第三顆小按鈕，鍵盤 L）。這間房不列在選單、不會被自動配對、不能換對手、沒有團戰。頁面在木樁上方顯示累計傷害和最近一擊。

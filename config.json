@@ -368,6 +368,10 @@
       "width": 50
     }
   },
+  "dummy": {
+    "max_hp": 100000,
+    "radius": 28
+  },
   "ash": {
     "max_hp": 150,
     "walk_speed": 150,
@@ -400,6 +404,8 @@
       "stun_duration": 1.5,
       "knockback": 250,
       "cooldown": 14,
+      "lunge_distance": 250,
+      "show_warning": false,
       "charge_scale": 1,
       "fist_scale": 1,
       "impact_scale": 1

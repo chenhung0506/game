@@ -476,6 +476,12 @@ type Config struct {
 			GhostFireDamage         int     `json:"ghost_fire_damage"`
 		} `json:"shadow_ball"`
 	} `json:"gengar"`
+	// The practice dummy (the mode "打木樁"): a stump that never moves or hits back, with `max_hp` so high that a practice
+	// session does not end it, `radius` wide. It is only ever the computer's, in a room opened for practice.
+	Dummy struct {
+		MaxHP  int     `json:"max_hp"`
+		Radius float64 `json:"radius"`
+	} `json:"dummy"`
 }
 
 // BrawlerCfg is the numbers of one of the two brawlers (Ash and Machamp): the tree slam, the comet punch and the rock tomb.
@@ -535,7 +541,9 @@ type BrawlerCfg struct {
 	// on the opponent as it begins, with a warning on the ground (the line the fist will fly along) and circles closing in on
 	// its hand; then it throws a fist `distance` ahead, `radius` either side of the line. The opponent it touches (at a height
 	// inside min_height..max_height) takes `damage` once, is stunned `stun_duration` seconds and is knocked `knockback` away
-	// along the punch. `charge_scale`, `fist_scale` and `impact_scale` only make the drawn charge-up circles, fist and impact
+	// along the punch. Ash is carried `lunge_distance` forward with the fist as it is thrown (it stops at the opponent's body); 0 =
+	// it stays where it is. `show_warning` false leaves out the line of the fist drawn on the ground (the rings and the charge stay);
+	// the computer still reads the danger from the state. `charge_scale`, `fist_scale` and `impact_scale` only make the drawn charge-up circles, fist and impact
 	// bigger; what it hits is `distance` and `radius`.
 	MegatonPunch struct {
 		Reach
@@ -546,6 +554,8 @@ type BrawlerCfg struct {
 		StunDuration   float64 `json:"stun_duration"`
 		Knockback      float64 `json:"knockback"`
 		Cooldown       float64 `json:"cooldown"` // counted from the start
+		LungeDistance  float64 `json:"lunge_distance"`
+		ShowWarning    bool    `json:"show_warning"`
 		ChargeScale    float64 `json:"charge_scale"`
 		FistScale      float64 `json:"fist_scale"`
 		ImpactScale    float64 `json:"impact_scale"`
@@ -791,6 +801,8 @@ func DefaultConfig() Config {
 	mp.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	mp.ChargeDuration, mp.Distance, mp.Radius, mp.Damage, mp.StunDuration, mp.Knockback, mp.Cooldown = 1, 420, 45, 40, 1.5, 250, 14
 	mp.ChargeScale, mp.FistScale, mp.ImpactScale = 1, 1, 1
+	mp.LungeDistance, mp.ShowWarning = 120, true
+	c.Dummy.MaxHP, c.Dummy.Radius = 100000, 28
 	cp := &c.Ash.CometPunch
 	cp.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	cp.Radius, cp.HP, cp.Damage, cp.Cooldown, cp.Mass = 22, 20, 2, 8, 10
@@ -976,6 +988,8 @@ func (c Config) validate() error {
 		{"machamp.tree_slam.jump_distance", c.Machamp.TreeSlam.JumpDistance, 0},
 		{"ash.tree_slam.jump_distance", c.Ash.TreeSlam.JumpDistance, 0},
 		{"ash.megaton_punch.distance", c.Ash.MegatonPunch.Distance, 0},
+		{"dummy.max_hp", float64(c.Dummy.MaxHP), 0},
+		{"dummy.radius", c.Dummy.Radius, 0},
 		{"ash.megaton_punch.radius", c.Ash.MegatonPunch.Radius, 0},
 		{"ash.megaton_punch.charge_scale", c.Ash.MegatonPunch.ChargeScale, 0},
 		{"ash.megaton_punch.fist_scale", c.Ash.MegatonPunch.FistScale, 0},
@@ -1161,6 +1175,7 @@ func (c Config) validate() error {
 		{"ash.megaton_punch.damage", float64(c.Ash.MegatonPunch.Damage)},
 		{"ash.megaton_punch.stun_duration", c.Ash.MegatonPunch.StunDuration},
 		{"ash.megaton_punch.knockback", c.Ash.MegatonPunch.Knockback},
+		{"ash.megaton_punch.lunge_distance", c.Ash.MegatonPunch.LungeDistance},
 		{"ash.megaton_punch.cooldown", c.Ash.MegatonPunch.Cooldown},
 		{"machamp.tree_slam.cooldown", c.Machamp.TreeSlam.Cooldown},
 		{"ash.tree_slam.cooldown", c.Ash.TreeSlam.Cooldown},
@@ -1317,6 +1332,8 @@ func (c Config) maxHPOf(kind int) int {
 		return c.Gengar.MaxHP
 	case gyarados:
 		return c.Gyarados.MaxHP
+	case dummy:
+		return c.Dummy.MaxHP
 	}
 	return c.Pikachu.MaxHP
 }
@@ -1343,6 +1360,8 @@ func (c Config) walkSpeedOf(kind int) float64 {
 		return c.Gengar.WalkSpeed
 	case gyarados:
 		return c.Gyarados.WalkSpeed
+	case dummy:
+		return 0.0
 	}
 	return c.Pikachu.WalkSpeed
 }
@@ -1369,6 +1388,8 @@ func (c Config) radiusOf(kind int) float64 {
 		return c.Gengar.Radius
 	case gyarados:
 		return c.Gyarados.Radius
+	case dummy:
+		return c.Dummy.Radius
 	}
 	return c.Pikachu.Radius
 }

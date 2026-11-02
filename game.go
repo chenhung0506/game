@@ -39,6 +39,8 @@ const (
 	kinds    = 10
 	gyarados = kinds
 	forms    = kinds + 1 // every kind a player can be in
+	dummy    = kinds + 1 // the practice dummy: only ever the computer's, in the room that practises on it
+	allForms = kinds + 2
 )
 
 // Input is the only thing a client controls: which keys are held. Skill is the
@@ -337,7 +339,8 @@ type Frost struct {
 
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
-	T  string  `json:"t"` // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze" | "paralyze" | "storm" | "iceburst" | "wave" | "tail" | "evolve"
+	L  float64 `json:"l,omitempty"` // how far the attacker was carried forward with its blow (the Megaton Punch)
+	T  string  `json:"t"`           // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze" | "paralyze" | "storm" | "iceburst" | "wave" | "tail" | "evolve"
 	X  float64 `json:"x"`
 	Y  float64 `json:"y"`
 	R  float64 `json:"r,omitempty"`  // slam reach, so the effect can match it
@@ -474,6 +477,9 @@ func (g *Game) ballMass(b *Ball) float64 {
 // knockBack pushes target d units straight away from (sx, sy), stopping at the walls. Standing exactly
 // on it there is no "away", so it goes along (fx, fy).
 func (g *Game) knockBack(sx, sy float64, target *Player, d, fx, fy float64) {
+	if target.Kind == dummy {
+		return // the dummy is planted
+	}
 	target.X, target.Y = g.pushedAway(target.X, target.Y, sx, sy, d, fx, fy)
 }
 

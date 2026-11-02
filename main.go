@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"sort"
@@ -39,6 +40,7 @@ type room struct {
 	id      string // the server's own number for it (never shown to players)
 	n       int    // counts the rooms opened, so the longest-waiting one is the lowest
 	mode    string // the view it was opened from
+	dummy   bool   // opened for practice: the computer is a dummy that stays; nobody else is let in, and a person may play Ash here
 	mu      sync.Mutex
 	g       *Game
 	c       [2]*client
@@ -84,7 +86,7 @@ func (h *hub) waiting(mode string) *room {
 	}
 	for _, r := range h.rooms {
 		r.mu.Lock()
-		single := r.alone()
+		single := r.alone() && !r.dummy
 		r.mu.Unlock()
 		if single && better(r) {
 			best = r
@@ -155,7 +157,7 @@ func (h *hub) joinRoom(id string, c *client) (r *room, idx int, ok bool) {
 		return nil, 0, false
 	}
 	r.mu.Lock()
-	alone := r.alone()
+	alone := r.alone() && !r.dummy
 	r.mu.Unlock()
 	if !alone {
 		return nil, 0, false
@@ -199,7 +201,7 @@ func (h *hub) waitingRooms() []roomInfo {
 	var rows []row
 	for _, r := range h.rooms {
 		r.mu.Lock()
-		if r.alone() {
+		if r.alone() && !r.dummy {
 			i := 0
 			if r.c[0] == nil {
 				i = 1
@@ -229,6 +231,40 @@ func (h *hub) waitingRooms() []roomInfo {
 // (or opens a room of its own); everyone else is paired with whoever has waited longest. ok is false when the
 // connection is over: the server is full, or the page left while choosing.
 func (h *hub) seat(c *client, mode string, menu bool) (r *room, idx int, ok bool) {
+	return h.seatFor(c, mode, menu, playPlayer)
+}
+
+// The three ways to play, chosen by the page when it connects (its own default is the computer): the player gets a room of their own with a computer in
+// it (which anyone looking for a person to fight can take the place of); "player" is the room menu and the auto-pairing there has always been;
+// "dummy" is a room of their own with a practice dummy, which nobody else is let into.
+const (
+	playComputer = "computer"
+	playPlayer   = "player"
+	playDummy    = "dummy"
+)
+
+// seatFor is seat for a way of playing.
+func (h *hub) seatFor(c *client, mode string, menu bool, play string) (r *room, idx int, ok bool) {
+	if play == playComputer || play == playDummy {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		if r = h.open(mode); r == nil {
+			return nil, 0, false
+		}
+		if idx, ok = sit(r, c); !ok {
+			return nil, 0, false
+		}
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if play == playDummy {
+			r.dummy = true
+			r.bot[1-idx], r.pick[1-idx] = newBot(dummy, uint64(time.Now().UnixNano())), dummy
+		} else {
+			kind := botKinds[rand.IntN(len(botKinds))]
+			r.bot[1-idx], r.pick[1-idx] = newBot(kind, uint64(time.Now().UnixNano())), kind
+		}
+		return r, idx, true
+	}
 	if !menu {
 		return h.join(mode, c)
 	}
@@ -310,7 +346,7 @@ func (r *room) clearPicks() {
 // is in that slot. Must be called with r.mu held.
 func (r *room) setBot(idx, kind int) bool {
 	o := 1 - idx
-	if r.playing() || r.team || r.c[o] != nil {
+	if r.playing() || r.team || r.dummy || r.c[o] != nil {
 		return false
 	}
 	if kind < 0 {
@@ -325,13 +361,13 @@ func (r *room) setBot(idx, kind int) bool {
 	return true
 }
 
-// personCanPick is whether a person may play this character: Ash is the computer's alone (see setBot), and Gyarados is only a form.
-func personCanPick(kind int) bool { return kind >= 0 && kind < kinds && kind != ash }
+// canPick is whether a person may play this character here: Ash is the computer's, except in a practice room, and Gyarados and the dummy are only forms.
+func (r *room) canPick(kind int) bool { return kind >= 0 && kind < kinds && (kind != ash || r.dummy) }
 
 // choose records slot idx's pick and starts the match once both players have one. It reports whether the
 // pick was taken: an unknown character is refused, and so is any pick while a match is on. Both players may play the same one. Must be called with r.mu held.
 func (r *room) choose(idx, kind int) bool {
-	if r.playing() || r.team || !personCanPick(kind) {
+	if r.playing() || r.team || !r.canPick(kind) {
 		return false
 	}
 	r.pick[idx] = kind
@@ -373,7 +409,7 @@ func (r *room) setOrder(idx int, order []int) bool {
 	}
 	var seen [kinds]bool
 	for _, k := range order {
-		if !personCanPick(k) || seen[k] {
+		if !r.canPick(k) || seen[k] {
 			return false
 		}
 		seen[k] = true
@@ -614,7 +650,11 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		c.touch()
 		return conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
-	r, idx, ok := h.seat(c, mode, req.URL.Query().Get("menu") == "1")
+	play := req.URL.Query().Get("play")
+	if play != playComputer && play != playDummy {
+		play = playPlayer // a page that says nothing gets what every page used to: the menu, else whoever is waiting (the page itself asks for the computer unless told otherwise)
+	}
+	r, idx, ok := h.seatFor(c, mode, req.URL.Query().Get("menu") == "1", play)
 	if !ok {
 		c.send <- []byte(`{"t":"full"}`) // also when the page left meanwhile: nobody reads it then
 		close(c.send)
@@ -635,12 +675,12 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
 		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp, gengar and the gyarados magikarp becomes
-		"radius": []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Gyarados.Radius},
-		"maxhp":  []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gengar.MaxHP, cfg.Gyarados.MaxHP},
+		"radius": []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Gyarados.Radius, cfg.Dummy.Radius},
+		"maxhp":  []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gengar.MaxHP, cfg.Gyarados.MaxHP, cfg.Dummy.MaxHP},
 		"evolve": cfg.Magikarp.EvolveHops,
 		"tree":   []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
 		"fist":   []map[string]float64{aFist, mFist},
-		"mega":   map[string]float64{"charge": cfg.Ash.MegatonPunch.ChargeDuration, "dist": cfg.Ash.MegatonPunch.Distance, "radius": cfg.Ash.MegatonPunch.Radius, "cscale": cfg.Ash.MegatonPunch.ChargeScale, "fscale": cfg.Ash.MegatonPunch.FistScale, "iscale": cfg.Ash.MegatonPunch.ImpactScale},
+		"mega":   map[string]float64{"charge": cfg.Ash.MegatonPunch.ChargeDuration, "dist": cfg.Ash.MegatonPunch.Distance, "radius": cfg.Ash.MegatonPunch.Radius, "cscale": cfg.Ash.MegatonPunch.ChargeScale, "fscale": cfg.Ash.MegatonPunch.FistScale, "iscale": cfg.Ash.MegatonPunch.ImpactScale, "warn": b2f(cfg.Ash.MegatonPunch.ShowWarning)},
 		"stone":  []map[string]float64{aStone, mStone},
 		"gengar": map[string]float64{"shadow": cfg.Gengar.ShadowSneak.ShadowRadius, "depth": cfg.Gengar.ShadowSneak.Height, "sneak": cfg.Gengar.ShadowSneak.Duration,
 			"fire": cfg.Gengar.GhostFire.Radius, "ring": cfg.Gengar.GhostFire.RingRadius,
@@ -672,7 +712,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,
 			"frost": cfg.Vulpix.FrostField.Cooldown, "storm": cfg.Vulpix.IceStorm.Cooldown, "fbeam": cfg.Vulpix.FreezeBeam.Cooldown,
 			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown,
-			"tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "mtree": cfg.Machamp.TreeSlam.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
+			"mega": cfg.Ash.MegatonPunch.Cooldown, "tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "mtree": cfg.Machamp.TreeSlam.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
 	})
 	c.send <- hi
 	r.broadcastLobby() // both players learn who joined
@@ -727,6 +767,14 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		r.g.P[idx].In = in
 		r.mu.Unlock()
 	}
+}
+
+// b2f is 1 for true and 0 for false, for the numbers the page is sent.
+func b2f(b bool) float64 {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func clampDir(v int) int { return min(max(v, -1), 1) }

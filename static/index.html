@@ -45,7 +45,7 @@
   #easebox { margin: 0 0 12px; text-align: center; line-height: 1.6; display: none; }
   #easebox input { width: 220px; vertical-align: middle; }
   #easemsg { font-size: 12px; opacity: .75; }
-  #modes, #teambar, #tools, #botpick { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 0 0 12px; }
+  #playmodes, #modes, #teambar, #tools, #botpick { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 0 0 12px; }
   #botpick { display: none; }
   #teambar { margin: 12px 0 0; }
   #pick button, #repick { font: bold 15px system-ui; padding: 9px 16px; border-radius: 10px; border: 2px solid #3d4a40; background: #1b1f27; color: #eee; cursor: pointer; }
@@ -63,7 +63,7 @@
 <body>
 <div id="bar"></div>
 <div id="rooms"><h2>選擇房間</h2><div id="roomlist"></div><button id="newroom">開新房間</button><div class="hint">灰色表示對方可能已斷線；沒有人等待時會自動開房</div></div>
-<div id="pick"><h2>選擇你的寶可夢</h2><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="tools"><button id="botMain">單機對戰</button><button id="botOff">改和真人對戰</button><button id="easeBtn">放水 0%</button></div><div id="botpick"></div><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="playmodes"><button data-play="computer">打電腦</button><button data-play="player">打玩家</button><button data-play="dummy">打木樁</button></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="tools"><button id="botMain">單機對戰</button><button id="botOff">改和真人對戰</button><button id="easeBtn">放水 0%</button></div><div id="botpick"></div><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
@@ -89,7 +89,7 @@ const HELP = [
   '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
   '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝滑翔（朝按住的方向衝出一道半月形弧線，彎向敵人那一側）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
-  '你是真新鎮小智　移動 WASD　空白鍵＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　J＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
+  '你是真新鎮小智　移動 WASD　空白鍵＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　J＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）　L＝百萬噸拳擊（定身蓄力一下，朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
   '你是怪力　移動 WASD　空白鍵＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　J＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
   '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才丟；輕點就丟向敵人；球飛在空中，落地才爆炸傷人，並向外炸出一圈不會回頭的紫色火焰）',
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
@@ -98,7 +98,7 @@ const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, range: 450, flight: 0.9, lob: 150, sfire: 20 }; // Gengar's, from 'hi'
-let megaCfg = { charge: 1, dist: 420, radius: 45, cscale: 1, fscale: 1, iscale: 1 }; // Ash's Megaton Punch, from 'hi'
+let megaCfg = { charge: 1, dist: 420, radius: 45, cscale: 1, fscale: 1, iscale: 1, warn: 1 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
 const beamCfgOf = (k) => (k === 10 ? gbeamCfg : beamCfg);
@@ -106,7 +106,10 @@ let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewis
 // Body sizes from 'hi' (world units). The art below was drawn at REF, so it is scaled by radius / REF;
 // that is also the size the server hits with, and it does not depend on the court's size.
 let radius = [16, 24, 26, 18, 14, 13]; // indexed by character
-const REF = [16, 24, 26, 18, 14, 13, 10, 30, 30, 20, 36];
+const REF = [16, 24, 26, 18, 14, 13, 10, 30, 30, 20, 36, 28];
+const dummyHit = { n: 0, at: 0, hp: null }; // the last blow the dummy took: how much, and when
+const DUMMY = 11; // the practice dummy (only the computer's)
+const PLAY = (() => { const p = new URLSearchParams(location.search).get('play'); return p === 'player' || p === 'dummy' ? p : 'computer'; })(); // the way to play: against the computer (the default), a person, or the practice dummy
 let maxHp = [100, 100, 120, 110, 100, 100]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
@@ -138,7 +141,7 @@ const look = [{ dir: null, vx: 0, vy: 0, mv: 0, ph: 0, ls: 1, la: 0 }, { dir: nu
 const disp = [{ x: null, y: 0, z: 0 }, { x: null, y: 0, z: 0 }]; // smoothed positions; set from the first snapshot
 let fx = [], shake = 0;
 
-const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?menu=1&mode=' + (PORTRAIT ? 'mobile' : 'web')); // no room number to type: when people are waiting the server sends their rooms to choose from, otherwise it opens one; the first player's view picks the court
+const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?menu=1&play=' + PLAY + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // no room number to type: when people are waiting the server sends their rooms to choose from, otherwise it opens one; the first player's view picks the court
 let picks = [-1, -1], here = [true, false], bots = [-1, -1], padKind = -1; // bots: the character a computer plays in each slot (-1 = a person or nobody)
 let ease = [0, 0]; // each slot's handicap in percent, from the lobby
 const TEAM_BIG = 6; // the two team sizes there are: 3 or 6 of the characters
@@ -175,6 +178,7 @@ ws.onmessage = (e) => {
       if (st > 0 && !(prevSt > 0)) shake = 14; // the sweep begins
       if (!(st > 0) && prevSt > 0 && beamLook[i].ang !== null) beamLook[i].tail = { x: disp[i].x, y: disp[i].y - 6, ang: beamLook[i].ang, age: 0, bc: beamCfgOf(m.p[i].k) };
     }
+    for (const i of slotsOf(DUMMY)) { const hp = m.p[i].hp; if (dummyHit.hp !== null && hp < dummyHit.hp) { dummyHit.n = dummyHit.hp - hp; dummyHit.at = performance.now(); } dummyHit.hp = hp; }
     if (old) for (const i of slotsOf(7)) { const o = old.p[i].mgt, n = m.p[i].mgt, half = megaCfg.charge / 2; if (o > half && n <= half && n > 0) shake = Math.max(shake, 12); } // the thunder of the charge
     for (const ev of m.e || []) {
       fx.push({ ...ev, age: 0 });
@@ -243,7 +247,7 @@ function buildCards() {
   cardEls.length = 0;
   NAMES.forEach((name, k) => {
     const el = document.createElement('div'); el.className = 'card';
-    if (k === COMPUTER_ONLY) el.style.display = 'none'; // Ash is the computer's: a person picks Machamp
+    if (k === COMPUTER_ONLY && PLAY !== 'dummy') el.style.display = 'none'; // Ash is the computer's (a person picks Machamp), except against the practice dummy
     const cvs = document.createElement('canvas'); cvs.width = 240; cvs.height = 200; // drawn at 2x
     const b = document.createElement('b'); b.textContent = name;
     const sm = document.createElement('small'); sm.textContent = `HP ${maxHp[k]}　${BLURB[k]}`;
@@ -272,13 +276,15 @@ function showPick() {
   document.getElementById('easeBtn').classList.toggle('on', ease[you] > 0);
   document.getElementById('easebox').style.display = easeOpen ? 'block' : 'none';
   document.getElementById('easemsg').textContent = `你的血量和移動速度減少 ${ease[you]}%` + (ease[1 - you] ? `　對手放水 ${ease[1 - you]}%` : '') + '（開打前設定）';
+  for (const b of document.querySelectorAll('#playmodes button')) b.classList.toggle('on', b.dataset.play === PLAY);
+  document.getElementById('modes').style.display = PLAY === 'dummy' ? 'none' : ''; // no team match against a dummy
   document.getElementById('mSingle').classList.toggle('on', !teamMode);
   document.getElementById('mTeam').classList.toggle('on', teamMode);
   document.getElementById('teambar').style.display = teamMode ? 'flex' : 'none';
   document.getElementById('szAll').textContent = `${TEAM_BIG} 隻`;
   for (const n of [3, TEAM_BIG]) { const b = document.getElementById(n === 3 ? 'sz3' : 'szAll'); b.style.display = teamMode ? '' : 'none'; b.classList.toggle('on', teamSize === n); }
   const vsComputer = bots[1 - you] >= 0, personHere = here[1 - you] && !vsComputer; // a computer can stand in for the opponent when no person is there
-  const canBot = !(teamMode || personHere); // the computer can only stand in where no person is, and not in a team match
+  const canBot = !(teamMode || personHere || PLAY === 'dummy'); // the computer can only stand in where no person is, and not in a team match; the dummy stays
   if (!canBot) botOpen = false;
   const botMain = document.getElementById('botMain');
   botMain.style.display = canBot ? '' : 'none';
@@ -301,7 +307,7 @@ function showPick() {
     return;
   }
   if (!here[1 - you]) lines.push('等待對手加入… 有人上線就會自動配對（來了就直接開打）<br>（電腦橫式版：在網址後面加上 ?landscape）<br>等不到人？按上面的「單機」先和電腦對戰，有人來就會換成真人');
-  else if (mine < 0 && theirs >= 0) lines.push(vsComputer ? `電腦玩${NAMES[theirs]}，換你選` : `對手選了${NAMES[theirs]}，換你選（可以選一樣的）`);
+  else if (mine < 0 && theirs >= 0) lines.push(vsComputer ? (theirs === DUMMY ? '對手是木樁（血量很高，不會動也不會還手），換你選；這裡可以選小智' : `電腦玩${NAMES[theirs]}，換你選`) : `對手選了${NAMES[theirs]}，換你選（可以選一樣的）`);
   else if (mine >= 0 && theirs < 0) lines.push('對手選擇中…');
   if (mine >= 0) lines.push(`你選了${NAMES[mine]}（對手還沒選好以前，可以重選；兩人可以選同一隻）`);
   else if (here[1 - you] && theirs < 0) lines.push('點一隻寶可夢開始');
@@ -312,6 +318,7 @@ const send = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const easeEl = document.getElementById('ease');
 easeEl.oninput = () => { document.getElementById('easeval').textContent = easeEl.value + '%'; };
 easeEl.onchange = () => send({ ease: +easeEl.value });
+for (const b of document.querySelectorAll('#playmodes button')) b.onclick = () => { if (b.dataset.play === PLAY) return; const q = new URLSearchParams(location.search); q.set('play', b.dataset.play); location.search = q.toString(); }; // a way to play is a different kind of room: connect again
 document.getElementById('mSingle').onclick = () => send({ team: false });
 document.getElementById('mTeam').onclick = () => send({ team: true });
 document.getElementById('sz3').onclick = () => send({ size: 3 });
@@ -344,7 +351,7 @@ function drawCards() {
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, gfire: false, sball: false }; // the pad's buttons
+const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -388,7 +395,7 @@ function sendInput() {
     razor: k('j') || touch.razor, vine: touch.vine,
     storm: k('j') || touch.storm, freeze: k('k') || touch.freeze,
     arrow: k('j') || touch.arrow, twister: k('k') || touch.twister,
-    comet: k('j') || touch.comet, rock: k('k') || touch.rock, gfire: k('j') || touch.gfire, sball: touch.sball,
+    comet: k('j') || touch.comet, rock: k('k') || touch.rock, mega: k('l') || touch.mega, gfire: k('j') || touch.gfire, sball: touch.sball,
     tail: touch.tail, tx: Math.round(cast.x * 100) / 100 || 0, ty: Math.round(cast.y * 100) / 100 || 0, // the tail and the vines are cast when the button is let go (see endAim), not while it is held
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
@@ -442,7 +449,7 @@ const PAD = [
   { main: ['冰山', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
   { main: ['滑翔', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
-  { main: ['拔樹', 'skill'], small: [['百裂拳', 'comet'], ['岩石陣', 'rock']] }, // Machamp
+  { main: ['拔樹', 'skill'], small: [['百裂拳', 'comet'], ['岩石陣', 'rock'], ['百萬噸', 'mega']] }, // Ash (only played against the dummy); the third is farther out
   { main: ['拔樹', 'skill'], small: [['百裂拳', 'comet'], ['岩石陣', 'rock']] }, // Machamp, the same three as Ash
   { main: ['暗影潛行', 'skill'], small: [['鬼火', 'gfire'], ['影子球', 'sball', true]] }, // Gengar
   { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
@@ -471,7 +478,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['trcd', 'tree'], comet: ['cpcd', 'comet'], rock: ['rkcd', 'rock'] }, { skill: ['trcd', 'mtree'], comet: ['cpcd', 'mcomet'], rock: ['rkcd', 'mrock'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['trcd', 'tree'], comet: ['cpcd', 'comet'], rock: ['rkcd', 'rock'], mega: ['mgcd', 'mega'] }, { skill: ['trcd', 'mtree'], comet: ['cpcd', 'mcomet'], rock: ['rkcd', 'mrock'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
   const hold = (b, label, name, aimed) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -501,11 +508,11 @@ function buildPad() {
   const [mainLabel, mainKey] = PAD[padKind].main;
   const main = el('btn'); place(main, MAIN, mcx, mcy); main.style.fontSize = '20px'; hold(main, mainLabel, mainKey);
   const R = MAIN / 2 + SMALL / 2 + 8;
-  [165, 105].forEach((deg, n) => { // slot angles: round the upper-left of the main button
+  [[165, R], [105, R], [135, R + 50]].forEach(([deg, rr], n) => { // slot angles: round the upper-left of the main button; the third sits farther out
     const def = PAD[padKind].small[n];
     if (!def) return;
     const b = el('btn'), a = deg * Math.PI / 180;
-    place(b, SMALL, mcx - R * Math.cos(a), mcy + R * Math.sin(a)); b.style.fontSize = '14px'; hold(b, def[0], def[1], def[2]);
+    place(b, SMALL, mcx - rr * Math.cos(a), mcy + rr * Math.sin(a)); b.style.fontSize = '14px'; hold(b, def[0], def[1], def[2]);
   });
 }
 
@@ -525,7 +532,23 @@ function art(c, kind, x, y, t, flap, pose = IDLE) {
   else if (kind === 7) artAsh(c, x, y, t, pose);
   else if (kind === 8) artMachamp(c, x, y, t, pose);
   else if (kind === 9) artGengar(c, x, y, t, pose);
+  else if (kind === DUMMY) artDummy(c, x, y);
   else artGyarados(c, x, y, t, pose);
+}
+
+// The practice dummy: a wooden stump with a target painted on it, planted in the ground.
+function artDummy(c, x, y) {
+  c.save(); c.translate(x, y);
+  poly(c, [[-13, 26], [-15, -8], [15, -8], [13, 26]], '#8a5a2e');            // the trunk
+  c.strokeStyle = 'rgba(50,30,10,.5)'; c.lineWidth = 1; c.beginPath();         // bark
+  for (const bx of [-8, -2, 5, 10]) { c.moveTo(bx, -6); c.lineTo(bx * 1.05, 24); }
+  c.stroke();
+  ov(c, 0, -8, 15, 6, '#c9985a');                                            // the cut top
+  ov(c, 0, -8, 9, 3.4, '#b3834a', 0, 'rgba(70,45,15,.5)'); ov(c, 0, -8, 3.4, 1.4, '#9a6e3a', 0, null);
+  ov(c, 0, 8, 10.5, 10.5, '#f4f4f4');                                        // a target on the front
+  ov(c, 0, 8, 7.8, 7.8, '#d9322b', 0, null); ov(c, 0, 8, 5, 5, '#f4f4f4', 0, null); ov(c, 0, 8, 2.4, 2.4, '#d9322b', 0, null);
+  ov(c, 0, 27, 17, 4.5, 'rgba(0,0,0,.28)', 0, null);                         // earth round its foot
+  c.restore();
 }
 
 // ---- Pikachu and Snorlax: one drawing per view ----
@@ -1639,7 +1662,7 @@ function drawMegaCharge(p, d) {
   const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
   ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(base);
   ctx.fillStyle = `rgba(255,50,40,${0.1 + 0.3 * k})`; ctx.strokeStyle = `rgba(255,${120 + 80 * pulse | 0},60,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.rect(0, -megaCfg.radius, megaCfg.dist, megaCfg.radius * 2); ctx.fill(); ctx.stroke();
+  if (megaCfg.warn) { ctx.beginPath(); ctx.rect(0, -megaCfg.radius, megaCfg.dist, megaCfg.radius * 2); ctx.fill(); ctx.stroke(); } // the line of the fist, unless the config turns it off
   ctx.restore();
   const hx = d.x + Math.cos(base) * 24, hy = d.y + Math.sin(base) * 24;
   if (k < 0.5) {
@@ -2440,6 +2463,7 @@ function drawPlayer(i, p) {
     else if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, top - 54 * bs); }
     if (p.sl > 0) { ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#b6e87a'; ctx.fillText(`緩速 ${p.sl.toFixed(1)}s`, 0, top - 68 * bs); }
     if (i === you) { ctx.fillStyle = '#fff'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 你', 0, top - 40 * bs); }
+    if (p.k === DUMMY) { const took = maxHp[DUMMY] - p.hp; ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe14d'; ctx.fillText(`已承受 ${took} 傷害`, 0, top - 56 * bs); if (dummyHit.at > performance.now() - 900) { ctx.fillStyle = '#ff7a5c'; ctx.font = `bold ${20 + Math.min(dummyHit.n, 40) * 0.4}px system-ui`; ctx.fillText(`-${dummyHit.n}`, 0, top - 74 * bs - (performance.now() - dummyHit.at) / 25); } }
     // HP bar follows the body.
     ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 36 * bs, 40, 6);
     ctx.fillStyle = p.hp > 0.3 * maxHp[p.k] ? '#6fd36f' : '#e55'; ctx.fillRect(-20, top - 36 * bs, 40 * p.hp / maxHp[p.k], 6);

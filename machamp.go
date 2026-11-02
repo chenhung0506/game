@@ -174,8 +174,18 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 // opponent it touches, once.
 func (g *Game) megatonPunch(i int) []Event {
 	p, other, mp := &g.P[i], &g.P[1-i], g.brawler(i).MegatonPunch
-	events := []Event{{T: "mega", X: p.X, Y: p.Y, R: mp.Distance, DX: p.MegaX, DY: p.MegaY}}
-	if mp.Reach.hits(other) && segDist(other.X, other.Y, p.X, p.Y, p.X+p.MegaX*mp.Distance, p.Y+p.MegaY*mp.Distance) <= mp.Radius+g.radius(1-i) {
+	ev := Event{T: "mega", X: p.X, Y: p.Y, R: mp.Distance, DX: p.MegaX, DY: p.MegaY}
+	hit := mp.Reach.hits(other) && segDist(other.X, other.Y, p.X, p.Y, p.X+p.MegaX*mp.Distance, p.Y+p.MegaY*mp.Distance) <= mp.Radius+g.radius(1-i)
+	// Ash is carried forward with the fist, and stops against the opponent's body when it is in the way.
+	adv := math.Min(mp.LungeDistance, mp.Distance)
+	if hit {
+		adv = math.Min(adv, math.Max(0, dist(p, other)-g.radius(i)-g.radius(1-i)))
+	}
+	p.X = math.Min(math.Max(p.X+p.MegaX*adv, 0), g.court.Length)
+	p.Y = math.Min(math.Max(p.Y+p.MegaY*adv, 0), g.court.Width)
+	ev.L = adv
+	events := []Event{ev}
+	if hit {
 		g.hit(other, mp.Damage)
 		other.StunT = math.Max(other.StunT, mp.StunDuration)
 		g.knockBack(p.X, p.Y, other, mp.Knockback, p.MegaX, p.MegaY)
