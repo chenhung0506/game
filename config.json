@@ -397,7 +397,7 @@
     "megaton_punch": {
       "min_height": 0,
       "max_height": 60,
-      "charge_duration": 1,
+      "charge_duration": 2,
       "distance": 420,
       "radius": 45,
       "damage": 40,
@@ -406,6 +406,8 @@
       "cooldown": 14,
       "lunge_distance": 250,
       "show_warning": false,
+      "fist_start": -40,
+      "fist_end": 400,
       "charge_scale": 1,
       "fist_scale": 1,
       "impact_scale": 1

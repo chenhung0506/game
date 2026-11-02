@@ -543,7 +543,8 @@ type BrawlerCfg struct {
 	// inside min_height..max_height) takes `damage` once, is stunned `stun_duration` seconds and is knocked `knockback` away
 	// along the punch. Ash is carried `lunge_distance` forward with the fist as it is thrown (it stops at the opponent's body); 0 =
 	// it stays where it is. `show_warning` false leaves out the line of the fist drawn on the ground (the rings and the charge stay);
-	// the computer still reads the danger from the state. `charge_scale`, `fist_scale` and `impact_scale` only make the drawn charge-up circles, fist and impact
+	// the computer still reads the danger from the state. The fist is only drawn flying from `fist_start` to `fist_end`, measured along the punch from
+	// where Ash stood as it threw (negative = behind it); what it hits is `distance`. `charge_scale`, `fist_scale` and `impact_scale` only make the drawn charge-up circles, fist and impact
 	// bigger; what it hits is `distance` and `radius`.
 	MegatonPunch struct {
 		Reach
@@ -556,6 +557,8 @@ type BrawlerCfg struct {
 		Cooldown       float64 `json:"cooldown"` // counted from the start
 		LungeDistance  float64 `json:"lunge_distance"`
 		ShowWarning    bool    `json:"show_warning"`
+		FistStart      float64 `json:"fist_start"`
+		FistEnd        float64 `json:"fist_end"`
 		ChargeScale    float64 `json:"charge_scale"`
 		FistScale      float64 `json:"fist_scale"`
 		ImpactScale    float64 `json:"impact_scale"`
@@ -802,6 +805,7 @@ func DefaultConfig() Config {
 	mp.ChargeDuration, mp.Distance, mp.Radius, mp.Damage, mp.StunDuration, mp.Knockback, mp.Cooldown = 1, 420, 45, 40, 1.5, 250, 14
 	mp.ChargeScale, mp.FistScale, mp.ImpactScale = 1, 1, 1
 	mp.LungeDistance, mp.ShowWarning = 120, true
+	mp.FistStart, mp.FistEnd = 24, mp.Distance
 	c.Dummy.MaxHP, c.Dummy.Radius = 100000, 28
 	cp := &c.Ash.CometPunch
 	cp.Reach = Reach{MinHeight: 0, MaxHeight: 60}

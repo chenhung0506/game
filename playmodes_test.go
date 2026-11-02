@@ -112,6 +112,17 @@ func TestAshIsCarriedForwardWithTheFistAndStopsAtTheBody(t *testing.T) {
 	}
 }
 
+func TestTheFistsDrawnStartAndEndAreSentToTheClient(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Ash.MegatonPunch.FistStart, cfg.Ash.MegatonPunch.FistEnd = -80, 300
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	mega := next(t, dialPlay(t, srv, "dummy"), "hi")["mega"].(map[string]any)
+	if mega["fstart"] != float64(-80) || mega["fend"] != float64(300) {
+		t.Fatalf("mega = %v", mega)
+	}
+}
+
 func TestTheWarningLineCanBeSwitchedOffInTheConfigTheClientIsSent(t *testing.T) {
 	for _, on := range []bool{true, false} {
 		cfg := DefaultConfig()
