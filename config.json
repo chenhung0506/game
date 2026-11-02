@@ -408,7 +408,7 @@
       "jump_distance": 200,
       "jump_duration": 0.4,
       "jump_height": 50,
-      "show_warning": false,
+      "show_warning": true,
       "show_text": false,
       "fist_start": -60,
       "fist_end": 380,
