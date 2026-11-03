@@ -465,7 +465,7 @@
       "air_speed_second_half": 250,
       "count": 16,
       "stone_radius": 40,
-      "stone_hp": 40,
+      "stone_hp": 20,
       "stone_duration": 6
     }
   },
