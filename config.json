@@ -423,7 +423,7 @@
       "jump_distance": 0,
       "jump_duration": 0,
       "jump_height": 0,
-      "show_warning": true,
+      "show_warning": false,
       "show_text": false,
       "fist_start": -60,
       "fist_end": 330,
