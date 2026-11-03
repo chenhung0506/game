@@ -432,7 +432,7 @@
       "show_text": false,
       "fist_start": -60,
       "fist_end": 330,
-      "charge_scale": 1.2,
+      "charge_scale": 1.6,
       "fist_scale": 1.2,
       "impact_scale": 1
     },
