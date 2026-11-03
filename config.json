@@ -417,7 +417,7 @@
       "bolt_start": 1,
       "bolt_count": 5,
       "bolt_interval": 0.1,
-      "bolt_offsets": [-80,80,40,-40,0],
+      "bolt_offsets": [60,-60,-120,120,0],
       "distance": 420,
       "radius": 55,
       "damage": 50,
