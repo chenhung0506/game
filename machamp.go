@@ -281,7 +281,7 @@ func (g *Game) megatonGather(i int) []Event {
 	if p.MegaX == 0 && p.MegaY == 0 {
 		p.MegaX, p.MegaY = unit(float64(p.FX), float64(p.FY))
 	}
-	if p.MegaT = mp.ChargeDuration; p.MegaT == 0 {
+	if p.MegaT = mp.RingDuration + mp.BallDuration; p.MegaT == 0 {
 		return g.megatonPunch(i)
 	}
 	return nil

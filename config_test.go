@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func writeConfig(t *testing.T, body string) string {
 
 func TestMissingFileUsesDefaults(t *testing.T) {
 	cfg, err := LoadConfig(filepath.Join(t.TempDir(), "nope.json"))
-	if err != nil || cfg != DefaultConfig() {
+	if err != nil || !reflect.DeepEqual(cfg, DefaultConfig()) {
 		t.Fatalf("cfg=%+v err=%v, want defaults and no error", cfg, err)
 	}
 }
@@ -30,7 +31,7 @@ func TestPartialFileOverridesOnlyWhatItSets(t *testing.T) {
 	}
 	want := DefaultConfig()
 	want.Pikachu.VoltTackle.Distance, want.Snorlax.Jump.Height = 300, 100
-	if cfg != want {
+	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("cfg = %+v, want %+v", cfg, want)
 	}
 }
@@ -195,7 +196,7 @@ func TestNestedBeamValuesOverrideOnlyWhatTheyName(t *testing.T) {
 	}
 	want := DefaultConfig()
 	want.Snorlax.HyperBeam.Damage = 99
-	if cfg != want {
+	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("cfg = %+v, want %+v", cfg, want)
 	}
 }

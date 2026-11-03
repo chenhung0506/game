@@ -99,7 +99,7 @@ const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per 
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, range: 450, flight: 0.9, lob: 150, sfire: 20 }; // Gengar's, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
-let megaCfg = { charge: 1, dist: 420, radius: 45, cscale: 1, fscale: 1, iscale: 1, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
+let megaCfg = { charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, cscale: 1, fscale: 1, iscale: 1, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
 const beamCfgOf = (k) => (k === 10 ? gbeamCfg : beamCfg);
@@ -180,7 +180,7 @@ ws.onmessage = (e) => {
       if (!(st > 0) && prevSt > 0 && beamLook[i].ang !== null) beamLook[i].tail = { x: disp[i].x, y: disp[i].y - 6, ang: beamLook[i].ang, age: 0, bc: beamCfgOf(m.p[i].k) };
     }
     for (const i of slotsOf(DUMMY)) { const hp = m.p[i].hp; if (dummyHit.hp !== null && hp < dummyHit.hp) { dummyHit.n = dummyHit.hp - hp; dummyHit.at = performance.now(); } dummyHit.hp = hp; }
-    if (old) for (const i of slotsOf(7)) { const o = old.p[i].mgt, n = m.p[i].mgt, half = megaCfg.charge / 2; if (o > half && n <= half && n > 0) shake = Math.max(shake, 12); } // the thunder of the charge
+    if (old) for (const i of slotsOf(7)) { const o = old.p[i].mgt, n = m.p[i].mgt, half = megaCfg.charge - megaCfg.ring; if (o > half && n <= half && n > 0) shake = Math.max(shake, 12); } // the thunder of the charge
     for (const ev of m.e || []) {
       fx.push({ ...ev, age: 0 });
       if (ev.t === 'slam') shake = 16;
@@ -1654,8 +1654,8 @@ function discLightning(R, black, bolts) {
   }
   ctx.restore();
 }
-// While Ash gathers. The ground shows the line the fist will fly along (it does not follow). The first half is Thunder's warning: rings close
-// in on the hand and, when they are as small as they go, lightning strikes it. The second half: the whole hand becomes a flickering
+// While Ash gathers. The ground shows the line the fist will fly along (it does not follow). The first part (`ring_duration`) is Thunder's warning: rings close
+// in on the hand; the bolts of the config strike it whenever they are due. The second part (`ball_duration`): the whole hand becomes a flickering
 // black and white disc that swells, with lightning crackling inside it.
 function drawMegaCharge(p, d) {
   if (!(p.mgt > 0)) return;
@@ -1666,8 +1666,19 @@ function drawMegaCharge(p, d) {
   if (megaCfg.warn) { ctx.beginPath(); ctx.rect(0, -megaCfg.radius, megaCfg.dist, megaCfg.radius * 2); ctx.fill(); ctx.stroke(); } // the line of the fist, unless the config turns it off
   ctx.restore();
   const hx = d.x + Math.cos(base) * 24, hy = d.y + Math.sin(base) * 24;
-  if (k < 0.5) {
-    const u = k / 0.5;
+  const e = megaCfg.charge - p.mgt, ringT = megaCfg.ring, BOLT = 0.22; // e: seconds since the charge began
+  for (let n = 0; n < megaCfg.bcount; n++) { // the bolts from the sky onto the hand, and the flash each makes
+    const since = e - (megaCfg.bstart + n * megaCfg.bint);
+    if (since < 0 || since >= BOLT) continue;
+    const a = 1 - since / BOLT, sy = screenY(hx, hy), off = megaCfg.boffs.length ? megaCfg.boffs[n % megaCfg.boffs.length] : 0;
+    upright(hx, hy, () => {
+      ctx.fillStyle = `rgba(255,248,190,${0.6 * a})`; ctx.beginPath(); ctx.arc(0, 0, 70 * cs, 0, 7); ctx.fill();
+      ctx.lineJoin = 'round';
+      for (const [w, col] of [[16, `rgba(255,225,70,${0.5 * a})`], [6, `rgba(255,255,255,${a})`]]) { ctx.strokeStyle = col; ctx.lineWidth = w; jagPath(off + (Math.random() - 0.5) * 24, -sy - 10, 0, 0, Math.max(4, sy / 38 | 0), 22); ctx.stroke(); }
+    });
+  }
+  if (e < ringT) {
+    const u = ringT > 0 ? e / ringT : 1;
     ctx.save(); ctx.lineWidth = 3;
     for (let j = 0; j < 3; j++) { // three rings, one after another, each closing in to the least it goes
       const v = Math.min(Math.max(u * 1.5 - j * 0.25, 0), 1), r = (150 * (1 - v) + 10) * cs;
@@ -1678,15 +1689,7 @@ function drawMegaCharge(p, d) {
     ctx.restore();
     return;
   }
-  const v = (k - 0.5) / 0.5, since = (k - 0.5) * megaCfg.charge, black = megaBlack(55), R = (16 + 30 * v) * cs;
-  if (since < 0.22) { // the bolt from the sky onto the hand, and the flash it makes
-    const a = 1 - since / 0.22, sy = screenY(hx, hy);
-    upright(hx, hy, () => {
-      ctx.fillStyle = `rgba(255,248,190,${0.6 * a})`; ctx.beginPath(); ctx.arc(0, 0, 70 * cs, 0, 7); ctx.fill();
-      ctx.lineJoin = 'round';
-      for (const [w, col] of [[16, `rgba(255,225,70,${0.5 * a})`], [6, `rgba(255,255,255,${a})`]]) { ctx.strokeStyle = col; ctx.lineWidth = w; jagPath((Math.random() - 0.5) * 24, -sy - 10, 0, 0, Math.max(4, sy / 38 | 0), 22); ctx.stroke(); }
-    });
-  }
+  const v = Math.min((e - ringT) / Math.max(megaCfg.charge - ringT, 1e-6), 1), black = megaBlack(55), R = (16 + 30 * v) * cs;
   ctx.save(); ctx.translate(hx, hy);
   const glow = ctx.createRadialGradient(0, 0, R * 0.6, 0, 0, R * 2.2);
   glow.addColorStop(0, black ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.45)'); glow.addColorStop(1, 'rgba(255,255,255,0)');

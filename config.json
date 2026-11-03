@@ -412,7 +412,12 @@
     "megaton_punch": {
       "min_height": 0,
       "max_height": 60,
-      "charge_duration": 2,
+      "ring_duration": 1,
+      "ball_duration": 2,
+      "bolt_start": 1,
+      "bolt_count": 3,
+      "bolt_interval": 0.25,
+      "bolt_offsets": [-40,40,0],
       "distance": 420,
       "radius": 55,
       "damage": 50,

@@ -80,7 +80,7 @@ func TestADummyIsNotMovedByAKnockbackButTakesTheHit(t *testing.T) {
 	g.P[1].HP = g.maxHP(1)
 	g.P[1].X = 600
 	press(g, 0, Input{Mega: true})
-	steps(g, int(cfg.Ash.MegatonPunch.ChargeDuration/dt)+2)
+	steps(g, int((cfg.Ash.MegatonPunch.RingDuration+cfg.Ash.MegatonPunch.BallDuration)/dt)+2)
 	if g.P[1].X != 600 || g.P[1].HP != cfg.Dummy.MaxHP-cfg.Ash.MegatonPunch.Damage {
 		t.Fatalf("dummy at x=%v HP=%d", g.P[1].X, g.P[1].HP)
 	}
@@ -91,20 +91,20 @@ func TestAshIsCarriedForwardWithTheFistAndStopsAtTheBody(t *testing.T) {
 	mp := cfg.Ash.MegatonPunch
 	g := megaDuel(cfg, 600) // the opponent is out of the fist's reach
 	press(g, 0, Input{Mega: true})
-	steps(g, int(mp.ChargeDuration/dt)+2)
+	steps(g, int((mp.RingDuration+mp.BallDuration)/dt)+2)
 	if math.Abs(g.P[0].X-(300+mp.LungeDistance)) > 1e-6 || g.P[0].Y != 250 {
 		t.Fatalf("Ash at %v,%v, want %v ahead", g.P[0].X, g.P[0].Y, mp.LungeDistance)
 	}
 	g = megaDuel(cfg, 100) // right up against it: it cannot be carried into the body
 	press(g, 0, Input{Mega: true})
-	steps(g, int(mp.ChargeDuration/dt)+2)
+	steps(g, int((mp.RingDuration+mp.BallDuration)/dt)+2)
 	if gap := g.P[1].X - g.P[0].X; gap < g.radius(0)+g.radius(1)-1e-6 {
 		t.Fatalf("Ash ended %v from the opponent, inside its body", gap)
 	}
 	cfg.Ash.MegatonPunch.LungeDistance = 0
 	g = megaDuel(cfg, 600)
 	press(g, 0, Input{Mega: true})
-	steps(g, int(mp.ChargeDuration/dt)+2)
+	steps(g, int((mp.RingDuration+mp.BallDuration)/dt)+2)
 	if g.P[0].X != 300 {
 		t.Fatal("it moved with no lunge")
 	}

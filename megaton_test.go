@@ -33,7 +33,7 @@ func TestMegatonPunchGathersRootedThenHurtsStunsAndKnocksBackWhatItReaches(t *te
 		g.Step(dt)
 		n++
 	}
-	if want := int(math.Ceil(mp.ChargeDuration / dt)); n != want {
+	if want := int(math.Ceil((mp.RingDuration + mp.BallDuration) / dt)); n != want {
 		t.Fatalf("charge took %d ticks, want %d", n, want)
 	}
 	if g.P[1].HP != g.maxHP(1)-mp.Damage {
@@ -61,7 +61,7 @@ func TestMegatonPunchFliesTheLineTheStickHoldsSoABodyBesideItIsMissed(t *testing
 	g := megaDuel(cfg, 300)
 	press(g, 0, Input{Mega: true, AimX: 1})
 	g.P[1].Y = 250 + mp.Radius + g.radius(1) + 10 // out of the line the stick holds
-	for range int(mp.ChargeDuration/dt) + 2 {
+	for range int((mp.RingDuration+mp.BallDuration)/dt) + 2 {
 		g.P[0].In = Input{AimX: 1}
 		g.Step(dt)
 	}
@@ -70,7 +70,7 @@ func TestMegatonPunchFliesTheLineTheStickHoldsSoABodyBesideItIsMissed(t *testing
 	}
 	g = megaDuel(cfg, mp.Distance+g.radius(1)+mp.Radius+20)
 	press(g, 0, Input{Mega: true})
-	steps(g, int(mp.ChargeDuration/dt)+2)
+	steps(g, int((mp.RingDuration+mp.BallDuration)/dt)+2)
 	if g.P[1].HP != g.maxHP(1) {
 		t.Fatal("hit a body beyond its reach")
 	}
@@ -83,7 +83,7 @@ func TestMegatonPunchHasItsHeightBandAndCooldownAndBelongsToAshAlone(t *testing.
 	g := flyer(cfg, mp.MaxHeight+30)
 	g.P[1].X, g.P[1].Y = 600, 250
 	press(g, 0, Input{Mega: true})
-	steps(g, int(mp.ChargeDuration/dt)+2)
+	steps(g, int((mp.RingDuration+mp.BallDuration)/dt)+2)
 	if g.P[1].HP != g.maxHP(1) {
 		t.Fatal("hit something above its band")
 	}
@@ -127,7 +127,7 @@ func TestAnyOtherSkillWaitsWhileTheMegatonPunchGathers(t *testing.T) {
 
 func TestMegatonPunchWithNoChargeLandsOnTheTickItIsPressed(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Ash.MegatonPunch.ChargeDuration = 0
+	cfg.Ash.MegatonPunch.RingDuration, cfg.Ash.MegatonPunch.BallDuration = 0, 0
 	g := megaDuel(cfg, 300)
 	press(g, 0, Input{Mega: true})
 	if g.P[1].HP != g.maxHP(1)-cfg.Ash.MegatonPunch.Damage {
@@ -170,7 +170,12 @@ func TestTheConfigRefusesNonsenseMegatonAndStunNumbers(t *testing.T) {
 		"distance":    func(c *Config) { c.Ash.MegatonPunch.Distance = 0 },
 		"radius":      func(c *Config) { c.Ash.MegatonPunch.Radius = 0 },
 		"stun":        func(c *Config) { c.Ash.MegatonPunch.StunDuration = -1 },
-		"charge":      func(c *Config) { c.Ash.MegatonPunch.ChargeDuration = -1 },
+		"charge":      func(c *Config) { c.Ash.MegatonPunch.RingDuration = -1 },
+		"ball":        func(c *Config) { c.Ash.MegatonPunch.BallDuration = -1 },
+		"bolt start":  func(c *Config) { c.Ash.MegatonPunch.BoltStart = -1 },
+		"bolt gap":    func(c *Config) { c.Ash.MegatonPunch.BoltInterval = -1 },
+		"bolt count":  func(c *Config) { c.Ash.MegatonPunch.BoltCount = 21 },
+		"bolt none":   func(c *Config) { c.Ash.MegatonPunch.BoltCount = -1 },
 		"knockback":   func(c *Config) { c.Ash.MegatonPunch.Knockback = -1 },
 		"fist_scale":  func(c *Config) { c.Ash.MegatonPunch.FistScale = 0 },
 		"tree stun":   func(c *Config) { c.Ash.TreeSlam.StunDuration = -1 },
@@ -218,7 +223,7 @@ func TestTheBotRunsAwayFromAMegatonPunchThatIsGathering(t *testing.T) {
 				t.Fatalf("%s: threat %+v, want the punch", NAMEOF[kind], th)
 			}
 			x0 := g.P[0].X
-			survive(g, b, 0, mp.ChargeDuration*0.9)
+			survive(g, b, 0, (mp.RingDuration+mp.BallDuration)*0.9)
 			if x0-g.P[0].X < 30 {
 				t.Fatalf("%s seed %d: moved %v away from the fist", NAMEOF[kind], seed, x0-g.P[0].X)
 			}
@@ -412,11 +417,31 @@ func TestTheStickTurnsTheMegatonFistWhileItGathersAndWithoutItTheFistFollowsTheO
 	if g.P[0].X != 300 || g.P[0].Y != 250 {
 		t.Fatal("turning the fist walked Ash")
 	}
-	steps(g, int(cfg.Ash.MegatonPunch.ChargeDuration/dt)+2)
+	steps(g, int((cfg.Ash.MegatonPunch.RingDuration+cfg.Ash.MegatonPunch.BallDuration)/dt)+2)
 	if g.P[1].HP != g.maxHP(1) {
 		t.Fatal("the fist hit the opponent it was turned away from")
 	}
 	if g.P[0].Y <= 250 {
 		t.Fatal("Ash did not lunge the way it was turned")
+	}
+}
+
+// The gather is the rings' time plus the ball's, and the page gets both parts and the bolts.
+func TestMegatonChargeIsRingPlusBallAndTheBoltsReachThePage(t *testing.T) {
+	cfg := DefaultConfig()
+	mp := &cfg.Ash.MegatonPunch
+	mp.RingDuration, mp.BallDuration, mp.BoltStart, mp.BoltCount, mp.BoltInterval, mp.BoltOffsets = 0.3, 0.7, 0.2, 3, 0.25, []float64{-80, 120}
+	mp.JumpDuration = 0
+	g := megaDuel(cfg, 300)
+	press(g, 0, Input{Mega: true})
+	if got := g.P[0].MegaT; math.Abs(got-(1.0-dt)) > 1e-9 { // one tick of it has already run
+		t.Fatalf("charge = %v, want ring + ball = 1 less a tick", got)
+	}
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	m := next(t, dialPlay(t, srv, "dummy"), "hi")["mega"].(map[string]any)
+	offs, _ := m["boffs"].([]any)
+	if m["charge"] != 1.0 || m["ring"] != 0.3 || m["bstart"] != 0.2 || m["bcount"] != 3.0 || m["bint"] != 0.25 || len(offs) != 2 || offs[0] != -80.0 || offs[1] != 120.0 {
+		t.Fatalf("mega = %v", m)
 	}
 }

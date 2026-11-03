@@ -852,7 +852,7 @@ func (b *Bot) ash(c *bctx) Input {
 	// The Megaton Punch goes where the opponent is as it starts: it is for one that cannot move out of the way, and now and then for one that may not.
 	mp := bc.MegatonPunch
 	mega := p.Kind == ash && p.MegaCD == 0 && mp.Reach.hits(f) && c.dist <= mp.Distance*0.8 && !danger &&
-		(c.rootedFor() >= mp.ChargeDuration*0.8 || b.rng.Float64() < 0.15)
+		(c.rootedFor() >= (mp.RingDuration+mp.BallDuration)*0.8 || b.rng.Float64() < 0.15)
 	if mega {
 		return Input{Mega: true}
 	}
