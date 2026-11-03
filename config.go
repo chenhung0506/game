@@ -563,7 +563,7 @@ type BrawlerCfg struct {
 	// along the punch. Ash is carried `lunge_distance` forward with the fist as it is thrown (it stops at the opponent's body); 0 =
 	// it stays where it is. `show_warning` false leaves out the line of the fist drawn on the ground (the rings and the charge stay);
 	// the computer still reads the danger from the state. `show_text` false leaves out the "轟！" shown where it lands. The fist is only drawn flying from `fist_start` to `fist_end`, measured along the punch from
-	// where Ash stood as it threw (negative = behind it); what it hits is `distance`. `charge_scale`, `fist_scale` and `impact_scale` only make the drawn charge-up circles, fist and impact
+	// where Ash stood as it threw (negative = behind it); what it hits is `distance`. `ring_scale` (the closing rings), `ball_scale` (the black and white ball), `fist_scale` and `impact_scale` only make the drawn rings, ball, fist and impact
 	// bigger; what it hits is `distance` and `radius`.
 	MegatonPunch struct {
 		Reach
@@ -587,7 +587,8 @@ type BrawlerCfg struct {
 		ShowText      bool      `json:"show_text"`
 		FistStart     float64   `json:"fist_start"`
 		FistEnd       float64   `json:"fist_end"`
-		ChargeScale   float64   `json:"charge_scale"`
+		RingScale     float64   `json:"ring_scale"`
+		BallScale     float64   `json:"ball_scale"`
 		FistScale     float64   `json:"fist_scale"`
 		ImpactScale   float64   `json:"impact_scale"`
 	} `json:"megaton_punch"`
@@ -832,7 +833,7 @@ func DefaultConfig() Config {
 	mp.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	mp.RingDuration, mp.BallDuration, mp.BoltStart, mp.BoltCount, mp.BoltOffsets = 0.5, 0.5, 0.5, 1, []float64{0}
 	mp.Distance, mp.Radius, mp.Damage, mp.StunDuration, mp.Knockback, mp.Cooldown = 420, 45, 40, 1.5, 250, 14
-	mp.ChargeScale, mp.FistScale, mp.ImpactScale = 1, 1, 1
+	mp.RingScale, mp.BallScale, mp.FistScale, mp.ImpactScale = 1, 1, 1, 1
 	mp.LungeDistance, mp.ShowWarning, mp.ShowText = 120, true, true
 	mp.JumpDistance, mp.JumpDuration, mp.JumpHeight = 200, 0.4, 50
 	mp.FistStart, mp.FistEnd = 24, mp.Distance
@@ -1036,7 +1037,8 @@ func (c Config) validate() error {
 		{"dummy.max_hp", float64(c.Dummy.MaxHP), 0},
 		{"dummy.radius", c.Dummy.Radius, 0},
 		{"ash.megaton_punch.radius", c.Ash.MegatonPunch.Radius, 0},
-		{"ash.megaton_punch.charge_scale", c.Ash.MegatonPunch.ChargeScale, 0},
+		{"ash.megaton_punch.ring_scale", c.Ash.MegatonPunch.RingScale, 0},
+		{"ash.megaton_punch.ball_scale", c.Ash.MegatonPunch.BallScale, 0},
 		{"ash.megaton_punch.fist_scale", c.Ash.MegatonPunch.FistScale, 0},
 		{"ash.megaton_punch.impact_scale", c.Ash.MegatonPunch.ImpactScale, 0},
 		{"machamp.tree_slam.jump_duration", c.Machamp.TreeSlam.JumpDuration, 0},
