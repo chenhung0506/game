@@ -880,7 +880,7 @@ function artMachamp(c, x, y, t, pose) {
   if (dir === 2) c.scale(-1, 1);
   ov(c, -9, 29 - Math.max(0, sw) * 4, 8, 5, BD); ov(c, 9, 29 - Math.max(0, -sw) * 4, 8, 5, BD); // feet
   ov(c, -8, 21, 7.5, 10, B); ov(c, 8, 21, 7.5, 10, B); // legs
-  ov(c, 0, 12.5, 8, 7, B); ov(c, 0, -1, 19, 13, B); // torso: a broad chest over a narrower waist, pinched in where they meet
+  ov(c, 0, 12.5, 9, 7, B); ov(c, 0, -1, 19, 13, B); // torso: a broad chest over a narrower waist, pinched in where they meet
   if (!back) { ov(c, 0, 1, 12.5, 8, BELLY, 0, null); ov(c, 0, 11, 8, 9, BELLY, 0, null); for (const [yy, hw] of [[3, 9], [9, 7], [15, 5]]) { c.strokeStyle = BD; c.lineWidth = 0.9; c.beginPath(); c.moveTo(-hw, yy); c.lineTo(hw, yy); c.stroke(); } } // the pale chest: wide at the top, narrow below
   c.lineJoin = 'round'; // the black pants: a rounded triangle, wide at the waist and pointing down (an outline pass, then the fill)
 //for (const [col, w] of [[OUTLINE, 5.8], [BLK, 5]]) { c.fillStyle = col; c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(-6.5, 15); c.lineTo(6.5, 15); c.lineTo(0, 21.5); c.closePath(); c.fill(); c.stroke(); }

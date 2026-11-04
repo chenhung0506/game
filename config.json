@@ -489,7 +489,7 @@
       "radius": 10,
       "damage": 30,
       "stun_duration": 1.2,
-      "knockback": 300,
+      "knockback": 200,
       "cooldown": 6,
       "show_warning": false
     },
@@ -517,7 +517,7 @@
       "radius": 22,
       "hp": 16,
       "damage": 2,
-      "cooldown": 8,
+      "cooldown": 6,
       "mass": 100,
       "ball_knockback": 100,
       "knockback": 12,
