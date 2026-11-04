@@ -292,10 +292,10 @@
       "min_height": 0,
       "max_height": 60,
       "height": -10,
-      "duration": 3.5,
+      "duration": 3,
       "cooldown": 8,
-      "shadow_speed_first_half": 300,
-      "shadow_speed_second_half": 180,
+      "shadow_speed_first_half": 400,
+      "shadow_speed_second_half": 220,
       "shadow_radius": 130
     },
     "ghost_fire": {
@@ -307,8 +307,8 @@
       "convergence_speed": 250,
       "damage": 5,
       "count": 14,
-      "radius": 10,
-      "hp": 10,
+      "radius": 15,
+      "hp": 4,
       "mass": 20
     },
     "shadow_ball": {
