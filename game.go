@@ -1252,6 +1252,7 @@ func solid(k int) bool { return k == ballPillar || k == ballStone }
 // Chikorita has not been shot yet and clashes with nothing.
 func (g *Game) clashBalls() {
 	hurt := make([]int, len(g.Balls))
+	burst := make([]bool, len(g.Balls)) // an Electro Ball and a Shadow Ball that meet set each other off at once, whatever HP they have
 	type shove struct {
 		ball       int
 		fx, fy, by float64
@@ -1272,6 +1273,9 @@ func (g *Game) clashBalls() {
 			if segDist(b.X0, b.Y0, a.X0, a.Y0, a.X0+rx, a.Y0+ry) <= g.ballRadius(a)+g.ballRadius(b) {
 				hurt[i] += g.ballDamage(b)
 				hurt[j] += g.ballDamage(a)
+				if (a.K == ballElectro && b.K == ballShadow) || (a.K == ballShadow && b.K == ballElectro) {
+					burst[i], burst[j] = true, true
+				}
 				for _, p := range [2][2]*Ball{{a, b}, {b, a}} {
 					if fist, other := p[0], p[1]; fist.K == ballFist && other.K != ballFist && !solid(other.K) {
 						idx := j
@@ -1293,6 +1297,9 @@ func (g *Game) clashBalls() {
 	kept := g.Balls[:0]
 	for i, b := range g.Balls {
 		b.HP -= hurt[i]
+		if burst[i] {
+			b.HP = 0 // both burst on the next step, where they are
+		}
 		if b.HP <= 0 && b.K != ballElectro && b.K != ballShadow && hurt[i] > 0 { // an Electro Ball or a Shadow Ball that is shot down bursts on the next step
 			continue
 		}

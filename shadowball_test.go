@@ -139,12 +139,12 @@ func TestShadowBallGravityZeroDoesNotDragAndANearbyOpponentIsDraggedFromAFar(t *
 
 func TestShadowBallHasHPAndIsShotDownEarlyByOtherProjectiles(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Pikachu.ElectroBall.ContactDamage = 10 // what an Electro Ball takes off what it runs into
+	cfg.Charizard.FireBreath.Damage = 10 // what a fire ball takes off what it runs into
 	sb := cfg.Gengar.ShadowBall
 	g := chargeDuel(cfg, 700)
 	g.Balls = []Ball{
 		{K: ballShadow, Owner: 0, X: 400, Y: 250, DX: 1, HP: sb.HP},
-		{K: ballElectro, Owner: 1, X: 440, Y: 250, DX: -1, HP: cfg.Pikachu.ElectroBall.HP},
+		{K: ballFire, Owner: 1, X: 440, Y: 250, DX: -1, HP: 20, Left: 500},
 	}
 	g.Step(dt)
 	var orb *Ball
@@ -153,13 +153,13 @@ func TestShadowBallHasHPAndIsShotDownEarlyByOtherProjectiles(t *testing.T) {
 			orb = &g.Balls[i]
 		}
 	}
-	if orb == nil || orb.HP != sb.HP-cfg.Pikachu.ElectroBall.ContactDamage {
+	if orb == nil || orb.HP != sb.HP-cfg.Charizard.FireBreath.Damage {
 		t.Fatalf("orb = %+v, want it worn down by the ball it met", orb)
 	}
 	g = chargeDuel(cfg, 700) // worn right down by what it meets: it stays one step with no HP, then bursts where it is
 	g.Balls = []Ball{
 		{K: ballShadow, Owner: 0, X: 400, Y: 250, DX: 1, HP: 5},
-		{K: ballElectro, Owner: 1, X: 440, Y: 250, DX: -1, HP: cfg.Pikachu.ElectroBall.HP},
+		{K: ballFire, Owner: 1, X: 440, Y: 250, DX: -1, HP: 20, Left: 500},
 	}
 	g.Step(dt)
 	if len(g.Wells) != 0 || g.Balls[0].K != ballShadow || g.Balls[0].HP > 0 {
@@ -222,5 +222,38 @@ func TestTheCharacterOfAShadowBallTravelsToThePage(t *testing.T) {
 	m := next(t, dialPlay(t, srv, "dummy"), "hi")["gengar"].(map[string]any)
 	if m["charge"] != 1.0 || m["ctime"] != 0.6 || m["pull"] != 1.7 || m["orb"] != cfg.Gengar.ShadowBall.Radius {
 		t.Fatalf("gengar = %v", m)
+	}
+}
+
+func TestAShadowBallAndAnElectroBallThatMeetBothBurstWhateverHPTheyHave(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.ElectroBall.ContactDamage = 0 // it does not even wear the other down: meeting is enough
+	g := chargeDuel(cfg, 900)
+	g.Balls = []Ball{
+		{K: ballShadow, Owner: 0, X: 400, Y: 250, DX: 1, HP: cfg.Gengar.ShadowBall.HP},
+		{K: ballElectro, Owner: 1, X: 460, Y: 250, DX: -1, HP: cfg.Pikachu.ElectroBall.HP},
+	}
+	g.Step(dt)
+	if len(g.Balls) != 2 || g.Balls[0].HP > 0 || g.Balls[1].HP > 0 {
+		t.Fatalf("balls %+v: both should be set off", g.Balls)
+	}
+	seen := map[string]bool{}
+	for _, e := range g.Step(dt) {
+		seen[e.T] = true
+	}
+	if len(g.Balls) != 0 || !seen["explode"] || !seen["gslam"] {
+		t.Fatalf("balls %+v events %v: want both to burst", g.Balls, seen)
+	}
+	// the same owner's balls pass through each other, and a ball of another kind only wears it down
+	g = chargeDuel(cfg, 900)
+	cfg.Charizard.FireBreath.Damage = 3
+	g.cfg = cfg
+	g.Balls = []Ball{
+		{K: ballShadow, Owner: 0, X: 400, Y: 250, DX: 1, HP: cfg.Gengar.ShadowBall.HP},
+		{K: ballFire, Owner: 1, X: 440, Y: 250, DX: -1, HP: 20, Left: 500},
+	}
+	g.Step(dt)
+	if g.Balls[0].K != ballShadow || g.Balls[0].HP != cfg.Gengar.ShadowBall.HP-3 {
+		t.Fatalf("balls %+v: a fire ball should only wear the orb down by its damage", g.Balls)
 	}
 }
