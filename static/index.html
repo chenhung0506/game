@@ -679,8 +679,8 @@ function artSnorlax(c, x, y, t, pose) {
     ov(c, -11, 17 - Math.max(0, sw) * 3, 7, 4.3, C); ov(c, 11, 17 - Math.max(0, -sw) * 3, 7, 4.3, C);
     ov(c, 0, 3, 22, 18, D);
     if (back) ov(c, 0, 3, 14, 11, DD, 0, null); else ov(c, 0, 6, 15, 12, C, 0, null);
-    ov(c, -16.8, 0.4 + sw * 2, 6, 9, D, 0.38); ov(c, 16.8, 0.4 - sw * 2, 6, 9, D, -0.38); // from high up by the neck, a little short, angled out: the belly is too big for them to hang straight
-    if (!back) { ov(c, -21, 9.8 + sw * 2, 4, 3, C, 0, null); ov(c, 21, 9.8 - sw * 2, 4, 3, C, 0, null); }
+    ov(c, -18.2, -0.3 + sw * 2, 6, 9, D, 0.55); ov(c, 18.2, -0.3 - sw * 2, 6, 9, D, -0.55); // from high up by the neck, a little short, angled out: the belly is too big for them to hang straight
+    if (!back) { ov(c, -23.8, 8.3 + sw * 2, 4, 3, C, 0, null); ov(c, 23.8, 8.3 - sw * 2, 4, 3, C, 0, null); }
     poly(c, [[-15, -20], [-13, -31], [-6, -24]], D); poly(c, [[15, -20], [13, -31], [6, -24]], D);
     ov(c, 0, -13, 16, 12.5, D);
     if (!back) {
@@ -881,9 +881,9 @@ function artMachamp(c, x, y, t, pose) {
   if (dir === 2 || dir === 3) c.scale(0.86, 1);
   ov(c, -9, 26 - Math.max(0, sw) * 4, 8, 5, BD); ov(c, 9, 26 - Math.max(0, -sw) * 4, 8, 5, BD); // feet
   ov(c, -8, 18, 7.5, 10, B); ov(c, 8, 18, 7.5, 10, B); // legs
-  ov(c, 0, 5, 16, 18, B); // torso
+  ov(c, 0, -2, 19, 12, B); ov(c, 0, 9, 13, 15, B); // torso: a broad chest over a narrower waist
   if (!back) { ov(c, 0, 8, 12, 12, BELLY, 0, null); for (const yy of [2, 8, 14]) { c.strokeStyle = BD; c.lineWidth = 0.9; c.beginPath(); c.moveTo(-8, yy); c.lineTo(8, yy); c.stroke(); } }
-  ov(c, 0, 17, 12.5, 4.5, BLK); // the belt
+  ov(c, 0, 17, 11.5, 4.5, BLK); // the belt
   for (const m of [-1, 1]) { // the lower arms hang, the upper ones are raised with fists up
     const swing = sw * m * 3;
     ov(c, m * 20.2, 9.1 + swing, 5.5, 11, B, m * 0.6 + Math.PI / 2); ov(c, m * 26.4, 18.4 + swing, 6, 5.5, BD); // the lower arms start at the shoulders and reach out and down
@@ -915,7 +915,7 @@ function artAsh(c, x, y, t, pose) {
   ov(c, 0, 17, 13, 3.5, JEAND); // the belt line
   for (const m of [-1, 1]) { // arms swing against the legs; white sleeves, black gloves
     const swing = sw * m * 4;
-    ov(c, m * 9.6, 2.4 + swing, 4.5, 10, WHITE, m * 0.12); ov(c, m * 10.8, 13.4 + swing, 4, 4, BLK); // the shoulders sit by the neck
+    ov(c, m * 12.8, 2.3 + swing, 4.5, 10, WHITE, -m * 0.2); ov(c, m * 15.5, 13.3 + swing, 4, 4, BLK); // the shoulder is where the sleeve starts (about 10.8 out, by the neck); the arm and hand angle out from there // the shoulders sit by the neck
   }
   ov(c, 0, -11, 11, 10.5, SKIN); // head
   if (back) ov(c, 0, -13, 11.5, 10.5, BLK); // the hair, all there is to see from behind
