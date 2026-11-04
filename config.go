@@ -563,7 +563,7 @@ type BrawlerCfg struct {
 	// along the punch. Ash is carried `lunge_distance` forward with the fist as it is thrown (it stops at the opponent's body); 0 =
 	// it stays where it is. `show_warning` false leaves out the line of the fist drawn on the ground (the rings and the charge stay);
 	// the computer still reads the danger from the state. `show_text` false leaves out the "轟！" shown where it lands. The fist is only drawn flying from `fist_start` to `fist_end`, measured along the punch from
-	// where Ash stood as it threw (negative = behind it); what it hits is `distance`. `ring_scale` (the closing rings), `ball_scale` (the black and white ball), `fist_scale` and `impact_scale` only make the drawn rings, ball, fist and impact; `ball_follow_scale`/`ball_follow_duration` the ball that goes forward with Ash as it is thrown, `ball_hit_scale`/`ball_hit_duration` the black ball that bursts on the opponent it hits (seconds, drawn only)
+	// where Ash stood as it threw (negative = behind it); what it hits is `distance`. `ring_scale` (the closing rings), `ball_scale` (the black and white ball), `fist_scale` and `impact_scale` only make the drawn rings, ball, fist and impact; `ball_follow_scale`/`ball_follow_duration` the ball that goes forward with Ash as it is thrown, `ball_hit_scale`/`ball_hit_duration` the black ball that bursts on the opponent it hits (its size is `ball_scale` times `ball_hit_scale`; seconds, drawn only)
 	// bigger; what it hits is `distance` and `radius`.
 	MegatonPunch struct {
 		Reach
@@ -593,7 +593,7 @@ type BrawlerCfg struct {
 		ImpactScale        float64   `json:"impact_scale"`
 		BallFollowScale    float64   `json:"ball_follow_scale"`    // the ball that goes forward with Ash as the fist is thrown: its size...
 		BallFollowDuration float64   `json:"ball_follow_duration"` // ...and how long it stays
-		BallHitScale       float64   `json:"ball_hit_scale"`       // the black ball that bursts in lightning on the opponent it hits: its size...
+		BallHitScale       float64   `json:"ball_hit_scale"`       // the black ball that bursts in lightning on the opponent it hits: its size (times ball_scale)...
 		BallHitDuration    float64   `json:"ball_hit_duration"`    // ...and how long the burst lasts
 	} `json:"megaton_punch"`
 	// Rock Tomb (K): Machamp jumps `height` up for `duration` seconds, steered in the air at `air_speed_first_half`
