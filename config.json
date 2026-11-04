@@ -332,7 +332,7 @@
       "hp": 30,
       "mass": 50,
       "gravity": 250,
-      "pull_duration": 1
+      "pull_duration": 3
     }
   },
   "gyarados": {
