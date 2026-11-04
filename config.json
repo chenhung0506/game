@@ -314,7 +314,7 @@
     "shadow_ball": {
       "min_height": 0,
       "max_height": 60,
-      "ball_scale": 1.5,
+      "ball_scale": 1,
       "damage": 20,
       "cooldown": 6,
       "slam_radius": 150,
