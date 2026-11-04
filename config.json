@@ -117,7 +117,7 @@
     },
     "seismic_toss": {
       "min_height": 0,
-      "max_height": 12,
+      "max_height": 40,
       "speed": 500,
       "radius": 80,
       "damage": 30,
