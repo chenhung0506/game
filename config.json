@@ -305,9 +305,9 @@
       "ring_radius": 650,
       "spread_speed": 500,
       "convergence_speed": 250,
-      "damage": 5,
+      "damage": 4,
       "count": 18,
-      "radius": 15,
+      "radius": 18,
       "hp": 4,
       "mass": 20
     },
