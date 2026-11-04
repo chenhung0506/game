@@ -68,6 +68,7 @@ type Input struct {
 	Kick    bool `json:"kick"`    // Ash only, and only the computer's (a person's is dropped on the way in): High Jump Kick, which is Machamp's Skill
 	GFire   bool `json:"gfire"`   // Gengar only: Ghost Fire
 	SBall   bool `json:"sball"`   // Gengar only: Shadow Ball (aimed like the Vine Whip, see CastX)
+	Shade   bool `json:"shade"`   // Gengar only, and only the computer's (a person's is dropped on the way in): Night Shade, the lobbed ball (aimed by CastX/CastY, whose length is how far)
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
 	// only aims the Electro Ball and the Ice Punch. A keyboard sends none and aims along DX/DY.
 	AimX float64 `json:"ax"`
@@ -271,8 +272,9 @@ type Player struct {
 	SneakCD          float64 `json:"gncd"`
 	GFireCD          float64 `json:"gfcd"`
 	SBallCD          float64 `json:"sbcd"`
-	SBallT           float64 `json:"sbt"` // charge mode: the charge time left (0 = not charging); the aim is AimX/AimY
-	SBallDX, SBallDY float64 `json:"-"`   // the direction chosen at the cast
+	ShadeCD          float64 `json:"nscd"` // Night Shade
+	SBallT           float64 `json:"sbt"`  // charge mode: the charge time left (0 = not charging); the aim is AimX/AimY
+	SBallDX, SBallDY float64 `json:"-"`    // the direction chosen at the cast
 	SBallLock        bool    `json:"-"`
 	SilentT          float64 `json:"sil"`
 }
@@ -1100,7 +1102,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 				kept = append(kept, b)
 				continue
 			}
-			events = append(events, g.shadowBlast(b.Owner, b.X, b.Y, true)...)
+			events = append(events, g.shadowBlast(b.Owner, b.X, b.Y)...)
 			continue
 		}
 		if b.K == ballGhost {

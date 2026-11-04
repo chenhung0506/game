@@ -353,13 +353,13 @@ func TestEachGhostFireHurtsTheOpponentOnceAndOnlyInItsBand(t *testing.T) {
 
 // ---- Shadow Ball ----
 
-func TestShadowBallLandsOnTheOpponentWhenNoAimWasChosenAndHurtsOnlyWhenItLands(t *testing.T) {
-	cfg := throwConfig()
-	sb := cfg.Gengar.ShadowBall
+func TestNightShadeLandsOnTheOpponentWhenNoAimWasChosenAndHurtsOnlyWhenItLands(t *testing.T) {
+	cfg := DefaultConfig()
+	sb := cfg.Gengar.NightShade
 	g := gen(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 300+300, 250 // within the range
 	hp := g.P[1].HP
-	gpress(g, Input{SBall: true})
+	gpress(g, Input{Shade: true})
 	if len(g.Shadows) != 1 || math.Abs(g.Shadows[0].TX-g.P[1].X) > 1e-6 {
 		t.Fatalf("balls %+v, want one to land on the opponent at %v", g.Shadows, g.P[1].X)
 	}
@@ -381,36 +381,36 @@ func TestShadowBallLandsOnTheOpponentWhenNoAimWasChosenAndHurtsOnlyWhenItLands(t
 	}
 }
 
-func TestShadowBallAtAnOpponentOutOfRangeLandsAsFarAsItGoes(t *testing.T) {
-	cfg := throwConfig()
-	sb := cfg.Gengar.ShadowBall
+func TestNightShadeAtAnOpponentOutOfRangeLandsAsFarAsItGoes(t *testing.T) {
+	cfg := DefaultConfig()
+	sb := cfg.Gengar.NightShade
 	g := gen(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 300+sb.Speed*sb.Duration+500, 250
-	gpress(g, Input{SBall: true})
+	gpress(g, Input{Shade: true})
 	if got := g.Shadows[0].TX - 300; math.Abs(got-sb.Speed*sb.Duration) > 1e-6 {
 		t.Fatalf("lands %v away, want the range %v", got, sb.Speed*sb.Duration)
 	}
 }
 
-func TestShadowBallWithAnAimLandsAtMaxRangeThatWay(t *testing.T) {
-	cfg := throwConfig()
-	sb := cfg.Gengar.ShadowBall
+func TestNightShadeWithAnAimLandsAtMaxRangeThatWay(t *testing.T) {
+	cfg := DefaultConfig()
+	sb := cfg.Gengar.NightShade
 	g := gen(cfg, snorlax)
 	g.P[0].X, g.P[0].Y = 800, 500
 	g.P[1].X, g.P[1].Y = 1500, 500 // the opponent is to the right, the aim is up
-	gpress(g, Input{SBall: true, CastX: 0, CastY: -3})
+	gpress(g, Input{Shade: true, CastX: 0, CastY: -3})
 	b := g.Shadows[0]
 	if math.Abs(b.TX-800) > 1e-6 || math.Abs((500-b.TY)-math.Min(500, sb.Speed*sb.Duration)) > 1e-6 {
 		t.Fatalf("lands at %v,%v, want straight up from 800,500 as far as the range or the wall", b.TX, b.TY)
 	}
 }
 
-func TestShadowBallFlamesSpreadOutAndDoNotComeBack(t *testing.T) {
-	cfg := throwConfig()
-	sb := cfg.Gengar.ShadowBall
+func TestNightShadeFlamesSpreadOutAndDoNotComeBack(t *testing.T) {
+	cfg := DefaultConfig()
+	sb := cfg.Gengar.NightShade
 	g := gen(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 2000, 900
-	gpress(g, Input{SBall: true})
+	gpress(g, Input{Shade: true})
 	for len(g.Ghosts) == 0 && len(g.Shadows) > 0 {
 		g.Step(dt)
 	}
@@ -431,11 +431,11 @@ func TestShadowBallFlamesSpreadOutAndDoNotComeBack(t *testing.T) {
 	}
 }
 
-func TestShadowBallCooldownAndGhostFireCooldownAreTheirOwn(t *testing.T) {
-	g := gen(throwConfig(), snorlax)
+func TestNightShadeCooldownAndGhostFireCooldownAreTheirOwn(t *testing.T) {
+	g := gen(DefaultConfig(), snorlax)
 	g.P[1].X, g.P[1].Y = 2000, 900
-	gpress(g, Input{SBall: true})
-	gpress(g, Input{SBall: true})
+	gpress(g, Input{Shade: true})
+	gpress(g, Input{Shade: true})
 	if len(g.Shadows) != 1 {
 		t.Fatalf("%d balls: a second one came during the cooldown", len(g.Shadows))
 	}
@@ -455,9 +455,11 @@ func TestGengarIsPickableAndItsConfigIsValidated(t *testing.T) {
 		"gengar.shadow_sneak.duration":        func(c *Config) { c.Gengar.ShadowSneak.Duration = 0 },
 		"gengar.shadow_sneak.shadow_radius":   func(c *Config) { c.Gengar.ShadowSneak.ShadowRadius = 0 },
 		"gengar.ghost_fire.count":             func(c *Config) { c.Gengar.GhostFire.Count = 0 },
-		"gengar.shadow_ball.duration":         func(c *Config) { c.Gengar.ShadowBall.Duration = 0 },
 		"gengar.shadow_ball.speed":            func(c *Config) { c.Gengar.ShadowBall.Speed = 0 },
-		"gengar.shadow_ball.ghost_fire_count": func(c *Config) { c.Gengar.ShadowBall.GhostFireCount = 0 },
+		"gengar.night_shade.duration":         func(c *Config) { c.Gengar.NightShade.Duration = 0 },
+		"gengar.night_shade.speed":            func(c *Config) { c.Gengar.NightShade.Speed = 0 },
+		"gengar.night_shade.ghost_fire_count": func(c *Config) { c.Gengar.NightShade.GhostFireCount = -1 },
+		"gengar.night_shade.height band":      func(c *Config) { c.Gengar.NightShade.MinHeight, c.Gengar.NightShade.MaxHeight = 50, 10 },
 		"gengar.ghost_fire":                   func(c *Config) { c.Gengar.GhostFire.MinHeight, c.Gengar.GhostFire.MaxHeight = 50, 10 },
 	} {
 		c := DefaultConfig()
@@ -472,15 +474,20 @@ func TestGengarIsPickableAndItsConfigIsValidated(t *testing.T) {
 		t.Fatalf("min_height -20 refused: %v", err)
 	}
 	c = DefaultConfig()
+	c.Gengar.NightShade.GhostFireCount = 0 // the blast alone, without flames
+	if err := c.validate(); err != nil {
+		t.Fatalf("no flames refused: %v", err)
+	}
+	c = DefaultConfig()
 	c.Gengar.ShadowSneak.Height = 5
 	if err := c.validate(); err == nil {
 		t.Fatal("a sneak that goes up in the air was accepted")
 	}
 }
 
-func TestAShadowBallsFlamesHurtTheOpponentOnlyOnceBetweenThem(t *testing.T) {
-	cfg := throwConfig()
-	sb := &cfg.Gengar.ShadowBall
+func TestANightShadesFlamesHurtTheOpponentOnlyOnceBetweenThem(t *testing.T) {
+	cfg := DefaultConfig()
+	sb := &cfg.Gengar.NightShade
 	sb.Damage, sb.GhostFireCount, sb.GhostFireRadius, sb.GhostFireDamage = 0, 36, 60, 7
 	g := gen(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 300+300, 250
@@ -492,35 +499,28 @@ func TestAShadowBallsFlamesHurtTheOpponentOnlyOnceBetweenThem(t *testing.T) {
 	}
 }
 
-func TestShadowBallLandsAsFarAsTheAimIsLongAndNoFartherThanItsRange(t *testing.T) {
-	cfg := throwConfig()
-	reach := cfg.Gengar.ShadowBall.Speed * cfg.Gengar.ShadowBall.Duration
+func TestNightShadeLandsAsFarAsTheAimIsLongAndNoFartherThanItsRange(t *testing.T) {
+	cfg := DefaultConfig()
+	reach := cfg.Gengar.NightShade.Speed * cfg.Gengar.NightShade.Duration
 	for _, c := range []struct{ cast, share float64 }{{0.5, 0.5}, {0.25, 0.25}, {1, 1}, {3, 1}} {
 		g := gen(cfg, snorlax)
 		g.P[1].X, g.P[1].Y = 300+reach/2, 250 // the opponent stands right in the way: it must not pull the ball
 		g.P[0].X, g.P[0].Y = 300, 250
-		gpress(g, Input{SBall: true, CastX: c.cast, CastY: 0})
+		gpress(g, Input{Shade: true, CastX: c.cast, CastY: 0})
 		if want := 300 + reach*c.share; math.Abs(g.Shadows[0].TX-want) > 1e-6 || g.Shadows[0].TY != 250 {
 			t.Fatalf("cast %v lands at %v,%v, want %v,250", c.cast, g.Shadows[0].TX, g.Shadows[0].TY, want)
 		}
 	}
 }
 
-func TestShadowBallAimedNearTheOpponentStaysWhereAimedAndIsNotPulledOntoIt(t *testing.T) {
-	cfg := throwConfig()
-	reach := cfg.Gengar.ShadowBall.Speed * cfg.Gengar.ShadowBall.Duration
+func TestNightShadeAimedNearTheOpponentStaysWhereAimedAndIsNotPulledOntoIt(t *testing.T) {
+	cfg := DefaultConfig()
+	reach := cfg.Gengar.NightShade.Speed * cfg.Gengar.NightShade.Duration
 	g := gen(cfg, snorlax)
 	g.P[0].X, g.P[0].Y = 300, 250
 	g.P[1].X, g.P[1].Y = 300+reach/2, 250+40 // a little off the line of the aim
-	gpress(g, Input{SBall: true, CastX: 0.5, CastY: 0})
+	gpress(g, Input{Shade: true, CastX: 0.5, CastY: 0})
 	if b := g.Shadows[0]; math.Abs(b.TX-(300+reach/2)) > 1e-6 || b.TY != 250 {
 		t.Fatalf("lands at %v,%v, want %v,250 where it was aimed, not on the opponent", b.TX, b.TY, 300+reach/2)
 	}
-}
-
-// throwConfig is the default numbers with the Shadow Ball lobbed (the mode that is kept for later), for the tests of that mode.
-func throwConfig() Config {
-	cfg := DefaultConfig()
-	cfg.Gengar.ShadowBall.Mode = shadowThrow
-	return cfg
 }

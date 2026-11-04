@@ -460,7 +460,30 @@ type Config struct {
 			HP               int     `json:"hp"`   // a flame is a projectile: the opponent's balls and skills wear it down
 			Mass             float64 `json:"mass"` // what a beam or a fist has to beat to push it
 		} `json:"ghost_fire"`
+		// Shadow Ball (K): rooted for `charge_time` seconds, then a ball flies straight along the aim (the way the Electro Ball does) at
+		// `speed`, `radius` big, with `hp` and `mass` (the opponent's skills and projectiles wear it down; at 0 it bursts where it
+		// is). It bursts on the opponent, a wall or when shot down: `slam_radius` round it the opponent takes `damage` once and is then
+		// dragged to the middle at `gravity` pixels a second for `pull_duration` seconds. `ball_scale` only makes the drawn ball bigger.
 		ShadowBall struct {
+			Reach
+			BallScale    float64 `json:"ball_scale"`
+			Damage       int     `json:"damage"`
+			Cooldown     float64 `json:"cooldown"`
+			SlamRadius   float64 `json:"slam_radius"`
+			Speed        float64 `json:"speed"`
+			ChargeTime   float64 `json:"charge_time"`
+			Radius       float64 `json:"radius"`
+			HP           int     `json:"hp"`
+			Mass         float64 `json:"mass"`
+			Gravity      float64 `json:"gravity"`
+			PullDuration float64 `json:"pull_duration"`
+		} `json:"shadow_ball"`
+		// Night Shade: the lobbed ball Shadow Ball used to be, kept for a skill to come (no key or button is bound to it yet; the
+		// server runs it when an input says `shade`, which a person's never does). A ball is lobbed `speed` x `duration` out at most,
+		// flies `duration` seconds in an arc `height` high and where it comes down hurts what is within `slam_radius` of it for
+		// `damage`, once, and sends `ghost_fire_count` flames out that do not come back (`ghost_fire_spread_speed` fast, `ghost_fire_spread_distance`
+		// far, `ghost_fire_radius` wide, `ghost_fire_damage` between them for the opponent, once). `ball_scale` only makes the drawn ball bigger.
+		NightShade struct {
 			Reach
 			BallScale               float64 `json:"ball_scale"`
 			Damage                  int     `json:"damage"`
@@ -474,14 +497,7 @@ type Config struct {
 			GhostFireSpreadDistance float64 `json:"ghost_fire_spread_distance"`
 			GhostFireCount          int     `json:"ghost_fire_count"`
 			GhostFireDamage         int     `json:"ghost_fire_damage"`
-			Mode                    string  `json:"mode"`          // "charge": rooted for charge_time, then a ball flies straight (like the Electro Ball) and, where it bursts, drags the opponent in; "throw": the ball is lobbed to where it lands
-			ChargeTime              float64 `json:"charge_time"`   // charge mode: seconds rooted before the ball leaves
-			Radius                  float64 `json:"radius"`        // charge mode: the flying ball's size (what touches the opponent)
-			HP                      int     `json:"hp"`            // charge mode: the opponent's skills and projectiles wear it down; at 0 it bursts where it is
-			Mass                    float64 `json:"mass"`          // charge mode: what a beam or a fist has to beat to push it
-			Gravity                 float64 `json:"gravity"`       // charge mode: how fast the burst drags the opponent to its middle, in pixels per second
-			PullDuration            float64 `json:"pull_duration"` // charge mode: how long the drag lasts
-		} `json:"shadow_ball"`
+		} `json:"night_shade"`
 	} `json:"gengar"`
 	// The practice dummy (the mode "打木樁"): a stump that never moves or hits back, with `max_hp` so high that a practice
 	// session does not end it, `radius` wide. It is only ever the computer's, in a room opened for practice.
@@ -872,9 +888,12 @@ func DefaultConfig() Config {
 	gf.HP, gf.Mass = 10, 20
 	sb := &g.ShadowBall
 	sb.Reach = Reach{MinHeight: 0, MaxHeight: 60}
-	sb.BallScale, sb.Damage, sb.Height, sb.Duration, sb.Cooldown, sb.SlamRadius, sb.Speed = 1, 25, 150, 0.9, 6, 110, 500
-	sb.GhostFireSpreadSpeed, sb.GhostFireRadius, sb.GhostFireSpreadDistance, sb.GhostFireCount, sb.GhostFireDamage = 260, 20, 220, 10, 5
-	sb.Mode, sb.ChargeTime, sb.Radius, sb.HP, sb.Mass, sb.Gravity, sb.PullDuration = shadowCharge, 0.8, 30, 30, 50, 250, 1
+	sb.BallScale, sb.Damage, sb.Cooldown, sb.SlamRadius, sb.Speed = 1, 25, 6, 110, 500
+	sb.ChargeTime, sb.Radius, sb.HP, sb.Mass, sb.Gravity, sb.PullDuration = 0.8, 30, 30, 50, 250, 1
+	ns := &g.NightShade
+	ns.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	ns.BallScale, ns.Damage, ns.Height, ns.Duration, ns.Cooldown, ns.SlamRadius, ns.Speed = 1, 25, 150, 0.9, 6, 110, 500
+	ns.GhostFireSpreadSpeed, ns.GhostFireRadius, ns.GhostFireSpreadDistance, ns.GhostFireCount, ns.GhostFireDamage = 260, 20, 220, 10, 5
 	c.Machamp = c.Ash // the same moves a notch weaker: less health and reach, fewer and frailer fists and stones, longer waits
 	c.Machamp.MaxHP, c.Machamp.WalkSpeed = 125, 130
 	c.Machamp.TreeSlam.TrunkLength, c.Machamp.TreeSlam.LeafRadius, c.Machamp.TreeSlam.Damage, c.Machamp.TreeSlam.Cooldown = 270, 160, 30, 9
@@ -1032,13 +1051,15 @@ func (c Config) validate() error {
 		{"gengar.ghost_fire.radius", c.Gengar.GhostFire.Radius, 0},
 		{"gengar.ghost_fire.hp", float64(c.Gengar.GhostFire.HP), 0},
 		{"gengar.shadow_ball.ball_scale", c.Gengar.ShadowBall.BallScale, 0},
-		{"gengar.shadow_ball.duration", c.Gengar.ShadowBall.Duration, 0},
 		{"gengar.shadow_ball.slam_radius", c.Gengar.ShadowBall.SlamRadius, 0},
 		{"gengar.shadow_ball.speed", c.Gengar.ShadowBall.Speed, 0},
-		{"gengar.shadow_ball.ghost_fire_spread_speed", c.Gengar.ShadowBall.GhostFireSpreadSpeed, 0},
-		{"gengar.shadow_ball.ghost_fire_radius", c.Gengar.ShadowBall.GhostFireRadius, 0},
-		{"gengar.shadow_ball.ghost_fire_spread_distance", c.Gengar.ShadowBall.GhostFireSpreadDistance, 0},
-		{"gengar.shadow_ball.ghost_fire_count", float64(c.Gengar.ShadowBall.GhostFireCount), 0},
+		{"gengar.night_shade.ball_scale", c.Gengar.NightShade.BallScale, 0},
+		{"gengar.night_shade.duration", c.Gengar.NightShade.Duration, 0},
+		{"gengar.night_shade.slam_radius", c.Gengar.NightShade.SlamRadius, 0},
+		{"gengar.night_shade.speed", c.Gengar.NightShade.Speed, 0},
+		{"gengar.night_shade.ghost_fire_spread_speed", c.Gengar.NightShade.GhostFireSpreadSpeed, 0},
+		{"gengar.night_shade.ghost_fire_radius", c.Gengar.NightShade.GhostFireRadius, 0},
+		{"gengar.night_shade.ghost_fire_spread_distance", c.Gengar.NightShade.GhostFireSpreadDistance, 0},
 		{"gengar.shadow_ball.radius", c.Gengar.ShadowBall.Radius, 0},
 		{"gengar.shadow_ball.hp", float64(c.Gengar.ShadowBall.HP), 0},
 		{"ash.radius", c.Ash.Radius, 0},
@@ -1279,13 +1300,16 @@ func (c Config) validate() error {
 		{"gengar.ghost_fire.damage", float64(c.Gengar.GhostFire.Damage)},
 		{"gengar.ghost_fire.mass", c.Gengar.GhostFire.Mass},
 		{"gengar.shadow_ball.damage", float64(c.Gengar.ShadowBall.Damage)},
-		{"gengar.shadow_ball.height", c.Gengar.ShadowBall.Height},
+		{"gengar.night_shade.damage", float64(c.Gengar.NightShade.Damage)},
+		{"gengar.night_shade.height", c.Gengar.NightShade.Height},
+		{"gengar.night_shade.cooldown", c.Gengar.NightShade.Cooldown},
+		{"gengar.night_shade.ghost_fire_count", float64(c.Gengar.NightShade.GhostFireCount)}, // none is allowed: the blast alone
+		{"gengar.night_shade.ghost_fire_damage", float64(c.Gengar.NightShade.GhostFireDamage)},
 		{"gengar.shadow_ball.cooldown", c.Gengar.ShadowBall.Cooldown},
 		{"gengar.shadow_ball.charge_time", c.Gengar.ShadowBall.ChargeTime},
 		{"gengar.shadow_ball.mass", c.Gengar.ShadowBall.Mass},
 		{"gengar.shadow_ball.gravity", c.Gengar.ShadowBall.Gravity},
 		{"gengar.shadow_ball.pull_duration", c.Gengar.ShadowBall.PullDuration},
-		{"gengar.shadow_ball.ghost_fire_damage", float64(c.Gengar.ShadowBall.GhostFireDamage)},
 		{"ash.comet_punch.mass", c.Ash.CometPunch.Mass},
 		{"machamp.comet_punch.ball_knockback", c.Machamp.CometPunch.BallKnockback},
 		{"ash.comet_punch.ball_knockback", c.Ash.CometPunch.BallKnockback},
@@ -1311,9 +1335,6 @@ func (c Config) validate() error {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
 		}
-	}
-	if m := c.Gengar.ShadowBall.Mode; m != shadowCharge && m != shadowThrow {
-		return fmt.Errorf("gengar.shadow_ball.mode must be %q or %q, got %q", shadowCharge, shadowThrow, m)
 	}
 	if n := c.Ash.MegatonPunch.BoltCount; n < 0 || n > 20 {
 		return fmt.Errorf("ash.megaton_punch.bolt_count must be 0..20, got %d", n)
@@ -1349,6 +1370,7 @@ func (c Config) validate() error {
 		"gengar.shadow_sneak":    c.Gengar.ShadowSneak.Reach,
 		"gengar.ghost_fire":      c.Gengar.GhostFire.Reach,
 		"gengar.shadow_ball":     c.Gengar.ShadowBall.Reach,
+		"gengar.night_shade":     c.Gengar.NightShade.Reach,
 		"ash.rock_tomb":          c.Ash.RockTomb.Reach,
 	} {
 		if !(r.MinHeight >= -minHeightFloor && r.MaxHeight >= r.MinHeight) { // also rejects NaN

@@ -685,9 +685,9 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		"stone":    []map[string]float64{aStone, mStone},
 		"gengar": map[string]float64{"shadow": cfg.Gengar.ShadowSneak.ShadowRadius, "depth": cfg.Gengar.ShadowSneak.Height, "sneak": cfg.Gengar.ShadowSneak.Duration,
 			"fire": cfg.Gengar.GhostFire.Radius, "ring": cfg.Gengar.GhostFire.RingRadius,
-			"scale": cfg.Gengar.ShadowBall.BallScale, "slam": cfg.Gengar.ShadowBall.SlamRadius, "range": cfg.Gengar.ShadowBall.Speed * cfg.Gengar.ShadowBall.Duration,
-			"flight": cfg.Gengar.ShadowBall.Duration, "lob": cfg.Gengar.ShadowBall.Height, "sfire": cfg.Gengar.ShadowBall.GhostFireRadius,
-			"charge": b2f(cfg.Gengar.ShadowBall.Mode == shadowCharge), "ctime": cfg.Gengar.ShadowBall.ChargeTime, "pull": cfg.Gengar.ShadowBall.PullDuration, "orb": cfg.Gengar.ShadowBall.Radius, "orbhp": float64(cfg.Gengar.ShadowBall.HP)},
+			"scale": cfg.Gengar.ShadowBall.BallScale, "slam": cfg.Gengar.ShadowBall.SlamRadius, "ctime": cfg.Gengar.ShadowBall.ChargeTime, "pull": cfg.Gengar.ShadowBall.PullDuration,
+			"orb": cfg.Gengar.ShadowBall.Radius, "orbhp": float64(cfg.Gengar.ShadowBall.HP),
+			"nscale": cfg.Gengar.NightShade.BallScale, "nslam": cfg.Gengar.NightShade.SlamRadius, "nflight": cfg.Gengar.NightShade.Duration, "nlob": cfg.Gengar.NightShade.Height, "sfire": cfg.Gengar.NightShade.GhostFireRadius},
 		"wave":    map[string]float64{"radius": cfg.Gyarados.Wave.Radius, "speed": cfg.Gyarados.Wave.Speed},
 		"tail":    map[string]float64{"angle": cfg.Gyarados.TailWhip.Angle, "length": cfg.Gyarados.TailWhip.Length, "stun": cfg.Gyarados.TailWhip.StunDuration, "charge": cfg.Gyarados.TailWhip.ChargeDuration},
 		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "scale": cfg.Vulpix.FrostField.Scale, "duration": cfg.Vulpix.FrostField.Duration, "ride": cfg.Vulpix.FrostField.SprayDuration},
@@ -766,7 +766,8 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		}
 		in := m.Input
 		in.DX, in.DY = clampDir(in.DX), clampDir(in.DY)
-		in.Kick = false // the kick key is the computer's Ash's; Machamp's person kicks with Skill
+		in.Shade = false // Night Shade has no key yet
+		in.Kick = false  // the kick key is the computer's Ash's; Machamp's person kicks with Skill
 		if r.g.P[idx].Kind == ash {
 			in.Comet = false // a person's Ash has three skills, like the others: the Comet Punch (and the kick) are the computer's
 		}

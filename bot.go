@@ -958,7 +958,7 @@ func (b *Bot) charizard(c *bctx) Input {
 
 // ---- Gengar ----
 
-// Gengar keeps a middle distance and throws Shadow Balls where the opponent is going to be, with Ghost Fire when it
+// Gengar keeps a middle distance and shoots Shadow Balls where the opponent is going to be, with Ghost Fire when it
 // comes close. Shadow Sneak is both its way out (nothing at height 0 can touch it under the ground) and its way in: it
 // slips towards the opponent so that its shadow, which keeps the opponent from starting a skill, falls on it, and comes
 // up beside it to cast.
@@ -983,29 +983,21 @@ func (b *Bot) gengar(c *bctx) Input {
 		}
 		return in
 	}
-	reach := sb.Speed * sb.Duration
+	reach := sb.Speed * 1.5 // a straight ball keeps its aim for about this far
 	if p.GFireCD == 0 && gf.Reach.hits(f) && c.dist <= gf.RingRadius*0.8 && !danger && b.rng.Float64() < 0.6 {
 		in := c.stay()
 		in.GFire = true
 		return in
 	}
 	if p.SBallCD == 0 && sb.Reach.hits(f) && c.dist <= reach && c.dist >= sb.SlamRadius*0.5 && !danger && (c.rootedFor() > 0.3 || b.rng.Float64() < 0.5) {
-		// at where the opponent will be when it lands (thrown: the cast is as long as the share of its range), or when the
-		// ball that is still to be charged reaches it (charged: only the way matters)
-		flight := sb.Duration
-		if sb.Mode == shadowCharge {
-			flight = sb.ChargeTime + c.dist/sb.Speed
-		}
+		// at where the opponent will be when the ball, which is still to be charged, reaches it: only the way matters
+		flight := sb.ChargeTime + c.dist/sb.Speed
 		x := math.Min(math.Max(c.f.X+c.vx*flight, 0), g.court.Length)
 		y := math.Min(math.Max(c.f.Y+c.vy*flight, 0), g.court.Width)
 		in := c.stay()
 		if dx, dy := x-p.X, y-p.Y; math.Hypot(dx, dy) > 1e-9 {
-			share := math.Min(math.Hypot(dx, dy)/reach, 1)
 			n := math.Hypot(dx, dy)
-			if sb.Mode == shadowCharge {
-				share = 1
-			}
-			in.SBall, in.CastX, in.CastY = true, dx/n*share, dy/n*share
+			in.SBall, in.CastX, in.CastY = true, dx/n, dy/n
 			return in
 		}
 	}

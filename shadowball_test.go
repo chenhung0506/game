@@ -4,6 +4,8 @@ import (
 	"math"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/gorilla/websocket"
 )
 
 // chargeDuel is Gengar (slot 0, 300,250) against a Snorlax that cannot walk off (slot 1, 300+d,250), with the charged Shadow Ball.
@@ -65,7 +67,6 @@ func TestShadowBallKeepsTheAimChosenAtTheCastAndOtherwiseFollowsTheOpponent(t *t
 func TestShadowBallBurstsOnTheOpponentHurtsOnceAndDragsItToTheMiddleAtTheGravity(t *testing.T) {
 	cfg := DefaultConfig()
 	sb := &cfg.Gengar.ShadowBall
-	sb.GhostFireCount = 0 // only the blast and the drag
 	g := chargeDuel(cfg, 500)
 	g.P[1].Kind = dummy // it cannot be dragged: see the next test
 	g.P[1].Kind = snorlax
@@ -85,6 +86,9 @@ func TestShadowBallBurstsOnTheOpponentHurtsOnceAndDragsItToTheMiddleAtTheGravity
 	}
 	if g.P[1].HP != hp-sb.Damage {
 		t.Fatalf("HP = %d, want %d: hurt once by the blast", g.P[1].HP, hp-sb.Damage)
+	}
+	if len(g.Ghosts) != 0 {
+		t.Fatalf("%d flames: a charged Shadow Ball only blasts and drags (the flames are Night Shade's)", len(g.Ghosts))
 	}
 	if len(g.Wells) != 1 {
 		t.Fatalf("wells = %+v, want one", g.Wells)
@@ -190,10 +194,8 @@ func TestShadowBallChargeIsLostWhenGengarIsStunnedAndTheCooldownStillRuns(t *tes
 	}
 }
 
-func TestShadowBallModeAndItsNumbersAreValidated(t *testing.T) {
+func TestShadowBallNumbersAreValidated(t *testing.T) {
 	for name, edit := range map[string]func(*Config){
-		"mode":    func(c *Config) { c.Gengar.ShadowBall.Mode = "lob" },
-		"empty":   func(c *Config) { c.Gengar.ShadowBall.Mode = "" },
 		"charge":  func(c *Config) { c.Gengar.ShadowBall.ChargeTime = -1 },
 		"radius":  func(c *Config) { c.Gengar.ShadowBall.Radius = 0 },
 		"hp":      func(c *Config) { c.Gengar.ShadowBall.HP = 0 },
@@ -207,11 +209,6 @@ func TestShadowBallModeAndItsNumbersAreValidated(t *testing.T) {
 			t.Errorf("%s: accepted", name)
 		}
 	}
-	c := DefaultConfig()
-	c.Gengar.ShadowBall.Mode = shadowThrow
-	if err := c.validate(); err != nil {
-		t.Errorf("throw mode refused: %v", err)
-	}
 }
 
 func TestTheCharacterOfAShadowBallTravelsToThePage(t *testing.T) {
@@ -220,7 +217,7 @@ func TestTheCharacterOfAShadowBallTravelsToThePage(t *testing.T) {
 	srv := httptest.NewServer(newMux(cfg))
 	defer srv.Close()
 	m := next(t, dialPlay(t, srv, "dummy"), "hi")["gengar"].(map[string]any)
-	if m["charge"] != 1.0 || m["ctime"] != 0.6 || m["pull"] != 1.7 || m["orb"] != cfg.Gengar.ShadowBall.Radius {
+	if m["ctime"] != 0.6 || m["pull"] != 1.7 || m["orb"] != cfg.Gengar.ShadowBall.Radius {
 		t.Fatalf("gengar = %v", m)
 	}
 }
@@ -255,5 +252,31 @@ func TestAShadowBallAndAnElectroBallThatMeetBothBurstWhateverHPTheyHave(t *testi
 	g.Step(dt)
 	if g.Balls[0].K != ballShadow || g.Balls[0].HP != cfg.Gengar.ShadowBall.HP-3 {
 		t.Fatalf("balls %+v: a fire ball should only wear the orb down by its damage", g.Balls)
+	}
+}
+
+func TestNightShadeIsKeptButAPersonCannotCastItAndTheShadowBallNeverLobs(t *testing.T) {
+	cfg := DefaultConfig()
+	g := chargeDuel(cfg, 500)
+	gpress(g, Input{Shade: true}) // the server runs it for an input that says so
+	if len(g.Shadows) != 1 || g.P[0].ShadeCD == 0 {
+		t.Fatalf("Night Shade did not lob: %+v cooldown %v", g.Shadows, g.P[0].ShadeCD)
+	}
+	g = chargeDuel(cfg, 500)
+	gpress(g, Input{SBall: true})
+	if len(g.Shadows) != 0 || g.P[0].SBallT == 0 {
+		t.Fatalf("the Shadow Ball lobbed: shadows %+v charge %v", g.Shadows, g.P[0].SBallT)
+	}
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	c := dialPlay(t, srv, "dummy")
+	next(t, c, "hi")
+	pick(t, c, gengar)
+	c.WriteMessage(websocket.TextMessage, []byte(`{"shade":true,"skill":false}`))
+	for i := 0; i < 30; i++ {
+		p := next(t, c, "s")["p"].([]any)[0].(map[string]any)
+		if p["nscd"].(float64) > 0 {
+			t.Fatal("a person cast Night Shade")
+		}
 	}
 }

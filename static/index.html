@@ -97,7 +97,7 @@ const HELP = [
 const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
-let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, range: 450, flight: 0.9, lob: 150, sfire: 20, charge: 1, ctime: 0.8, pull: 1, orb: 30, orbhp: 30 }; // Gengar's, from 'hi'
+let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, ctime: 0.8, pull: 1, orb: 30, orbhp: 30, nscale: 1, nslam: 110, nflight: 0.9, nlob: 150, sfire: 20 }; // Gengar's, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
 let megaCfg = { charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
@@ -370,8 +370,7 @@ function endAim(doCast) {
   const a = aiming; aiming = null; document.body.classList.remove('aiming');
   if (!doCast) return;
   const n = Math.hypot(a.x, a.y), w = n ? toWorld(a.x / n, a.y / n) : { x: 0, y: 0 };
-  const m = a.name === 'sball' && n ? (a.m ?? 1) : 1; // the Shadow Ball's cast is as long as the pull: the share of its range it flies
-  cast = { x: w.x * m, y: w.y * m }; touch[a.name] = true; sendInput();
+  cast = { x: w.x, y: w.y }; touch[a.name] = true; sendInput();
   setTimeout(() => { touch[a.name] = false; cast = { x: 0, y: 0 }; sendInput(); }, CAST_PULSE);
 }
 function sendInput() {
@@ -486,15 +485,14 @@ function buildPad() {
     if (padKind === 0 && name === 'skill') { usesBadge = document.createElement('div'); usesBadge.className = 'uses'; b.append(usesBadge); }
     if (aimed) { // the button turns into a stick while it is held: the way it is dragged is the way the skill goes
       const ring = document.createElement('div'), dot = document.createElement('div'); ring.className = 'aimring'; dot.className = 'aimdot'; b.append(ring, dot);
-      // The straight balls (the Electro Ball, the charged Shadow Ball) are aimed like a stick that starts where the finger went down, with a dead zone: a tap, or a finger that
-      // only wobbles, aims nothing and the ball goes at the opponent. The lobbed Shadow Ball measures from the button's middle, its pull is how far it lands.
-      const fromTouch = name === 'ball' || (name === 'sball' && gengarCfg.charge), lob = name === 'sball' && !gengarCfg.charge;
-      const DEAD = fromTouch ? 30 : lob ? 10 : 20, MAXR = lob ? 110 : 56; // a short pull of the lobbed Shadow Ball is a short throw, not a tap that follows the opponent; its pull is long (and its ring as wide) so one pixel is ~4 of range, not ~8
-      if (lob) { ring.style.width = ring.style.height = MAXR * 2 + 'px'; ring.style.margin = -MAXR + 'px 0 0 ' + -MAXR + 'px'; }
+      // The straight balls (the Electro Ball, the Shadow Ball) are aimed like a stick that starts where the finger went down, with a dead zone: a tap, or a finger that
+      // only wobbles, aims nothing and the ball goes at the opponent. The whips measure from the button's middle.
+      const fromTouch = name === 'ball' || name === 'sball';
+      const DEAD = fromTouch ? 30 : 20, MAXR = 56;
       let o = null; // where the finger went down
       const drag = (e) => {
         const r = b.getBoundingClientRect(), ox = fromTouch && o ? o.x : r.left + r.width / 2, oy = fromTouch && o ? o.y : r.top + r.height / 2, vx = e.clientX - ox, vy = e.clientY - oy, len = Math.hypot(vx, vy);
-        if (aiming) { aiming.x = len < DEAD ? 0 : vx / len; aiming.y = len < DEAD ? 0 : vy / len; aiming.m = Math.min(len / MAXR, 1); }
+        if (aiming) { aiming.x = len < DEAD ? 0 : vx / len; aiming.y = len < DEAD ? 0 : vy / len; }
         const pull = Math.min(len, MAXR);
         dot.style.transform = len ? `translate(${vx / len * pull}px, ${vy / len * pull}px)` : '';
       };
@@ -1060,22 +1058,12 @@ function drawTelegraph() {
 // real warning takes over. Without a direction it points at the opponent, which is where a tap would send it.
 function drawAimFan(p, d) {
   const o = disp[1 - you], n = Math.hypot(aiming.x, aiming.y), w = n ? toWorld(aiming.x / n, aiming.y / n) : { x: o.x - d.x, y: o.y - d.y };
-  if (aiming.name === 'sball' && gengarCfg.charge) { // charged: the ball flies straight, so a line and the ball where it starts (a tap, no direction, goes at the opponent)
+  if (aiming.name === 'sball') { // the ball flies straight, so a line and the ball where it starts (a tap, no direction, goes at the opponent)
     const base = Math.atan2(w.y, w.x), r = gengarCfg.orb * gengarCfg.scale, off = radius[9] + gengarCfg.orb;
     ctx.save(); ctx.globalAlpha = p.sbcd > 0 ? 0.4 : 1;
     ctx.strokeStyle = 'rgba(200,140,255,0.85)'; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
     ctx.beginPath(); ctx.moveTo(d.x + Math.cos(base) * 30, d.y + Math.sin(base) * 30); ctx.lineTo(d.x + Math.cos(base) * 420, d.y + Math.sin(base) * 420); ctx.stroke(); ctx.setLineDash([]);
     ctx.beginPath(); ctx.arc(d.x + Math.cos(base) * off, d.y + Math.sin(base) * off, r, 0, 7); ctx.stroke();
-    ctx.restore(); return;
-  }
-  if (aiming.name === 'sball') { // the ball is lobbed: where it will come down, and how far its blast reaches
-    const R = gengarCfg.range * (n && aiming.m != null ? aiming.m : 1), dd = Math.hypot(o.x - d.x, o.y - d.y);
-    const tx = d.x + (n ? w.x * R : (o.x - d.x) / Math.max(dd, 1e-9) * Math.min(dd, R)), ty = d.y + (n ? w.y * R : (o.y - d.y) / Math.max(dd, 1e-9) * Math.min(dd, R));
-    ctx.save(); ctx.globalAlpha = p.sbcd > 0 ? 0.4 : 1;
-    ctx.strokeStyle = 'rgba(200,140,255,0.85)'; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
-    ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(tx, ty); ctx.stroke();
-    ctx.beginPath(); ctx.arc(tx, ty, gengarCfg.slam, 0, 7); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(160,90,230,0.18)'; ctx.fill();
     ctx.restore(); return;
   }
   if (aiming.name === 'ball') { // the ball flies straight: a line, and the ball where it starts
@@ -2037,7 +2025,7 @@ function shadowOrbAt(x, y, r, now) {
   ctx.beginPath(); ctx.arc(x, y, r * 1.15, 0, 7); ctx.stroke(); ctx.setLineDash([]);
 }
 function drawShadowCharge(p, d) {
-  if (!(p.sbt > 0) || !gengarCfg.charge) return;
+  if (!(p.sbt > 0)) return;
   const k = 1 - p.sbt / Math.max(gengarCfg.ctime, 1e-6), ux = p.ax, uy = p.ay, now = performance.now() / 1000;
   ctx.save();
   ctx.strokeStyle = `rgba(200,140,255,${0.3 + 0.4 * k})`; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
@@ -2068,14 +2056,14 @@ function drawPullWell(f) {
   }
   ctx.restore();
 }
-// A Shadow Ball in the air: a dark purple sphere, high above the ground by its arc, with its shadow and where it will come down on the ground.
+// A Night Shade ball in the air (the lobbed one; no button throws it yet): a dark purple sphere, high above the ground by its arc, with its shadow and where it will come down on the ground.
 function drawShadowBalls() {
   const now = performance.now() / 1000;
   for (const b of snap.sb || []) {
-    const u = Math.min(1, b.t / gengarCfg.flight), r = 16 * gengarCfg.scale;
+    const u = Math.min(1, b.t / gengarCfg.nflight), r = 16 * gengarCfg.nscale;
     ctx.save(); // the landing place: the blast's reach, filling in as the ball comes down
     ctx.strokeStyle = `rgba(190,120,255,${0.5 + 0.4 * u})`; ctx.lineWidth = 3; ctx.setLineDash([10, 8]);
-    ctx.beginPath(); ctx.arc(b.tx, b.ty, gengarCfg.slam, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(b.tx, b.ty, gengarCfg.nslam, 0, 7); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = `rgba(120,50,200,${0.08 + 0.3 * u * u})`; ctx.fill();
     ctx.restore();
     upright(b.x, b.y, () => {

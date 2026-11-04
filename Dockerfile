@@ -3,7 +3,8 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/game .
+# The compile cache is a cache mount, not part of the layer: otherwise every build leaves ~100 MB of it behind in the image cache.
+RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/game .
 
 FROM alpine:3.20
 RUN adduser -D -u 10001 game

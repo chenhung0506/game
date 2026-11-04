@@ -60,7 +60,11 @@ cd ~/reverse-proxy/docker
 $COMPOSE up -d --build --force-recreate game
 sleep 4
 docker ps --filter name=^game\$ --format '{{.Names}} {{.Status}}'
-docker logs --tail 2 game 2>&1"
+docker logs --tail 2 game 2>&1
+# Every build leaves the image it replaced and some build cache behind: drop the images nothing uses and the cache nobody
+# has touched for a day (recent cache stays, so the next build is still fast). Never fails the deploy.
+docker image prune -f >/dev/null || true
+docker builder prune -f --filter until=24h >/dev/null || true"
 
 echo "== deploying $commit to $HOST"
 if $dry; then
