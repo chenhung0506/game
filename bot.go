@@ -13,7 +13,7 @@ import (
 //   - it decides only every botEvery ticks and holds the stick in between (a skill key is pressed for one tick);
 //   - it takes a chance on some moves instead of always making the best one.
 //
-// Everything about how a character plays is in its own function (pikachu, snorlax, chikorita, ash and machamp, charizard, gengar); the rest here is shared: what
+// Everything about how a character plays is in its own function (pikachu, snorlax, chikorita, ash and machamp, charizard, vulpix, gengar); the rest here is shared: what
 // threatens the bot, where to stand, and the 8-way stick.
 const (
 	botEvery = 4 // ticks between decisions
@@ -21,7 +21,7 @@ const (
 )
 
 // botKinds are the characters a Bot can play so far.
-var botKinds = []int{pikachu, snorlax, chikorita, ash, machamp, charizard, gengar}
+var botKinds = []int{pikachu, snorlax, chikorita, ash, machamp, charizard, vulpix, gengar}
 
 func botCanPlay(kind int) bool {
 	for _, k := range botKinds {
@@ -81,6 +81,8 @@ func (b *Bot) Decide(g *Game, me int) Input {
 		in = b.ash(c)
 	case charizard:
 		in = b.charizard(c)
+	case vulpix:
+		in = b.vulpix(c)
 	case gengar:
 		in = b.gengar(c)
 	}
@@ -954,6 +956,57 @@ func (b *Bot) charizard(c *bctx) Input {
 		in.Fire = true // it walks while it breathes
 	}
 	return in
+}
+
+// ---- Vulpix ----
+
+// Vulpix opens with the Ice Storm, which chases the opponent and strikes where it stands, and keeps its distance while that works. The
+// Frost Field is its way in: it rides the iceberg at the opponent, which bursts on it. The Freeze Beam raises a wall of pillars
+// in the way of an opponent that is within the beam's length (it roots Vulpix while it runs, so it is only tried now and then).
+func (b *Bot) vulpix(c *bctx) Input {
+	g, p, f := c.g, c.p, c.f
+	fs, is, fb := g.cfg.Vulpix.FrostField, g.cfg.Vulpix.IceStorm, g.cfg.Vulpix.FreezeBeam
+	if p.FrozenT > 0 || p.Held || p.StunT > 0 {
+		return c.stay()
+	}
+	if p.FBeamT > 0 { // the stick moves the end of the beam: toward the opponent, so the pillars line up in its way
+		in := c.stay()
+		in.DX, in.DY = dir8(c.ux, c.uy)
+		return in
+	}
+	if p.FrostT > 0 {
+		return c.move(c.ux, c.uy) // the ride cannot stop: it is aimed at the opponent
+	}
+	th := c.th
+	if th.kind != thNone && th.eta <= botHorizon {
+		return c.move(th.ax, th.ay)
+	}
+	danger := f.Kind == rowlet && f.ArrowT > 0
+	stormReach := is.FollowSpeed*float64(is.Strikes)*is.Interval + is.Radius + c.fr
+	if p.StormCD == 0 && p.StormLeft == 0 && is.Reach.hits(f) && c.dist <= stormReach && !danger && b.rng.Float64() < 0.7 {
+		in := c.stay()
+		in.Storm = true
+		return in
+	}
+	if p.FrostCD == 0 && fs.Reach.hits(f) && c.dist >= 120 && c.dist <= fs.SlideSpeed*fs.SprayDuration*0.85 && !danger && b.rng.Float64() < 0.35 {
+		in := c.move(c.ux, c.uy)
+		in.Skill = true
+		return in
+	}
+	if p.FBeamCD == 0 && c.dist >= 120 && c.dist <= fb.Length*0.8 && !danger && c.rootedFor() == 0 && b.rng.Float64() < 0.25 {
+		in := c.stay()
+		in.Freeze = true // aimed at the opponent: the first pillar rises toward it
+		return in
+	}
+	const lo = 260.0
+	tx, ty := -c.uy*b.strafe, c.ux*b.strafe
+	switch {
+	case c.dist < 170:
+		return c.move(-c.ux+tx*0.6, -c.uy+ty*0.6)
+	case c.dist > lo+160:
+		return c.move(c.ux+tx*0.3, c.uy+ty*0.3)
+	}
+	return c.move(tx, ty)
 }
 
 // ---- Gengar ----

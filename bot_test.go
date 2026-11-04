@@ -10,7 +10,7 @@ import (
 // ---- the computer player ----
 
 func hasAct(in Input) bool {
-	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Mega || in.Kick || in.Toss || in.GFire || in.SBall
+	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Mega || in.Kick || in.Toss || in.GFire || in.SBall || in.Storm || in.Freeze
 }
 
 // firstAct runs the bot for n ticks on a scene that does not change and returns the first decision that presses a
@@ -428,7 +428,7 @@ func TestTheBotNoticesAThreatOnlyAfterItsReactionTime(t *testing.T) {
 
 func TestOnlyPikachuSnorlaxCharizardChikoritaAshAndGengarCanBePlayedByTheComputer(t *testing.T) {
 	for k := 0; k < kinds; k++ {
-		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash || k == machamp || k == charizard || k == gengar; got != want {
+		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash || k == machamp || k == charizard || k == vulpix || k == gengar; got != want {
 			t.Errorf("botCanPlay(%d) = %v, want %v", k, got, want)
 		}
 	}
@@ -533,7 +533,7 @@ func TestTheComputerCanTakeEitherSlot(t *testing.T) {
 
 func TestTheComputerIsRefusedWhereItCannotPlay(t *testing.T) {
 	r := botRoom(0)
-	if r.setBot(0, vulpix) || r.bot[1] != nil {
+	if r.setBot(0, rowlet) || r.bot[1] != nil {
 		t.Fatal("a character it cannot play was accepted")
 	}
 	r.c[1] = &client{send: make(chan []byte, 8)}
