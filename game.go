@@ -267,11 +267,14 @@ type Player struct {
 	KickCD    float64 `json:"kkcd"`
 	// Gengar: seconds left under the ground (the shadow shows), the three cooldowns, and how much longer it cannot start a skill
 	// (an opponent's shadow is on it).
-	SneakT  float64 `json:"gnt"`
-	SneakCD float64 `json:"gncd"`
-	GFireCD float64 `json:"gfcd"`
-	SBallCD float64 `json:"sbcd"`
-	SilentT float64 `json:"sil"`
+	SneakT           float64 `json:"gnt"`
+	SneakCD          float64 `json:"gncd"`
+	GFireCD          float64 `json:"gfcd"`
+	SBallCD          float64 `json:"sbcd"`
+	SBallT           float64 `json:"sbt"` // charge mode: the charge time left (0 = not charging); the aim is AimX/AimY
+	SBallDX, SBallDY float64 `json:"-"`   // the direction chosen at the cast
+	SBallLock        bool    `json:"-"`
+	SilentT          float64 `json:"sil"`
 }
 
 // Leaf Slash phases.
@@ -301,6 +304,7 @@ const (
 	ballStone   = 6 // Machamp's rock: it stands where it rose, blocks the other player and is worn down like a projectile (a pillar's way)
 	ballFist    = 7 // one of Machamp's Comet Punch fists: it hangs where it appeared, hits the opponent it touches once and has HP like a fire ball
 	ballGhost   = 8 // one of Gengar's Ghost Fire flames: it flies out, comes back to Gengar and hurts the opponent once; it has HP like a fire ball
+	ballShadow  = 9 // Gengar's Shadow Ball in charge mode: it flies straight like the Electro Ball, bursts where it is stopped and drags the opponent in; it has HP
 )
 
 // Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
@@ -377,6 +381,7 @@ type Game struct {
 	Fires   []FireZone   // the ground the Seismic Toss set alight
 	Ghosts  []ghostFire  // Gengar's purple flames
 	Shadows []shadowBall // Shadow Balls in the air
+	Wells   []pullWell   // where Shadow Balls burst and are still dragging the opponent in
 	Waves   []wave       // Gyarados's waves running out over the ground (the client draws them from an event)
 	rng     *rand.Rand   // the fire's random spread; tests replace it
 	// Ease is each player's handicap in percent (a multiple of easeStep, at most easeMax): its HP and its
@@ -420,7 +425,7 @@ func (g *Game) Reset() {
 	}
 	g.P[0] = Player{Kind: g.P[0].Kind, X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(0), FX: 1, AimX: 1}
 	g.P[1] = Player{Kind: g.P[1].Kind, X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(1), FX: -1, AimX: -1}
-	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows = nil, nil, nil, nil, nil, nil
+	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells = nil, nil, nil, nil, nil, nil, nil
 	for i := range g.P {
 		if g.P[i].Kind == rowlet {
 			g.P[i].Z = g.cfg.Rowlet.FlyHigh // it is always in the air
@@ -459,6 +464,8 @@ func (g *Game) ballRadius(b *Ball) float64 {
 		return g.brawler(b.Owner).CometPunch.Radius
 	case ballGhost:
 		return g.cfg.Gengar.GhostFire.Radius
+	case ballShadow:
+		return g.cfg.Gengar.ShadowBall.Radius
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Radius
 	case ballTornado:
@@ -479,6 +486,8 @@ func (g *Game) ballMass(b *Ball) float64 {
 		return g.brawler(b.Owner).CometPunch.Mass
 	case ballGhost:
 		return g.cfg.Gengar.GhostFire.Mass
+	case ballShadow:
+		return g.cfg.Gengar.ShadowBall.Mass
 	case ballTornado:
 		return g.cfg.Rowlet.Tornado.Mass
 	case ballArrow:
@@ -757,7 +766,9 @@ func (g *Game) Step(dt float64) []Event {
 		}
 
 		if p.Kind == gengar {
-			events = append(events, g.stepGengar(i, in, dt)...)
+			var ev []Event
+			ev, casting = g.stepGengar(i, in, dt) // the charge of a Shadow Ball roots it
+			events = append(events, ev...)
 		}
 
 		if p.Kind == rowlet {
@@ -917,6 +928,7 @@ func (g *Game) Step(dt float64) []Event {
 	g.tickFires(dt)
 	g.stepGhosts(dt)
 	events = append(events, g.stepShadowBalls(dt)...)
+	g.stepWells(dt)
 	g.stepWaves(dt)
 	events = append(events, g.stepBalls(dt)...)
 	return append(events, g.stepTwirl(dt)...)
@@ -1067,6 +1079,30 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}
 			continue
 		}
+		if b.K == ballShadow {
+			sb := g.cfg.Gengar.ShadowBall
+			boom := b.HP <= 0 // shot down where it is
+			if !boom {
+				x0, y0 := b.X, b.Y
+				b.X += b.DX * sb.Speed * dt
+				b.Y += b.DY * sb.Speed * dt
+				if b.X <= 0 || b.X >= g.court.Length || b.Y <= 0 || b.Y >= g.court.Width {
+					b.X = math.Min(math.Max(b.X, 0), g.court.Length)
+					b.Y = math.Min(math.Max(b.Y, 0), g.court.Width)
+					boom = true
+				}
+				if sb.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= sb.Radius+g.radius(1-b.Owner) {
+					b.X, b.Y = closestOnSegment(foe.X, foe.Y, x0, y0, b.X, b.Y) // it bursts where it met the opponent
+					boom = true
+				}
+			}
+			if !boom {
+				kept = append(kept, b)
+				continue
+			}
+			events = append(events, g.shadowBlast(b.Owner, b.X, b.Y, true)...)
+			continue
+		}
 		if b.K == ballGhost {
 			if b.HP > 0 {
 				gf, owner := g.cfg.Gengar.GhostFire, &g.P[b.Owner]
@@ -1195,6 +1231,8 @@ func (g *Game) ballDamage(b *Ball) int {
 		return g.brawler(b.Owner).CometPunch.Damage
 	case ballGhost:
 		return g.cfg.Gengar.GhostFire.Damage
+	case ballShadow:
+		return g.cfg.Gengar.ShadowBall.Damage
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Damage
 	case ballTornado:
@@ -1255,7 +1293,7 @@ func (g *Game) clashBalls() {
 	kept := g.Balls[:0]
 	for i, b := range g.Balls {
 		b.HP -= hurt[i]
-		if b.HP <= 0 && b.K != ballElectro && hurt[i] > 0 {
+		if b.HP <= 0 && b.K != ballElectro && b.K != ballShadow && hurt[i] > 0 { // an Electro Ball or a Shadow Ball that is shot down bursts on the next step
 			continue
 		}
 		kept = append(kept, b)

@@ -528,6 +528,8 @@ func (c Config) ballSpeed(kind int) float64 {
 		return c.Chikorita.RazorLeaf.Speed
 	case ballArrow:
 		return c.Rowlet.Arrows.Speed
+	case ballShadow:
+		return c.Gengar.ShadowBall.Speed
 	}
 	return c.Pikachu.ElectroBall.Speed
 }
@@ -988,13 +990,21 @@ func (b *Bot) gengar(c *bctx) Input {
 		return in
 	}
 	if p.SBallCD == 0 && sb.Reach.hits(f) && c.dist <= reach && c.dist >= sb.SlamRadius*0.5 && !danger && (c.rootedFor() > 0.3 || b.rng.Float64() < 0.5) {
-		// at where the opponent will be when it lands: the cast is as long as the share of its range
-		x := math.Min(math.Max(c.f.X+c.vx*sb.Duration, 0), g.court.Length)
-		y := math.Min(math.Max(c.f.Y+c.vy*sb.Duration, 0), g.court.Width)
+		// at where the opponent will be when it lands (thrown: the cast is as long as the share of its range), or when the
+		// ball that is still to be charged reaches it (charged: only the way matters)
+		flight := sb.Duration
+		if sb.Mode == shadowCharge {
+			flight = sb.ChargeTime + c.dist/sb.Speed
+		}
+		x := math.Min(math.Max(c.f.X+c.vx*flight, 0), g.court.Length)
+		y := math.Min(math.Max(c.f.Y+c.vy*flight, 0), g.court.Width)
 		in := c.stay()
 		if dx, dy := x-p.X, y-p.Y; math.Hypot(dx, dy) > 1e-9 {
 			share := math.Min(math.Hypot(dx, dy)/reach, 1)
 			n := math.Hypot(dx, dy)
+			if sb.Mode == shadowCharge {
+				share = 1
+			}
 			in.SBall, in.CastX, in.CastY = true, dx/n*share, dy/n*share
 			return in
 		}

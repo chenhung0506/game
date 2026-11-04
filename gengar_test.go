@@ -354,7 +354,7 @@ func TestEachGhostFireHurtsTheOpponentOnceAndOnlyInItsBand(t *testing.T) {
 // ---- Shadow Ball ----
 
 func TestShadowBallLandsOnTheOpponentWhenNoAimWasChosenAndHurtsOnlyWhenItLands(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := throwConfig()
 	sb := cfg.Gengar.ShadowBall
 	g := gen(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 300+300, 250 // within the range
@@ -382,7 +382,7 @@ func TestShadowBallLandsOnTheOpponentWhenNoAimWasChosenAndHurtsOnlyWhenItLands(t
 }
 
 func TestShadowBallAtAnOpponentOutOfRangeLandsAsFarAsItGoes(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := throwConfig()
 	sb := cfg.Gengar.ShadowBall
 	g := gen(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 300+sb.Speed*sb.Duration+500, 250
@@ -393,7 +393,7 @@ func TestShadowBallAtAnOpponentOutOfRangeLandsAsFarAsItGoes(t *testing.T) {
 }
 
 func TestShadowBallWithAnAimLandsAtMaxRangeThatWay(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := throwConfig()
 	sb := cfg.Gengar.ShadowBall
 	g := gen(cfg, snorlax)
 	g.P[0].X, g.P[0].Y = 800, 500
@@ -406,7 +406,7 @@ func TestShadowBallWithAnAimLandsAtMaxRangeThatWay(t *testing.T) {
 }
 
 func TestShadowBallFlamesSpreadOutAndDoNotComeBack(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := throwConfig()
 	sb := cfg.Gengar.ShadowBall
 	g := gen(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 2000, 900
@@ -432,7 +432,7 @@ func TestShadowBallFlamesSpreadOutAndDoNotComeBack(t *testing.T) {
 }
 
 func TestShadowBallCooldownAndGhostFireCooldownAreTheirOwn(t *testing.T) {
-	g := gen(DefaultConfig(), snorlax)
+	g := gen(throwConfig(), snorlax)
 	g.P[1].X, g.P[1].Y = 2000, 900
 	gpress(g, Input{SBall: true})
 	gpress(g, Input{SBall: true})
@@ -479,7 +479,7 @@ func TestGengarIsPickableAndItsConfigIsValidated(t *testing.T) {
 }
 
 func TestAShadowBallsFlamesHurtTheOpponentOnlyOnceBetweenThem(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := throwConfig()
 	sb := &cfg.Gengar.ShadowBall
 	sb.Damage, sb.GhostFireCount, sb.GhostFireRadius, sb.GhostFireDamage = 0, 36, 60, 7
 	g := gen(cfg, snorlax)
@@ -493,7 +493,7 @@ func TestAShadowBallsFlamesHurtTheOpponentOnlyOnceBetweenThem(t *testing.T) {
 }
 
 func TestShadowBallLandsAsFarAsTheAimIsLongAndNoFartherThanItsRange(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := throwConfig()
 	reach := cfg.Gengar.ShadowBall.Speed * cfg.Gengar.ShadowBall.Duration
 	for _, c := range []struct{ cast, share float64 }{{0.5, 0.5}, {0.25, 0.25}, {1, 1}, {3, 1}} {
 		g := gen(cfg, snorlax)
@@ -507,7 +507,7 @@ func TestShadowBallLandsAsFarAsTheAimIsLongAndNoFartherThanItsRange(t *testing.T
 }
 
 func TestShadowBallAimedNearTheOpponentStaysWhereAimedAndIsNotPulledOntoIt(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := throwConfig()
 	reach := cfg.Gengar.ShadowBall.Speed * cfg.Gengar.ShadowBall.Duration
 	g := gen(cfg, snorlax)
 	g.P[0].X, g.P[0].Y = 300, 250
@@ -516,4 +516,11 @@ func TestShadowBallAimedNearTheOpponentStaysWhereAimedAndIsNotPulledOntoIt(t *te
 	if b := g.Shadows[0]; math.Abs(b.TX-(300+reach/2)) > 1e-6 || b.TY != 250 {
 		t.Fatalf("lands at %v,%v, want %v,250 where it was aimed, not on the opponent", b.TX, b.TY, 300+reach/2)
 	}
+}
+
+// throwConfig is the default numbers with the Shadow Ball lobbed (the mode that is kept for later), for the tests of that mode.
+func throwConfig() Config {
+	cfg := DefaultConfig()
+	cfg.Gengar.ShadowBall.Mode = shadowThrow
+	return cfg
 }

@@ -91,13 +91,13 @@ const HELP = [
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
   '你是真新鎮小智　移動 WASD　空白鍵＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）　L＝百萬噸拳擊（朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
   '你是怪力　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
-  '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才丟；輕點就丟向敵人；球飛在空中，落地才爆炸傷人，並向外炸出一圈不會回頭的紫色火焰）',
+  '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才發射；輕點就朝敵人；定身蓄力一下後，球筆直飛出去，碰到敵人、牆或被打爆就爆炸，會把範圍內的敵人往中心吸過去一陣子，並向外炸出一圈不會回頭的紫色火焰；球有血量，敵人的招式和飛行物可以提早打爆它）',
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
 const ghosts = []; // dash afterimages
 const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
-let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, range: 450, flight: 0.9, lob: 150, sfire: 20 }; // Gengar's, from 'hi'
+let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, range: 450, flight: 0.9, lob: 150, sfire: 20, charge: 1, ctime: 0.8, pull: 1, orb: 30, orbhp: 30 }; // Gengar's, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
 let megaCfg = { charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
@@ -486,15 +486,19 @@ function buildPad() {
     if (padKind === 0 && name === 'skill') { usesBadge = document.createElement('div'); usesBadge.className = 'uses'; b.append(usesBadge); }
     if (aimed) { // the button turns into a stick while it is held: the way it is dragged is the way the skill goes
       const ring = document.createElement('div'), dot = document.createElement('div'); ring.className = 'aimring'; dot.className = 'aimdot'; b.append(ring, dot);
-      const DEAD = name === 'sball' ? 10 : 20, MAXR = name === 'sball' ? 110 : 56; // a short pull of the Shadow Ball is a short throw, not a tap that follows the opponent; its pull is long (and its ring as wide) so one pixel is ~4 of range, not ~8
-      if (name === 'sball') { ring.style.width = ring.style.height = MAXR * 2 + 'px'; ring.style.margin = -MAXR + 'px 0 0 ' + -MAXR + 'px'; }
+      // The straight balls (the Electro Ball, the charged Shadow Ball) are aimed like a stick that starts where the finger went down, with a dead zone: a tap, or a finger that
+      // only wobbles, aims nothing and the ball goes at the opponent. The lobbed Shadow Ball measures from the button's middle, its pull is how far it lands.
+      const fromTouch = name === 'ball' || (name === 'sball' && gengarCfg.charge), lob = name === 'sball' && !gengarCfg.charge;
+      const DEAD = fromTouch ? 30 : lob ? 10 : 20, MAXR = lob ? 110 : 56; // a short pull of the lobbed Shadow Ball is a short throw, not a tap that follows the opponent; its pull is long (and its ring as wide) so one pixel is ~4 of range, not ~8
+      if (lob) { ring.style.width = ring.style.height = MAXR * 2 + 'px'; ring.style.margin = -MAXR + 'px 0 0 ' + -MAXR + 'px'; }
+      let o = null; // where the finger went down
       const drag = (e) => {
-        const r = b.getBoundingClientRect(), vx = e.clientX - (r.left + r.width / 2), vy = e.clientY - (r.top + r.height / 2), len = Math.hypot(vx, vy);
+        const r = b.getBoundingClientRect(), ox = fromTouch && o ? o.x : r.left + r.width / 2, oy = fromTouch && o ? o.y : r.top + r.height / 2, vx = e.clientX - ox, vy = e.clientY - oy, len = Math.hypot(vx, vy);
         if (aiming) { aiming.x = len < DEAD ? 0 : vx / len; aiming.y = len < DEAD ? 0 : vy / len; aiming.m = Math.min(len / MAXR, 1); }
         const pull = Math.min(len, MAXR);
         dot.style.transform = len ? `translate(${vx / len * pull}px, ${vy / len * pull}px)` : '';
       };
-      b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (id !== null) return; id = e.pointerId; b.setPointerCapture(id); beginAim({ name, x: 0, y: 0 }); b.classList.add('on', 'aim'); drag(e); });
+      b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (id !== null) return; id = e.pointerId; b.setPointerCapture(id); o = { x: e.clientX, y: e.clientY }; beginAim({ name, x: 0, y: 0 }); b.classList.add('on', 'aim'); drag(e); });
       b.addEventListener('pointermove', (e) => { if (e.pointerId === id) drag(e); });
       const end = (doCast) => (e) => { if (e.pointerId !== id) return; id = null; b.classList.remove('on', 'aim'); dot.style.transform = ''; endAim(doCast); };
       b.addEventListener('pointerup', end(true));
@@ -1056,6 +1060,14 @@ function drawTelegraph() {
 // real warning takes over. Without a direction it points at the opponent, which is where a tap would send it.
 function drawAimFan(p, d) {
   const o = disp[1 - you], n = Math.hypot(aiming.x, aiming.y), w = n ? toWorld(aiming.x / n, aiming.y / n) : { x: o.x - d.x, y: o.y - d.y };
+  if (aiming.name === 'sball' && gengarCfg.charge) { // charged: the ball flies straight, so a line and the ball where it starts (a tap, no direction, goes at the opponent)
+    const base = Math.atan2(w.y, w.x), r = gengarCfg.orb * gengarCfg.scale, off = radius[9] + gengarCfg.orb;
+    ctx.save(); ctx.globalAlpha = p.sbcd > 0 ? 0.4 : 1;
+    ctx.strokeStyle = 'rgba(200,140,255,0.85)'; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
+    ctx.beginPath(); ctx.moveTo(d.x + Math.cos(base) * 30, d.y + Math.sin(base) * 30); ctx.lineTo(d.x + Math.cos(base) * 420, d.y + Math.sin(base) * 420); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(d.x + Math.cos(base) * off, d.y + Math.sin(base) * off, r, 0, 7); ctx.stroke();
+    ctx.restore(); return;
+  }
   if (aiming.name === 'sball') { // the ball is lobbed: where it will come down, and how far its blast reaches
     const R = gengarCfg.range * (n && aiming.m != null ? aiming.m : 1), dd = Math.hypot(o.x - d.x, o.y - d.y);
     const tx = d.x + (n ? w.x * R : (o.x - d.x) / Math.max(dd, 1e-9) * Math.min(dd, R)), ty = d.y + (n ? w.y * R : (o.y - d.y) / Math.max(dd, 1e-9) * Math.min(dd, R));
@@ -1139,6 +1151,7 @@ function drawBeam(i, p, d, beamLook) {
 // a small HP bar (the opponent's skills wear it down; at 0 it explodes).
 function drawBalls() {
   for (const pi of slotsOf(0)) drawBallCharge(snap.p[pi], disp[pi]);
+  for (const pi of slotsOf(9)) drawShadowCharge(snap.p[pi], disp[pi]);
   for (const b of snap.b || []) drawBall(b);
 }
 function drawBallCharge(p, d) {
@@ -1164,6 +1177,7 @@ function drawBall(b) {
   if (b.k === 6) { drawStone(b); return; }
   if (b.k === 7) { drawCometFist(b); return; }
   if (b.k === 8) { drawGhostFlame(b.x, b.y, gengarCfg.fire); return; }
+  if (b.k === 9) { drawShadowOrb(b); return; }
   {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
@@ -2012,6 +2026,48 @@ function drawSneakShadows() {
     ctx.restore();
   }
 }
+// Shadow Ball (charge mode): while Gengar charges, a dashed line along the aim and a dark orb that swells in front of it; the ball
+// in flight is the same dark purple sphere on the ground, with an HP bar once it has been hurt (the opponent's skills wear it
+// down, and at 0 it bursts where it is).
+function shadowOrbAt(x, y, r, now) {
+  const gr = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, 1, x, y, r * 1.5);
+  gr.addColorStop(0, '#d9b0ff'); gr.addColorStop(0.35, '#7a3fc0'); gr.addColorStop(0.8, '#2a0f4d'); gr.addColorStop(1, 'rgba(42,15,77,0)');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r * 1.5, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(190,130,255,0.7)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.lineDashOffset = -now * 40;
+  ctx.beginPath(); ctx.arc(x, y, r * 1.15, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+}
+function drawShadowCharge(p, d) {
+  if (!(p.sbt > 0) || !gengarCfg.charge) return;
+  const k = 1 - p.sbt / Math.max(gengarCfg.ctime, 1e-6), ux = p.ax, uy = p.ay, now = performance.now() / 1000;
+  ctx.save();
+  ctx.strokeStyle = `rgba(200,140,255,${0.3 + 0.4 * k})`; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
+  ctx.beginPath(); ctx.moveTo(d.x + ux * 30, d.y + uy * 30); ctx.lineTo(d.x + ux * 420, d.y + uy * 420); ctx.stroke(); ctx.setLineDash([]);
+  const r = gengarCfg.orb * (0.3 + 0.7 * k) * gengarCfg.scale, off = radius[9] + gengarCfg.orb;
+  shadowOrbAt(d.x + ux * off, d.y + uy * off, r, now);
+  ctx.restore();
+}
+function drawShadowOrb(b) {
+  const r = gengarCfg.orb * gengarCfg.scale, now = performance.now() / 1000;
+  shadowOrbAt(b.x, b.y, r, now);
+  if (b.hp < gengarCfg.orbhp) upright(b.x, b.y, () => {
+    ctx.fillStyle = '#000a'; ctx.fillRect(-14, -r - 16, 28, 4);
+    ctx.fillStyle = '#c690ff'; ctx.fillRect(-14, -r - 16, 28 * Math.max(b.hp, 0) / gengarCfg.orbhp, 4);
+  });
+}
+// Where a Shadow Ball burst and is dragging the opponent in: dark rings that run in toward the middle, for as long as the drag lasts.
+function drawPullWell(f) {
+  const life = Math.max(gengarCfg.pull, 1e-6), k = f.age / life, a = Math.min(1, (1 - k) * 2), R = f.r, now = performance.now() / 1000;
+  ctx.save(); ctx.translate(f.x, f.y);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+  g.addColorStop(0, `rgba(10,0,25,${0.75 * a})`); g.addColorStop(1, `rgba(60,20,110,${0.15 * a})`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+  ctx.lineWidth = 3;
+  for (let n = 0; n < 3; n++) { // rings shrinking toward the middle, one after another
+    const u = (now * 1.3 + n / 3) % 1;
+    ctx.strokeStyle = `rgba(200,150,255,${a * (1 - u) * 0.9})`; ctx.beginPath(); ctx.arc(0, 0, R * (1 - u), 0, 7); ctx.stroke();
+  }
+  ctx.restore();
+}
 // A Shadow Ball in the air: a dark purple sphere, high above the ground by its arc, with its shadow and where it will come down on the ground.
 function drawShadowBalls() {
   const now = performance.now() / 1000;
@@ -2623,7 +2679,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' ? 0.5 : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' ? 0.5 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -2637,6 +2693,7 @@ function frame() {
       else if (f.t === 'megahit') drawMegaImpact(f);
       else if (f.t === 'kickhit') drawKickImpact(f);
       else if (f.t === 'gslam') drawGhostSlam(f);
+      else if (f.t === 'gwell') drawPullWell(f);
       else if (f.t === 'evolve') drawEvolve(f);
       else if (f.t === 'storm') drawStormStrike(f);
       else if (f.t === 'paralyze') drawParalyzeBurst(f);

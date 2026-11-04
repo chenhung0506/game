@@ -474,6 +474,13 @@ type Config struct {
 			GhostFireSpreadDistance float64 `json:"ghost_fire_spread_distance"`
 			GhostFireCount          int     `json:"ghost_fire_count"`
 			GhostFireDamage         int     `json:"ghost_fire_damage"`
+			Mode                    string  `json:"mode"`          // "charge": rooted for charge_time, then a ball flies straight (like the Electro Ball) and, where it bursts, drags the opponent in; "throw": the ball is lobbed to where it lands
+			ChargeTime              float64 `json:"charge_time"`   // charge mode: seconds rooted before the ball leaves
+			Radius                  float64 `json:"radius"`        // charge mode: the flying ball's size (what touches the opponent)
+			HP                      int     `json:"hp"`            // charge mode: the opponent's skills and projectiles wear it down; at 0 it bursts where it is
+			Mass                    float64 `json:"mass"`          // charge mode: what a beam or a fist has to beat to push it
+			Gravity                 float64 `json:"gravity"`       // charge mode: how fast the burst drags the opponent to its middle, in pixels per second
+			PullDuration            float64 `json:"pull_duration"` // charge mode: how long the drag lasts
 		} `json:"shadow_ball"`
 	} `json:"gengar"`
 	// The practice dummy (the mode "打木樁"): a stump that never moves or hits back, with `max_hp` so high that a practice
@@ -867,6 +874,7 @@ func DefaultConfig() Config {
 	sb.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	sb.BallScale, sb.Damage, sb.Height, sb.Duration, sb.Cooldown, sb.SlamRadius, sb.Speed = 1, 25, 150, 0.9, 6, 110, 500
 	sb.GhostFireSpreadSpeed, sb.GhostFireRadius, sb.GhostFireSpreadDistance, sb.GhostFireCount, sb.GhostFireDamage = 260, 20, 220, 10, 5
+	sb.Mode, sb.ChargeTime, sb.Radius, sb.HP, sb.Mass, sb.Gravity, sb.PullDuration = shadowCharge, 0.8, 30, 30, 50, 250, 1
 	c.Machamp = c.Ash // the same moves a notch weaker: less health and reach, fewer and frailer fists and stones, longer waits
 	c.Machamp.MaxHP, c.Machamp.WalkSpeed = 125, 130
 	c.Machamp.TreeSlam.TrunkLength, c.Machamp.TreeSlam.LeafRadius, c.Machamp.TreeSlam.Damage, c.Machamp.TreeSlam.Cooldown = 270, 160, 30, 9
@@ -1031,6 +1039,8 @@ func (c Config) validate() error {
 		{"gengar.shadow_ball.ghost_fire_radius", c.Gengar.ShadowBall.GhostFireRadius, 0},
 		{"gengar.shadow_ball.ghost_fire_spread_distance", c.Gengar.ShadowBall.GhostFireSpreadDistance, 0},
 		{"gengar.shadow_ball.ghost_fire_count", float64(c.Gengar.ShadowBall.GhostFireCount), 0},
+		{"gengar.shadow_ball.radius", c.Gengar.ShadowBall.Radius, 0},
+		{"gengar.shadow_ball.hp", float64(c.Gengar.ShadowBall.HP), 0},
 		{"ash.radius", c.Ash.Radius, 0},
 		{"machamp.tree_slam.jump_distance", c.Machamp.TreeSlam.JumpDistance, 0},
 		{"machamp.high_jump_kick.kick_distance", c.Machamp.HighJumpKick.KickDistance, 0},
@@ -1271,6 +1281,10 @@ func (c Config) validate() error {
 		{"gengar.shadow_ball.damage", float64(c.Gengar.ShadowBall.Damage)},
 		{"gengar.shadow_ball.height", c.Gengar.ShadowBall.Height},
 		{"gengar.shadow_ball.cooldown", c.Gengar.ShadowBall.Cooldown},
+		{"gengar.shadow_ball.charge_time", c.Gengar.ShadowBall.ChargeTime},
+		{"gengar.shadow_ball.mass", c.Gengar.ShadowBall.Mass},
+		{"gengar.shadow_ball.gravity", c.Gengar.ShadowBall.Gravity},
+		{"gengar.shadow_ball.pull_duration", c.Gengar.ShadowBall.PullDuration},
 		{"gengar.shadow_ball.ghost_fire_damage", float64(c.Gengar.ShadowBall.GhostFireDamage)},
 		{"ash.comet_punch.mass", c.Ash.CometPunch.Mass},
 		{"machamp.comet_punch.ball_knockback", c.Machamp.CometPunch.BallKnockback},
@@ -1297,6 +1311,9 @@ func (c Config) validate() error {
 		if !(f.v >= 0) {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
 		}
+	}
+	if m := c.Gengar.ShadowBall.Mode; m != shadowCharge && m != shadowThrow {
+		return fmt.Errorf("gengar.shadow_ball.mode must be %q or %q, got %q", shadowCharge, shadowThrow, m)
 	}
 	if n := c.Ash.MegatonPunch.BoltCount; n < 0 || n > 20 {
 		return fmt.Errorf("ash.megaton_punch.bolt_count must be 0..20, got %d", n)

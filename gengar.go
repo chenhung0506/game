@@ -49,6 +49,19 @@ type shadowBall struct {
 	Y0    float64 `json:"-"`
 }
 
+// The two ways a Shadow Ball is used (config gengar.shadow_ball.mode).
+const (
+	shadowCharge = "charge" // rooted for charge_time, then it flies straight like the Electro Ball and drags the opponent in where it bursts
+	shadowThrow  = "throw"  // it is lobbed to where it lands
+)
+
+// pullWell is where a Shadow Ball burst, dragging the opponent toward its middle for as long as it lasts.
+type pullWell struct {
+	Owner int
+	X, Y  float64
+	T     float64 // seconds left
+}
+
 // maxGhostFires bounds the flames on the court, whatever the config says.
 const maxGhostFires = 400
 
@@ -61,6 +74,7 @@ func (g *Game) dropGengar(i int) {
 			p.Z = 0
 		}
 	}
+	p.SBallT = 0 // a charge is lost
 }
 
 // sneakSpeed is how fast Gengar is steered under the ground: the first speed until the middle of the sneak, the second after.
@@ -72,8 +86,8 @@ func (g *Game) sneakSpeed(p *Player) float64 {
 	return ss.ShadowSpeedSecondHalf
 }
 
-// stepGengar runs Gengar's three skills.
-func (g *Game) stepGengar(i int, in Input, dt float64) []Event {
+// stepGengar runs Gengar's three skills. It says whether Gengar is rooted (charging a Shadow Ball).
+func (g *Game) stepGengar(i int, in Input, dt float64) ([]Event, bool) {
 	p, other := &g.P[i], &g.P[1-i]
 	gs := g.cfg.Gengar
 	ss, gf, sb := gs.ShadowSneak, gs.GhostFire, gs.ShadowBall
@@ -85,6 +99,21 @@ func (g *Game) stepGengar(i int, in Input, dt float64) []Event {
 		}
 	}
 
+	// ---- Shadow Ball, charging: rooted, and no other skill meanwhile ----
+	if p.SBallT > 0 {
+		if p.SBallLock { // the aim chosen at the cast, whatever the stick says meanwhile
+			p.AimX, p.AimY = p.SBallDX, p.SBallDY
+		} else if dx, dy := other.X-p.X, other.Y-p.Y; math.Hypot(dx, dy) > 1e-9 { // on top of it there is no direction: the aim stays
+			n := math.Hypot(dx, dy)
+			p.AimX, p.AimY = dx/n, dy/n
+		}
+		if p.SBallT -= dt; p.SBallT < 1e-9 {
+			p.SBallT = 0
+			g.launchShadowBall(i)
+		}
+		return nil, true // rooted through the tick it leaves, free from the next
+	}
+
 	// ---- Shadow Sneak ----
 	if in.Skill && p.SneakT == 0 && p.SneakCD == 0 && p.Z == 0 {
 		p.SneakT, p.SneakCD = ss.Duration, ss.Cooldown
@@ -93,15 +122,15 @@ func (g *Game) stepGengar(i int, in Input, dt float64) []Event {
 		p.Z = ss.Height
 		if p.SneakT -= dt; p.SneakT < 1e-9 {
 			p.SneakT, p.Z = 0, 0
-			return nil // up again: no skill on the tick it comes up
+			return nil, false // up again: no skill on the tick it comes up
 		}
 		if ss.Reach.hits(other) && math.Hypot(other.X-p.X, other.Y-p.Y) <= ss.ShadowRadius+g.radius(1-i) {
 			other.SilentT = silenceLinger
 		}
-		return nil
+		return nil, false
 	}
 	if p.Z != 0 {
-		return nil // lifted by something else
+		return nil, false // lifted by something else
 	}
 
 	// ---- Ghost Fire ----
@@ -116,6 +145,20 @@ func (g *Game) stepGengar(i int, in Input, dt float64) []Event {
 	}
 
 	// ---- Shadow Ball ----
+	if in.SBall && p.SBallCD == 0 && sb.Mode == shadowCharge {
+		p.SBallCD, p.SBallT, p.SBallLock = sb.Cooldown, sb.ChargeTime, false
+		if n := math.Hypot(in.CastX, in.CastY); n > 1e-9 && !math.IsInf(n, 0) { // an aim was chosen at the cast
+			p.SBallDX, p.SBallDY, p.SBallLock = in.CastX/n, in.CastY/n, true
+			p.AimX, p.AimY = p.SBallDX, p.SBallDY
+		} else if dx, dy := other.X-p.X, other.Y-p.Y; math.Hypot(dx, dy) > 1e-9 {
+			n := math.Hypot(dx, dy)
+			p.AimX, p.AimY = dx/n, dy/n
+		}
+		if p.SBallT == 0 { // no charge: it leaves at once
+			g.launchShadowBall(i)
+		}
+		return nil, p.SBallT > 0
+	}
 	if in.SBall && p.SBallCD == 0 {
 		p.SBallCD = sb.Cooldown
 		reach := sb.Speed * sb.Duration
@@ -131,7 +174,55 @@ func (g *Game) stepGengar(i int, in Input, dt float64) []Event {
 		tx, ty = math.Min(math.Max(tx, 0), g.court.Length), math.Min(math.Max(ty, 0), g.court.Width)
 		g.Shadows = append(g.Shadows, shadowBall{Owner: i, X: p.X, Y: p.Y, X0: p.X, Y0: p.Y, TX: tx, TY: ty})
 	}
-	return nil
+	return nil, false
+}
+
+// launchShadowBall sends a charged Shadow Ball out along the aim, starting just clear of Gengar's body.
+func (g *Game) launchShadowBall(i int) {
+	p, sb := &g.P[i], g.cfg.Gengar.ShadowBall
+	off := g.radius(i) + sb.Radius + 1
+	g.Balls = append(g.Balls, Ball{K: ballShadow, Owner: i, X: p.X + p.AimX*off, Y: p.Y + p.AimY*off, DX: p.AimX, DY: p.AimY, HP: sb.HP})
+}
+
+// shadowBlast is what a Shadow Ball does where it comes down or bursts: the blast hurts, the flames fly out of it, and (charge
+// mode) the opponent in its reach is dragged toward its middle for `pull_duration` seconds.
+func (g *Game) shadowBlast(owner int, x, y float64, pull bool) []Event {
+	sb, foe := g.cfg.Gengar.ShadowBall, &g.P[1-owner]
+	events := []Event{{T: "gslam", X: x, Y: y, R: sb.SlamRadius}}
+	if sb.Reach.hits(foe) && math.Hypot(foe.X-x, foe.Y-y) <= sb.SlamRadius+g.radius(1-owner) {
+		g.hit(foe, sb.Damage)
+	}
+	hurt := new(bool)
+	for n := 0; n < sb.GhostFireCount; n++ {
+		a := 2 * math.Pi * float64(n) / float64(sb.GhostFireCount)
+		ux, uy := math.Cos(a), math.Sin(a)
+		g.addGhost(ghostFire{Owner: owner, X: x, Y: y, DX: ux, DY: uy, Max: sb.GhostFireSpreadDistance, Speed: sb.GhostFireSpreadSpeed,
+			R: sb.GhostFireRadius, Dmg: sb.GhostFireDamage, Reach: sb.Reach, Hurt: hurt})
+	}
+	if pull && sb.PullDuration > 0 && sb.Gravity > 0 {
+		g.Wells = append(g.Wells, pullWell{Owner: owner, X: x, Y: y, T: sb.PullDuration})
+		events = append(events, Event{T: "gwell", X: x, Y: y, R: sb.SlamRadius})
+	}
+	return events
+}
+
+// stepWells drags the opponent toward the middle of every burst that is still pulling: at `gravity` pixels a second, never past
+// the middle, for the opponent whose body touches the reach of the blast at the heights the skill hits. A planted dummy, and one
+// carried off by something else, stay where they are.
+func (g *Game) stepWells(dt float64) {
+	sb := g.cfg.Gengar.ShadowBall
+	kept := g.Wells[:0]
+	for _, w := range g.Wells {
+		foe := &g.P[1-w.Owner]
+		if d := math.Hypot(w.X-foe.X, w.Y-foe.Y); foe.Kind != dummy && !foe.Held && sb.Reach.hits(foe) && d > 1e-9 && d <= sb.SlamRadius+g.radius(1-w.Owner) {
+			step := math.Min(sb.Gravity*dt, d)
+			foe.X, foe.Y = foe.X+(w.X-foe.X)/d*step, foe.Y+(w.Y-foe.Y)/d*step
+		}
+		if w.T -= dt; w.T > 1e-9 {
+			kept = append(kept, w)
+		}
+	}
+	g.Wells = kept
 }
 
 func (g *Game) addGhost(f ghostFire) {
@@ -166,7 +257,6 @@ func (g *Game) stepShadowBalls(dt float64) []Event {
 	sb := g.cfg.Gengar.ShadowBall
 	kept := g.Shadows[:0]
 	for _, b := range g.Shadows {
-		foe := &g.P[1-b.Owner]
 		if b.T += dt; b.T < sb.Duration-1e-9 {
 			u := b.T / sb.Duration
 			b.X, b.Y = b.X0+(b.TX-b.X0)*u, b.Y0+(b.TY-b.Y0)*u
@@ -175,17 +265,7 @@ func (g *Game) stepShadowBalls(dt float64) []Event {
 			continue
 		}
 		// it comes down: the blast, then the flames
-		events = append(events, Event{T: "gslam", X: b.TX, Y: b.TY, R: sb.SlamRadius})
-		if sb.Reach.hits(foe) && math.Hypot(foe.X-b.TX, foe.Y-b.TY) <= sb.SlamRadius+g.radius(1-b.Owner) {
-			g.hit(foe, sb.Damage)
-		}
-		hurt := new(bool)
-		for n := 0; n < sb.GhostFireCount; n++ {
-			a := 2 * math.Pi * float64(n) / float64(sb.GhostFireCount)
-			ux, uy := math.Cos(a), math.Sin(a)
-			g.addGhost(ghostFire{Owner: b.Owner, X: b.TX, Y: b.TY, DX: ux, DY: uy, Max: sb.GhostFireSpreadDistance, Speed: sb.GhostFireSpreadSpeed,
-				R: sb.GhostFireRadius, Dmg: sb.GhostFireDamage, Reach: sb.Reach, Hurt: hurt})
-		}
+		events = append(events, g.shadowBlast(b.Owner, b.TX, b.TY, false)...)
 	}
 	g.Shadows = kept
 	return events
