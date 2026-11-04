@@ -563,34 +563,38 @@ type BrawlerCfg struct {
 	// along the punch. Ash is carried `lunge_distance` forward with the fist as it is thrown (it stops at the opponent's body); 0 =
 	// it stays where it is. `show_warning` false leaves out the line of the fist drawn on the ground (the rings and the charge stay);
 	// the computer still reads the danger from the state. `show_text` false leaves out the "轟！" shown where it lands. The fist is only drawn flying from `fist_start` to `fist_end`, measured along the punch from
-	// where Ash stood as it threw (negative = behind it); what it hits is `distance`. `ring_scale` (the closing rings), `ball_scale` (the black and white ball), `fist_scale` and `impact_scale` only make the drawn rings, ball, fist and impact
+	// where Ash stood as it threw (negative = behind it); what it hits is `distance`. `ring_scale` (the closing rings), `ball_scale` (the black and white ball), `fist_scale` and `impact_scale` only make the drawn rings, ball, fist and impact; `ball_follow_scale`/`ball_follow_duration` the ball that goes forward with Ash as it is thrown, `ball_hit_scale`/`ball_hit_duration` the black ball that bursts on the opponent it hits (seconds, drawn only)
 	// bigger; what it hits is `distance` and `radius`.
 	MegatonPunch struct {
 		Reach
-		RingDuration  float64   `json:"ring_duration"` // the charge is two parts: the rings closing in on the hand for this long, then...
-		BallDuration  float64   `json:"ball_duration"` // ...the black and white ball swelling for this long; the fist is thrown when both are over
-		BoltStart     float64   `json:"bolt_start"`    // seconds from the start of the charge to the first bolt from the sky onto the fist
-		BoltCount     int       `json:"bolt_count"`    // how many bolts (0..20); each is drawn for 0.22 s
-		BoltInterval  float64   `json:"bolt_interval"` // seconds between the starts of two bolts
-		BoltOffsets   []float64 `json:"bolt_offsets"`  // where bolt n starts in the sky, sideways of the fist in pixels (the n-th, repeated if there are fewer); every bolt ends on the fist
-		Distance      float64   `json:"distance"`
-		Radius        float64   `json:"radius"`
-		Damage        int       `json:"damage"`
-		StunDuration  float64   `json:"stun_duration"`
-		Knockback     float64   `json:"knockback"`
-		Cooldown      float64   `json:"cooldown"` // counted from the start
-		LungeDistance float64   `json:"lunge_distance"`
-		JumpDistance  float64   `json:"jump_distance"` // the leap along the stick before it gathers (0 = none: it gathers where it stands)
-		JumpDuration  float64   `json:"jump_duration"`
-		JumpHeight    float64   `json:"jump_height"`
-		ShowWarning   bool      `json:"show_warning"`
-		ShowText      bool      `json:"show_text"`
-		FistStart     float64   `json:"fist_start"`
-		FistEnd       float64   `json:"fist_end"`
-		RingScale     float64   `json:"ring_scale"`
-		BallScale     float64   `json:"ball_scale"`
-		FistScale     float64   `json:"fist_scale"`
-		ImpactScale   float64   `json:"impact_scale"`
+		RingDuration       float64   `json:"ring_duration"` // the charge is two parts: the rings closing in on the hand for this long, then...
+		BallDuration       float64   `json:"ball_duration"` // ...the black and white ball swelling for this long; the fist is thrown when both are over
+		BoltStart          float64   `json:"bolt_start"`    // seconds from the start of the charge to the first bolt from the sky onto the fist
+		BoltCount          int       `json:"bolt_count"`    // how many bolts (0..20); each is drawn for 0.22 s
+		BoltInterval       float64   `json:"bolt_interval"` // seconds between the starts of two bolts
+		BoltOffsets        []float64 `json:"bolt_offsets"`  // where bolt n starts in the sky, sideways of the fist in pixels (the n-th, repeated if there are fewer); every bolt ends on the fist
+		Distance           float64   `json:"distance"`
+		Radius             float64   `json:"radius"`
+		Damage             int       `json:"damage"`
+		StunDuration       float64   `json:"stun_duration"`
+		Knockback          float64   `json:"knockback"`
+		Cooldown           float64   `json:"cooldown"` // counted from the start
+		LungeDistance      float64   `json:"lunge_distance"`
+		JumpDistance       float64   `json:"jump_distance"` // the leap along the stick before it gathers (0 = none: it gathers where it stands)
+		JumpDuration       float64   `json:"jump_duration"`
+		JumpHeight         float64   `json:"jump_height"`
+		ShowWarning        bool      `json:"show_warning"`
+		ShowText           bool      `json:"show_text"`
+		FistStart          float64   `json:"fist_start"`
+		FistEnd            float64   `json:"fist_end"`
+		RingScale          float64   `json:"ring_scale"`
+		BallScale          float64   `json:"ball_scale"`
+		FistScale          float64   `json:"fist_scale"`
+		ImpactScale        float64   `json:"impact_scale"`
+		BallFollowScale    float64   `json:"ball_follow_scale"`    // the ball that goes forward with Ash as the fist is thrown: its size...
+		BallFollowDuration float64   `json:"ball_follow_duration"` // ...and how long it stays
+		BallHitScale       float64   `json:"ball_hit_scale"`       // the black ball that bursts in lightning on the opponent it hits: its size...
+		BallHitDuration    float64   `json:"ball_hit_duration"`    // ...and how long the burst lasts
 	} `json:"megaton_punch"`
 	// Rock Tomb (K): Machamp jumps `height` up for `duration` seconds, steered in the air at `air_speed_first_half`
 	// then `air_speed_second_half`, and the landing raises `count` stones in a ring `ring_radius` from where it lands
@@ -834,6 +838,7 @@ func DefaultConfig() Config {
 	mp.RingDuration, mp.BallDuration, mp.BoltStart, mp.BoltCount, mp.BoltOffsets = 0.5, 0.5, 0.5, 1, []float64{0}
 	mp.Distance, mp.Radius, mp.Damage, mp.StunDuration, mp.Knockback, mp.Cooldown = 420, 45, 40, 1.5, 250, 14
 	mp.RingScale, mp.BallScale, mp.FistScale, mp.ImpactScale = 1, 1, 1, 1
+	mp.BallFollowScale, mp.BallFollowDuration, mp.BallHitScale, mp.BallHitDuration = 1, 0.3, 1, 0.6
 	mp.LungeDistance, mp.ShowWarning, mp.ShowText = 120, true, true
 	mp.JumpDistance, mp.JumpDuration, mp.JumpHeight = 200, 0.4, 50
 	mp.FistStart, mp.FistEnd = 24, mp.Distance
@@ -1039,6 +1044,8 @@ func (c Config) validate() error {
 		{"ash.megaton_punch.radius", c.Ash.MegatonPunch.Radius, 0},
 		{"ash.megaton_punch.ring_scale", c.Ash.MegatonPunch.RingScale, 0},
 		{"ash.megaton_punch.ball_scale", c.Ash.MegatonPunch.BallScale, 0},
+		{"ash.megaton_punch.ball_follow_scale", c.Ash.MegatonPunch.BallFollowScale, 0},
+		{"ash.megaton_punch.ball_hit_scale", c.Ash.MegatonPunch.BallHitScale, 0},
 		{"ash.megaton_punch.fist_scale", c.Ash.MegatonPunch.FistScale, 0},
 		{"ash.megaton_punch.impact_scale", c.Ash.MegatonPunch.ImpactScale, 0},
 		{"machamp.tree_slam.jump_duration", c.Machamp.TreeSlam.JumpDuration, 0},
@@ -1222,6 +1229,8 @@ func (c Config) validate() error {
 		{"ash.megaton_punch.ball_duration", c.Ash.MegatonPunch.BallDuration},
 		{"ash.megaton_punch.bolt_start", c.Ash.MegatonPunch.BoltStart},
 		{"ash.megaton_punch.bolt_interval", c.Ash.MegatonPunch.BoltInterval},
+		{"ash.megaton_punch.ball_follow_duration", c.Ash.MegatonPunch.BallFollowDuration},
+		{"ash.megaton_punch.ball_hit_duration", c.Ash.MegatonPunch.BallHitDuration},
 		{"ash.megaton_punch.damage", float64(c.Ash.MegatonPunch.Damage)},
 		{"ash.megaton_punch.stun_duration", c.Ash.MegatonPunch.StunDuration},
 		{"ash.megaton_punch.knockback", c.Ash.MegatonPunch.Knockback},

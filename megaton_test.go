@@ -176,6 +176,10 @@ func TestTheConfigRefusesNonsenseMegatonAndStunNumbers(t *testing.T) {
 		"bolt gap":    func(c *Config) { c.Ash.MegatonPunch.BoltInterval = -1 },
 		"bolt count":  func(c *Config) { c.Ash.MegatonPunch.BoltCount = 21 },
 		"bolt none":   func(c *Config) { c.Ash.MegatonPunch.BoltCount = -1 },
+		"follow size": func(c *Config) { c.Ash.MegatonPunch.BallFollowScale = 0 },
+		"follow time": func(c *Config) { c.Ash.MegatonPunch.BallFollowDuration = -1 },
+		"hit size":    func(c *Config) { c.Ash.MegatonPunch.BallHitScale = 0 },
+		"hit time":    func(c *Config) { c.Ash.MegatonPunch.BallHitDuration = -1 },
 		"knockback":   func(c *Config) { c.Ash.MegatonPunch.Knockback = -1 },
 		"fist_scale":  func(c *Config) { c.Ash.MegatonPunch.FistScale = 0 },
 		"tree stun":   func(c *Config) { c.Ash.TreeSlam.StunDuration = -1 },
@@ -442,6 +446,31 @@ func TestMegatonChargeIsRingPlusBallAndTheBoltsReachThePage(t *testing.T) {
 	m := next(t, dialPlay(t, srv, "dummy"), "hi")["mega"].(map[string]any)
 	offs, _ := m["boffs"].([]any)
 	if m["charge"] != 1.0 || m["ring"] != 0.3 || m["bstart"] != 0.2 || m["bcount"] != 3.0 || m["bint"] != 0.25 || len(offs) != 2 || offs[0] != -80.0 || offs[1] != 120.0 {
+		t.Fatalf("mega = %v", m)
+	}
+}
+
+// The ball that goes forward with Ash needs to know whose it is, and the page gets its sizes and times apart from the burst's.
+func TestMegatonEventNamesTheThrowerAndTheBallSettingsReachThePage(t *testing.T) {
+	cfg := DefaultConfig()
+	mp := &cfg.Ash.MegatonPunch
+	mp.BallFollowScale, mp.BallFollowDuration, mp.BallHitScale, mp.BallHitDuration = 1.5, 0.4, 2.5, 0.9
+	mp.RingDuration, mp.BallDuration = 0, 0
+	for slot := 0; slot < 2; slot++ { // thrown at once, by Ash in either seat
+		g := megaDuel(cfg, 300)
+		if slot == 1 {
+			g.P[0].Kind, g.P[1].Kind = snorlax, ash
+			g.P[0].X, g.P[1].X = 600, 300
+		}
+		ev := press(g, slot, Input{Mega: true})
+		if len(ev) == 0 || ev[0].T != "mega" || ev[0].S != slot {
+			t.Fatalf("slot %d: events = %+v", slot, ev)
+		}
+	}
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	m := next(t, dialPlay(t, srv, "dummy"), "hi")["mega"].(map[string]any)
+	if m["fwscale"] != 1.5 || m["fwdur"] != 0.4 || m["htscale"] != 2.5 || m["htdur"] != 0.9 {
 		t.Fatalf("mega = %v", m)
 	}
 }

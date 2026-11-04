@@ -291,7 +291,7 @@ func (g *Game) megatonGather(i int) []Event {
 // opponent it touches, once.
 func (g *Game) megatonPunch(i int) []Event {
 	p, other, mp := &g.P[i], &g.P[1-i], g.brawler(i).MegatonPunch
-	ev := Event{T: "mega", X: p.X, Y: p.Y, R: mp.Distance, DX: p.MegaX, DY: p.MegaY}
+	ev := Event{T: "mega", S: i, X: p.X, Y: p.Y, R: mp.Distance, DX: p.MegaX, DY: p.MegaY}
 	hit := mp.Reach.hits(other) && segDist(other.X, other.Y, p.X, p.Y, p.X+p.MegaX*mp.Distance, p.Y+p.MegaY*mp.Distance) <= mp.Radius+g.radius(1-i)
 	// Ash is carried forward with the fist, and stops against the opponent's body when it is in the way.
 	adv := math.Min(mp.LungeDistance, mp.Distance)

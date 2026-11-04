@@ -99,7 +99,7 @@ const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per 
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, range: 450, flight: 0.9, lob: 150, sfire: 20 }; // Gengar's, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
-let megaCfg = { charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
+let megaCfg = { charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
 const beamCfgOf = (k) => (k === 10 ? gbeamCfg : beamCfg);
@@ -1690,6 +1690,10 @@ function drawMegaCharge(p, d) {
     return;
   }
   const v = Math.min((e - ringT) / Math.max(megaCfg.charge - ringT, 1e-6), 1), black = megaBlack(55), R = (16 + 30 * v) * bs;
+  megaBall(hx, hy, R, black);
+}
+// The black and white ball of the charge, flickering, with lightning inside it and a dashed ring round it (also the one that goes forward with Ash).
+function megaBall(hx, hy, R, black) {
   ctx.save(); ctx.translate(hx, hy);
   const glow = ctx.createRadialGradient(0, 0, R * 0.6, 0, 0, R * 2.2);
   glow.addColorStop(0, black ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.45)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
@@ -1703,6 +1707,12 @@ function drawMegaCharge(p, d) {
 }
 // The punch itself: a big black and white fist that flashes out along the line, trailing afterimages and crackling with lightning, then fades.
 function drawMegaFist(f) {
+  if (f.age < megaCfg.fwdur && snap) { // the ball goes forward with Ash as it is carried, and fades at the end
+    const d = disp[f.s || 0], ang = Math.atan2(f.dy || 0, f.dx || 0), left = 1 - f.age / megaCfg.fwdur;
+    ctx.save(); ctx.globalAlpha = Math.min(1, left * 3);
+    megaBall(d.x + Math.cos(ang) * 24, d.y + Math.sin(ang) * 24, 46 * megaCfg.fwscale, megaBlack(55));
+    ctx.restore();
+  }
   const FLY = 0.14, u = Math.min(f.age / FLY, 1), ang = Math.atan2(f.dy || 0, f.dx || 0), R = megaCfg.radius * megaCfg.fscale * 1.3;
   const fade = f.age < FLY ? 1 : Math.max(0, 1 - (f.age - FLY) / 0.3);
   if (fade <= 0) return;
@@ -1723,8 +1733,29 @@ function drawMegaFist(f) {
   }
   ctx.restore();
 }
+// The ball that was charged bursts on the opponent: a black ball that swells and fades, with black lightning thrown out of it in every direction.
+function drawMegaBoom(f) {
+  const k = f.age / Math.max(megaCfg.htdur, 1e-6);
+  if (k >= 1) return;
+  const a = 1 - k, R0 = 46 * megaCfg.htscale, R = R0 * (0.8 + 2.2 * Math.sqrt(k));
+  ctx.save(); ctx.translate(f.x, f.y);
+  const glow = ctx.createRadialGradient(0, 0, R * 0.5, 0, 0, R * 1.8);
+  glow.addColorStop(0, `rgba(120,90,255,${0.5 * a})`); glow.addColorStop(1, 'rgba(120,90,255,0)');
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, R * 1.8, 0, 7); ctx.fill();
+  ctx.globalAlpha = Math.min(1, a * 1.5); ctx.fillStyle = '#05050a'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.globalAlpha = 1; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  for (let i = 0; i < 12; i++) { // black bolts with a violet glow, from the middle past the rim
+    const t = Math.random() * Math.PI * 2, L = R * (1.2 + 0.7 * Math.random());
+    for (const [w, col] of [[R * 0.16, `rgba(150,110,255,${0.5 * a})`], [R * 0.05, `rgba(10,10,20,${a})`]]) { ctx.strokeStyle = col; ctx.lineWidth = Math.max(w, 1); jagPath(0, 0, Math.cos(t) * L, Math.sin(t) * L, 7, R * 0.18); ctx.stroke(); }
+  }
+  discLightning(R, true, 6);
+  ctx.restore();
+}
 // Where it lands: a flash that flickers black and white, shock rings, a spiky burst, lines thrown out along the punch and the sound of it.
 function drawMegaImpact(f) {
+  drawMegaBoom(f);
+  if (f.age >= 0.65) return; // the rest of it is over (the boom may last longer)
   const k = f.age / 0.65, a = 1 - k, s = megaCfg.iscale, ang = Math.atan2(f.dy || 0, f.dx || 1), black = megaBlack(45);
   ctx.save(); ctx.translate(f.x, f.y);
   ctx.fillStyle = black ? `rgba(0,0,0,${0.85 * a})` : `rgba(255,255,255,${0.95 * a})`; ctx.beginPath(); ctx.arc(0, 0, 110 * s * (0.4 + 0.6 * Math.min(1, k * 4)), 0, 7); ctx.fill();
@@ -2591,7 +2622,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? 0.5 : f.t === 'megahit' ? 0.65 : f.t === 'kickhit' ? 0.5 : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' ? 0.5 : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);

@@ -352,6 +352,7 @@ type Frost struct {
 // Event is a one-shot effect the client plays (ring, screen shake).
 type Event struct {
 	L  float64 `json:"l,omitempty"` // how far the attacker was carried forward with its blow (the Megaton Punch)
+	S  int     `json:"s,omitempty"` // the slot of whoever made it, where the effect has to follow them (the Megaton Punch's ball)
 	T  string  `json:"t"`           // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze" | "paralyze" | "storm" | "iceburst" | "wave" | "tail" | "evolve"
 	X  float64 `json:"x"`
 	Y  float64 `json:"y"`

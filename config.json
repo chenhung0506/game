@@ -302,12 +302,12 @@
       "min_height": 0,
       "max_height": 60,
       "cooldown": 7,
-      "ring_radius": 290,
+      "ring_radius": 400,
       "spread_speed": 400,
       "convergence_speed": 250,
-      "damage": 15,
+      "damage": 5,
       "count": 14,
-      "radius": 15,
+      "radius": 10,
       "hp": 10,
       "mass": 20
     },
@@ -412,9 +412,9 @@
     "megaton_punch": {
       "min_height": 0,
       "max_height": 60,
-      "ring_duration": 1,
-      "ball_duration": 2.2,
-      "bolt_start": 2,
+      "ring_duration": 0.6,
+      "ball_duration": 1.8,
+      "bolt_start": 1.2,
       "bolt_count": 6,
       "bolt_interval": 0.2,
       "bolt_offsets": [60,-60,-120,120,60,-60],
@@ -435,7 +435,11 @@
       "ring_scale": 1.6,
       "ball_scale": 2.0,
       "fist_scale": 0.8,
-      "impact_scale": 1.2
+      "impact_scale": 1.2,
+      "ball_follow_scale": 1,
+      "ball_follow_duration": 0.3,
+      "ball_hit_scale": 1,
+      "ball_hit_duration": 0.6
     },
     "comet_punch": {
       "min_height": 0,
