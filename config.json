@@ -314,16 +314,16 @@
     "shadow_ball": {
       "min_height": 0,
       "max_height": 60,
-      "ball_scale": 2,
+      "ball_scale": 1.5,
       "damage": 20,
       "cooldown": 6,
-      "slam_radius": 200,
+      "slam_radius": 150,
       "speed": 600,
       "charge_time": 0.4,
       "radius": 60,
       "hp": 30,
       "mass": 50,
-      "gravity": 250,
+      "gravity": 100,
       "pull_duration": 4
     },
     "night_shade": {
