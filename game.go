@@ -807,6 +807,11 @@ func (g *Game) Step(dt float64) []Event {
 				p.ThunderIn -= dt
 				for p.ThunderLeft > 0 && p.ThunderIn < 1e-9 { // a loop so a tiny interval cannot lose bolts
 					events = append(events, Event{T: "skybolt", X: p.X, Y: p.Y}, Event{T: "thunder", X: p.ShadowX, Y: p.ShadowY})
+					for j := range g.Balls { // the bolt wears down the other player's projectiles, pillars and stones caught in it, whether or not it hits a body
+						if b := &g.Balls[j]; b.Owner != i && math.Hypot(b.X-p.ShadowX, b.Y-p.ShadowY) <= th.Radius+g.ballRadius(b) {
+							b.HP -= th.Damage
+						}
+					}
 					if th.Reach.hits(other) && math.Hypot(other.X-p.ShadowX, other.Y-p.ShadowY) <= th.Radius+g.radius(1-i) {
 						g.hit(other, th.Damage)
 					}

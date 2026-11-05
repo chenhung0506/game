@@ -77,6 +77,7 @@ type Config struct {
 			Damage           int     `json:"damage"`
 			Mass             float64 `json:"mass"`
 		} `json:"volt_tackle"`
+		// Thunder: every bolt also takes `damage` off every projectile (fire balls, stones, pillars...) of the other player inside `radius`.
 		Thunder struct {
 			Reach
 			Delay       float64 `json:"delay"`        // shadow appears -> first bolt

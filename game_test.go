@@ -2364,3 +2364,36 @@ func TestElectroBallWithNoDirectionStillFollowsTheOpponentWhileCharging(t *testi
 		t.Fatalf("ball goes %v,%v, want 0,1: at where the opponent stood when the charge ended", b.DX, b.DY)
 	}
 }
+
+func TestThunderBoltsWearDownTheOpponentsFireBallsStonesAndPillarsInTheirArea(t *testing.T) {
+	cfg := DefaultConfig()
+	th := cfg.Pikachu.Thunder
+	g := duel(cfg, pikachu, snorlax)
+	g.P[1].X, g.P[1].Y = 1200, 700
+	at := func(dx float64, b Ball) Ball { b.X, b.Y = g.P[1].X+dx, g.P[1].Y; return b }
+	g.Balls = []Ball{
+		at(40, Ball{K: ballFire, Owner: 1, HP: 50, Left: 1e9}),                    // fire, inside
+		at(-40, Ball{K: ballStone, Owner: 1, Side: 2, HP: 50, Life: 30}),          // stone, inside
+		at(-5, Ball{K: ballPillar, Owner: 1, HP: 50, Life: 30}),                   // pillar, inside
+		at(th.Radius+300, Ball{K: ballFire, Owner: 1, HP: 50, Left: 1e9}),         // fire, outside
+		{K: ballFire, Owner: 0, HP: 50, Left: 1e9, X: g.P[1].X, Y: g.P[1].Y + 65}, // Pikachu's own, inside
+	}
+	g.P[0].In.Thunder = true
+	steps(g, 1)
+	g.P[0].In = Input{}
+	for k := 0; k < int((th.Delay+th.Interval)*tickRate)+2 && g.P[0].ThunderLeft == th.Strikes; k++ {
+		g.Step(dt) // up to the first bolt
+	}
+	if g.P[0].ThunderLeft != th.Strikes-1 {
+		t.Fatalf("ThunderLeft %d, want the first bolt just landed", g.P[0].ThunderLeft)
+	}
+	want := []int{50 - th.Damage, 50 - th.Damage, 50 - th.Damage, 50, 50}
+	if len(g.Balls) != len(want) {
+		t.Fatalf("%d balls left, want %d: %+v", len(g.Balls), len(want), g.Balls)
+	}
+	for j, w := range want {
+		if got := g.Balls[j].HP; got != w {
+			t.Errorf("ball %d (%+v): HP %d, want %d", j, g.Balls[j], got, w)
+		}
+	}
+}
