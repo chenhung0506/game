@@ -15,6 +15,7 @@ const (
 	kickNone  = iota
 	kickSlide // sliding along the stick
 	kickFly   // leaping at the opponent
+	kickWait  // standing still between the slide and the leap (kick_delay); the leap is aimed when it ends
 )
 
 // isBrawler is whether kind is one of the two that fight with the tree, the fists and the rocks.
@@ -113,6 +114,14 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		idle = false
 	}
 	flying := p.KickPhase == kickFly // the kick leaves on the tick after the slide ends
+	if p.KickPhase == kickWait {
+		if p.KickT -= dt; p.KickT < 1e-9 {
+			p.KickT, p.KickPhase, p.KickD = 0, kickFly, 0
+			if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
+				p.KickX, p.KickY = ux, uy // the kick goes at where the opponent stands as the wait ends
+			}
+		}
+	}
 	if p.KickPhase == kickSlide {
 		step := math.Min(dt, p.KickT) // the last step is clipped so the distance is exact
 		if p.KickT > 0 {
@@ -121,9 +130,13 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 			p.Y = math.Min(math.Max(p.Y+p.KickY*v*step, 0), g.court.Width)
 		}
 		if p.KickT -= step; p.KickT < 1e-9 {
-			p.KickT, p.KickPhase, p.KickD = 0, kickFly, 0
-			if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
-				p.KickX, p.KickY = ux, uy // the kick goes at where the opponent stands as the slide ends
+			if hk.KickDelay > 0 {
+				p.KickT, p.KickPhase = hk.KickDelay, kickWait
+			} else {
+				p.KickT, p.KickPhase, p.KickD = 0, kickFly, 0
+				if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
+					p.KickX, p.KickY = ux, uy // the kick goes at where the opponent stands as the slide ends
+				}
 			}
 		}
 	}

@@ -354,3 +354,33 @@ func TestShowWarningOfTheKickIsSentToThePageAndIsOnForAshOnlyByDefault(t *testin
 		t.Fatalf("kickwarn = %v", kw)
 	}
 }
+
+func TestHighJumpKickWaitsKickDelayAfterTheSlideAndAimsWhenTheWaitEnds(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Machamp.HighJumpKick.KickDelay = 0.5
+	hk := cfg.Machamp.HighJumpKick
+	g := kickDuel(cfg, 700)
+	press(g, 0, Input{Skill: true, DY: 1})
+	for g.P[0].KickPhase == kickSlide {
+		g.Step(dt)
+	}
+	if g.P[0].KickPhase != kickWait {
+		t.Fatalf("phase %d after the slide, want the wait", g.P[0].KickPhase)
+	}
+	x, y, n := g.P[0].X, g.P[0].Y, 0
+	g.P[1].X, g.P[1].Y = 900, 100 // the opponent moves while it waits
+	for g.P[0].KickPhase == kickWait {
+		if g.P[0].X != x || g.P[0].Y != y || g.P[0].Z != 0 {
+			t.Fatal("moved during the wait")
+		}
+		g.Step(dt)
+		n++
+	}
+	if want := int(math.Ceil(hk.KickDelay / dt)); n != want {
+		t.Fatalf("wait took %d ticks, want %d", n, want)
+	}
+	wx, wy := unit(g.P[1].X-g.P[0].X, g.P[1].Y-g.P[0].Y)
+	if g.P[0].KickPhase != kickFly || math.Abs(g.P[0].KickX-wx) > 1e-9 || math.Abs(g.P[0].KickY-wy) > 1e-9 {
+		t.Fatalf("phase %d aim %v,%v, want the kick aimed at %v,%v", g.P[0].KickPhase, g.P[0].KickX, g.P[0].KickY, wx, wy)
+	}
+}

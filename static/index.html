@@ -1783,14 +1783,15 @@ function drawMegaImpact(f) {
 }
 // High Jump Kick. While it slides, speed lines trail behind Machamp; in the leap a boot is thrust out ahead, with a streak behind it.
 function drawKickLeg(p, d, bs) {
-  const [ax, ay] = rv(p.kkx, p.kky), fly = p.kkp === 2, top = -d.z;
+  const [ax, ay] = rv(p.kkx, p.kky), fly = p.kkp === 2, wait = p.kkp === 3, top = -d.z;
   if (p.k === 7 ? kickWarn.ash : kickWarn.machamp) upright(d.x, d.y, () => { // the name of the move over its head
     ctx.save(); ctx.font = '900 26px system-ui'; ctx.textAlign = 'center'; ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,.85)';
-    const txt = fly ? '浪子踢球' : '閃身步', y = top - 60 * bs;
-    ctx.strokeText(txt, 0, y); ctx.fillStyle = fly ? '#ffd23a' : '#9fe8ff'; ctx.fillText(txt, 0, y); ctx.restore();
+    const txt = fly || wait ? '浪子踢球' : '閃身步', y = top - 60 * bs;
+    ctx.strokeText(txt, 0, y); ctx.fillStyle = fly || wait ? '#ffd23a' : '#9fe8ff'; ctx.fillText(txt, 0, y); ctx.restore();
   });
   upright(d.x, d.y, () => {
     ctx.lineCap = 'round';
+    if (wait) return; // standing still, about to leap: no streaks
     for (let n = 0; n < (fly ? 7 : 4); n++) { // streaks behind it
       const off = (n - 3) * 5 * bs, L = (fly ? 90 : 55) * bs * (0.6 + 0.4 * Math.abs(Math.sin(n * 2.3 + performance.now() / 60)));
       const sx = -ay * off, sy = ax * off;

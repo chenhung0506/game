@@ -457,8 +457,9 @@ type Config struct {
 			Damage           int     `json:"damage"`
 			Count            int     `json:"count"`
 			Radius           float64 `json:"radius"`
-			HP               int     `json:"hp"`   // a flame is a projectile: the opponent's balls and skills wear it down
-			Mass             float64 `json:"mass"` // what a beam or a fist has to beat to push it
+			RehitInterval    float64 `json:"rehit_interval"` // 0: a flame hurts the opponent once; above 0: again every that many seconds it still overlaps
+			HP               int     `json:"hp"`             // a flame is a projectile: the opponent's balls and skills wear it down
+			Mass             float64 `json:"mass"`           // what a beam or a fist has to beat to push it
 		} `json:"ghost_fire"`
 		// Shadow Ball (K): rooted for `charge_time` seconds, then a ball flies straight along the aim (the way the Electro Ball does) at
 		// `speed`, `radius` big, with `hp` and `mass` (the opponent's skills and projectiles wear it down; at 0 it bursts where it
@@ -545,6 +546,7 @@ type BrawlerCfg struct {
 		Reach
 		SlideDistance float64 `json:"slide_distance"`
 		SlideDuration float64 `json:"slide_duration"`
+		KickDelay     float64 `json:"kick_delay"` // seconds it stands still between the slide and the leap (the leap is aimed when it ends)
 		KickDistance  float64 `json:"kick_distance"`
 		KickSpeed     float64 `json:"kick_speed"`
 		KickHeight    float64 `json:"kick_height"`
@@ -1268,6 +1270,7 @@ func (c Config) validate() error {
 		{"ash.megaton_punch.lunge_distance", c.Ash.MegatonPunch.LungeDistance},
 		{"machamp.high_jump_kick.slide_distance", c.Machamp.HighJumpKick.SlideDistance},
 		{"machamp.high_jump_kick.slide_duration", c.Machamp.HighJumpKick.SlideDuration},
+		{"machamp.high_jump_kick.kick_delay", c.Machamp.HighJumpKick.KickDelay},
 		{"machamp.high_jump_kick.kick_height", c.Machamp.HighJumpKick.KickHeight},
 		{"machamp.high_jump_kick.radius", c.Machamp.HighJumpKick.Radius},
 		{"machamp.high_jump_kick.damage", float64(c.Machamp.HighJumpKick.Damage)},
@@ -1276,6 +1279,7 @@ func (c Config) validate() error {
 		{"machamp.high_jump_kick.cooldown", c.Machamp.HighJumpKick.Cooldown},
 		{"ash.high_jump_kick.slide_distance", c.Ash.HighJumpKick.SlideDistance},
 		{"ash.high_jump_kick.slide_duration", c.Ash.HighJumpKick.SlideDuration},
+		{"ash.high_jump_kick.kick_delay", c.Ash.HighJumpKick.KickDelay},
 		{"ash.high_jump_kick.kick_height", c.Ash.HighJumpKick.KickHeight},
 		{"ash.high_jump_kick.radius", c.Ash.HighJumpKick.Radius},
 		{"ash.high_jump_kick.damage", float64(c.Ash.HighJumpKick.Damage)},
@@ -1297,6 +1301,7 @@ func (c Config) validate() error {
 		{"gengar.shadow_sneak.shadow_speed_first_half", c.Gengar.ShadowSneak.ShadowSpeedFirstHalf},
 		{"gengar.shadow_sneak.shadow_speed_second_half", c.Gengar.ShadowSneak.ShadowSpeedSecondHalf},
 		{"gengar.ghost_fire.cooldown", c.Gengar.GhostFire.Cooldown},
+		{"gengar.ghost_fire.rehit_interval", c.Gengar.GhostFire.RehitInterval},
 		{"gengar.ghost_fire.damage", float64(c.Gengar.GhostFire.Damage)},
 		{"gengar.ghost_fire.mass", c.Gengar.GhostFire.Mass},
 		{"gengar.shadow_ball.damage", float64(c.Gengar.ShadowBall.Damage)},

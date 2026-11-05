@@ -283,12 +283,15 @@ func (c *bctx) findThreat() threat {
 	if isBrawler(f.Kind) && f.KickPhase != kickNone { // a High Jump Kick: the line it flies along is fixed once the slide ends, at where the bot stands now
 		hk := cfg.brawlerOf(f.Kind).HighJumpKick
 		sx, sy, kx, ky, left, eta := f.X, f.Y, f.KickX, f.KickY, hk.KickDistance-f.KickD, 0.0
-		if f.KickPhase == kickSlide { // not yet aimed: it will kick from where the slide ends, straight at the bot
-			if hk.SlideDuration > 0 {
+		if f.KickPhase == kickSlide || f.KickPhase == kickWait { // not yet aimed: it will kick from where the slide ends, straight at the bot
+			if f.KickPhase == kickSlide && hk.SlideDuration > 0 {
 				sx, sy = sx+f.KickX*hk.SlideDistance*f.KickT/hk.SlideDuration, sy+f.KickY*hk.SlideDistance*f.KickT/hk.SlideDuration
 			}
 			kx, ky = unit(p.X-sx, p.Y-sy)
 			left, eta = hk.KickDistance, f.KickT
+			if f.KickPhase == kickSlide {
+				eta += hk.KickDelay
+			}
 		}
 		if d := math.Hypot(p.X-sx, p.Y-sy); (kx != 0 || ky != 0) && d > 0 && eta+d/hk.KickSpeed >= 0 &&
 			segDist(p.X, p.Y, sx, sy, sx+kx*left, sy+ky*left) < hk.Radius+c.pr+c.fr+15 {

@@ -351,6 +351,31 @@ func TestEachGhostFireHurtsTheOpponentOnceAndOnlyInItsBand(t *testing.T) {
 	}
 }
 
+func TestGhostFireRehitIntervalLetsOneFlameHurtAgain(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Gengar.GhostFire.Damage = 5
+	cfg.Gengar.GhostFire.RehitInterval = 0.5
+	g := gen(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 500, 250 // one flame parked on the opponent (it does not move: spread_speed 0)
+	g.Balls = []Ball{{K: ballGhost, Owner: 0, X: 500, Y: 250, DX: 1, Left: 1e9, HP: cfg.Gengar.GhostFire.HP}}
+	g.cfg.Gengar.GhostFire.SpreadSpeed = 0
+	hp := g.P[1].HP
+	steps(g, int(2*tickRate)) // two seconds
+	if lost := hp - g.P[1].HP; lost < 15 || lost > 25 {
+		t.Fatalf("lost %d in 2s, want about 4 hits of 5", lost)
+	}
+	cfg.Gengar.GhostFire.RehitInterval = 0
+	g = gen(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 500, 250
+	g.Balls = []Ball{{K: ballGhost, Owner: 0, X: 500, Y: 250, DX: 1, Left: 1e9, HP: cfg.Gengar.GhostFire.HP}}
+	g.cfg.Gengar.GhostFire.SpreadSpeed = 0
+	hp = g.P[1].HP
+	steps(g, int(2*tickRate))
+	if lost := hp - g.P[1].HP; lost != 5 {
+		t.Fatalf("lost %d with rehit_interval 0, want exactly one hit of 5", lost)
+	}
+}
+
 // ---- Shadow Ball ----
 
 func TestNightShadeLandsOnTheOpponentWhenNoAimWasChosenAndHurtsOnlyWhenItLands(t *testing.T) {

@@ -334,6 +334,7 @@ type Ball struct {
 	Z         float64 `json:"z,omitempty"`  // pillar: height above the ground while a tornado carries it
 	Back      bool    `json:"bk,omitempty"` // ghost fire: it has flown out and is coming back to its owner
 	Hit       bool    `json:"-"`            // ghost fire: it has hurt the opponent already
+	FoeCD     float64 `json:"-"`            // ghost fire: until it may hurt the opponent again (rehit_interval)
 }
 
 // Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
@@ -1121,8 +1122,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 					}
 					b.X, b.Y = b.X+dx/d*gf.ConvergenceSpeed*dt, b.Y+dy/d*gf.ConvergenceSpeed*dt
 				}
-				if !b.Hit && gf.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= gf.Radius+g.radius(1-b.Owner) {
-					b.Hit = true
+				b.FoeCD = hitCDTick(b.FoeCD, dt)
+				if b.FoeCD <= 1e-9 && (!b.Hit || gf.RehitInterval > 0) && gf.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= gf.Radius+g.radius(1-b.Owner) {
+					b.Hit, b.FoeCD = true, hitCDNext(b.FoeCD, gf.RehitInterval)
 					g.hit(foe, gf.Damage)
 				}
 				kept = append(kept, b)
