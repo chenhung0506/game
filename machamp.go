@@ -18,6 +18,10 @@ const (
 	kickWait  // standing still between the slide and the leap (kick_delay); the leap is aimed when it ends
 )
 
+// pinned is whether a vine or a paralysis holds the player on the spot: a skill it is in the middle of goes on (its timers
+// run, its fist or kick still comes), but it does not move.
+func (p *Player) pinned() bool { return p.BoundT > 0 || p.ParalyzeT > 0 }
+
 // isBrawler is whether kind is one of the two that fight with the tree, the fists and the rocks.
 func isBrawler(kind int) bool { return kind == ash || kind == machamp }
 
@@ -124,7 +128,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	}
 	if p.KickPhase == kickSlide {
 		step := math.Min(dt, p.KickT) // the last step is clipped so the distance is exact
-		if p.KickT > 0 {
+		if p.KickT > 0 && !p.pinned() {
 			v := hk.SlideDistance / hk.SlideDuration
 			p.X = math.Min(math.Max(p.X+p.KickX*v*step, 0), g.court.Length)
 			p.Y = math.Min(math.Max(p.Y+p.KickY*v*step, 0), g.court.Width)
@@ -219,8 +223,10 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	if p.MegaJT > 0 {
 		step := math.Min(dt, p.MegaJT) // the last step is clipped so the distance is exact
 		v := mp.JumpDistance / mp.JumpDuration
-		p.X = math.Min(math.Max(p.X+p.MegaJX*v*step, 0), g.court.Length)
-		p.Y = math.Min(math.Max(p.Y+p.MegaJY*v*step, 0), g.court.Width)
+		if !p.pinned() {
+			p.X = math.Min(math.Max(p.X+p.MegaJX*v*step, 0), g.court.Length)
+			p.Y = math.Min(math.Max(p.Y+p.MegaJY*v*step, 0), g.court.Width)
+		}
 		if p.MegaJT -= step; p.MegaJT < 1e-9 {
 			p.MegaJT, p.Z = 0, 0
 			events = append(events, g.megatonGather(i)...) // the fist is aimed from where it landed
@@ -258,6 +264,16 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 func (g *Game) kickStep(i int, dt float64) []Event {
 	p, other, hk := &g.P[i], &g.P[1-i], g.brawler(i).HighJumpKick
 	s := math.Min(hk.KickSpeed*dt, hk.KickDistance-p.KickD)
+	if p.pinned() { // held on the spot: the leap runs its course but gets nowhere, and so touches nobody
+		p.KickD += s
+		if p.KickD >= hk.KickDistance-1e-9 {
+			p.KickPhase, p.Z = kickNone, 0
+		} else {
+			u := p.KickD / hk.KickDistance
+			p.Z = 4 * hk.KickHeight * u * (1 - u)
+		}
+		return nil
+	}
 	// The first moment, along the path, that the bodies (and the leg's `radius`) touch: where the circle round the opponent
 	// of that size meets the line.
 	R := g.radius(i) + g.radius(1-i) + hk.Radius
@@ -308,7 +324,9 @@ func (g *Game) megatonPunch(i int) []Event {
 	hit := mp.Reach.hits(other) && segDist(other.X, other.Y, p.X, p.Y, p.X+p.MegaX*mp.Distance, p.Y+p.MegaY*mp.Distance) <= mp.Radius+g.radius(1-i)
 	// Ash is carried forward with the fist, and stops against the opponent's body when it is in the way.
 	adv := math.Min(mp.LungeDistance, mp.Distance)
-	if hit {
+	if p.pinned() {
+		adv = 0 // held on the spot: the fist flies from where it stands
+	} else if hit {
 		adv = math.Min(adv, math.Max(0, dist(p, other)-g.radius(i)-g.radius(1-i)))
 	}
 	p.X = math.Min(math.Max(p.X+p.MegaX*adv, 0), g.court.Length)

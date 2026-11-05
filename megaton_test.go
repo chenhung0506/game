@@ -474,3 +474,21 @@ func TestMegatonEventNamesTheThrowerAndTheBallSettingsReachThePage(t *testing.T)
 		t.Fatalf("mega = %v", m)
 	}
 }
+
+func TestMegatonPunchHeldByAVineLeapsAndLungesNowhere(t *testing.T) {
+	cfg := DefaultConfig()
+	mp := cfg.Ash.MegatonPunch
+	g := mach(cfg, snorlax)
+	g.P[1].X, g.P[1].Y = 900, 250
+	press(g, 0, Input{Mega: true, DY: 1})
+	steps(g, 2) // in the air already
+	x, y := g.P[0].X, g.P[0].Y
+	g.P[0].BoundT = 10
+	steps(g, int((mp.JumpDuration+mp.RingDuration+mp.BallDuration)/dt)+3)
+	if g.P[0].X != x || g.P[0].Y != y || g.P[0].Z != 0 {
+		t.Fatalf("at %v,%v z=%v, want it held at %v,%v", g.P[0].X, g.P[0].Y, g.P[0].Z, x, y)
+	}
+	if g.P[0].MegaT != 0 || g.P[0].MegaJT != 0 {
+		t.Fatal("the punch did not run its course")
+	}
+}

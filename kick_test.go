@@ -384,3 +384,31 @@ func TestHighJumpKickWaitsKickDelayAfterTheSlideAndAimsWhenTheWaitEnds(t *testin
 		t.Fatalf("phase %d aim %v,%v, want the kick aimed at %v,%v", g.P[0].KickPhase, g.P[0].KickX, g.P[0].KickY, wx, wy)
 	}
 }
+
+func TestHighJumpKickHeldByAVineOrParalysisStaysOnTheSpotAndTouchesNobody(t *testing.T) {
+	for name, pin := range map[string]func(p *Player){
+		"bound":     func(p *Player) { p.BoundT = 5 },
+		"paralyzed": func(p *Player) { p.ParalyzeT = 5 },
+	} {
+		for _, phase := range []int{kickSlide, kickFly} {
+			g := kickDuel(DefaultConfig(), 300) // the opponent is right in the line of the kick
+			press(g, 0, Input{Skill: true, DY: 1})
+			for g.P[0].KickPhase != phase {
+				g.Step(dt)
+			}
+			x, y := g.P[0].X, g.P[0].Y
+			pin(&g.P[0])
+			hp := g.P[1].HP
+			steps(g, int(2*tickRate))
+			if g.P[0].X != x || g.P[0].Y != y {
+				t.Fatalf("%s/%d: moved %v,%v while held", name, phase, g.P[0].X-x, g.P[0].Y-y)
+			}
+			if g.P[1].HP != hp || g.P[1].StunT > 0 {
+				t.Fatalf("%s/%d: the kick hurt from where it could not reach", name, phase)
+			}
+			if g.P[0].KickPhase != kickNone || g.P[0].Z != 0 {
+				t.Fatalf("%s/%d: the kick did not run its course (phase %d z=%v)", name, phase, g.P[0].KickPhase, g.P[0].Z)
+			}
+		}
+	}
+}
