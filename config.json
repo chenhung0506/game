@@ -449,13 +449,13 @@
       "show_text": false,
       "fist_start": -60,
       "fist_end": 330,
-      "ring_scale": 1.6,
+      "ring_scale": 2.0,
       "ball_scale": 2.0,
-      "fist_scale": 0.8,
-      "impact_scale": 1,
+      "fist_scale": 0.6,
+      "impact_scale": 0.8,
       "ball_follow_scale": 1,
       "ball_follow_duration": 0.3,
-      "ball_hit_scale": 0.8,
+      "ball_hit_scale": 0.6,
       "ball_hit_duration": 0.6
     },
     "comet_punch": {
