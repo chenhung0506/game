@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,6 +33,9 @@ type client struct {
 	conn *websocket.Conn
 	send chan []byte
 	seen atomic.Int64 // unix nanoseconds of the last pong or message from the page
+
+	squad    *squad // set when this connection plays in a 2v2 room (see squad.go): which one, and which of its two people
+	squadIdx int
 }
 
 func (c *client) touch() { c.seen.Store(time.Now().UnixNano()) }
@@ -63,13 +67,16 @@ type room struct {
 }
 
 type hub struct {
-	mu    sync.Mutex
-	rooms map[string]*room
-	cfg   Config
-	seq   int // rooms opened so far
+	mu     sync.Mutex
+	rooms  map[string]*room
+	squads map[string]*squad // the 2v2 rooms
+	cfg    Config
+	seq    int // rooms opened so far
 }
 
-func newHub(cfg Config) *hub { return &hub{rooms: map[string]*room{}, cfg: cfg} }
+func newHub(cfg Config) *hub {
+	return &hub{rooms: map[string]*room{}, squads: map[string]*squad{}, cfg: cfg}
+}
 
 // waiting is the room a newcomer is put in: one with a single person in it (who may be playing the computer),
 // the one that has waited longest, preferring one opened from the newcomer's own view. Must be called with h.mu held.
@@ -100,7 +107,7 @@ func (r *room) alone() bool { return (r.c[0] == nil) != (r.c[1] == nil) }
 
 // open makes a room for c's view. Must be called with h.mu held; nil when there are too many rooms.
 func (h *hub) open(mode string) *room {
-	if len(h.rooms) >= maxRooms {
+	if len(h.rooms)+len(h.squads) >= maxRooms {
 		return nil
 	}
 	h.seq++
@@ -187,6 +194,7 @@ type roomInfo struct {
 	Pick  int    `json:"pick"`  // the character they chose, -1 if none yet
 	Bot   bool   `json:"bot"`   // they are playing the computer
 	Team  bool   `json:"team"`
+	Squad bool   `json:"squad,omitempty"` // a 2v2 room: joining it makes you the host's teammate
 }
 
 // waitingRooms lists the rooms someone is alone in: those still answering first, then the longest waiting.
@@ -213,6 +221,20 @@ func (h *hub) waitingRooms() []roomInfo {
 			}, r.n})
 		}
 		r.mu.Unlock()
+	}
+	for _, s := range h.squads {
+		s.mu.Lock()
+		if s.alone() {
+			i := 0
+			if s.c[0] == nil {
+				i = 1
+			}
+			rows = append(rows, row{roomInfo{
+				ID: s.id, Wait: int(now.Sub(s.aloneAt).Seconds()), Pick: s.pick[i], Squad: true,
+				Stale: now.UnixNano()-s.c[i].seen.Load() > int64(staleAfter),
+			}, s.n})
+		}
+		s.mu.Unlock()
 	}
 	sort.Slice(rows, func(a, b int) bool {
 		if rows[a].Stale != rows[b].Stale {
@@ -241,10 +263,19 @@ const (
 	playComputer = "computer"
 	playPlayer   = "player"
 	playDummy    = "dummy"
+	playSquad    = "squad" // a 2v2 room: the person opens it, a second person joins from the menu, and two computers are the other side
 )
 
 // seatFor is seat for a way of playing.
 func (h *hub) seatFor(c *client, mode string, menu bool, play string) (r *room, idx int, ok bool) {
+	if play == playSquad { // the connection is a squad's: c.squad says which, and there is no duel room
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		if c.squad, c.squadIdx, ok = h.openSquad(mode, c); !ok {
+			return nil, 0, false
+		}
+		return nil, 0, true
+	}
 	if play == playComputer || play == playDummy {
 		h.mu.Lock()
 		defer h.mu.Unlock()
@@ -291,6 +322,10 @@ func (h *hub) seatFor(c *client, mode string, menu bool, play string) (r *room, 
 			continue
 		}
 		switch {
+		case strings.HasPrefix(m.Join, "q"):
+			if c.squad, c.squadIdx, ok = h.joinSquad(m.Join, c); ok {
+				return nil, 0, true
+			}
 		case m.Join != "":
 			if r, idx, ok = h.joinRoom(m.Join, c); ok {
 				return
@@ -628,41 +663,9 @@ func (r *room) step(now time.Time) []byte {
 	return msg
 }
 
-func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
-	mode := req.URL.Query().Get("mode") // the view the player opened the page in; it only matters to whoever opens the room
-	if mode == "" {
-		mode = modeMobile
-	}
-	if mode != modeMobile && mode != modeWeb {
-		http.Error(w, "bad mode", http.StatusBadRequest)
-		return
-	}
-	conn, err := upgrader.Upgrade(w, req, nil)
-	if err != nil {
-		return
-	}
-	c := &client{conn: conn, send: make(chan []byte, 8)}
-	c.touch()
-	go c.writePump()
-	conn.SetReadLimit(512)
-	conn.SetReadDeadline(time.Now().Add(pongWait))
-	conn.SetPongHandler(func(string) error {
-		c.touch()
-		return conn.SetReadDeadline(time.Now().Add(pongWait))
-	})
-	play := req.URL.Query().Get("play")
-	if play != playComputer && play != playDummy {
-		play = playPlayer // a page that says nothing gets what every page used to: the menu, else whoever is waiting (the page itself asks for the computer unless told otherwise)
-	}
-	r, idx, ok := h.seatFor(c, mode, req.URL.Query().Get("menu") == "1", play)
-	if !ok {
-		c.send <- []byte(`{"t":"full"}`) // also when the page left meanwhile: nobody reads it then
-		close(c.send)
-		return
-	}
-
-	r.mu.Lock()
-	cfg := r.g.cfg
+// hiMessage is the page's greeting: which slot it plays, the court and the camera, and every number the page draws from. mode is
+// the view the room was opened from.
+func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 	hb, gb, th, fb, ts := cfg.Snorlax.HyperBeam, cfg.Gyarados.HyperBeam, cfg.Pikachu.Thunder, cfg.Charizard.FireBreath, cfg.Charizard.SeismicToss // tunable, so the client takes them from here instead of hard-coding
 	brawl := func(b BrawlerCfg) (tree, fist, stone map[string]float64) {                                                                          // what the page draws of Ash's and of Machamp's tree, fists and stones
 		return map[string]float64{"len": b.TreeSlam.TrunkLength, "w": b.TreeSlam.TrunkWidth, "scale": b.TreeSlam.TrunkScale, "leaf": b.TreeSlam.LeafRadius, "leafscale": b.TreeSlam.LeafScale, "angle": b.TreeSlam.LeafAngle, "charge": b.TreeSlam.ChargeDuration, "swing": b.TreeSlam.SwingDuration, "dist": b.TreeSlam.JumpDistance, "jump": b.TreeSlam.JumpDuration},
@@ -672,9 +675,9 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	aTree, aFist, aStone := brawl(cfg.Ash)
 	mTree, mFist, mStone := brawl(cfg.Machamp)
 	tree, comet, rock := cfg.Ash.TreeSlam, cfg.Ash.CometPunch, cfg.Ash.RockTomb
-	cc := cfg.courtConfigFor(r.mode)
+	cc := cfg.courtConfigFor(mode)
 	hi, _ := json.Marshal(map[string]any{
-		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
+		"t": "hi", "you": idx, "arena": map[string]float64{"w": court.Length, "h": court.Width}, // the x and y extents
 		"cam": map[string]float64{"minw": cc.MinLength, "minh": cc.MinWidth, "maxw": cc.MaxLength, "maxh": cc.MaxWidth, "zin": cc.ZoomInDistance, "zout": cc.ZoomOutDistance, "zspeed": cc.ZoomSpeed, "margin": cc.SeaMargin}, // the camera window and its zoom
 		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp, gengar and the gyarados magikarp becomes
 		"radius":   []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Gyarados.Radius, cfg.Dummy.Radius},
@@ -718,6 +721,48 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown,
 			"mega": cfg.Ash.MegatonPunch.Cooldown, "tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "kick": cfg.Machamp.HighJumpKick.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
 	})
+	return hi
+}
+
+func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
+	mode := req.URL.Query().Get("mode") // the view the player opened the page in; it only matters to whoever opens the room
+	if mode == "" {
+		mode = modeMobile
+	}
+	if mode != modeMobile && mode != modeWeb {
+		http.Error(w, "bad mode", http.StatusBadRequest)
+		return
+	}
+	conn, err := upgrader.Upgrade(w, req, nil)
+	if err != nil {
+		return
+	}
+	c := &client{conn: conn, send: make(chan []byte, 8)}
+	c.touch()
+	go c.writePump()
+	conn.SetReadLimit(512)
+	conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error {
+		c.touch()
+		return conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+	play := req.URL.Query().Get("play")
+	if play != playComputer && play != playDummy && play != playSquad {
+		play = playPlayer // a page that says nothing gets what every page used to: the menu, else whoever is waiting (the page itself asks for the computer unless told otherwise)
+	}
+	r, idx, ok := h.seatFor(c, mode, req.URL.Query().Get("menu") == "1", play)
+	if ok && c.squad != nil {
+		h.serveSquad(c, conn)
+		return
+	}
+	if !ok {
+		c.send <- []byte(`{"t":"full"}`) // also when the page left meanwhile: nobody reads it then
+		close(c.send)
+		return
+	}
+
+	r.mu.Lock()
+	hi := hiMessage(r.g.cfg, r.mode, r.g.court, idx)
 	c.send <- hi
 	r.broadcastLobby() // both players learn who joined
 	r.mu.Unlock()

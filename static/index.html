@@ -79,7 +79,7 @@
 <div id="bar"></div>
 <button id="reconnect">連線中斷　重新連線</button>
 <div id="rooms"><h2>選擇房間</h2><div id="roomlist"></div><button id="newroom">開新房間</button><div class="hint">灰色表示對方可能已斷線；沒有人等待時會自動開房</div></div>
-<div id="pick"><h2>選擇你的寶可夢</h2><div id="playmodes"><button data-play="computer">打電腦</button><button data-play="player">打玩家</button><button data-play="dummy">打木樁</button></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="tools"><button id="botMain">單機對戰</button><button id="botOff">改和真人對戰</button><button id="easeBtn">放水 0%</button></div><div id="botpick"></div><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="playmodes"><button data-play="computer">打電腦</button><button data-play="player">打玩家</button><button data-play="dummy">打木樁</button><button data-play="squad">2v2</button></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="tools"><button id="botMain">單機對戰</button><button id="botOff">改和真人對戰</button><button id="easeBtn">放水 0%</button></div><div id="botpick"></div><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
@@ -111,7 +111,9 @@ const HELP = [
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
 const ghosts = []; // dash afterimages
-const beamLook = [{ ang: null, tail: null }, { ang: null, tail: null }]; // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
+const SLOTS = 4; // a 2v2 has four characters: the state kept for each is made for all of them
+const perSlot = (make) => Array.from({ length: SLOTS }, make);
+const beamLook = perSlot(() => ({ ang: null, tail: null })); // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, ctime: 0.8, pull: 1, orb: 30, orbhp: 30, nscale: 1, nslam: 110, nflight: 0.9, nlob: 150, sfire: 20 }; // Gengar's, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
@@ -126,7 +128,7 @@ let radius = [16, 24, 26, 18, 14, 13]; // indexed by character
 const REF = [16, 24, 26, 18, 14, 13, 10, 30, 30, 20, 36, 28];
 const dummyHit = { n: 0, at: 0, hp: null }; // the last blow the dummy took: how much, and when
 const DUMMY = 11; // the practice dummy (only the computer's)
-const PLAY = (() => { const p = new URLSearchParams(location.search).get('play'); return p === 'player' || p === 'dummy' ? p : 'computer'; })(); // the way to play: against the computer (the default), a person, or the practice dummy
+const PLAY = (() => { const p = new URLSearchParams(location.search).get('play'); return p === 'player' || p === 'dummy' || p === 'squad' ? p : 'computer'; })(); // the way to play: against the computer (the default), a person, or the practice dummy
 let maxHp = [100, 100, 120, 110, 100, 100]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
@@ -136,12 +138,12 @@ let voltCfg = { radius: 16, uses: 3, window: 2 }; // Volt Tackle, from 'hi'
 let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
 let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8 }; // Vulpix's, from 'hi'
 let arrowCfg = { radius: 8, hp: 2, slow: 2, count: 5, angle: 12, charge: 0.5, scale: 1 }, tornadoCfg = { radius: 50, hp: 40, charge: 0.4, lift: 200, scale: 1 }; // Rowlet's, from 'hi'
-const stormLook = [{ x: null, y: 0 }, { x: null, y: 0 }], fbLook = [{ x: null, y: 0 }, { x: null, y: 0 }]; // per slot: the smoothed storm position and beam end
+const stormLook = perSlot(() => ({ x: null, y: 0 })), fbLook = perSlot(() => ({ x: null, y: 0 })); // per slot: the smoothed storm position and beam end
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
 let usesBadge = null; // Pikachu's main button: how many Volt Tackles are left
-const shadow = [{ x: null, y: null }, { x: null, y: null }]; // per slot: the smoothed thunder shadow position
+const shadow = perSlot(() => ({ x: null, y: null })); // per slot: the smoothed thunder shadow position
 const smoke = []; // puffs rising off Snorlax while it recharges
 const flames = []; // fading flames Charizard leaves while it runs with a catch
 let smokeAcc = 0;
@@ -157,20 +159,35 @@ let cam = { minw: 2000, minh: 1000, maxw: 2000, maxh: 1000, zin: 500, zout: 800,
 if (PORTRAIT) { cv.width = cam.minh; cv.height = cam.minw; }
 let you = -1, snap = null, waiting = true, status = '連線中…';
 // Which way each character faces on screen and how it is running (see art); set from how its display position moves.
-const look = [{ dir: null, vx: 0, vy: 0, mv: 0, ph: 0, ls: 1, la: 0 }, { dir: null, vx: 0, vy: 0, mv: 0, ph: 0, ls: 1, la: 0 }]; // ls, la: the size and angle of Chikorita's leaf
-const disp = [{ x: null, y: 0, z: 0 }, { x: null, y: 0, z: 0 }]; // smoothed positions; set from the first snapshot
+const look = perSlot(() => ({ dir: null, vx: 0, vy: 0, mv: 0, ph: 0, ls: 1, la: 0 })); // ls, la: the size and angle of Chikorita's leaf
+const disp = perSlot(() => ({ x: null, y: 0, z: 0 })); // smoothed positions; set from the first snapshot
 let fx = [], shake = 0;
 
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?menu=1&play=' + PLAY + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // no room number to type: when people are waiting the server sends their rooms to choose from, otherwise it opens one; the first player's view picks the court
 let picks = [-1, -1], here = [true, false], bots = [-1, -1], padKind = -1; // bots: the character a computer plays in each slot (-1 = a person or nobody)
 let ease = [0, 0]; // each slot's handicap in percent, from the lobby
+let squadMode = false; // the lobby is a 2v2's: two people on one side (their picks and presence are lists of two, in order of arrival)
 const TEAM_BIG = 6; // the two team sizes there are: 3 or 6 of the characters
 let teamMode = false, teamSize = TEAM_BIG, myOrder = [], sentOrder = ''; // the lobby's match type; the order I field my characters in, and the one the server has
 const brawlerIdx = (kind) => (kind === 8 ? 1 : 0); // Ash's numbers are the first of each pair, Machamp's the second
 const ownerIdx = (side) => (snap && side ? brawlerIdx(snap.p[side - 1].k) : 0); // for a fist or a stone: its owner's slot + 1
+// A 2v2 is slots 0 and 2 against 1 and 3: a slot's side is its number mod 2 (in a duel, its number). foeOf is the slot of the nearest
+// character of the other side still standing (the opponent, in a duel); a fallen character of a 2v2 is not drawn.
+const sideOf = (i) => i % 2;
+const fallen = (i) => snap && snap.p.length > 2 && snap.p[i].hp <= 0;
+function foeOf(i) {
+  if (!snap || snap.p.length === 2) return 1 - i;
+  let best = -1, bd = Infinity;
+  for (let j = 0; j < snap.p.length; j++) {
+    if (sideOf(j) === sideOf(i) || fallen(j)) continue;
+    const d = disp[i].x === null || disp[j].x === null ? 0 : Math.hypot(disp[j].x - disp[i].x, disp[j].y - disp[i].y);
+    if (d < bd) { best = j; bd = d; }
+  }
+  return best >= 0 ? best : 1 - sideOf(i);
+}
 const hasBeam = (k) => k === 1 || k === 10; // Snorlax and Gyarados fire the Hyper Beam
-const beamSlots = () => (snap ? [0, 1].filter((i) => hasBeam(snap.p[i].k)) : []);
-const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
+const beamSlots = () => (snap ? [...snap.p.keys()].filter((i) => hasBeam(snap.p[i].k)) : []);
+const slotsOf = (k) => (snap ? [...snap.p.keys()].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
   if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
@@ -181,6 +198,7 @@ ws.onmessage = (e) => {
     if (sentOrder && m.picks[you] < 0) { myOrder = []; sentOrder = ''; } // sent back to choose again
     endAim(false); // a match that ended while the tail was being aimed
     ease = m.ease || [0, 0];
+    squadMode = !!m.squad;
     picks = m.picks; here = m.here; bots = m.bot || [-1, -1]; waiting = !(here[0] && here[1]); snap = null; padKind = -1;
     document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
     showPick();
@@ -235,7 +253,7 @@ function showRooms(list) {
   list.forEach((r) => {
     const b = document.createElement('button');
     const who = r.pick >= 0 ? NAMES[r.pick] : '選角中';
-    b.textContent = (r.bot ? '對電腦中・' : '') + who + '　等了 ' + r.wait + ' 秒' + (r.stale ? '　（可能已斷線）' : '');
+    b.textContent = (r.squad ? '2v2 隊友・' : r.bot ? '對電腦中・' : '') + who + '　等了 ' + r.wait + ' 秒' + (r.stale ? '　（可能已斷線）' : '');
     if (r.stale) b.className = 'stale';
     b.onclick = () => ws.send(JSON.stringify({ join: r.id }));
     ul.appendChild(b);
@@ -253,14 +271,15 @@ const camState = { t: 0, cx: null, cy: null, last: 0 }; // t: 0 = zoomed all the
 function setView() {
   tele.width = arena.w; tele.height = arena.h; // the warning fan is drawn in world space
   if (!PORTRAIT) { ROT = 0; cv.width = cam.minw; cv.height = cam.minh; }
-  else { cv.width = cam.minh; cv.height = cam.minw; ROT = you === 0 ? -Math.PI / 2 : Math.PI / 2; }
+  else { cv.width = cam.minh; cv.height = cam.minw; ROT = sideOf(you) === 0 ? -Math.PI / 2 : Math.PI / 2; }
   camState.t = 0; camState.cx = camState.cy = null;
   updateCamera(0);
 }
 // The zoom follows the distance between the farthest two characters (so it works for more than two): above zout it widens, below zin
 // it closes in, and in between it holds, zspeed of the whole range per second. The window centres on all of them.
 function updateCamera(dt) {
-  const pts = snap ? snap.p.map((p, i) => (disp[i] && disp[i].x !== null ? { x: disp[i].x, y: disp[i].y } : { x: p.x, y: p.y })) : [];
+  let pts = snap ? snap.p.map((p, i) => (disp[i] && disp[i].x !== null ? { x: disp[i].x, y: disp[i].y } : { x: p.x, y: p.y })) : [];
+  if (snap && snap.p.length > 2 && snap.p.some((p) => p.hp > 0)) pts = pts.filter((_, i) => snap.p[i].hp > 0); // the camera follows whoever still fights
   let far = 0, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   pts.forEach((a, i) => {
     x0 = Math.min(x0, a.x); x1 = Math.max(x1, a.x); y0 = Math.min(y0, a.y); y1 = Math.max(y1, a.y);
@@ -279,7 +298,7 @@ function updateCamera(dt) {
   const cx = fit(S.cx, visL, arena.w), cy = fit(S.cy, visW, arena.h), ox = cx - visL / 2, oy = cy - visW / 2;
   CAMK = k;
   if (!PORTRAIT) VIEW = [k, 0, 0, k, -k * ox, -k * oy];
-  else if (you === 0) VIEW = [0, -k, k, 0, -k * oy, CL + k * ox]; // x' = k(y - oy),      y' = CL - k(x - ox)
+  else if (sideOf(you) === 0) VIEW = [0, -k, k, 0, -k * oy, CL + k * ox]; // x' = k(y - oy),      y' = CL - k(x - ox)
   else VIEW = [0, k, -k, 0, CW + k * oy, -k * ox];                 // x' = CW - k(y - oy), y' = k(x - ox)
 }
 const screenY = (x, y) => (VIEW[1] * x + VIEW[3] * y + VIEW[5]) / CAMK; // where a world point lands on the canvas, in world units from the top
@@ -312,53 +331,64 @@ function buildCards() {
   });
 }
 function showPick() {
+  const me = squadMode ? you >> 1 : you; // my place in the lobby's lists: in a 2v2 the two people are 0 and 1, whichever slots they play
   document.getElementById('pick').style.display = 'flex';
   cardEls.forEach(({ el, ord }, k) => {
     const n = myOrder.indexOf(k);
-    el.classList.toggle('mine', teamMode ? n >= 0 : picks[you] === k);
+    el.classList.toggle('mine', teamMode ? n >= 0 : picks[me] === k);
     ord.style.display = teamMode && n >= 0 ? 'block' : 'none';
     ord.textContent = n + 1;
   });
-  if (document.activeElement !== easeEl) { easeEl.value = ease[you]; document.getElementById('easeval').textContent = ease[you] + '%'; }
-  document.getElementById('easeBtn').textContent = `放水 ${ease[you]}%${easeOpen ? ' ▲' : ' ▼'}`;
-  document.getElementById('easeBtn').classList.toggle('on', ease[you] > 0);
+  if (document.activeElement !== easeEl) { easeEl.value = ease[me]; document.getElementById('easeval').textContent = ease[me] + '%'; }
+  document.getElementById('easeBtn').textContent = `放水 ${ease[me]}%${easeOpen ? ' ▲' : ' ▼'}`;
+  document.getElementById('easeBtn').classList.toggle('on', ease[me] > 0);
   document.getElementById('easebox').style.display = easeOpen ? 'block' : 'none';
-  document.getElementById('easemsg').textContent = `你的血量和移動速度減少 ${ease[you]}%` + (ease[1 - you] ? `　對手放水 ${ease[1 - you]}%` : '') + '（開打前設定）';
+  document.getElementById('easemsg').textContent = `你的血量和移動速度減少 ${ease[me]}%` + (ease[1 - me] ? `　對手放水 ${ease[1 - me]}%` : '') + '（開打前設定）';
   for (const b of document.querySelectorAll('#playmodes button')) b.classList.toggle('on', b.dataset.play === PLAY);
-  document.getElementById('modes').style.display = PLAY === 'player' ? '' : 'none'; // single or team match is for people; the computer and the dummy are single bouts // no team match against a dummy
+  document.getElementById('tools').style.display = squadMode ? 'none' : ''; // no computer to pick and no handicap in a 2v2
+  document.getElementById('modes').style.display = PLAY === 'player' && !squadMode ? '' : 'none'; // single or team match is for people; the computer and the dummy are single bouts // no team match against a dummy
   document.getElementById('mSingle').classList.toggle('on', !teamMode);
   document.getElementById('mTeam').classList.toggle('on', teamMode);
   document.getElementById('teambar').style.display = teamMode ? 'flex' : 'none';
   document.getElementById('szAll').textContent = `${TEAM_BIG} 隻`;
   for (const n of [3, TEAM_BIG]) { const b = document.getElementById(n === 3 ? 'sz3' : 'szAll'); b.style.display = teamMode ? '' : 'none'; b.classList.toggle('on', teamSize === n); }
-  const vsComputer = bots[1 - you] >= 0, personHere = here[1 - you] && !vsComputer; // a computer can stand in for the opponent when no person is there
+  const vsComputer = bots[1 - me] >= 0, personHere = here[1 - me] && !vsComputer; // a computer can stand in for the opponent when no person is there
   const canBot = !(teamMode || personHere) && PLAY === 'computer'; // only against the computer: a person's room has no computer list, the dummy stays // the computer can only stand in where no person is, and not in a team match; the dummy stays
   if (!canBot) botOpen = false;
   const botMain = document.getElementById('botMain');
   botMain.style.display = canBot ? '' : 'none';
-  botMain.textContent = vsComputer ? `單機：電腦玩${NAMES[bots[1 - you]]}（換對手）` : `單機對戰${botOpen ? ' ▲' : ' ▼'}`;
+  botMain.textContent = vsComputer ? `單機：電腦玩${NAMES[bots[1 - me]]}（換對手）` : `單機對戰${botOpen ? ' ▲' : ' ▼'}`;
   botMain.classList.toggle('on', vsComputer);
   document.getElementById('botOff').style.display = 'none'; // the way to a person is the 打玩家 button
   const bp = document.getElementById('botpick');
   bp.style.display = canBot && botOpen ? 'flex' : 'none';
-  bp.querySelectorAll('button').forEach((el) => el.classList.toggle('on', bots[1 - you] === +el.dataset.k));
+  bp.querySelectorAll('button').forEach((el) => el.classList.toggle('on', bots[1 - me] === +el.dataset.k));
   document.getElementById('tOk').disabled = myOrder.length !== teamSize || myOrder.join() === sentOrder;
   document.getElementById('tClear').disabled = !myOrder.length;
-  const mine = picks[you], theirs = picks[1 - you];
+  const mine = picks[me], theirs = picks[1 - me];
   const lines = [];
+  if (squadMode) {
+    if (!here[1 - me]) lines.push('2v2：等隊友加入…<br>隊友要從選單的房間列表（打玩家）選這個房間，對手是兩隻隨機的電腦');
+    else if (mine < 0 && theirs >= 0) lines.push('隊友選了' + NAMES[theirs] + '，換你選');
+    else if (mine >= 0 && theirs < 0) lines.push('隊友選擇中…');
+    if (mine >= 0) lines.push(`你選了${NAMES[mine]}（隊友還沒選好以前，可以重選）`);
+    else if (here[1 - me] && theirs < 0) lines.push('點一隻寶可夢開始：你和隊友一起打兩隻隨機的電腦');
+    document.getElementById('pickmsg').innerHTML = lines.join('<br>');
+    return;
+  }
   if (teamMode) {
-    if (!here[1 - you]) lines.push('等待對手加入… 有人上線就會自動配對');
-    if (sentOrder) lines.push(`你的出場順序：${sentOrder.split(',').map((k) => NAMES[k]).join(' → ')}${picks[1 - you] >= 0 ? '' : '（等對手排好順序…）'}`);
-    else lines.push(`依序點選 ${teamSize} 隻，決定出場順序（點已排的可以取消）；${here[1 - you] && picks[1 - you] >= 0 ? '對手已經排好了' : '雙方都確認後開打'}`);
+    if (!here[1 - me]) lines.push('等待對手加入… 有人上線就會自動配對');
+    if (sentOrder) lines.push(`你的出場順序：${sentOrder.split(',').map((k) => NAMES[k]).join(' → ')}${picks[1 - me] >= 0 ? '' : '（等對手排好順序…）'}`);
+    else lines.push(`依序點選 ${teamSize} 隻，決定出場順序（點已排的可以取消）；${here[1 - me] && picks[1 - me] >= 0 ? '對手已經排好了' : '雙方都確認後開打'}`);
     lines.push('一隻被打倒就換下一隻上場，活著的角色保留剩下的血量，一方的隊伍全部倒下就輸了');
     document.getElementById('pickmsg').innerHTML = lines.join('<br>');
     return;
   }
-  if (!here[1 - you]) lines.push('等待對手加入… 有人上線就會自動配對（來了就直接開打）<br>（電腦橫式版：在網址後面加上 ?landscape）<br>等不到人？按上面的「單機」先和電腦對戰，有人來就會換成真人');
+  if (!here[1 - me]) lines.push('等待對手加入… 有人上線就會自動配對（來了就直接開打）<br>（電腦橫式版：在網址後面加上 ?landscape）<br>等不到人？按上面的「單機」先和電腦對戰，有人來就會換成真人');
   else if (mine < 0 && theirs >= 0) lines.push(vsComputer ? (theirs === DUMMY ? '對手是木樁（血量很高，不會動也不會還手），換你選；這裡可以選小智' : `電腦玩${NAMES[theirs]}，換你選`) : `對手選了${NAMES[theirs]}，換你選（可以選一樣的）`);
   else if (mine >= 0 && theirs < 0) lines.push('對手選擇中…');
   if (mine >= 0) lines.push(`你選了${NAMES[mine]}（對手還沒選好以前，可以重選；兩人可以選同一隻）`);
-  else if (here[1 - you] && theirs < 0) lines.push('點一隻寶可夢開始');
+  else if (here[1 - me] && theirs < 0) lines.push('點一隻寶可夢開始');
   document.getElementById('pickmsg').innerHTML = lines.join('<br>');
 }
 let botOpen = false, easeOpen = false; // the opponent list and the handicap slider are folded away until their button is pressed
@@ -1104,7 +1134,7 @@ function drawTelegraph() {
 // The fan of an aimed skill the player is choosing, drawn for them only (the opponent's page never gets it; it is not sent) until the cast, when the
 // real warning takes over. Without a direction it points at the opponent, which is where a tap would send it.
 function drawAimFan(p, d) {
-  const o = disp[1 - you], n = Math.hypot(aiming.x, aiming.y), w = n ? toWorld(aiming.x / n, aiming.y / n) : { x: o.x - d.x, y: o.y - d.y };
+  const o = disp[foeOf(you)], n = Math.hypot(aiming.x, aiming.y), w = n ? toWorld(aiming.x / n, aiming.y / n) : { x: o.x - d.x, y: o.y - d.y };
   if (aiming.name === 'sball') { // the ball flies straight, so a line and the ball where it starts (a tap, no direction, goes at the opponent)
     const base = Math.atan2(w.y, w.x), r = gengarCfg.orb * gengarCfg.scale, off = radius[9] + gengarCfg.orb;
     ctx.save(); ctx.globalAlpha = p.sbcd > 0 ? 0.4 : 1;
@@ -1164,7 +1194,7 @@ function drawBeamLine(x0, y0, ang, a, bc) {
 // The beam is drawn from the snapshot, so it turns as the server turns it. The
 // server's angle is counter-clockwise positive, which is a smaller canvas angle.
 function drawBeams() {
-  for (const i of [0, 1]) drawBeam(i, snap.p[i], disp[i], beamLook[i]);
+  for (const i of snap.p.keys()) drawBeam(i, snap.p[i], disp[i], beamLook[i]);
 }
 function drawBeam(i, p, d, beamLook) {
   if (!hasBeam(p.k)) { beamLook.ang = null; return; }
@@ -1926,7 +1956,7 @@ function drawStunned(p, top, bs) {
 // Thunder: a dark circle the size of the strike area sits where the bolt will land.
 // It darkens and a ring closes in on it as the bolt gets near.
 function drawShadow() {
-  for (const i of [0, 1]) drawThunderShadow(snap.p[i], shadow[i]);
+  for (const i of snap.p.keys()) drawThunderShadow(snap.p[i], shadow[i]);
 }
 function drawThunderShadow(p, shadow) {
   if (p.k !== 0 || !(p.tn > 0)) { shadow.x = null; return; }
@@ -2355,7 +2385,7 @@ function drawArrowAims() {
   for (const si of slotsOf(5)) {
     const p = snap.p[si];
     if (!(p.at > 0)) continue;
-    const d = disp[si], o = disp[1 - si], k = 1 - p.at / Math.max(arrowCfg.charge, 1e-6), base = Math.atan2(o.y - d.y, o.x - d.x);
+    const d = disp[si], o = disp[foeOf(si)], k = 1 - p.at / Math.max(arrowCfg.charge, 1e-6), base = Math.atan2(o.y - d.y, o.x - d.x);
     ctx.save(); ctx.lineCap = 'round'; ctx.setLineDash([14, 10]); ctx.lineDashOffset = -performance.now() / 20;
     ctx.strokeStyle = `rgba(150,235,110,${0.25 + 0.5 * k})`; ctx.lineWidth = 2 + 2 * k;
     for (let n = 0; n < arrowCfg.count; n++) {
@@ -2566,7 +2596,7 @@ function drawPlayer(i, p) {
   // Only a dash moves this fast along the ground (walking is ~3px/frame): leave an afterimage.
   const lk = look[i], [sx, sy] = rv(d.x - px, d.y - py), sp = Math.hypot(sx, sy); // moved this frame, as seen on screen
   const faceOf = (vx, vy) => (Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 2 : 3) : (vy < 0 ? 1 : 0));
-  if (lk.dir === null) { const o = disp[1 - i]; lk.dir = o.x === null ? 0 : faceOf(...rv(o.x - d.x, o.y - d.y)); } // starts facing the opponent
+  if (lk.dir === null) { const o = disp[foeOf(i)]; lk.dir = o.x === null ? 0 : faceOf(...rv(o.x - d.x, o.y - d.y)); } // starts facing the opponent
   lk.vx += (sx - lk.vx) * 0.3; lk.vy += (sy - lk.vy) * 0.3;
   const running = sp > 0.35;
   if (running && Math.hypot(lk.vx, lk.vy) > 0.3) lk.dir = faceOf(lk.vx, lk.vy);
@@ -2585,6 +2615,10 @@ function drawPlayer(i, p) {
   upright(d.x, d.y, () => {
     ctx.fillStyle = `rgba(0,0,0,${0.35 - 0.2 * lift})`;
     ctx.beginPath(); ctx.ellipse(0, 14 * bs, 18 * bs * (1 - 0.4 * lift), 7 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.fill();
+    if (snap.p.length > 2) { // a 2v2: a ring in the colour of the side, green for mine and red for theirs
+      ctx.strokeStyle = sideOf(i) === sideOf(you) ? '#5fe08a' : '#ff6b6b'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(0, 14 * bs, 24 * bs * (1 - 0.4 * lift), 10 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.stroke();
+    }
   });
   if (p.k === 4 && p.yt > 0) drawIceberg(d, p);
   drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose, p.tw === 1 ? performance.now() / 1000 * 14 : 0); // the body floats d.z above the ground; Charizard beats its wings hard in flight
@@ -2614,7 +2648,7 @@ function drawPlayer(i, p) {
       ctx.fillText(p.rt > 0 ? 'MUST RECHARGE' : '破壞死光！', 0, top - 54 * bs);
     }
     if (p.k === 2 && p.ht > 0) { // Fire Breath: flames at the mouth, toward the opponent
-      const o = disp[1 - i], [vx, vy] = rv(o.x - d.x, o.y - d.y), n = Math.hypot(vx, vy) || 1, ux = vx / n, uy = vy / n;
+      const o = disp[foeOf(i)], [vx, vy] = rv(o.x - d.x, o.y - d.y), n = Math.hypot(vx, vy) || 1, ux = vx / n, uy = vy / n;
       const mx = ux * 18 * bs, my = top - 11 * bs + uy * 18 * bs, R = 17 * bs * (0.8 + 0.4 * Math.random());
       const gr = ctx.createRadialGradient(mx, my, 0, mx, my, R);
       gr.addColorStop(0, '#fff6c0'); gr.addColorStop(0.4, '#ffb030'); gr.addColorStop(1, 'rgba(255,70,10,0)');
@@ -2628,6 +2662,7 @@ function drawPlayer(i, p) {
     else if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, top - 54 * bs); }
     if (p.sl > 0) { ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#b6e87a'; ctx.fillText(`緩速 ${p.sl.toFixed(1)}s`, 0, top - 68 * bs); }
     if (i === you) { ctx.fillStyle = '#fff'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 你', 0, top - 40 * bs); }
+    else if (snap.p.length > 2 && sideOf(i) === sideOf(you)) { ctx.fillStyle = '#9ff0b8'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 隊友', 0, top - 40 * bs); }
     if (p.k === DUMMY) { const took = maxHp[DUMMY] - p.hp; ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe14d'; ctx.fillText(`已承受 ${took} 傷害`, 0, top - 56 * bs); if (dummyHit.at > performance.now() - 900) { ctx.fillStyle = '#ff7a5c'; ctx.font = `bold ${20 + Math.min(dummyHit.n, 40) * 0.4}px system-ui`; ctx.fillText(`-${dummyHit.n}`, 0, top - 74 * bs - (performance.now() - dummyHit.at) / 25); } }
     // HP bar follows the body.
     ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 36 * bs, 40, 6);
@@ -2674,7 +2709,7 @@ function drawTeamHud() {
 function drawResult() {
   if (snap.w < 0) return;
   const tm = snap.tm, final = !tm || tm.o, me = snap.p[you], op = snap.p[1 - you];
-  const text = final ? ((tm ? tm.mw : snap.w) === you ? '你贏了！' : '你輸了')
+  const text = final ? ((tm ? tm.mw : snap.w) === sideOf(you) ? '你贏了！' : '你輸了')
     : me.hp <= 0 && op.hp <= 0 ? '同時倒下！雙方換下一隻' : me.hp <= 0 ? `${FORMS[me.k]}倒下了，換下一隻` : `打倒對手的${FORMS[op.k]}！`;
   ctx.fillStyle = '#000a'; ctx.fillRect(0, cv.height / 2 - 50, cv.width, 100);
   ctx.fillStyle = '#fff'; ctx.font = (final ? 40 : 28) + 'px system-ui'; ctx.textAlign = 'center';
@@ -2862,7 +2897,7 @@ function frame() {
     drawBeams();
     drawSmoke(); // under the players, so the labels and HP bars stay readable
     // Draw lower players first so the one nearer the camera overlaps correctly.
-    [0, 1].sort((a, b) => screenY(snap.p[a].x, snap.p[a].y) - screenY(snap.p[b].x, snap.p[b].y)).forEach((i) => drawPlayer(i, snap.p[i]));
+    [...snap.p.keys()].filter((i) => !fallen(i)).sort((a, b) => screenY(snap.p[a].x, snap.p[a].y) - screenY(snap.p[b].x, snap.p[b].y)).forEach((i) => drawPlayer(i, snap.p[i]));
     drawLeafSlashes(); // over the bodies: the blade is the thing to see
     drawVines();
     drawFBeams();
