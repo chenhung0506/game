@@ -269,12 +269,48 @@ const (
 // seatFor is seat for a way of playing.
 func (h *hub) seatFor(c *client, mode string, menu bool, play string) (r *room, idx int, ok bool) {
 	if play == playSquad { // the connection is a squad's: c.squad says which, and there is no duel room
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		if c.squad, c.squadIdx, ok = h.openSquad(mode, c); !ok {
-			return nil, 0, false
+		for {
+			var list []roomInfo // the squads waiting for a second person, when the page asked for the menu
+			if menu {
+				for _, ri := range h.waitingRooms() {
+					if ri.Squad {
+						list = append(list, ri)
+					}
+				}
+			}
+			if len(list) > 0 {
+				msg, _ := json.Marshal(map[string]any{"t": "rooms", "rooms": list})
+				select {
+				case c.send <- msg:
+				default:
+				}
+				_, data, err := c.conn.ReadMessage()
+				if err != nil {
+					return nil, 0, false
+				}
+				c.touch()
+				var m struct {
+					Join string `json:"join"`
+					New  bool   `json:"new"`
+				}
+				if json.Unmarshal(data, &m) != nil {
+					continue
+				}
+				switch {
+				case strings.HasPrefix(m.Join, "q"):
+					if c.squad, c.squadIdx, ok = h.joinSquad(m.Join, c); ok {
+						return nil, 0, true
+					}
+					continue // taken meanwhile: the list is sent again
+				case !m.New:
+					continue
+				}
+			}
+			h.mu.Lock()
+			c.squad, c.squadIdx, ok = h.openSquad(mode, c)
+			h.mu.Unlock()
+			return nil, 0, ok
 		}
-		return nil, 0, true
 	}
 	if play == playComputer || play == playDummy {
 		h.mu.Lock()

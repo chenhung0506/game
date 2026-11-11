@@ -111,3 +111,50 @@ func TestWhenOnePersonLeavesASquadTheOtherGoesBackToTheLobby(t *testing.T) {
 		}
 	}
 }
+
+// Two people who both press 2v2 meet: the second is shown the waiting squads and can join one or open its own.
+func TestPressing2v2WithASquadWaitingShowsItAndJoiningMakesYouTheTeammate(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	host := dialWith(t, srv, "play=squad&menu=1&mode=web")
+	next(t, host, "hi") // nobody was waiting: its own squad, at once
+
+	mate := dialWith(t, srv, "play=squad&menu=1&mode=web")
+	rooms := next(t, mate, "rooms")["rooms"].([]any)
+	if len(rooms) != 1 || rooms[0].(map[string]any)["squad"] != true {
+		t.Fatalf("shown %v, want the one waiting squad", rooms)
+	}
+	mate.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(`{"join":%q}`, rooms[0].(map[string]any)["id"])))
+	if got := next(t, mate, "hi")["you"]; got != float64(2) {
+		t.Fatalf("the joiner is slot %v, want 2", got)
+	}
+}
+
+func TestAPersonWhoPressed2v2CanOpenASquadOfTheirOwnInstead(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	host := dialWith(t, srv, "play=squad&menu=1&mode=web")
+	next(t, host, "hi")
+	other := dialWith(t, srv, "play=squad&menu=1&mode=web")
+	next(t, other, "rooms")
+	other.WriteMessage(websocket.TextMessage, []byte(`{"new":true}`))
+	if got := next(t, other, "hi")["you"]; got != float64(0) {
+		t.Fatalf("a squad of its own seats its opener in slot %v, want 0", got)
+	}
+	third := dialWith(t, srv, "play=squad&menu=1&mode=web")
+	if rooms := next(t, third, "rooms")["rooms"].([]any); len(rooms) != 2 {
+		t.Fatalf("shown %d squads, want both", len(rooms))
+	}
+}
+
+// A connection that does not ask for the menu (older pages, tests) always opens its own squad.
+func TestA2v2ConnectionWithoutTheMenuOpensItsOwnSquadEvenWhenOthersWait(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	a := dialWith(t, srv, "play=squad&mode=web")
+	next(t, a, "hi")
+	b := dialWith(t, srv, "play=squad&mode=web")
+	if got := next(t, b, "hi")["you"]; got != float64(0) {
+		t.Fatalf("slot %v, want its own squad's slot 0", got)
+	}
+}
