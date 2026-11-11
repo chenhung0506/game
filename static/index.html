@@ -888,7 +888,7 @@ function artRowlet(c, x, y, t, pose) {
   if (dir === 2) c.scale(-1, 1);
   if (dir === 0 || dir === 1) {
     const back = dir === 1;
-    if (back) { wing(-8, 1, -1, 0.3 + flap); wing(8, 1, 1, 0.3 + flap); }
+    wing(-8, 1, -1, 0.3 + flap); wing(8, 1, 1, 0.3 + flap); // behind the body, seen from the front as well as from the back
     ov(c, 0, 12.5, 4.5, 2.4, BD, 0, null); // tail feathers
     ov(c, 0, 4.5, 11.6, 11.6, BR);
     if (!back) { ov(c, 0, 7.4, 7, 7.4, WL, 0, null); for (const fy of [4.5, 8, 11.5]) { c.strokeStyle = '#b79b6a'; c.lineWidth = 0.7; c.beginPath(); c.arc(0, fy, 2.4, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke(); } }
@@ -903,7 +903,6 @@ function artRowlet(c, x, y, t, pose) {
     } else {
       poly(c, [[-4, 4], [0, 10], [4, 4], [0, 7]], G, GD); // the leaf on its back
     }
-    if (!back) { wing(-8, 1, -1, 0.3 + flap); wing(8, 1, 1, 0.3 + flap); }
   } else { // side view, facing right
     c.save(); c.translate(-3, 2); c.rotate(-0.5 - flap * 0.6); // the far wing, behind the body
     ov(c, -7, 0, 9, 6.4, BD); c.restore();

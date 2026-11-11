@@ -231,7 +231,7 @@
     "tailwind": {
       "radius": 450,
       "speed": 650,
-      "duration": 0.5,
+      "duration": 1,
       "cooldown": 3.5
     },
     "arrows": {
