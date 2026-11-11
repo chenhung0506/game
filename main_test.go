@@ -238,8 +238,8 @@ func TestInputMovesPlayerAndLeaveSendsWait(t *testing.T) {
 // The room takes the court of the view it was opened from, whatever the second player opens it with.
 func TestRoomCourtFollowsTheViewThatOpenedIt(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Court.Mobile = CourtSize{Width: 600, Length: 1200}
-	cfg.Court.Web = CourtSize{Width: 900, Length: 1600}
+	cfg.Court.Mobile = CourtConfig{MinWidth: 600, MinLength: 1200, MaxWidth: 600, MaxLength: 1200, ZoomInDistance: 1, ZoomOutDistance: 2, ZoomSpeed: 1}
+	cfg.Court.Web = CourtConfig{MinWidth: 900, MinLength: 1600, MaxWidth: 900, MaxLength: 1600, ZoomInDistance: 1, ZoomOutDistance: 2, ZoomSpeed: 1}
 	srv := httptest.NewServer(newMux(cfg))
 	defer srv.Close()
 	arenaOf := func(hi map[string]any) (w, h float64) {
@@ -325,5 +325,23 @@ func TestHiCarriesGyaradosBeamSeparatelyFromSnorlaxs(t *testing.T) {
 	cd, _ := hi["cooldown"].(map[string]any)
 	if gb["len"] != float64(333) || gb["angle"] != float64(11) || sb["len"] != float64(450) || cd["gbeam"] != float64(7) || cd["beam"] != float64(5) {
 		t.Fatalf("hi.gbeam %v, hi.beam %v, cooldowns %v: each beam should carry its own numbers", gb, sb, cd)
+	}
+}
+
+// The field is the `max_*` court; the camera window and its zoom rule travel in the `hi` message.
+func TestTheCourtIsTheMaxSizeAndTheHiCarriesTheCamera(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Court.Mobile = CourtConfig{MinWidth: 600, MinLength: 1000, MaxWidth: 800, MaxLength: 1200, ZoomInDistance: 500, ZoomOutDistance: 800, ZoomSpeed: 0.5, SeaMargin: 250}
+	if g := NewGameFor(cfg, modeMobile); g.court.Width != 800 || g.court.Length != 1200 {
+		t.Fatalf("court %vx%v, want the max 1200x800", g.court.Length, g.court.Width)
+	}
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	hi := next(t, dialIn(t, srv, "mobile"), "hi")
+	cam := hi["cam"].(map[string]any)
+	for k, want := range map[string]float64{"minw": 1000, "minh": 600, "maxw": 1200, "maxh": 800, "zin": 500, "zout": 800, "zspeed": 0.5, "margin": 250} {
+		if cam[k] != want {
+			t.Errorf("cam[%s] = %v, want %v", k, cam[k], want)
+		}
 	}
 }

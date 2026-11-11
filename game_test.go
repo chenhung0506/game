@@ -1242,8 +1242,8 @@ func TestBodyRadiusWidensWhatEverySkillCanHit(t *testing.T) {
 // The view a room is opened from picks its court: a phone gets the tall one, the web page the wide one.
 func TestCourtSizeDecidesSpawnAndWalls(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Court.Mobile = CourtSize{Width: 600, Length: 1200}
-	cfg.Court.Web = CourtSize{Width: 900, Length: 1600}
+	cfg.Court.Mobile = CourtConfig{MinWidth: 600, MinLength: 1200, MaxWidth: 600, MaxLength: 1200, ZoomInDistance: 1, ZoomOutDistance: 2, ZoomSpeed: 1}
+	cfg.Court.Web = CourtConfig{MinWidth: 900, MinLength: 1600, MaxWidth: 900, MaxLength: 1600, ZoomInDistance: 1, ZoomOutDistance: 2, ZoomSpeed: 1}
 	for _, tc := range []struct {
 		mode string
 		w, l float64

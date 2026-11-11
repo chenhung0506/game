@@ -672,8 +672,10 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 	aTree, aFist, aStone := brawl(cfg.Ash)
 	mTree, mFist, mStone := brawl(cfg.Machamp)
 	tree, comet, rock := cfg.Ash.TreeSlam, cfg.Ash.CometPunch, cfg.Ash.RockTomb
+	cc := cfg.courtConfigFor(r.mode)
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": r.g.court.Length, "h": r.g.court.Width}, // the x and y extents
+		"cam": map[string]float64{"minw": cc.MinLength, "minh": cc.MinWidth, "maxw": cc.MaxLength, "maxh": cc.MaxWidth, "zin": cc.ZoomInDistance, "zout": cc.ZoomOutDistance, "zspeed": cc.ZoomSpeed, "margin": cc.SeaMargin}, // the camera window and its zoom
 		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp, gengar and the gyarados magikarp becomes
 		"radius":   []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Gyarados.Radius, cfg.Dummy.Radius},
 		"maxhp":    []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gengar.MaxHP, cfg.Gyarados.MaxHP, cfg.Dummy.MaxHP},

@@ -150,8 +150,11 @@ let smokeAcc = 0;
 const bar = document.getElementById('bar');
 const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
-let arena = { w: 2000, h: 1000 }; // replaced by the server's values in 'hi'
-if (PORTRAIT) { cv.width = arena.h; cv.height = arena.w; }
+let arena = { w: 2000, h: 1000 }; // the whole court; replaced by the server's values in 'hi'
+// The camera: it shows a window of the court, `min` of it (what the canvas holds) while the characters are close, widening to `max` as the
+// farthest two part (the zoom rule is the court's in config.json). Replaced by the server's values in 'hi'.
+let cam = { minw: 2000, minh: 1000, maxw: 2000, maxh: 1000, zin: 500, zout: 800, zspeed: 0.5, margin: 0 };
+if (PORTRAIT) { cv.width = cam.minh; cv.height = cam.minw; }
 let you = -1, snap = null, waiting = true, status = '連線中…';
 // Which way each character faces on screen and how it is running (see art); set from how its display position moves.
 const look = [{ dir: null, vx: 0, vy: 0, mv: 0, ph: 0, ls: 1, la: 0 }, { dir: null, vx: 0, vy: 0, mv: 0, ph: 0, ls: 1, la: 0 }]; // ls, la: the size and angle of Chikorita's leaf
@@ -170,7 +173,7 @@ const beamSlots = () => (snap ? [0, 1].filter((i) => hasBeam(snap.p[i].k)) : [])
 const slotsOf = (k) => (snap ? [0, 1].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
     if (teamSize !== (m.size || TEAM_BIG)) { teamSize = m.size || TEAM_BIG; myOrder = []; sentOrder = ''; } // another team size: choose again
@@ -243,16 +246,43 @@ document.getElementById('newroom').onclick = () => ws.send(JSON.stringify({ new:
 
 // The view: the world is drawn through VIEW, so everything that is not upright art (rings, beams, the
 // strike areas) just follows. Pikachu starts on the left, so its view turns the arena a quarter turn
-// counter-clockwise (the opponent ends up above it); Snorlax's turns clockwise.
+// counter-clockwise (the opponent ends up above it); Snorlax's turns clockwise. VIEW also holds the camera (the zoom and
+// where the window sits), so it is rebuilt every frame by updateCamera.
+let CAMK = 1; // world units -> canvas pixels
+const camState = { t: 0, cx: null, cy: null, last: 0 }; // t: 0 = zoomed all the way in, 1 = all the way out
 function setView() {
-  const W = arena.w, H = arena.h;
-  tele.width = W; tele.height = H; // the warning fan is drawn in world space
-  if (!PORTRAIT) { ROT = 0; VIEW = [1, 0, 0, 1, 0, 0]; cv.width = W; cv.height = H; return; }
-  cv.width = H; cv.height = W;
-  if (you === 0) { ROT = -Math.PI / 2; VIEW = [0, -1, 1, 0, 0, W]; } // x' = y,     y' = W - x
-  else { ROT = Math.PI / 2; VIEW = [0, 1, -1, 0, H, 0]; }            // x' = H - y, y' = x
+  tele.width = arena.w; tele.height = arena.h; // the warning fan is drawn in world space
+  if (!PORTRAIT) { ROT = 0; cv.width = cam.minw; cv.height = cam.minh; }
+  else { cv.width = cam.minh; cv.height = cam.minw; ROT = you === 0 ? -Math.PI / 2 : Math.PI / 2; }
+  camState.t = 0; camState.cx = camState.cy = null;
+  updateCamera(0);
 }
-const screenY = (x, y) => VIEW[1] * x + VIEW[3] * y + VIEW[5]; // where a world point lands on the canvas
+// The zoom follows the distance between the farthest two characters (so it works for more than two): above zout it widens, below zin
+// it closes in, and in between it holds, zspeed of the whole range per second. The window centres on all of them.
+function updateCamera(dt) {
+  const pts = snap ? snap.p.map((p, i) => (disp[i] && disp[i].x !== null ? { x: disp[i].x, y: disp[i].y } : { x: p.x, y: p.y })) : [];
+  let far = 0, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  pts.forEach((a, i) => {
+    x0 = Math.min(x0, a.x); x1 = Math.max(x1, a.x); y0 = Math.min(y0, a.y); y1 = Math.max(y1, a.y);
+    for (let j = i + 1; j < pts.length; j++) far = Math.max(far, Math.hypot(a.x - pts[j].x, a.y - pts[j].y));
+  });
+  const S = camState;
+  if (pts.length > 1) { if (far > cam.zout) S.t += cam.zspeed * dt; else if (far < cam.zin) S.t -= cam.zspeed * dt; }
+  S.t = Math.min(1, Math.max(0, S.t));
+  const CL = cam.minw, CW = cam.minh;
+  const m = cam.margin; // the camera may look this far past the walls; fully zoomed out it shows the whole field and the sea around it
+  const k = Math.min(CL / (cam.minw + (cam.maxw + 2 * m - cam.minw) * S.t), CW / (cam.minh + (cam.maxh + 2 * m - cam.minh) * S.t));
+  const visL = CL / k, visW = CW / k; // what the canvas shows of the court
+  const tx = pts.length ? (x0 + x1) / 2 : arena.w / 2, ty = pts.length ? (y0 + y1) / 2 : arena.h / 2;
+  if (S.cx === null) { S.cx = tx; S.cy = ty; } else { const f = Math.min(1, dt * 6); S.cx += (tx - S.cx) * f; S.cy += (ty - S.cy) * f; }
+  const fit = (c, vis, whole) => (vis >= whole + 2 * m ? whole / 2 : Math.min(Math.max(c, vis / 2 - m), whole + m - vis / 2)); // the window stays within the sea margin (centred when it is bigger)
+  const cx = fit(S.cx, visL, arena.w), cy = fit(S.cy, visW, arena.h), ox = cx - visL / 2, oy = cy - visW / 2;
+  CAMK = k;
+  if (!PORTRAIT) VIEW = [k, 0, 0, k, -k * ox, -k * oy];
+  else if (you === 0) VIEW = [0, -k, k, 0, -k * oy, CL + k * ox]; // x' = k(y - oy),      y' = CL - k(x - ox)
+  else VIEW = [0, k, -k, 0, CW + k * oy, -k * ox];                 // x' = CW - k(y - oy), y' = k(x - ox)
+}
+const screenY = (x, y) => (VIEW[1] * x + VIEW[3] * y + VIEW[5]) / CAMK; // where a world point lands on the canvas, in world units from the top
 // A world vector as it appears on screen (for offsets drawn inside an upright frame).
 const rv = (x, y) => [x * Math.cos(ROT) - y * Math.sin(ROT), x * Math.sin(ROT) + y * Math.cos(ROT)];
 // Draw upright art at a world point: the origin is that point and the axes are the screen's.
@@ -2652,16 +2682,168 @@ function drawResult() {
   ctx.fillText(text, cv.width / 2, cv.height / 2 + 12);
 }
 
+// The battlefield is a sandy island in a shallow sea. The sea, shallows, beach, speckles, rocks and the palm are painted once into an
+// offscreen bitmap (half resolution: it is all soft) and blitted every frame; the court markings are drawn live so they stay crisp.
+// The coast lies COAST units outside the walls, so every spot a fighter can stand on is sand.
+const COAST = 70, SEA_SCALE = 0.5;
+const seaPad = () => cam.margin + 300; // painted a little past what the camera can reach
+let seaArt = null, seaKey = '';
+
+function seededRandom(seed) { // mulberry32: both players paint the same island
+  return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+// The shore: a rounded rectangle `grow` units outside the walls, pushed further out by a slow wobble (never inwards, so the corners stay sand).
+// Returns points {x, y, nx, ny} (nx, ny the outward normal).
+function coastline(grow, wob) {
+  const x0 = -grow, y0 = -grow, w = arena.w + 2 * grow, h = arena.h + 2 * grow, r = Math.min(220, grow * 3.2), N = 360;
+  const sw = w - 2 * r, sh = h - 2 * r, arc = Math.PI * r / 2, per = 2 * sw + 2 * sh + 4 * arc, out = [];
+  for (let i = 0; i < N; i++) {
+    let s = i / N * per, x, y, nx, ny;
+    if (s < sw) { x = x0 + r + s; y = y0; nx = 0; ny = -1; }
+    else if ((s -= sw) < arc) { const a = -Math.PI / 2 + s / r; nx = Math.cos(a); ny = Math.sin(a); x = x0 + w - r + nx * r; y = y0 + r + ny * r; }
+    else if ((s -= arc) < sh) { x = x0 + w; y = y0 + r + s; nx = 1; ny = 0; }
+    else if ((s -= sh) < arc) { const a = s / r; nx = Math.cos(a); ny = Math.sin(a); x = x0 + w - r + nx * r; y = y0 + h - r + ny * r; }
+    else if ((s -= arc) < sw) { x = x0 + w - r - s; y = y0 + h; nx = 0; ny = 1; }
+    else if ((s -= sw) < arc) { const a = Math.PI / 2 + s / r; nx = Math.cos(a); ny = Math.sin(a); x = x0 + r + nx * r; y = y0 + h - r + ny * r; }
+    else if ((s -= arc) < sh) { x = x0; y = y0 + h - r - s; nx = -1; ny = 0; }
+    else { s -= sh; const a = Math.PI + s / r; nx = Math.cos(a); ny = Math.sin(a); x = x0 + r + nx * r; y = y0 + r + ny * r; }
+    const u = i / N * Math.PI * 2, d = wob * (0.5 + 0.28 * Math.sin(u * 3 + 1) + 0.14 * Math.sin(u * 7 + 2) + 0.08 * Math.sin(u * 13 + 4));
+    out.push({ x: x + nx * d, y: y + ny * d, nx, ny });
+  }
+  return out;
+}
+
+function tracePath(c, pts) { c.beginPath(); pts.forEach((p, i) => (i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y))); c.closePath(); }
+
+function paintRock(c, x, y, r, rnd) {
+  c.fillStyle = 'rgba(10,60,90,.28)'; c.beginPath(); c.ellipse(x + r * 0.2, y + r * 0.35, r * 1.25, r * 0.8, 0, 0, 7); c.fill(); // the shadow in the water
+  c.fillStyle = '#4b5057'; c.beginPath(); c.ellipse(x, y, r, r * 0.78, rnd() * 3, 0, 7); c.fill();
+  c.fillStyle = '#6d747c'; c.beginPath(); c.ellipse(x - r * 0.2, y - r * 0.22, r * 0.6, r * 0.42, 0, 0, 7); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.22)'; c.beginPath(); c.ellipse(x - r * 0.3, y - r * 0.35, r * 0.25, r * 0.15, 0, 0, 7); c.fill();
+}
+
+// A palm on the beach leaning out over the water (n is the outward normal of the shore there), so it never stands over the court:
+// a tapering ringed trunk, a crown of drooping fronds (a midrib with leaflets down both sides) and a bunch of coconuts.
+function paintPalm(c, x, y, nx, ny, rnd) {
+  const tx = -ny, ty = nx, lean = rnd() < 0.5 ? 1 : -1, H = 150;
+  const ex = x + nx * H + tx * 26 * lean, ey = y + ny * H + ty * 26 * lean, kx = x + nx * H * 0.5 + tx * 46 * lean, ky = y + ny * H * 0.5 + ty * 46 * lean; // the trunk's end and bend
+  const at = (t) => ({ x: (1 - t) * (1 - t) * x + 2 * (1 - t) * t * kx + t * t * ex, y: (1 - t) * (1 - t) * y + 2 * (1 - t) * t * ky + t * t * ey });
+  c.save(); c.lineCap = 'round';
+  c.fillStyle = 'rgba(10,50,80,.25)'; c.beginPath(); c.ellipse((x + ex) / 2 + 26, (y + ey) / 2 + 30, 96, 34, 0, 0, 7); c.fill(); // its shadow on the water and sand
+  const seg = 14; // trunk: short slanted pieces, dark at the edges, getting thinner towards the top
+  for (let i = 0; i < seg; i++) {
+    const a = at(i / seg), b = at((i + 1) / seg), w = 21 - 10 * (i / seg);
+    c.strokeStyle = i % 2 ? '#6b4a2b' : '#7d5934'; c.lineWidth = w; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+    c.strokeStyle = 'rgba(40,22,8,.55)'; c.lineWidth = 2; c.beginPath(); c.moveTo(a.x - tx * w * 0.5, a.y - ty * w * 0.5); c.lineTo(a.x + tx * w * 0.5, a.y + ty * w * 0.5); c.stroke(); // the growth ring
+    c.strokeStyle = 'rgba(255,220,160,.28)'; c.lineWidth = w * 0.22; c.beginPath(); c.moveTo(a.x - 3, a.y - 3); c.lineTo(b.x - 3, b.y - 3); c.stroke(); // the lit side
+  }
+  const FR = 11; // fronds, the far ones first so the near ones overlap them
+  for (let i = 0; i < FR; i++) {
+    const ang = i / FR * Math.PI * 2 + rnd() * 0.25 + 0.2, dx = Math.cos(ang), dy = Math.sin(ang), L = 98 + rnd() * 26;
+    const mx = ex + dx * L * 0.55, my = ey + dy * L * 0.55 * 0.8 - 22, fx = ex + dx * L, fy = ey + dy * L * 0.8 + 30; // the midrib arches up, then droops
+    const rib = (t) => ({ x: (1 - t) * (1 - t) * ex + 2 * (1 - t) * t * mx + t * t * fx, y: (1 - t) * (1 - t) * ey + 2 * (1 - t) * t * my + t * t * fy });
+    const dark = i % 2 ? '#2a7035' : '#348341', light = i % 2 ? '#3f9a4a' : '#4aad55';
+    for (let k = 1; k <= 15; k++) { // leaflets, longest in the middle of the frond
+      const t = k / 15, p = rib(t), q = rib(Math.min(1, t + 0.04)), rx = q.x - p.x, ry = q.y - p.y, rl = Math.hypot(rx, ry) || 1;
+      const ux = rx / rl, uy = ry / rl, len = 30 * Math.sin(Math.PI * (0.15 + 0.8 * t)) + 4;
+      for (const side of [-1, 1]) {
+        const lx = -uy * side, ly = ux * side, ox = p.x + (lx * 0.8 + ux * 0.7) * len, oy = p.y + (ly * 0.8 + uy * 0.7) * len + len * 0.35; // swept forward and hanging
+        c.strokeStyle = side > 0 ? dark : light; c.lineWidth = 6.5 - 3.5 * t; c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(ox, oy); c.stroke();
+      }
+    }
+    c.strokeStyle = '#2d6a30'; c.lineWidth = 4.5; c.beginPath(); c.moveTo(ex, ey); c.quadraticCurveTo(mx, my, fx, fy); c.stroke(); // the midrib
+  }
+  for (const [ox, oy, r] of [[-9, 8, 10], [8, 10, 10.5], [0, 20, 9.5]]) { // the coconuts
+    c.fillStyle = '#4a3220'; c.beginPath(); c.arc(ex + ox, ey + oy, r, 0, 7); c.fill();
+    c.fillStyle = '#6e4d30'; c.beginPath(); c.arc(ex + ox - 2.5, ey + oy - 3, r * 0.55, 0, 7); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.arc(ex + ox - 4, ey + oy - 5, r * 0.2, 0, 7); c.fill();
+  }
+  c.restore();
+}
+
+function buildSea() {
+  const rnd = seededRandom(arena.w * 31 + arena.h), SEA_PAD = seaPad(), W = arena.w + 2 * SEA_PAD, H = arena.h + 2 * SEA_PAD;
+  const bmp = document.createElement('canvas'); bmp.width = Math.ceil(W * SEA_SCALE); bmp.height = Math.ceil(H * SEA_SCALE);
+  const c = bmp.getContext('2d'); c.scale(SEA_SCALE, SEA_SCALE); c.translate(SEA_PAD, SEA_PAD);
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  const g = c.createLinearGradient(0, -SEA_PAD, 0, arena.h + SEA_PAD); g.addColorStop(0, '#1b79b4'); g.addColorStop(1, '#1d86be');
+  c.fillStyle = g; c.fillRect(-SEA_PAD, -SEA_PAD, W, H); // the open sea
+  const shore = coastline(COAST, 34);
+  // the shallows: wide translucent turquoise bands around the coast, the widest and darkest outermost
+  [[420, 'rgba(46,190,205,.20)'], [300, 'rgba(60,205,215,.22)'], [190, 'rgba(95,222,225,.28)'], [100, 'rgba(150,236,232,.38)'], [44, 'rgba(215,248,240,.55)']].forEach(([lw, col]) => { c.strokeStyle = col; c.lineWidth = lw; tracePath(c, shore); c.stroke(); });
+  for (let i = 0; i < 90; i++) { // ripples
+    const x = -SEA_PAD + rnd() * W, y = -SEA_PAD + rnd() * H, l = 30 + rnd() * 50;
+    c.strokeStyle = 'rgba(255,255,255,.10)'; c.lineWidth = 3; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + l / 2, y - 6, x + l, y); c.stroke();
+  }
+  for (let i = 0; i < shore.length; i += 3) { // wave crests rolling in: short white arcs along the coast, one row per band of the shallows
+    for (const d of [90, 170, 250]) {
+      if (rnd() < 0.45) continue;
+      const p = shore[i], l = 40 + rnd() * 50, ox = p.x + p.nx * (d + rnd() * 30), oy = p.y + p.ny * (d + rnd() * 30), tx = -p.ny * l, ty = p.nx * l;
+      c.strokeStyle = 'rgba(255,255,255,' + (0.22 + rnd() * 0.18) + ')'; c.lineWidth = 3 + rnd() * 3;
+      c.beginPath(); c.moveTo(ox - tx, oy - ty); c.quadraticCurveTo(ox + p.nx * 14, oy + p.ny * 14, ox + tx, oy + ty); c.stroke();
+    }
+  }
+  // the beach: wet sand at the waterline, then dry sand, then the sea's foam line on top
+  c.fillStyle = '#d9c28c'; tracePath(c, shore); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 9; c.stroke();
+  const dry = coastline(COAST - 22, 24); c.fillStyle = '#ecdcab'; tracePath(c, dry); c.fill();
+  c.save(); tracePath(c, dry); c.clip();
+  for (let i = 0; i < 40; i++) { // darker and lighter patches of sand
+    const x = rnd() * arena.w, y = rnd() * arena.h, r = 120 + rnd() * 220, gr = c.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, rnd() < 0.5 ? 'rgba(200,170,110,.20)' : 'rgba(255,248,225,.28)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = gr; c.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  const specks = Math.round(arena.w * arena.h / 700);
+  for (let i = 0; i < specks; i++) { // grains
+    c.fillStyle = rnd() < 0.6 ? 'rgba(150,120,70,.30)' : 'rgba(255,255,255,.45)';
+    const s = 1.5 + rnd() * 2.5; c.fillRect(-COAST + rnd() * (arena.w + 2 * COAST), -COAST + rnd() * (arena.h + 2 * COAST), s, s);
+  }
+  for (let i = 0; i < 26; i++) { // a few shells and pebbles
+    const x = -COAST + rnd() * (arena.w + 2 * COAST), y = -COAST + rnd() * (arena.h + 2 * COAST);
+    c.fillStyle = rnd() < 0.5 ? '#f6e9ee' : '#c9a98a'; c.beginPath(); c.ellipse(x, y, 5 + rnd() * 4, 3.5 + rnd() * 3, rnd() * 3, 0, 7); c.fill();
+  }
+  c.restore();
+  // rocks standing in the water (never on the sand, so nothing there is mistaken for an obstacle) and the palm on the shore
+  for (let i = 0; i < shore.length; i += 7) {
+    if (rnd() < 0.45) continue;
+    const p = shore[i], d = 60 + rnd() * 200, n = 1 + Math.floor(rnd() * 3);
+    for (let k = 0; k < n; k++) paintRock(c, p.x + p.nx * d + (rnd() - 0.5) * 70, p.y + p.ny * d + (rnd() - 0.5) * 70, 14 + rnd() * 24, rnd);
+  }
+  for (const f of [0.03, 0.2, 0.37, 0.55, 0.72, 0.9]) { const p = shore[Math.floor(shore.length * f)]; paintPalm(c, p.x - p.nx * 25, p.y - p.ny * 25, p.nx, p.ny, rnd); }
+  seaArt = bmp; seaKey = arena.w + 'x' + arena.h + 'x' + cam.margin;
+}
+
+// The island with its court markings: a dotted circle, the halfway line and circle, and a small circle in front of each side's start.
+function drawIsland() {
+  if (seaKey !== arena.w + 'x' + arena.h + 'x' + cam.margin) buildSea();
+  const pad = seaPad();
+  ctx.drawImage(seaArt, -pad, -pad, arena.w + 2 * pad, arena.h + 2 * pad);
+  const w = arena.w, h = arena.h, cx = w / 2, cy = h / 2;
+  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.setLineDash([1, 17]);
+  ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.42, 0, 7); ctx.stroke(); // the big circle
+  ctx.beginPath(); ctx.moveTo(cx, h * 0.04); ctx.lineTo(cx, h * 0.96); ctx.stroke(); // the halfway line
+  ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.12, 0, 7); ctx.stroke(); // the centre circle
+  for (const sx of [0.2, 0.8]) for (const sy of [0.26, 0.74]) { ctx.beginPath(); ctx.arc(w * sx, h * sy, Math.min(w, h) * 0.05, 0, 7); ctx.stroke(); }
+  ctx.setLineDash([]); ctx.strokeStyle = 'rgba(120,90,50,.35)'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, w, h); // the walls, a faint line in the sand
+  ctx.restore();
+}
+
+let lastFrame = performance.now();
 function frame() {
+  const now = performance.now(), dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
   drawCooldowns();
   drawCards();
+  updateCamera(dt);
   ctx.save();
   ctx.clearRect(0, 0, cv.width, cv.height);
   if (shake > 0) { ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake); shake *= 0.85; if (shake < .5) shake = 0; }
 
   if (snap) {
+    ctx.fillStyle = '#1c80b9'; ctx.fillRect(0, 0, cv.width, cv.height); // the open sea, past the painted part
     ctx.save();
     ctx.transform(...VIEW); // from here on, coordinates are the world's
+    drawIsland();
     for (const g of ghosts) { drawBody(g.k, g.x, g.y, Math.max(g.a, 0), g.z, 0, g.pose); g.a -= 0.04; }
     while (ghosts.length && ghosts[0].a <= 0) ghosts.shift();
     drawTelegraph();

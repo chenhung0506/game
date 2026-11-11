@@ -210,3 +210,25 @@ func TestRepoConfigFileIsValid(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTheConfigRefusesACameraWindowBiggerThanTheCourtOrAZoomBackwards(t *testing.T) {
+	for name, edit := range map[string]func(c *CourtConfig){
+		"min wider than max":     func(c *CourtConfig) { c.MinWidth = c.MaxWidth + 1 },
+		"min longer than max":    func(c *CourtConfig) { c.MinLength = c.MaxLength + 1 },
+		"zoom in above zoom out": func(c *CourtConfig) { c.ZoomInDistance, c.ZoomOutDistance = 900, 800 },
+		"no zoom speed":          func(c *CourtConfig) { c.ZoomSpeed = 0 },
+		"negative zoom in":       func(c *CourtConfig) { c.ZoomInDistance = -1 },
+		"negative sea margin":    func(c *CourtConfig) { c.SeaMargin = -1 },
+	} {
+		cfg := DefaultConfig()
+		edit(&cfg.Court.Web)
+		if err := cfg.validate(); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	cfg := DefaultConfig()
+	cfg.Court.Web = CourtConfig{MinWidth: 900, MinLength: 1600, MaxWidth: 1200, MaxLength: 2000, ZoomInDistance: 700, ZoomOutDistance: 700, ZoomSpeed: 1}
+	if err := cfg.validate(); err != nil {
+		t.Errorf("a good camera was refused: %v", err)
+	}
+}

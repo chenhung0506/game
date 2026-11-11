@@ -15,6 +15,25 @@ type CourtSize struct {
 	Length float64 `json:"length"`
 }
 
+// CourtConfig is one view's court: the walls (`max_*`: what the fighters can walk on and where the spawns are; past them is out of
+// bounds) and the window the camera shows. The island and the sea around it are drawn beyond the walls and the camera may look
+// `sea_margin` units past them on every side. The camera shows `min_*` while the farthest two characters are close and widens to
+// `max_*` plus the sea margin on both sides as they part: it zooms out while that distance is above `zoom_out_distance`, in while it
+// is below `zoom_in_distance` (in between it holds), by `zoom_speed` of the whole range per second. The window keeps the shape of `min_*`.
+type CourtConfig struct {
+	MinWidth        float64 `json:"min_width"`
+	MinLength       float64 `json:"min_length"`
+	MaxWidth        float64 `json:"max_width"`
+	MaxLength       float64 `json:"max_length"`
+	ZoomInDistance  float64 `json:"zoom_in_distance"`
+	ZoomOutDistance float64 `json:"zoom_out_distance"`
+	ZoomSpeed       float64 `json:"zoom_speed"`
+	SeaMargin       float64 `json:"sea_margin"`
+}
+
+// size is the field itself.
+func (c CourtConfig) size() CourtSize { return CourtSize{Width: c.MaxWidth, Length: c.MaxLength} }
+
 // Reach is the band of heights in which a skill can hurt its target: a target whose height Z is between
 // min_height and max_height (both included) is hit, anyone above or below it is not. Every attack has one;
 // it is read as part of the skill's own block. Height 0 is the ground; the numbers are the same units as
@@ -53,8 +72,8 @@ type Config struct {
 	// Length runs between the two players (left-right on the web page, up-down on a phone), width
 	// across. A room takes the court of the view its first player opened it in.
 	Court struct {
-		Mobile CourtSize `json:"mobile"`
-		Web    CourtSize `json:"web"`
+		Mobile CourtConfig `json:"mobile"`
+		Web    CourtConfig `json:"web"`
 	} `json:"court"`
 	Pikachu struct {
 		MaxHP     int     `json:"max_hp"`
@@ -644,7 +663,7 @@ type BrawlerCfg struct {
 
 func DefaultConfig() Config {
 	var c Config
-	c.Court.Mobile = CourtSize{Width: arenaH, Length: arenaW}
+	c.Court.Mobile = CourtConfig{MinWidth: arenaH, MinLength: arenaW, MaxWidth: arenaH, MaxLength: arenaW, ZoomInDistance: 500, ZoomOutDistance: 800, ZoomSpeed: 0.5} // no zoom: the window is the whole court
 	c.Court.Web = c.Court.Mobile
 	c.Pikachu.MaxHP = maxHP
 	c.Pikachu.WalkSpeed = speed
@@ -943,8 +962,12 @@ func (c Config) validate() error {
 		v    float64
 		min  float64 // exclusive lower bound
 	}{
-		{"court.mobile.width", c.Court.Mobile.Width, 0},
-		{"court.web.width", c.Court.Web.Width, 0},
+		{"court.mobile.min_width", c.Court.Mobile.MinWidth, 0},
+		{"court.web.min_width", c.Court.Web.MinWidth, 0},
+		{"court.mobile.max_width", c.Court.Mobile.MaxWidth, 0},
+		{"court.web.max_width", c.Court.Web.MaxWidth, 0},
+		{"court.mobile.zoom_speed", c.Court.Mobile.ZoomSpeed, 0},
+		{"court.web.zoom_speed", c.Court.Web.ZoomSpeed, 0},
 		{"pikachu.radius", c.Pikachu.Radius, 0},
 		{"snorlax.radius", c.Snorlax.Radius, 0},
 		{"pikachu.max_hp", float64(c.Pikachu.MaxHP), 0},
@@ -1154,9 +1177,23 @@ func (c Config) validate() error {
 			return fmt.Errorf("%s must be > %v, got %v", f.name, f.min, f.v)
 		}
 	}
-	for name, l := range map[string]float64{"court.mobile.length": c.Court.Mobile.Length, "court.web.length": c.Court.Web.Length} {
+	for name, l := range map[string]float64{
+		"court.mobile.min_length": c.Court.Mobile.MinLength, "court.web.min_length": c.Court.Web.MinLength,
+		"court.mobile.max_length": c.Court.Mobile.MaxLength, "court.web.max_length": c.Court.Web.MaxLength,
+	} {
 		if !(l >= 2*spawnHalfGap) { // the players start spawnHalfGap either side of the middle
 			return fmt.Errorf("%s must be >= %v so both players start inside it, got %v", name, 2*spawnHalfGap, l)
+		}
+	}
+	for name, ct := range map[string]CourtConfig{"court.mobile": c.Court.Mobile, "court.web": c.Court.Web} {
+		if ct.MinWidth > ct.MaxWidth || ct.MinLength > ct.MaxLength {
+			return fmt.Errorf("%s: min_width x min_length (%v x %v) must not be bigger than max_width x max_length (%v x %v)", name, ct.MinWidth, ct.MinLength, ct.MaxWidth, ct.MaxLength)
+		}
+		if !(ct.SeaMargin >= 0) {
+			return fmt.Errorf("%s: sea_margin must be >= 0, got %v", name, ct.SeaMargin)
+		}
+		if !(ct.ZoomInDistance >= 0) || !(ct.ZoomOutDistance >= ct.ZoomInDistance) {
+			return fmt.Errorf("%s: zoom_in_distance (%v) must be >= 0 and not above zoom_out_distance (%v)", name, ct.ZoomInDistance, ct.ZoomOutDistance)
 		}
 	}
 	for _, f := range []struct {
@@ -1530,7 +1567,10 @@ func (c Config) gravity() float64 {
 }
 
 // courtFor is the court of a room opened from the given view ("mobile" or "web").
-func (c Config) courtFor(mode string) CourtSize {
+func (c Config) courtFor(mode string) CourtSize { return c.courtConfigFor(mode).size() }
+
+// courtConfigFor is the whole court section (field, camera window and zoom) of that view.
+func (c Config) courtConfigFor(mode string) CourtConfig {
 	if mode == modeWeb {
 		return c.Court.Web
 	}
