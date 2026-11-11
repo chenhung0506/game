@@ -150,6 +150,7 @@ type Player struct {
 	BreathLeft float64 `json:"-"`   // the full duration, to tell how far along the breath is
 	// Seismic Toss: TossPhase is tossNone, tossDash (running at the target), tossRise (carrying it up) or tossFall.
 	TossAir   bool    `json:"-"` // the toss began in flight
+	TossFoe   int     `json:"-"` // the slot it has caught plus one, while it is carrying it up and down (0: not recorded, the nearest foe)
 	TossPhase int     `json:"gp"`
 	TossLeft  float64 `json:"-"` // dash distance left
 	TossDX    float64 `json:"gdx"`
@@ -335,6 +336,7 @@ type Ball struct {
 	Back      bool    `json:"bk,omitempty"` // ghost fire: it has flown out and is coming back to its owner
 	Hit       bool    `json:"-"`            // ghost fire: it has hurt the opponent already
 	FoeCD     float64 `json:"-"`            // ghost fire: until it may hurt the opponent again (rehit_interval)
+	Prey      int     `json:"-"`            // tornado: the slot it holds plus one (0: not recorded, whichever foe it is holding)
 }
 
 // Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
@@ -375,10 +377,13 @@ const (
 	modeWeb    = "web"
 )
 
+// maxSlots is the most characters a game holds: a 2v2.
+const maxSlots = 4
+
 type Game struct {
 	cfg     Config
 	court   CourtSize
-	P       [2]Player
+	P       []Player // slots 0 and 1 are the duel; in a 2v2 slots 2 and 3 join them, so a slot's side is its number mod 2
 	Balls   []Ball
 	Frost   []Frost
 	Fires   []FireZone   // the ground the Seismic Toss set alight
@@ -388,7 +393,7 @@ type Game struct {
 	Waves   []wave       // Gyarados's waves running out over the ground (the client draws them from an event)
 	rng     *rand.Rand   // the fire's random spread; tests replace it
 	// Ease is each player's handicap in percent (a multiple of easeStep, at most easeMax): its HP and its
-	// walking speed are cut by that much. It survives Reset.
+	// walking speed are cut by that much. It survives Reset. Only slots 0 and 1 have one; a teammate has none.
 	Ease [2]int
 }
 
@@ -401,13 +406,58 @@ const (
 func validEase(pct int) bool { return pct >= 0 && pct <= easeMax && pct%easeStep == 0 }
 
 // maxHP is slot i's full HP, handicap included (at least 1).
-func (g *Game) maxHP(i int) int { return max(1, g.cfg.maxHPOf(g.P[i].Kind)*(100-g.Ease[i])/100) }
+func (g *Game) maxHP(i int) int { return max(1, g.cfg.maxHPOf(g.P[i].Kind)*(100-g.ease(i))/100) }
+
+// ease is slot i's handicap in percent.
+func (g *Game) ease(i int) int {
+	if i < len(g.Ease) {
+		return g.Ease[i]
+	}
+	return 0
+}
+
+// side is which team slot i fights for: 0 (the left) or 1 (the right). Teammates never hurt one another.
+func (g *Game) side(i int) int { return i % 2 }
+
+// foes are the slots slot i's skills may hurt: the other side's characters still standing. In a duel the opponent is always
+// one, even on the tick it falls, because the round only ends after the tick.
+func (g *Game) foes(i int) []int {
+	var out []int
+	for j := range g.P {
+		if g.side(j) != g.side(i) && (len(g.P) == 2 || g.P[j].HP > 0) {
+			out = append(out, j)
+		}
+	}
+	return out
+}
+
+// nearestFoe is the foe of slot i closest to it, the one its aimed skills turn to. With nobody left standing it is the
+// closest of the other side anyway, so the answer is always a slot.
+func (g *Game) nearestFoe(i int) int {
+	best, bd := -1, math.Inf(1)
+	for pass := 0; pass < 2 && best < 0; pass++ {
+		for j := range g.P {
+			if g.side(j) == g.side(i) || (pass == 0 && len(g.P) > 2 && g.P[j].HP <= 0) {
+				continue
+			}
+			if d := dist(&g.P[i], &g.P[j]); d < bd {
+				best, bd = j, d
+			}
+		}
+	}
+	return best
+}
 
 func NewGame(cfg Config) *Game { return NewGameFor(cfg, modeWeb) }
 
-func NewGameFor(cfg Config, mode string) *Game {
-	g := &Game{cfg: cfg, court: cfg.courtFor(mode), rng: rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 1))}
-	g.P[0].Kind, g.P[1].Kind = pikachu, snorlax
+func NewGameFor(cfg Config, mode string) *Game { return NewTeamGame(cfg, mode, 2) }
+
+// NewTeamGame opens a game of n characters (2 for a duel, 4 for a 2v2), the first two being the duel's.
+func NewTeamGame(cfg Config, mode string, n int) *Game {
+	g := &Game{cfg: cfg, court: cfg.courtFor(mode), rng: rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 1)), P: make([]Player, n)}
+	for i := range g.P {
+		g.P[i].Kind = []int{pikachu, snorlax}[i%2]
+	}
 	g.Reset()
 	return g
 }
@@ -426,8 +476,16 @@ func (g *Game) Reset() {
 			g.P[i].Kind = magikarp // a new round starts from the beginning
 		}
 	}
-	g.P[0] = Player{Kind: g.P[0].Kind, X: c.Length/2 - spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(0), FX: 1, AimX: 1}
-	g.P[1] = Player{Kind: g.P[1].Kind, X: c.Length/2 + spawnHalfGap, Y: c.Width / 2, HP: g.maxHP(1), FX: -1, AimX: -1}
+	for i := range g.P { // the sides face each other across the middle; in a 2v2 each side's pair stands apart along its line
+		x, fx, y := c.Length/2-spawnHalfGap, 1, c.Width/2
+		if g.side(i) == 1 {
+			x, fx = c.Length/2+spawnHalfGap, -1
+		}
+		if len(g.P) > 2 {
+			y += []float64{-1, 1}[i/2%2] * c.Width / 6
+		}
+		g.P[i] = Player{Kind: g.P[i].Kind, X: x, Y: y, HP: g.maxHP(i), FX: fx, AimX: float64(fx)}
+	}
 	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells = nil, nil, nil, nil, nil, nil, nil
 	for i := range g.P {
 		if g.P[i].Kind == rowlet {
@@ -436,14 +494,53 @@ func (g *Game) Reset() {
 	}
 }
 
-// Winner returns the index of the surviving player, or -1 while both are alive.
+// touchedFoe is the first foe of slot owner for which touches holds (it is given the foe and the radius of its body), and
+// whether there was one. A skill that hurts the foe it reaches asks this, so it never needs to know how many foes there are.
+func (g *Game) touchedFoe(owner int, touches func(f *Player, rad float64) bool) (*Player, bool) {
+	for _, j := range g.foes(owner) {
+		if f := &g.P[j]; touches(f, g.radius(j)) {
+			return f, true
+		}
+	}
+	return nil, false
+}
+
+// slotOf is the slot a player of this game stands in.
+func (g *Game) slotOf(p *Player) int {
+	for j := range g.P {
+		if &g.P[j] == p {
+			return j
+		}
+	}
+	return -1
+}
+
+// foeNearTo is the foe of slot owner nearest to the point (x, y): what a thing that chases (a tornado, a leaf) goes for.
+func (g *Game) foeNearTo(owner int, x, y float64) *Player {
+	best, bd := &g.P[g.nearestFoe(owner)], math.Inf(1)
+	for _, j := range g.foes(owner) {
+		if d := math.Hypot(g.P[j].X-x, g.P[j].Y-y); d < bd {
+			best, bd = &g.P[j], d
+		}
+	}
+	return best
+}
+
+// Winner returns the side that has won (0 or 1), or -1 while both still have someone standing. A side is out when all its
+// characters have fallen.
 func (g *Game) Winner() int {
+	var left [2]int
+	for i := range g.P {
+		if g.P[i].HP > 0 {
+			left[g.side(i)]++
+		}
+	}
 	switch {
-	case g.P[0].HP <= 0 && g.P[1].HP <= 0:
+	case left[0] == 0 && left[1] == 0:
 		return 0 // simultaneous KO: arbitrary but deterministic
-	case g.P[0].HP <= 0:
+	case left[0] == 0:
 		return 1
-	case g.P[1].HP <= 0:
+	case left[1] == 0:
 		return 0
 	}
 	return -1
@@ -575,7 +672,10 @@ var (
 func (g *Game) Step(dt float64) []Event {
 	var events []Event
 	for i := range g.P {
-		p, other := &g.P[i], &g.P[1-i]
+		p, other := &g.P[i], &g.P[g.nearestFoe(i)] // other: the foe the aimed skills turn to; the damage is dealt to every foe in reach (g.foes)
+		if len(g.P) > 2 && p.HP <= 0 {
+			continue // a fallen character of a 2v2 stays out of the fight
+		}
 
 		// A frozen or held player is deaf to its keys until it thaws or lands: the held keys take effect
 		// again afterwards.
@@ -708,10 +808,18 @@ func (g *Game) Step(dt float64) []Event {
 				// Like the landing shock, the beam travels along the ground and misses airborne targets.
 				// It hits again every hit_interval for as long as the target stays in the beam (0 = once per sweep).
 				ready := p.BeamHitCD <= 1e-9 && (hb.HitInterval > 0 || !p.SweptHit)
-				if ready && hb.Reach.hits(other) && sweepHits(p, other, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+g.radius(1-i), hb.Width+2*g.radius(1-i)) {
-					g.hit(other, hb.Damage)
-					p.SweptHit, p.BeamHitCD = true, hitCDNext(p.BeamHitCD, hb.HitInterval)
-					g.knockBack(p.X, p.Y, other, hb.Knockback, p.BeamX, p.BeamY)
+				if ready {
+					landed := false
+					for _, j := range g.foes(i) {
+						if foe := &g.P[j]; hb.Reach.hits(foe) && sweepHits(p, foe, p.BeamX, p.BeamY, prev, p.BeamA, hb.Length+g.radius(j), hb.Width+2*g.radius(j)) {
+							g.hit(foe, hb.Damage)
+							g.knockBack(p.X, p.Y, foe, hb.Knockback, p.BeamX, p.BeamY)
+							landed = true
+						}
+					}
+					if landed {
+						p.SweptHit, p.BeamHitCD = true, hitCDNext(p.BeamHitCD, hb.HitInterval)
+					}
 				}
 				// A ball is hit like a player: at once, then every hit_interval while it stays in the beam
 				// (0 = once per sweep). Each hit also pushes it away from Snorlax by the beam's mass minus
@@ -808,12 +916,14 @@ func (g *Game) Step(dt float64) []Event {
 				for p.ThunderLeft > 0 && p.ThunderIn < 1e-9 { // a loop so a tiny interval cannot lose bolts
 					events = append(events, Event{T: "skybolt", X: p.X, Y: p.Y}, Event{T: "thunder", X: p.ShadowX, Y: p.ShadowY})
 					for j := range g.Balls { // the bolt wears down the other player's projectiles, pillars and stones caught in it, whether or not it hits a body
-						if b := &g.Balls[j]; b.Owner != i && math.Hypot(b.X-p.ShadowX, b.Y-p.ShadowY) <= th.Radius+g.ballRadius(b) {
+						if b := &g.Balls[j]; g.side(b.Owner) != g.side(i) && math.Hypot(b.X-p.ShadowX, b.Y-p.ShadowY) <= th.Radius+g.ballRadius(b) {
 							b.HP -= th.Damage
 						}
 					}
-					if th.Reach.hits(other) && math.Hypot(other.X-p.ShadowX, other.Y-p.ShadowY) <= th.Radius+g.radius(1-i) {
-						g.hit(other, th.Damage)
+					for _, j := range g.foes(i) {
+						if foe := &g.P[j]; th.Reach.hits(foe) && math.Hypot(foe.X-p.ShadowX, foe.Y-p.ShadowY) <= th.Radius+g.radius(j) {
+							g.hit(foe, th.Damage)
+						}
 					}
 					p.ThunderLeft--
 					p.ThunderIn += th.Interval
@@ -866,8 +976,10 @@ func (g *Game) Step(dt float64) []Event {
 			if p.DashT -= step; p.DashT < 1e-9 {
 				p.DashT = 0
 			}
-			if !p.VoltHit && vt.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= vt.Radius+g.radius(1-i) {
-				events = append(events, g.contact(i, vt.Mass)...)
+			for _, j := range g.foes(i) {
+				if foe := &g.P[j]; !p.VoltHit && vt.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, p.X, p.Y) <= vt.Radius+g.radius(j) {
+					events = append(events, g.contact(i, j, vt.Mass)...)
+				}
 			}
 		} else if n := math.Hypot(float64(in.DX), float64(in.DY)); !busy && !casting && n > 0 {
 			// Normalise diagonals so they are not faster. Snorlax steers at its own speeds in
@@ -891,7 +1003,7 @@ func (g *Game) Step(dt float64) []Event {
 					v = g.cfg.Snorlax.Jump.AirSpeedFirstHalf
 				}
 			}
-			v *= float64(100-g.Ease[i]) / 100 // the handicap slows every way of walking, flying and steering in the air
+			v *= float64(100-g.ease(i)) / 100 // the handicap slows every way of walking, flying and steering in the air
 			v *= g.frostFactor(i)             // so does Vulpix's frost, or speeds it up
 			if p.SlowT > 0 {
 				v *= 1 - g.cfg.Rowlet.Arrows.Slow // and an arrow's slow
@@ -921,8 +1033,10 @@ func (g *Game) Step(dt float64) []Event {
 		// The slam resolves on the landing frame, not while falling.
 		if landed {
 			events = append(events, Event{T: "slam", X: p.X, Y: p.Y, R: g.cfg.Snorlax.Jump.SlamRadius}) // the client draws the real reach
-			if dist(p, other) < g.cfg.Snorlax.Jump.SlamRadius+g.radius(1-i) && g.cfg.Snorlax.Jump.Reach.hits(other) {
-				g.hit(other, slamDamage)
+			for _, j := range g.foes(i) {
+				if foe := &g.P[j]; dist(p, foe) < g.cfg.Snorlax.Jump.SlamRadius+g.radius(j) && g.cfg.Snorlax.Jump.Reach.hits(foe) {
+					g.hit(foe, slamDamage)
+				}
 			}
 			for j := range g.Balls { // the shock wave is a ground attack: it hits balls too
 				b := &g.Balls[j]
@@ -946,7 +1060,7 @@ func (g *Game) Step(dt float64) []Event {
 // the direction held when the charge ends. The fist hits whatever it touches along the dash, once.
 func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 	var events []Event
-	p, other := &g.P[i], &g.P[1-i]
+	p := &g.P[i]
 	ip := g.cfg.Snorlax.IcePunch
 	if p.PunchCD > 0 {
 		if p.PunchCD -= dt; p.PunchCD < 1e-9 {
@@ -975,8 +1089,10 @@ func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 		}
 		// Like the other ground attacks it misses an airborne opponent. Tested along the whole step so a
 		// fast fist cannot jump over a body between two ticks.
-		if !p.PunchHit && ip.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.radius(1-i) {
-			events = append(events, g.contact(i, ip.Mass)...)
+		for _, j := range g.foes(i) {
+			if foe := &g.P[j]; !p.PunchHit && ip.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, p.X, p.Y) <= ip.Radius+g.radius(j) {
+				events = append(events, g.contact(i, j, ip.Mass)...)
+			}
 		}
 		for j := range g.Balls {
 			b := &g.Balls[j]
@@ -1008,7 +1124,6 @@ func (g *Game) stepBalls(dt float64) []Event {
 	var blasts []blast
 	kept := g.Balls[:0]
 	for _, b := range g.Balls {
-		foe := &g.P[1-b.Owner]
 		b.X0, b.Y0 = b.X, b.Y
 		if b.K == ballPillar || b.K == ballStone {
 			if b.HP > 0 {
@@ -1025,7 +1140,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 		if b.K == ballFist {
 			if b.HP > 0 {
 				cp := g.brawler(b.Owner).CometPunch
-				if cp.Reach.hits(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= cp.Radius+g.radius(1-b.Owner) {
+				if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
+					return cp.Reach.hits(f) && math.Hypot(f.X-b.X, f.Y-b.Y) <= cp.Radius+rad
+				}); ok {
 					g.hit(foe, cp.Damage)
 					if !foe.Held { // a body pinned by a tornado stays where it is held
 						g.knockBack(b.X, b.Y, foe, cp.Knockback, b.DX, b.DY)
@@ -1044,7 +1161,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 				x0, y0 := b.X, b.Y
 				b.X += b.DX * ar.Speed * dt
 				b.Y += b.DY * ar.Speed * dt
-				if ar.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= ar.Radius+g.radius(1-b.Owner) {
+				if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
+					return ar.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, b.X, b.Y) <= ar.Radius+rad
+				}); ok {
 					g.hit(foe, ar.Damage)
 					foe.SlowT = math.Max(foe.SlowT, ar.SlowDuration)
 					events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
@@ -1066,8 +1185,8 @@ func (g *Game) stepBalls(dt float64) []Event {
 				}
 				continue
 			}
-			// It chases the opponent without overshooting, for `distance` of travel or `duration` seconds.
-			if dx, dy := foe.X-b.X, foe.Y-b.Y; math.Hypot(dx, dy) > 1e-9 {
+			// It chases the nearest foe without overshooting, for `distance` of travel or `duration` seconds.
+			if dx, dy := g.foeNearTo(b.Owner, b.X, b.Y).X-b.X, g.foeNearTo(b.Owner, b.X, b.Y).Y-b.Y; math.Hypot(dx, dy) > 1e-9 {
 				d := math.Hypot(dx, dy)
 				step := math.Min(math.Min(tn.Speed*dt, b.Left), d)
 				b.X += dx / d * step
@@ -1075,8 +1194,10 @@ func (g *Game) stepBalls(dt float64) []Event {
 				b.Left -= step
 			}
 			b.Life -= dt
-			if !foe.Held && foe.Twirl == twirlNone && tn.Reach.hits(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= tn.Radius+g.radius(1-b.Owner) {
-				b.Caught, b.Life = true, tn.SpinDuration
+			if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
+				return !f.Held && f.Twirl == twirlNone && tn.Reach.hits(f) && math.Hypot(f.X-b.X, f.Y-b.Y) <= tn.Radius+rad
+			}); ok {
+				b.Caught, b.Life, b.Prey = true, tn.SpinDuration, g.slotOf(foe)+1
 				foe.Twirl, foe.Held, foe.VZ, foe.TwirlIn = twirlSpin, true, 0, tn.SpinInterval
 				events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
 				kept = append(kept, b)
@@ -1099,7 +1220,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 					b.Y = math.Min(math.Max(b.Y, 0), g.court.Width)
 					boom = true
 				}
-				if sb.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= sb.Radius+g.radius(1-b.Owner) {
+				if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
+					return sb.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, b.X, b.Y) <= sb.Radius+rad
+				}); ok {
 					b.X, b.Y = closestOnSegment(foe.X, foe.Y, x0, y0, b.X, b.Y) // it bursts where it met the opponent
 					boom = true
 				}
@@ -1128,9 +1251,13 @@ func (g *Game) stepBalls(dt float64) []Event {
 					b.X, b.Y = b.X+dx/d*gf.ConvergenceSpeed*dt, b.Y+dy/d*gf.ConvergenceSpeed*dt
 				}
 				b.FoeCD = hitCDTick(b.FoeCD, dt)
-				if b.FoeCD <= 1e-9 && (!b.Hit || gf.RehitInterval > 0) && gf.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= gf.Radius+g.radius(1-b.Owner) {
-					b.Hit, b.FoeCD = true, hitCDNext(b.FoeCD, gf.RehitInterval)
-					g.hit(foe, gf.Damage)
+				if b.FoeCD <= 1e-9 && (!b.Hit || gf.RehitInterval > 0) {
+					if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
+						return gf.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, b.X, b.Y) <= gf.Radius+rad
+					}); ok {
+						b.Hit, b.FoeCD = true, hitCDNext(b.FoeCD, gf.RehitInterval)
+						g.hit(foe, gf.Damage)
+					}
 				}
 				kept = append(kept, b)
 			}
@@ -1144,7 +1271,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 				b.Y += b.DY * step
 				b.Left -= step
 				// Along the whole step, so a fast fire ball cannot jump over the opponent.
-				if fb.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= fb.Radius+g.radius(1-b.Owner) {
+				if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
+					return fb.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, b.X, b.Y) <= fb.Radius+rad
+				}); ok {
 					g.hit(foe, fb.Damage)
 					continue
 				}
@@ -1159,6 +1288,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 			if b.HP > 0 {
 				if b.Wait { // hanging around Chikorita until its delay is up, then it picks its target
 					if b.Delay -= dt; b.Delay <= 1e-9 {
+						foe := g.foeNearTo(b.Owner, b.X, b.Y)
 						dx, dy := foe.X-b.X, foe.Y-b.Y
 						if n := math.Hypot(dx, dy); n > 1e-9 {
 							b.DX, b.DY, b.Wait = dx/n, dy/n, false
@@ -1173,7 +1303,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 				x0, y0 := b.X, b.Y
 				b.X += b.DX * rl.Speed * dt
 				b.Y += b.DY * rl.Speed * dt
-				if rl.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= rl.Radius+g.radius(1-b.Owner) {
+				if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
+					return rl.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, b.X, b.Y) <= rl.Radius+rad
+				}); ok {
 					g.hit(foe, rl.Damage)
 					events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
 					continue
@@ -1196,7 +1328,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}
 			// Along the whole step, so a fast ball cannot jump over the opponent between two ticks.
 			// Outside the ball's heights it flies past the opponent.
-			if bc.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, b.X, b.Y) <= bc.Radius+g.radius(1-b.Owner) {
+			if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
+				return bc.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, b.X, b.Y) <= bc.Radius+rad
+			}); ok {
 				b.X, b.Y = closestOnSegment(foe.X, foe.Y, x0, y0, b.X, b.Y) // it blows up where it met the opponent
 				g.hit(foe, bc.ContactDamage)                                // the ball itself hurts, then the blast does
 				boom = true
@@ -1208,9 +1342,11 @@ func (g *Game) stepBalls(dt float64) []Event {
 		}
 		events = append(events, Event{T: "explode", X: b.X, Y: b.Y, R: bc.ExplosionRadius})
 		blasts = append(blasts, blast{b.X, b.Y})
-		if bc.Reach.hits(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= bc.ExplosionRadius+g.radius(1-b.Owner) {
-			g.hit(foe, bc.ExplosionDamage)
-			g.knockBack(b.X, b.Y, foe, bc.Knockback, b.DX, b.DY)
+		for _, j := range g.foes(b.Owner) { // the blast hurts every foe in it
+			if foe := &g.P[j]; bc.Reach.hits(foe) && math.Hypot(foe.X-b.X, foe.Y-b.Y) <= bc.ExplosionRadius+g.radius(j) {
+				g.hit(foe, bc.ExplosionDamage)
+				g.knockBack(b.X, b.Y, foe, bc.Knockback, b.DX, b.DY)
+			}
 		}
 	}
 	g.Balls = kept
@@ -1274,7 +1410,7 @@ func (g *Game) clashBalls() {
 		}
 		for j := i + 1; j < len(g.Balls); j++ {
 			b := &g.Balls[j]
-			if b.HP <= 0 || b.Wait || a.Owner == b.Owner || (solid(a.K) && (solid(b.K) || b.K == ballTornado)) || (a.K == ballTornado && solid(b.K)) {
+			if b.HP <= 0 || b.Wait || g.side(a.Owner) == g.side(b.Owner) || (solid(a.K) && (solid(b.K) || b.K == ballTornado)) || (a.K == ballTornado && solid(b.K)) {
 				continue
 			}
 			// b stands still at its start; a moves by the difference of their moves.
@@ -1340,7 +1476,7 @@ func (g *Game) fistShove(fist, ball *Ball) float64 {
 // carries it up `high` and slams it down, where it takes `damage`.
 func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 	var events []Event
-	p, other := &g.P[i], &g.P[1-i]
+	p, other := &g.P[i], &g.P[g.nearestFoe(i)]
 	cz := g.cfg.Charizard
 	stunned := p.FrozenT > 0 || p.Held // in is already empty then; this only stops new skills
 	tick := func(v *float64) {
@@ -1419,8 +1555,11 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 		p.Y = math.Min(math.Max(p.Y+p.TossDY*step, 0), g.court.Width)
 		p.TossLeft -= step
 		// A ground attack like the punch: it misses an opponent who is in the air. Tested along the whole step.
-		if ts.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= ts.Radius+g.radius(1-i) {
-			events = append(events, g.contact(i, ts.Mass)...)
+		for _, j := range g.foes(i) {
+			if foe := &g.P[j]; ts.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, p.X, p.Y) <= ts.Radius+g.radius(j) {
+				events = append(events, g.contact(i, j, ts.Mass)...)
+				break // it catches one
+			}
 		}
 		if p.TossPhase == tossDash && p.TossLeft < 1e-9 {
 			p.TossPhase = tossNone // missed
@@ -1436,22 +1575,23 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 			if p.TossAir {
 				p.FlyCD = cz.Fly.Cooldown
 			}
-			g.hit(other, ts.Damage)
-			other.Held, other.Z = false, 0
-			events = append(events, Event{T: "slam", X: other.X, Y: other.Y, R: ts.Radius}) // the same shock as Snorlax's landing
+			caught := &g.P[g.tossVictim(i)]
+			g.hit(caught, ts.Damage)
+			caught.Held, caught.Z = false, 0
+			events = append(events, Event{T: "slam", X: caught.X, Y: caught.Y, R: ts.Radius}) // the same shock as Snorlax's landing
 			if ts.FireRadius > 0 && ts.FireDuration > 0 {
-				g.Fires = append(g.Fires, FireZone{Owner: i, X: other.X, Y: other.Y, R: ts.FireRadius, Left: ts.FireDuration})
+				g.Fires = append(g.Fires, FireZone{Owner: i, X: caught.X, Y: caught.Y, R: ts.FireRadius, Left: ts.FireDuration})
 				if over := len(g.Fires) - maxFires; over > 0 {
 					g.Fires = g.Fires[over:]
 				}
 			}
 		}
 	}
-	if other.Held && p.TossPhase != tossNone { // the caught body hangs in front of Charizard
-		off := g.radius(i) + g.radius(1-i)
-		other.X = math.Min(math.Max(p.X+p.TossDX*off, 0), g.court.Length)
-		other.Y = math.Min(math.Max(p.Y+p.TossDY*off, 0), g.court.Width)
-		other.Z = p.Z
+	if caught := &g.P[g.tossVictim(i)]; caught.Held && (p.TossPhase == tossRise || p.TossPhase == tossFall) { // the caught body hangs in front of Charizard
+		off := g.radius(i) + g.radius(g.tossVictim(i))
+		caught.X = math.Min(math.Max(p.X+p.TossDX*off, 0), g.court.Length)
+		caught.Y = math.Min(math.Max(p.Y+p.TossDY*off, 0), g.court.Width)
+		caught.Z = p.Z
 	}
 	return events
 }
@@ -1462,7 +1602,8 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 // the blade hits anyone in reach within slash_radius.
 func (g *Game) stepChikorita(i int, in Input, dt float64) []Event {
 	var events []Event
-	p, other := &g.P[i], &g.P[1-i]
+	oi := g.nearestFoe(i) // it closes in on the nearest foe
+	p, other := &g.P[i], &g.P[oi]
 	ls := g.cfg.Chikorita.LeafSlash
 	if p.LeafCD > 0 {
 		if p.LeafCD -= dt; p.LeafCD < 1e-9 {
@@ -1498,7 +1639,7 @@ func (g *Game) stepChikorita(i int, in Input, dt float64) []Event {
 			if p.LeafN == ls.Slashes-1 {
 				used = math.Min(dt, p.LeafT)
 			}
-			adv := math.Min(ls.SlashStep*used/ls.SlashInterval, math.Max(0, d-g.radius(i)-g.radius(1-i)))
+			adv := math.Min(ls.SlashStep*used/ls.SlashInterval, math.Max(0, d-g.radius(i)-g.radius(oi)))
 			p.X = math.Min(math.Max(p.X+(other.X-p.X)/d*adv, 0), g.court.Length)
 			p.Y = math.Min(math.Max(p.Y+(other.Y-p.Y)/d*adv, 0), g.court.Width)
 		}
@@ -1506,9 +1647,11 @@ func (g *Game) stepChikorita(i int, in Input, dt float64) []Event {
 		p.LeafK = math.Min(math.Max(1-p.LeafT/ls.SlashInterval, 0), 1)
 		if !p.LeafHit && p.LeafK >= 0.5 {
 			p.LeafHit = true
-			if ls.Reach.hits(other) && dist(p, other) <= ls.SlashRadius+g.radius(1-i) {
-				g.hit(other, ls.Damage)
-				events = append(events, Event{T: "leaf", X: other.X, Y: other.Y})
+			for _, j := range g.foes(i) {
+				if foe := &g.P[j]; ls.Reach.hits(foe) && dist(p, foe) <= ls.SlashRadius+g.radius(j) {
+					g.hit(foe, ls.Damage)
+					events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
+				}
 			}
 		}
 		if p.LeafT < 1e-9 {
@@ -1527,7 +1670,7 @@ func (g *Game) stepChikorita(i int, in Input, dt float64) []Event {
 // stepChikoritaVines runs Chikorita's two small skills: the Razor Leaf cast and the Vine Whip swing.
 func (g *Game) stepChikoritaVines(i int, in Input, dt float64) []Event {
 	var events []Event
-	p, other := &g.P[i], &g.P[1-i]
+	p := &g.P[i]
 	rl, vw := g.cfg.Chikorita.RazorLeaf, g.cfg.Chikorita.VineWhip
 	ready := p.LeafPhase == leafNone && !p.vineBusy() && p.Z == 0 && p.FrozenT == 0 && !p.Held
 	for _, cd := range []*float64{&p.RazorCD, &p.VineCD} {
@@ -1576,13 +1719,16 @@ func (g *Game) stepChikoritaVines(i int, in Input, dt float64) []Event {
 		p.VineA = vw.SweepAngle * p.VineT / vw.SweepDuration
 		// The vines are mirror images, so one test along the swept angles of each covers both. Whichever touches
 		// first hurts and binds; a second touch in the same swing does not.
-		reach, w := vw.Length+g.radius(1-i), vw.Width+2*g.radius(1-i)
-		if !p.VineHit && vw.Reach.hits(other) &&
-			(sweepHits(p, other, p.VineX, p.VineY, prev, p.VineA, reach, w) || sweepHits(p, other, p.VineX, p.VineY, -p.VineA, -prev, reach, w)) {
-			p.VineHit = true
-			g.hit(other, vw.Damage)
-			other.BoundT = math.Max(other.BoundT, vw.BindDuration)
-			events = append(events, Event{T: "leaf", X: other.X, Y: other.Y})
+		for _, j := range g.foes(i) {
+			other := &g.P[j]
+			reach, w := vw.Length+g.radius(j), vw.Width+2*g.radius(j)
+			if !p.VineHit && vw.Reach.hits(other) &&
+				(sweepHits(p, other, p.VineX, p.VineY, prev, p.VineA, reach, w) || sweepHits(p, other, p.VineX, p.VineY, -p.VineA, -prev, reach, w)) {
+				p.VineHit = true
+				g.hit(other, vw.Damage)
+				other.BoundT = math.Max(other.BoundT, vw.BindDuration)
+				events = append(events, Event{T: "leaf", X: other.X, Y: other.Y})
+			}
 		}
 	}
 	if p.VineRecT > 0 && p.VineT == 0 {
@@ -1608,15 +1754,23 @@ func (g *Game) dropLeaf(i int) {
 	p.LeafPhase, p.LeafK, p.LeafN = leafNone, 0, 0
 }
 
+// tossVictim is the slot Charizard i has caught in its Seismic Toss.
+func (g *Game) tossVictim(i int) int {
+	if f := g.P[i].TossFoe; f > 0 {
+		return f - 1
+	}
+	return g.nearestFoe(i)
+}
+
 // dropToss lets go of a caught opponent: Charizard was frozen (or caught itself) mid-toss. The opponent falls
 // where it is, unhurt.
 func (g *Game) dropToss(i int) {
-	p, other := &g.P[i], &g.P[1-i]
+	p := &g.P[i]
 	if p.TossPhase == tossNone {
 		return
 	}
-	if other.Held {
-		other.Held, other.Z = false, 0
+	if caught := &g.P[g.tossVictim(i)]; p.TossPhase != tossDash && caught.Held {
+		caught.Held, caught.Z = false, 0
 	}
 	if p.TossPhase != tossDash {
 		p.Z = 0
@@ -1642,11 +1796,10 @@ func (g *Game) runningMass(j int) (float64, bool) {
 	return 0, false
 }
 
-// contact resolves player i's running attack (of this mass) touching the opponent. If the opponent is running
+// contact resolves player i's running attack (of this mass) touching foe j. If j is running
 // an attack of its own, the heavier mass wins: it lands, and the lighter attack is cut short and does nothing.
 // Equal masses cancel each other.
-func (g *Game) contact(i int, mass float64) []Event {
-	j := 1 - i
+func (g *Game) contact(i, j int, mass float64) []Event {
 	mj, clash := g.runningMass(j)
 	switch {
 	case !clash:
@@ -1694,7 +1847,7 @@ func (g *Game) land(w, v int) []Event {
 		return []Event{{T: "freeze", X: victim.X, Y: victim.Y}}
 	case charizard:
 		victim.Held, victim.VZ = true, 0
-		p.TossPhase = tossRise
+		p.TossPhase, p.TossFoe = tossRise, v+1
 	}
 	return nil
 }
@@ -1735,13 +1888,20 @@ func (g *Game) tickFires(dt float64) {
 	ts := g.cfg.Charizard.SeismicToss
 	kept := g.Fires[:0]
 	for _, z := range g.Fires {
-		foe := &g.P[1-z.Owner]
 		if z.HitCD > 0 {
 			z.HitCD -= dt
 		}
-		if z.HitCD <= 1e-9 && foe.Z >= 0 && foe.Z <= ts.FireMaxHeight && math.Hypot(foe.X-z.X, foe.Y-z.Y) <= z.R+g.radius(1-z.Owner) {
-			g.hit(foe, ts.FireDamage)
-			z.HitCD = ts.FireInterval
+		if z.HitCD <= 1e-9 { // the whole side the fire was lit against burns while it stands in it
+			burnt := false
+			for _, j := range g.foes(z.Owner) {
+				if foe := &g.P[j]; foe.Z >= 0 && foe.Z <= ts.FireMaxHeight && math.Hypot(foe.X-z.X, foe.Y-z.Y) <= z.R+g.radius(j) {
+					g.hit(foe, ts.FireDamage)
+					burnt = true
+				}
+			}
+			if burnt {
+				z.HitCD = ts.FireInterval
+			}
 		}
 		if z.Left -= dt; z.Left > 1e-9 {
 			kept = append(kept, z)

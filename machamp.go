@@ -58,7 +58,8 @@ func (g *Game) machampAirSpeed(i int) float64 {
 // the tree jump and the flurry move it themselves, the smash holds it still; the Rock Tomb jump is steered like a walk).
 func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
-	p, other := &g.P[i], &g.P[1-i]
+	oi := g.nearestFoe(i) // what it runs at, aims at and closes in on is the nearest foe
+	p, other := &g.P[i], &g.P[oi]
 	ts, cp, rt := g.brawler(i).TreeSlam, g.brawler(i).CometPunch, g.brawler(i).RockTomb
 	mp, hk := g.brawler(i).MegatonPunch, g.brawler(i).HighJumpKick
 	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD, &p.KickCD} {
@@ -163,7 +164,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 			fx, fy = unit(float64(p.FX), float64(p.FY))
 		}
 		step := math.Min(dt, p.CometT)
-		adv := math.Min(cp.Distance/cp.Duration*step, math.Max(0, dist(p, other)-g.radius(i)-g.radius(1-i)))
+		adv := math.Min(cp.Distance/cp.Duration*step, math.Max(0, dist(p, other)-g.radius(i)-g.radius(oi)))
 		if p.BoundT > 0 || p.ParalyzeT > 0 { // pinned by a vine or paralyzed: the fists are thrown from where it stands
 			adv = 0
 		}
@@ -259,10 +260,10 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	return events, rooted
 }
 
-// kickStep flies the kick on one tick along the direction it was aimed: it stops at the opponent's body, which it hurts,
-// stuns and kicks away, or at the end of its distance.
+// kickStep flies the kick on one tick along the direction it was aimed: it stops at the first foe's body it meets, which it
+// hurts, stuns and kicks away, or at the end of its distance.
 func (g *Game) kickStep(i int, dt float64) []Event {
-	p, other, hk := &g.P[i], &g.P[1-i], g.brawler(i).HighJumpKick
+	p, hk := &g.P[i], g.brawler(i).HighJumpKick
 	s := math.Min(hk.KickSpeed*dt, hk.KickDistance-p.KickD)
 	if p.pinned() { // held on the spot: the leap runs its course but gets nowhere, and so touches nobody
 		p.KickD += s
@@ -274,17 +275,21 @@ func (g *Game) kickStep(i int, dt float64) []Event {
 		}
 		return nil
 	}
-	// The first moment, along the path, that the bodies (and the leg's `radius`) touch: where the circle round the opponent
-	// of that size meets the line.
-	R := g.radius(i) + g.radius(1-i) + hk.Radius
-	rx, ry := other.X-p.X, other.Y-p.Y
-	along, side := rx*p.KickX+ry*p.KickY, math.Abs(rx*p.KickY-ry*p.KickX)
-	hit := false
-	if hk.Reach.hits(other) && along > 0 && side <= R {
-		if c := along - math.Sqrt(R*R-side*side); c <= s {
-			s, hit = math.Max(c, 0), true
+	// The first moment, along the path, that the bodies (and the leg's `radius`) touch: where the circle round a foe
+	// of that size meets the line. Of the foes in the way, the nearest along the path is the one it meets.
+	var other *Player
+	for _, j := range g.foes(i) {
+		foe := &g.P[j]
+		R := g.radius(i) + g.radius(j) + hk.Radius
+		rx, ry := foe.X-p.X, foe.Y-p.Y
+		along, side := rx*p.KickX+ry*p.KickY, math.Abs(rx*p.KickY-ry*p.KickX)
+		if hk.Reach.hits(foe) && along > 0 && side <= R {
+			if c := along - math.Sqrt(R*R-side*side); c <= s {
+				s, other = math.Max(c, 0), foe
+			}
 		}
 	}
+	hit := other != nil
 	p.X = math.Min(math.Max(p.X+p.KickX*s, 0), g.court.Length)
 	p.Y = math.Min(math.Max(p.Y+p.KickY*s, 0), g.court.Width)
 	p.KickD += s
@@ -305,7 +310,7 @@ func (g *Game) kickStep(i int, dt float64) []Event {
 
 // megatonGather locks the direction of the punch on the opponent and starts the charge (a charge of zero throws it at once).
 func (g *Game) megatonGather(i int) []Event {
-	p, other, mp := &g.P[i], &g.P[1-i], g.brawler(i).MegatonPunch
+	p, other, mp := &g.P[i], &g.P[g.nearestFoe(i)], g.brawler(i).MegatonPunch
 	p.MegaX, p.MegaY = unit(other.X-p.X, other.Y-p.Y)
 	if p.MegaX == 0 && p.MegaY == 0 {
 		p.MegaX, p.MegaY = unit(float64(p.FX), float64(p.FY))
@@ -319,21 +324,29 @@ func (g *Game) megatonGather(i int) []Event {
 // megatonPunch throws the fist along the direction locked when the charge began: it hurts, stuns and knocks back the
 // opponent it touches, once.
 func (g *Game) megatonPunch(i int) []Event {
-	p, other, mp := &g.P[i], &g.P[1-i], g.brawler(i).MegatonPunch
+	p, mp := &g.P[i], g.brawler(i).MegatonPunch
 	ev := Event{T: "mega", S: i, X: p.X, Y: p.Y, R: mp.Distance, DX: p.MegaX, DY: p.MegaY}
-	hit := mp.Reach.hits(other) && segDist(other.X, other.Y, p.X, p.Y, p.X+p.MegaX*mp.Distance, p.Y+p.MegaY*mp.Distance) <= mp.Radius+g.radius(1-i)
-	// Ash is carried forward with the fist, and stops against the opponent's body when it is in the way.
+	var hits []int // every foe the fist touches
+	for _, j := range g.foes(i) {
+		if foe := &g.P[j]; mp.Reach.hits(foe) && segDist(foe.X, foe.Y, p.X, p.Y, p.X+p.MegaX*mp.Distance, p.Y+p.MegaY*mp.Distance) <= mp.Radius+g.radius(j) {
+			hits = append(hits, j)
+		}
+	}
+	// Ash is carried forward with the fist, and stops against the nearest body that is in the way.
 	adv := math.Min(mp.LungeDistance, mp.Distance)
 	if p.pinned() {
 		adv = 0 // held on the spot: the fist flies from where it stands
-	} else if hit {
-		adv = math.Min(adv, math.Max(0, dist(p, other)-g.radius(i)-g.radius(1-i)))
+	} else {
+		for _, j := range hits {
+			adv = math.Min(adv, math.Max(0, dist(p, &g.P[j])-g.radius(i)-g.radius(j)))
+		}
 	}
 	p.X = math.Min(math.Max(p.X+p.MegaX*adv, 0), g.court.Length)
 	p.Y = math.Min(math.Max(p.Y+p.MegaY*adv, 0), g.court.Width)
 	ev.L = adv
 	events := []Event{ev}
-	if hit {
+	for _, j := range hits {
+		other := &g.P[j]
 		g.hit(other, mp.Damage)
 		other.StunT = math.Max(other.StunT, mp.StunDuration)
 		g.knockBack(p.X, p.Y, other, mp.Knockback, p.MegaX, p.MegaY)
@@ -361,10 +374,12 @@ func (g *Game) advanceTree(i int) []Event {
 
 // smashTree brings the tree down toward where the opponent stood as it landed and hurts the opponent it lands on, once.
 func (g *Game) smashTree(i int) []Event {
-	p, other, ts := &g.P[i], &g.P[1-i], g.brawler(i).TreeSlam
-	if ts.Reach.hits(other) && treeHits(p.X, p.Y, p.TreeX, p.TreeY, other.X, other.Y, g.radius(1-i), ts.TrunkLength, ts.TrunkWidth, ts.LeafRadius, ts.LeafAngle) {
-		g.hit(other, ts.Damage)
-		other.StunT = math.Max(other.StunT, ts.StunDuration)
+	p, ts := &g.P[i], g.brawler(i).TreeSlam
+	for _, j := range g.foes(i) {
+		if other := &g.P[j]; ts.Reach.hits(other) && treeHits(p.X, p.Y, p.TreeX, p.TreeY, other.X, other.Y, g.radius(j), ts.TrunkLength, ts.TrunkWidth, ts.LeafRadius, ts.LeafAngle) {
+			g.hit(other, ts.Damage)
+			other.StunT = math.Max(other.StunT, ts.StunDuration)
+		}
 	}
 	return []Event{{T: "tree", X: p.X, Y: p.Y, R: ts.TrunkLength, DX: p.TreeX, DY: p.TreeY, K: p.Kind}}
 }

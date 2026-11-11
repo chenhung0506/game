@@ -17,7 +17,7 @@ type wave struct {
 	Owner int
 	X, Y  float64
 	R     float64
-	Hit   bool
+	Hit   [maxSlots]bool // which foes it has reached already
 }
 
 // evolve turns slot i's Magikarp into a Gyarados.
@@ -138,14 +138,17 @@ func (g *Game) stepGyarados(i int, in Input, dt float64) ([]Event, bool) {
 
 // whip is the tail whip landing: the fan fixed when it was started, knocking back and stunning the opponent in it.
 func (g *Game) whip(i int) []Event {
-	p, other := &g.P[i], &g.P[1-i]
+	p := &g.P[i]
 	tw := g.cfg.Gyarados.TailWhip
 	ux, uy := p.TailX, p.TailY
-	dx, dy := other.X-p.X, other.Y-p.Y
-	d := math.Hypot(dx, dy)
-	if tw.Reach.hits(other) && d <= tw.Length+g.radius(1-i) && (d < 1e-9 || (dx*ux+dy*uy)/d >= math.Cos(tw.Angle/2*math.Pi/180)) {
-		g.knockBack(p.X, p.Y, other, tw.Knockback, ux, uy)
-		other.StunT = math.Max(other.StunT, tw.StunDuration)
+	for _, j := range g.foes(i) {
+		other := &g.P[j]
+		dx, dy := other.X-p.X, other.Y-p.Y
+		d := math.Hypot(dx, dy)
+		if tw.Reach.hits(other) && d <= tw.Length+g.radius(j) && (d < 1e-9 || (dx*ux+dy*uy)/d >= math.Cos(tw.Angle/2*math.Pi/180)) {
+			g.knockBack(p.X, p.Y, other, tw.Knockback, ux, uy)
+			other.StunT = math.Max(other.StunT, tw.StunDuration)
+		}
 	}
 	return []Event{{T: "tail", X: p.X, Y: p.Y, R: tw.Length, DX: ux, DY: uy}}
 }
@@ -156,12 +159,13 @@ func (g *Game) stepWaves(dt float64) {
 	wv := g.cfg.Gyarados.Wave
 	kept := g.Waves[:0]
 	for _, w := range g.Waves {
-		foe := &g.P[1-w.Owner]
 		w.R = math.Min(w.R+wv.Speed*dt, wv.Radius)
-		if !w.Hit && math.Hypot(foe.X-w.X, foe.Y-w.Y)-g.radius(1-w.Owner) <= w.R {
-			w.Hit = true
-			if wv.Reach.hits(foe) {
-				g.hit(foe, wv.Damage)
+		for _, j := range g.foes(w.Owner) {
+			if foe := &g.P[j]; !w.Hit[j] && math.Hypot(foe.X-w.X, foe.Y-w.Y)-g.radius(j) <= w.R {
+				w.Hit[j] = true
+				if wv.Reach.hits(foe) {
+					g.hit(foe, wv.Damage)
+				}
 			}
 		}
 		if w.R < wv.Radius {
@@ -177,7 +181,7 @@ func (g *Game) castDir(i int, in Input) (float64, float64) {
 	if n := math.Hypot(in.CastX, in.CastY); n > 1e-9 && !math.IsInf(n, 0) {
 		return in.CastX / n, in.CastY / n
 	}
-	p, o := &g.P[i], &g.P[1-i]
+	p, o := &g.P[i], &g.P[g.nearestFoe(i)]
 	if n := math.Hypot(o.X-p.X, o.Y-p.Y); n > 1e-9 {
 		return (o.X - p.X) / n, (o.Y - p.Y) / n
 	}

@@ -33,7 +33,8 @@ func botCanPlay(kind int) bool {
 }
 
 type botSnap struct {
-	foe   Player
+	foe   Player   // the nearest foe, as the bot saw it
+	all   []Player // everyone, by slot: in a 2v2 the foe it goes for is chosen from these when it decides
 	balls []Ball
 }
 
@@ -104,7 +105,8 @@ func (b *Bot) observe(g *Game, me int) {
 		b.hist = append(b.hist, botSnap{})
 	}
 	s := &b.hist[len(b.hist)-1]
-	s.foe = g.P[1-me]
+	s.foe = g.P[g.nearestFoe(me)]
+	s.all = append(s.all[:0], g.P...)
 	s.balls = append(s.balls[:0], g.Balls...)
 }
 
@@ -114,6 +116,7 @@ type bctx struct {
 	g      *Game
 	b      *Bot
 	me     int
+	fs     int // the slot of f
 	p, f   *Player
 	balls  []Ball
 	pr, fr float64 // body radii
@@ -125,7 +128,16 @@ type bctx struct {
 
 func (b *Bot) look(g *Game, me int) *bctx {
 	old := &b.hist[0]
-	c := &bctx{g: g, b: b, me: me, p: &g.P[me], f: &old.foe, balls: old.balls}
+	fs := g.nearestFoe(me) // the foe it goes for, as it stood botReact ticks ago: the nearest to where the bot is now
+	if len(g.P) > 2 {
+		best := math.Inf(1)
+		for _, j := range g.foes(me) {
+			if d := math.Hypot(old.all[j].X-g.P[me].X, old.all[j].Y-g.P[me].Y); d < best {
+				fs, best = j, d
+			}
+		}
+	}
+	c := &bctx{g: g, b: b, me: me, fs: fs, p: &g.P[me], f: &old.all[fs], balls: old.balls}
 	c.pr, c.fr = g.cfg.radiusOf(c.p.Kind), g.cfg.radiusOf(c.f.Kind)
 	dx, dy := c.f.X-c.p.X, c.f.Y-c.p.Y
 	c.dist = math.Hypot(dx, dy)
@@ -135,10 +147,20 @@ func (b *Bot) look(g *Game, me int) *bctx {
 		c.ux = float64(c.p.FX)
 	}
 	if len(b.hist) > 1 {
-		n := &b.hist[1].foe // the tick after the one it is looking at
+		n := &b.hist[1].all[fs] // the tick after the one it is looking at
 		c.vx, c.vy = (n.X-c.f.X)/dtBot, (n.Y-c.f.Y)/dtBot
 	}
 	c.th = c.findThreat()
+	for _, j := range g.foes(me) { // every foe's attack counts as a threat, not only the one it goes for
+		if j == fs {
+			continue
+		}
+		cc := *c
+		cc.f, cc.fr = &old.all[j], g.cfg.radiusOf(old.all[j].Kind)
+		if t := cc.findThreat(); t.eta < c.th.eta {
+			c.th = t
+		}
+	}
 	return c
 }
 
@@ -323,7 +345,7 @@ func (c *bctx) findThreat() threat {
 	}
 
 	for _, z := range g.Fires { // burning ground: it burns whoever stands in it every half second, so get out of it
-		if z.Owner != c.me && p.Z <= cfg.Charizard.SeismicToss.FireMaxHeight && math.Hypot(p.X-z.X, p.Y-z.Y) <= z.R+c.pr+10 {
+		if g.side(z.Owner) != g.side(c.me) && p.Z <= cfg.Charizard.SeismicToss.FireMaxHeight && math.Hypot(p.X-z.X, p.Y-z.Y) <= z.R+c.pr+10 {
 			zz := z
 			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-zz.X, y-zz.Y) <= zz.R+c.pr+10 })
 			consider(threat{thFire, 0.2, ax, ay})
@@ -358,7 +380,7 @@ func (c *bctx) findThreat() threat {
 func (c *bctx) flames() []*Ball {
 	var fl []*Ball
 	for i := range c.balls {
-		if bl := &c.balls[i]; bl.K == ballGhost && bl.Owner != c.me && bl.HP > 0 && !bl.Hit {
+		if bl := &c.balls[i]; bl.K == ballGhost && c.g.side(bl.Owner) != c.g.side(c.me) && bl.HP > 0 && !bl.Hit {
 			fl = append(fl, bl)
 		}
 	}
@@ -452,7 +474,7 @@ func (c *bctx) hazards() []hazard {
 	}
 	for i := range c.balls {
 		bl := &c.balls[i]
-		if bl.Owner == c.me || bl.Wait || bl.HP <= 0 {
+		if c.g.side(bl.Owner) == c.g.side(c.me) || bl.Wait || bl.HP <= 0 {
 			continue
 		}
 		switch bl.K {
@@ -934,7 +956,7 @@ func (b *Bot) charizard(c *bctx) Input {
 	if th.kind != thNone && th.eta <= botHorizon {
 		in = c.move(th.ax, th.ay)
 	} else {
-		tossRange := ts.Length + g.radius(1-c.me) - 30
+		tossRange := ts.Length + g.radius(c.fs) - 30
 		tx, ty := -c.uy*b.strafe, c.ux*b.strafe
 		switch {
 		case p.TossCD == 0 && ts.Reach.hits(f) && c.dist <= tossRange && !danger && (c.rootedFor() > 0.3 || b.rng.Float64() < 0.6):

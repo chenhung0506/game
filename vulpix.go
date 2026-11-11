@@ -24,7 +24,7 @@ const (
 // beam hurts nobody, and an ice pillar rises wherever its end passes (not on top of another of Vulpix's).
 func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 	var events []Event
-	p, other := &g.P[i], &g.P[1-i]
+	p, other := &g.P[i], &g.P[g.nearestFoe(i)] // other: the foe its storm follows
 	fs, is, fb := g.cfg.Vulpix.FrostField, g.cfg.Vulpix.IceStorm, g.cfg.Vulpix.FreezeBeam
 	for _, cd := range []*float64{&p.FrostCD, &p.StormCD, &p.FBeamCD} {
 		if *cd > 0 {
@@ -60,9 +60,11 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 				p.FrostY += (p.Y - p.FrostY) / d * fs.Radius
 				g.layFrost(i, p.FrostX, p.FrostY)
 			}
-			touched := fs.Reach.hits(other) && segDist(other.X, other.Y, x0, y0, p.X, p.Y) <= fs.Radius+g.radius(1-i)
+			foe, touched := g.touchedFoe(i, func(f *Player, rad float64) bool {
+				return fs.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, p.X, p.Y) <= fs.Radius+rad
+			})
 			if touched {
-				g.hit(other, fs.ContactDamage)
+				g.hit(foe, fs.ContactDamage)
 			}
 			if p.FrostT -= step; touched || p.FrostT < 1e-9 {
 				p.FrostT = 0
@@ -70,8 +72,10 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 				if fs.ExplosionRadius > 0 { // the blast leaves a patch of frost as wide as itself
 					g.layFrostOf(i, p.X, p.Y, fs.ExplosionRadius)
 				}
-				if fs.Reach.hits(other) && math.Hypot(other.X-p.X, other.Y-p.Y) <= fs.ExplosionRadius+g.radius(1-i) {
-					g.hit(other, fs.ExplosionDamage)
+				for _, j := range g.foes(i) {
+					if f := &g.P[j]; fs.Reach.hits(f) && math.Hypot(f.X-p.X, f.Y-p.Y) <= fs.ExplosionRadius+g.radius(j) {
+						g.hit(f, fs.ExplosionDamage)
+					}
 				}
 			}
 		}
@@ -93,15 +97,17 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 		for p.StormLeft > 0 && p.StormIn < 1e-9 { // a loop so a tiny interval cannot lose strikes
 			events = append(events, Event{T: "storm", X: p.StormX, Y: p.StormY, R: is.Radius})
 			for j := range g.Balls { // the storm wears down the other player's projectiles (and pillars) caught in it, whether or not it hits a body
-				if b := &g.Balls[j]; b.Owner != i && math.Hypot(b.X-p.StormX, b.Y-p.StormY) <= is.Radius+g.ballRadius(b) {
+				if b := &g.Balls[j]; g.side(b.Owner) != g.side(i) && math.Hypot(b.X-p.StormX, b.Y-p.StormY) <= is.Radius+g.ballRadius(b) {
 					b.HP -= is.Damage
 				}
 			}
-			if is.Reach.hits(other) && math.Hypot(other.X-p.StormX, other.Y-p.StormY) <= is.Radius+g.radius(1-i) {
-				g.hit(other, is.Damage)
-				if p.StormHits++; p.StormHits%is.FreezeHits == 0 {
-					other.FrozenT = math.Max(other.FrozenT, is.FreezeDuration)
-					events = append(events, Event{T: "freeze", X: other.X, Y: other.Y})
+			for _, j := range g.foes(i) {
+				if foe := &g.P[j]; is.Reach.hits(foe) && math.Hypot(foe.X-p.StormX, foe.Y-p.StormY) <= is.Radius+g.radius(j) {
+					g.hit(foe, is.Damage)
+					if p.StormHits++; p.StormHits%is.FreezeHits == 0 {
+						foe.FrozenT = math.Max(foe.FrozenT, is.FreezeDuration)
+						events = append(events, Event{T: "freeze", X: foe.X, Y: foe.Y})
+					}
 				}
 			}
 			p.StormLeft--
@@ -177,7 +183,7 @@ func (g *Game) frostFactor(i int) float64 {
 			w = f.R
 		}
 		if math.Hypot(p.X-f.X, p.Y-f.Y) <= w {
-			own, foe = own || f.Owner == i, foe || f.Owner != i
+			own, foe = own || g.side(f.Owner) == g.side(i), foe || g.side(f.Owner) != g.side(i)
 		}
 	}
 	v := 1.0
@@ -223,7 +229,7 @@ func (g *Game) blockByPillars(i int) {
 	for pass := 0; pass < 2; pass++ {
 		for j := range g.Balls {
 			b := &g.Balls[j]
-			if !solid(b.K) || b.Owner == i || b.HP <= 0 || b.Z > 0 { // one in the air (a tornado has it) blocks nothing
+			if !solid(b.K) || g.side(b.Owner) == g.side(i) || b.HP <= 0 || b.Z > 0 { // one in the air (a tornado has it) blocks nothing
 				continue
 			}
 			reach, r := fb.Reach, fb.PillarRadius

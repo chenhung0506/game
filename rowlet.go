@@ -33,7 +33,7 @@ func rotate(x, y, a float64) (float64, float64) {
 // projectile that chases the opponent (see stepBalls) and carries it up (see stepTwirl).
 func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
-	p, other := &g.P[i], &g.P[1-i]
+	p, other := &g.P[i], &g.P[g.nearestFoe(i)] // other: the foe it aims at and curves towards
 	rw := g.cfg.Rowlet
 	dr, ar, tn := rw.Tailwind, rw.Arrows, rw.Tornado
 	for _, cd := range []*float64{&p.DriftCD, &p.ArrowCD, &p.TwistCD} {
@@ -137,10 +137,11 @@ func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 	return events, rooted
 }
 
-// caughtBy is the tornado of slot owner that holds the other player, if any.
-func (g *Game) caughtBy(owner int) *Ball {
+// holding is the tornado that holds slot v, if any: one that caught it, or one that is recorded as holding nobody in
+// particular and belongs to the other side.
+func (g *Game) holding(v int) *Ball {
 	for j := range g.Balls {
-		if b := &g.Balls[j]; b.K == ballTornado && b.Caught && b.Owner == owner && b.HP > 0 {
+		if b := &g.Balls[j]; b.K == ballTornado && b.Caught && b.HP > 0 && (b.Prey == v+1 || (b.Prey == 0 && g.side(b.Owner) != g.side(v))) {
 			return b
 		}
 	}
@@ -157,7 +158,7 @@ func (g *Game) stepTwirl(dt float64) []Event {
 	for v := range g.P {
 		p := &g.P[v]
 		if p.Twirl == twirlSpin {
-			if b := g.caughtBy(1 - v); b != nil {
+			if b := g.holding(v); b != nil {
 				p.X, p.Y = b.X, b.Y
 				p.Z = tn.LiftHeight * math.Min(1, (tn.SpinDuration-b.Life)/(tn.SpinDuration/2))
 				for p.TwirlIn -= dt; p.TwirlIn < 1e-9; p.TwirlIn += tn.SpinInterval { // a loop so a tiny interval cannot lose ticks
@@ -193,7 +194,7 @@ func (g *Game) grindPillars(dt float64) {
 		var held *Ball
 		for i := range g.Balls {
 			t := &g.Balls[i]
-			if t.K != ballTornado || t.HP <= 0 || t.Owner == p.Owner {
+			if t.K != ballTornado || t.HP <= 0 || g.side(t.Owner) == g.side(p.Owner) {
 				continue
 			}
 			tx, ty := t.X, t.Y

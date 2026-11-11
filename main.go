@@ -614,7 +614,7 @@ func (r *room) step(now time.Time) []byte {
 	}
 	msg, _ := json.Marshal(struct {
 		T  string       `json:"t"`
-		P  [2]Player    `json:"p"`
+		P  []Player     `json:"p"`
 		E  []Event      `json:"e,omitempty"`
 		B  []Ball       `json:"b,omitempty"`
 		F  []Frost      `json:"f,omitempty"`

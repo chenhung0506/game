@@ -25,18 +25,18 @@ const silenceLinger = 0.15
 // one ball share Hurt, so however many of them touch the opponent it is hurt once. Gengar's own Ghost Fire flames are
 // projectiles in Game.Balls instead (ballGhost).
 type ghostFire struct {
-	Owner int     `json:"o"`
-	X     float64 `json:"x"`
-	Y     float64 `json:"y"`
-	DX    float64 `json:"-"`
-	DY    float64 `json:"-"`
-	Dist  float64 `json:"-"` // how far it has flown out
-	Max   float64 `json:"-"` // how far out it goes
-	Speed float64 `json:"-"`
-	R     float64 `json:"-"`
-	Dmg   int     `json:"-"`
-	Reach Reach   `json:"-"`
-	Hurt  *bool   `json:"-"` // set once any flame of its ball has hurt the opponent
+	Owner int             `json:"o"`
+	X     float64         `json:"x"`
+	Y     float64         `json:"y"`
+	DX    float64         `json:"-"`
+	DY    float64         `json:"-"`
+	Dist  float64         `json:"-"` // how far it has flown out
+	Max   float64         `json:"-"` // how far out it goes
+	Speed float64         `json:"-"`
+	R     float64         `json:"-"`
+	Dmg   int             `json:"-"`
+	Reach Reach           `json:"-"`
+	Hurt  *[maxSlots]bool `json:"-"` // which foes a flame of its ball has hurt already: each is hurt once
 }
 
 // shadowBall is a Shadow Ball in the air.
@@ -85,7 +85,7 @@ func (g *Game) sneakSpeed(p *Player) float64 {
 
 // stepGengar runs Gengar's three skills. It says whether Gengar is rooted (charging a Shadow Ball).
 func (g *Game) stepGengar(i int, in Input, dt float64) ([]Event, bool) {
-	p, other := &g.P[i], &g.P[1-i]
+	p, other := &g.P[i], &g.P[g.nearestFoe(i)] // other: the foe it aims at
 	gs := g.cfg.Gengar
 	ss, gf, sb, ns := gs.ShadowSneak, gs.GhostFire, gs.ShadowBall, gs.NightShade
 	for _, cd := range []*float64{&p.SneakCD, &p.GFireCD, &p.SBallCD, &p.ShadeCD} {
@@ -121,8 +121,10 @@ func (g *Game) stepGengar(i int, in Input, dt float64) ([]Event, bool) {
 			p.SneakT, p.Z = 0, 0
 			return nil, false // up again: no skill on the tick it comes up
 		}
-		if ss.Reach.hits(other) && math.Hypot(other.X-p.X, other.Y-p.Y) <= ss.ShadowRadius+g.radius(1-i) {
-			other.SilentT = silenceLinger
+		for _, j := range g.foes(i) {
+			if foe := &g.P[j]; ss.Reach.hits(foe) && math.Hypot(foe.X-p.X, foe.Y-p.Y) <= ss.ShadowRadius+g.radius(j) {
+				foe.SilentT = silenceLinger
+			}
 		}
 		return nil, false
 	}
@@ -186,10 +188,12 @@ func (g *Game) launchShadowBall(i int) {
 // shadowBlast is what a charged Shadow Ball does where it bursts: the blast hurts the opponent in its reach once, and then drags it
 // toward its middle for `pull_duration` seconds (see stepWells).
 func (g *Game) shadowBlast(owner int, x, y float64) []Event {
-	sb, foe := g.cfg.Gengar.ShadowBall, &g.P[1-owner]
+	sb := g.cfg.Gengar.ShadowBall
 	events := []Event{{T: "gslam", X: x, Y: y, R: sb.SlamRadius}}
-	if sb.Reach.hits(foe) && math.Hypot(foe.X-x, foe.Y-y) <= sb.SlamRadius+g.radius(1-owner) {
-		g.hit(foe, sb.Damage)
+	for _, j := range g.foes(owner) {
+		if foe := &g.P[j]; sb.Reach.hits(foe) && math.Hypot(foe.X-x, foe.Y-y) <= sb.SlamRadius+g.radius(j) {
+			g.hit(foe, sb.Damage)
+		}
 	}
 	if sb.PullDuration > 0 && sb.Gravity > 0 {
 		g.Wells = append(g.Wells, pullWell{Owner: owner, X: x, Y: y, T: sb.PullDuration})
@@ -200,12 +204,14 @@ func (g *Game) shadowBlast(owner int, x, y float64) []Event {
 
 // nightShadeBlast is what a lobbed ball does where it comes down: the blast hurts, then the flames fly out of it.
 func (g *Game) nightShadeBlast(owner int, x, y float64) []Event {
-	ns, foe := g.cfg.Gengar.NightShade, &g.P[1-owner]
+	ns := g.cfg.Gengar.NightShade
 	events := []Event{{T: "gslam", X: x, Y: y, R: ns.SlamRadius}}
-	if ns.Reach.hits(foe) && math.Hypot(foe.X-x, foe.Y-y) <= ns.SlamRadius+g.radius(1-owner) {
-		g.hit(foe, ns.Damage)
+	for _, j := range g.foes(owner) {
+		if foe := &g.P[j]; ns.Reach.hits(foe) && math.Hypot(foe.X-x, foe.Y-y) <= ns.SlamRadius+g.radius(j) {
+			g.hit(foe, ns.Damage)
+		}
 	}
-	hurt := new(bool)
+	hurt := new([maxSlots]bool)
 	for n := 0; n < ns.GhostFireCount; n++ {
 		a := 2 * math.Pi * float64(n) / float64(ns.GhostFireCount)
 		ux, uy := math.Cos(a), math.Sin(a)
@@ -222,10 +228,12 @@ func (g *Game) stepWells(dt float64) {
 	sb := g.cfg.Gengar.ShadowBall
 	kept := g.Wells[:0]
 	for _, w := range g.Wells {
-		foe := &g.P[1-w.Owner]
-		if d := math.Hypot(w.X-foe.X, w.Y-foe.Y); foe.Kind != dummy && !foe.Held && sb.Reach.hits(foe) && d > 1e-9 && d <= sb.SlamRadius+g.radius(1-w.Owner) {
-			step := math.Min(sb.Gravity*dt, d)
-			foe.X, foe.Y = foe.X+(w.X-foe.X)/d*step, foe.Y+(w.Y-foe.Y)/d*step
+		for _, j := range g.foes(w.Owner) {
+			foe := &g.P[j]
+			if d := math.Hypot(w.X-foe.X, w.Y-foe.Y); foe.Kind != dummy && !foe.Held && sb.Reach.hits(foe) && d > 1e-9 && d <= sb.SlamRadius+g.radius(j) {
+				step := math.Min(sb.Gravity*dt, d)
+				foe.X, foe.Y = foe.X+(w.X-foe.X)/d*step, foe.Y+(w.Y-foe.Y)/d*step
+			}
 		}
 		if w.T -= dt; w.T > 1e-9 {
 			kept = append(kept, w)
@@ -245,13 +253,14 @@ func (g *Game) addGhost(f ghostFire) {
 func (g *Game) stepGhosts(dt float64) {
 	kept := g.Ghosts[:0]
 	for _, f := range g.Ghosts {
-		foe := &g.P[1-f.Owner]
 		x0, y0 := f.X, f.Y
 		step := math.Min(f.Speed*dt, f.Max-f.Dist)
 		f.X, f.Y, f.Dist = f.X+f.DX*step, f.Y+f.DY*step, f.Dist+step
-		if !*f.Hurt && f.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, f.X, f.Y) <= f.R+g.radius(1-f.Owner) {
-			*f.Hurt = true
-			g.hit(foe, f.Dmg)
+		for _, j := range g.foes(f.Owner) { // each foe is hurt once by a burst's flames
+			if foe := &g.P[j]; !f.Hurt[j] && f.Reach.hits(foe) && segDist(foe.X, foe.Y, x0, y0, f.X, f.Y) <= f.R+g.radius(j) {
+				f.Hurt[j] = true
+				g.hit(foe, f.Dmg)
+			}
 		}
 		if f.Dist < f.Max-1e-9 { // the last step still gets to hit
 			kept = append(kept, f)
