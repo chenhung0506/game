@@ -342,13 +342,13 @@ function showPick() {
     ord.textContent = n + 1;
   });
   const amt = soloMode ? bonus : ease[me]; // the slider: the handicap, or in a 1v2 the extra HP
-  easeEl.max = soloMode ? 100 : 90;
+  easeEl.max = soloMode ? 300 : 90;
   document.getElementById('easelabel').textContent = soloMode ? '增加血量' : '放水';
   if (document.activeElement !== easeEl) { easeEl.value = amt; document.getElementById('easeval').textContent = amt + '%'; }
   document.getElementById('easeBtn').textContent = `${soloMode ? '增加血量 +' : '放水 '}${amt}%${easeOpen ? ' ▲' : ' ▼'}`;
   document.getElementById('easeBtn').classList.toggle('on', amt > 0);
   document.getElementById('easebox').style.display = easeOpen ? 'block' : 'none';
-  document.getElementById('easemsg').textContent = (soloMode ? `你的血量增加 ${amt}%（最高 100%）` : `你的血量和移動速度減少 ${amt}%`) + (!soloMode && ease[1 - me] ? `　對手放水 ${ease[1 - me]}%` : '') + '（開打前設定）';
+  document.getElementById('easemsg').textContent = (soloMode ? `你的血量增加 ${amt}%（最高 300%）` : `你的血量和移動速度減少 ${amt}%`) + (!soloMode && ease[1 - me] ? `　對手放水 ${ease[1 - me]}%` : '') + '（開打前設定）';
   for (const b of document.querySelectorAll('#playmodes button')) b.classList.toggle('on', b.dataset.play === PLAY);
   document.getElementById('tools').style.display = squadMode && !soloMode ? 'none' : ''; // a 2v2 has no computer to pick and no handicap; a 1v2 has the extra-HP slider
   document.getElementById('modes').style.display = PLAY === 'player' && !squadMode ? '' : 'none'; // single or team match is for people; the computer and the dummy are single bouts // no team match against a dummy

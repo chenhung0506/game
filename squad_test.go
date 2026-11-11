@@ -244,13 +244,13 @@ func TestTheExtraHPOfASoloSquadRaisesOnlyItsPersonsHPAndTheSnapshotSaysTheFullHP
 func TestTheExtraHPIsRefusedUnlessItIsASoloSquadBetweenMatchesAndAValidStep(t *testing.T) {
 	cfg := DefaultConfig()
 	solo := &squad{g: NewTeamGame(cfg, modeWeb, 4), solo: true, pick: [2]int{-1, -1}}
-	for _, bad := range []int{-10, 110, 15, 101} {
+	for _, bad := range []int{-10, 310, 15, 301} {
 		if solo.setBonus(bad) {
 			t.Errorf("a bonus of %d%% was accepted", bad)
 		}
 	}
-	if !solo.setBonus(100) || solo.bonus != 100 {
-		t.Fatal("100% is the most and must be accepted")
+	if !solo.setBonus(300) || solo.bonus != 300 {
+		t.Fatal("300% is the most and must be accepted")
 	}
 	solo.c[0], solo.pick[0] = &client{send: make(chan []byte, 1)}, pikachu
 	if solo.setBonus(0) {

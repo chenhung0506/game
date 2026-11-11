@@ -401,7 +401,7 @@ type Game struct {
 }
 
 const (
-	boostMax = 100 // a solo squad's HP bonus goes up to doubling it
+	boostMax = 300 // a solo squad's HP bonus goes up to quadrupling it
 	easeStep = 10
 	easeMax  = 90 // 100 would leave nothing to fight with
 )
