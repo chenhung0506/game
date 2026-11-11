@@ -395,9 +395,13 @@ type Game struct {
 	// Ease is each player's handicap in percent (a multiple of easeStep, at most easeMax): its HP and its
 	// walking speed are cut by that much. It survives Reset. Only slots 0 and 1 have one; a teammate has none.
 	Ease [2]int
+	// Boost is extra HP in percent of a character's own (at most boostMax), chosen in the lobby of a solo squad for the one person; it
+	// survives Reset like Ease.
+	Boost [maxSlots]int
 }
 
 const (
+	boostMax = 100 // a solo squad's HP bonus goes up to doubling it
 	easeStep = 10
 	easeMax  = 90 // 100 would leave nothing to fight with
 )
@@ -406,7 +410,9 @@ const (
 func validEase(pct int) bool { return pct >= 0 && pct <= easeMax && pct%easeStep == 0 }
 
 // maxHP is slot i's full HP, handicap included (at least 1).
-func (g *Game) maxHP(i int) int { return max(1, g.cfg.maxHPOf(g.P[i].Kind)*(100-g.ease(i))/100) }
+func (g *Game) maxHP(i int) int {
+	return max(1, g.cfg.maxHPOf(g.P[i].Kind)*(100-g.ease(i)+g.Boost[i])/100)
+}
 
 // ease is slot i's handicap in percent.
 func (g *Game) ease(i int) int {

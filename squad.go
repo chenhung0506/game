@@ -27,24 +27,39 @@ type squad struct {
 	overAt  time.Time // zero while a match is in progress
 	winner  int
 	aloneAt time.Time // since when one person has been in it alone
+	bonus   int       // a solo squad's extra HP for its person, in percent (0 to boostMax, a multiple of easeStep)
+	solo    bool      // one person alone against the two computers ("1v2"): slot 2 stays empty (fallen from the start) and nobody else joins
 }
 
 // slotOf is the game slot of the squad's person h (0 or 1), and foeSlot that of its computer f.
 func squadSlot(h int) int { return 2 * h }
 func foeSlot(f int) int   { return 2*f + 1 }
 
-func (s *squad) alone() bool { return (s.c[0] == nil) != (s.c[1] == nil) }
+func (s *squad) alone() bool { return !s.solo && (s.c[0] == nil) != (s.c[1] == nil) }
 func (s *squad) playing() bool {
+	if s.solo {
+		return s.c[0] != nil && s.pick[0] >= 0
+	}
 	return s.c[0] != nil && s.c[1] != nil && s.pick[0] >= 0 && s.pick[1] >= 0
 }
 
+// reset starts the match over with the same characters; in a solo squad the empty slot is down from the start and the person
+// stands in the middle.
+func (s *squad) reset() {
+	s.g.Reset()
+	if s.solo {
+		s.g.P[2].HP = 0
+		s.g.P[0].Y = s.g.court.Width / 2
+	}
+}
+
 // openSquad makes a squad room with c as its first person. Must be called with h.mu held; nil when there are too many rooms.
-func (h *hub) openSquad(mode string, c *client) (*squad, int, bool) {
+func (h *hub) openSquad(mode string, c *client, solo bool) (*squad, int, bool) {
 	if len(h.rooms)+len(h.squads) >= maxRooms {
 		return nil, 0, false
 	}
 	h.seq++
-	s := &squad{id: "q" + strconv.Itoa(h.seq), n: h.seq, mode: mode, g: NewTeamGame(h.cfg, mode, 4), winner: -1, pick: [2]int{-1, -1}, aloneAt: time.Now()}
+	s := &squad{id: "q" + strconv.Itoa(h.seq), n: h.seq, mode: mode, g: NewTeamGame(h.cfg, mode, 4), winner: -1, pick: [2]int{-1, -1}, aloneAt: time.Now(), solo: solo}
 	s.c[0] = c
 	h.squads[s.id] = s
 	return s, 0, true
@@ -102,6 +117,16 @@ func (s *squad) choose(idx, kind int) bool {
 	return true
 }
 
+// setBonus records the extra HP percent of a solo squad's person, which counts from the next match. It is refused in any other squad,
+// while a match is on, and unless it is a multiple of easeStep up to boostMax. Must be called with s.mu held.
+func (s *squad) setBonus(pct int) bool {
+	if !s.solo || s.playing() || pct < 0 || pct > boostMax || pct%easeStep != 0 {
+		return false
+	}
+	s.bonus = pct
+	return true
+}
+
 // repick sends both people back to the lobby once the result of a match is showing. Must be called with s.mu held.
 func (s *squad) repick() bool {
 	if s.overAt.IsZero() {
@@ -120,9 +145,13 @@ func (s *squad) startIfReady() {
 	for f := range s.foes {
 		s.foes[f] = newBot(botKinds[rand.IntN(len(botKinds))], uint64(time.Now().UnixNano())+uint64(f))
 	}
-	s.g.P[0].Kind, s.g.P[2].Kind = s.pick[0], s.pick[1]
+	s.g.P[0].Kind, s.g.P[2].Kind = s.pick[0], pikachu // the empty slot of a solo squad never fights, but it needs a kind that exists
+	if !s.solo {
+		s.g.P[2].Kind = s.pick[1]
+	}
 	s.g.P[1].Kind, s.g.P[3].Kind = s.foes[0].kind, s.foes[1].kind
-	s.g.Reset()
+	s.g.Boost[0] = s.bonus
+	s.reset()
 	s.overAt, s.winner = time.Time{}, -1
 	if !s.running {
 		s.running = true
@@ -141,7 +170,7 @@ func (s *squad) broadcastLobby() {
 			}
 		}
 	}
-	msg, _ := json.Marshal(map[string]any{"t": "lobby", "squad": true, "picks": s.pick, "here": [2]bool{s.c[0] != nil, s.c[1] != nil}, "foes": foes})
+	msg, _ := json.Marshal(map[string]any{"t": "lobby", "squad": true, "solo": s.solo, "bonus": s.bonus, "on": s.playing(), "picks": s.pick, "here": [2]bool{s.c[0] != nil, s.c[1] != nil}, "foes": foes})
 	s.broadcast(msg)
 }
 
@@ -187,13 +216,17 @@ func (s *squad) step(now time.Time) []byte {
 			s.overAt, s.winner = now, w
 		}
 	} else if now.Sub(s.overAt) > resultHold { // the same characters play again
-		s.g.Reset()
+		s.reset()
 		for _, b := range s.foes {
 			if b != nil {
 				b.reset()
 			}
 		}
 		s.overAt, s.winner = time.Time{}, -1
+	}
+	mx := make([]int, len(s.g.P))
+	for i := range mx {
+		mx[i] = s.g.maxHP(i)
 	}
 	msg, _ := json.Marshal(struct {
 		T  string       `json:"t"`
@@ -206,7 +239,8 @@ func (s *squad) step(now time.Time) []byte {
 		SB []shadowBall `json:"sb,omitempty"`
 		W  int          `json:"w"`
 		EZ [2]int       `json:"ez"`
-	}{"s", s.g.P, events, s.g.Balls, s.g.Frost, s.g.Fires, s.g.Ghosts, s.g.Shadows, s.winner, s.g.Ease})
+		MX []int        `json:"mx"` // each slot's full HP, which the page draws the bars against
+	}{"s", s.g.P, events, s.g.Balls, s.g.Frost, s.g.Fires, s.g.Ghosts, s.g.Shadows, s.winner, s.g.Ease, mx})
 	return msg
 }
 
@@ -228,6 +262,7 @@ func (h *hub) serveSquad(c *client, conn *websocket.Conn) {
 		c.touch()
 		var m struct {
 			Pick   *int `json:"pick"`
+			Bonus  *int `json:"bonus"`
 			Repick bool `json:"repick"`
 			Input
 		}
@@ -235,10 +270,13 @@ func (h *hub) serveSquad(c *client, conn *websocket.Conn) {
 			continue
 		}
 		s.mu.Lock()
-		if m.Pick != nil || m.Repick {
-			if m.Pick != nil {
+		if m.Pick != nil || m.Bonus != nil || m.Repick {
+			switch {
+			case m.Pick != nil:
 				s.choose(idx, *m.Pick)
-			} else {
+			case m.Bonus != nil:
+				s.setBonus(*m.Bonus)
+			default:
 				s.repick()
 			}
 			s.broadcastLobby() // also when refused, so the page learns what is taken

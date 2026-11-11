@@ -263,11 +263,20 @@ const (
 	playComputer = "computer"
 	playPlayer   = "player"
 	playDummy    = "dummy"
+	playVs2      = "vs2"   // 1v2: the person alone against two computers, in a squad room nobody else joins
 	playSquad    = "squad" // a 2v2 room: the person opens it, a second person joins from the menu, and two computers are the other side
 )
 
 // seatFor is seat for a way of playing.
 func (h *hub) seatFor(c *client, mode string, menu bool, play string) (r *room, idx int, ok bool) {
+	if play == playVs2 {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		if c.squad, c.squadIdx, ok = h.openSquad(mode, c, true); !ok {
+			return nil, 0, false
+		}
+		return nil, 0, true
+	}
 	if play == playSquad { // the connection is a squad's: c.squad says which, and there is no duel room
 		for {
 			var list []roomInfo // the squads waiting for a second person, when the page asked for the menu
@@ -307,7 +316,7 @@ func (h *hub) seatFor(c *client, mode string, menu bool, play string) (r *room, 
 				}
 			}
 			h.mu.Lock()
-			c.squad, c.squadIdx, ok = h.openSquad(mode, c)
+			c.squad, c.squadIdx, ok = h.openSquad(mode, c, false)
 			h.mu.Unlock()
 			return nil, 0, ok
 		}
@@ -783,7 +792,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		return conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
 	play := req.URL.Query().Get("play")
-	if play != playComputer && play != playDummy && play != playSquad {
+	if play != playComputer && play != playDummy && play != playSquad && play != playVs2 {
 		play = playPlayer // a page that says nothing gets what every page used to: the menu, else whoever is waiting (the page itself asks for the computer unless told otherwise)
 	}
 	r, idx, ok := h.seatFor(c, mode, req.URL.Query().Get("menu") == "1", play)

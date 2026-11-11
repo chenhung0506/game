@@ -158,3 +158,119 @@ func TestA2v2ConnectionWithoutTheMenuOpensItsOwnSquadEvenWhenOthersWait(t *testi
 		t.Fatalf("slot %v, want its own squad's slot 0", got)
 	}
 }
+
+// ---- 1v2: one person against the two computers ----
+
+func TestAPersonAloneAgainstTwoComputersStartsAsSoonAsTheyPickAndSlotTwoIsEmpty(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	c := dialWith(t, srv, "play=vs2&mode=web")
+	if got := next(t, c, "hi")["you"]; got != float64(0) {
+		t.Fatalf("slot %v, want 0", got)
+	}
+	pick(t, c, pikachu)
+	ps := next(t, c, "s")["p"].([]any)
+	if len(ps) != 4 {
+		t.Fatalf("%d fighters, want 4 slots", len(ps))
+	}
+	hp := func(i int) float64 { return ps[i].(map[string]any)["hp"].(float64) }
+	if hp(2) != 0 {
+		t.Fatalf("the empty slot has %v HP, want it down from the start", hp(2))
+	}
+	if hp(0) <= 0 || hp(1) <= 0 || hp(3) <= 0 {
+		t.Fatalf("the person and both computers must be standing: %v %v %v", hp(0), hp(1), hp(3))
+	}
+}
+
+func TestASoloSquadIsNeverListedAndNobodyJoinsIt(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	c := dialWith(t, srv, "play=vs2&mode=web")
+	next(t, c, "hi")
+	other := dialWith(t, srv, "menu=1&mode=web") // looks for someone: the solo squad is not offered
+	if got := next(t, other, "hi")["you"]; got != float64(0) {
+		t.Fatalf("a duel player was put in slot %v of the solo squad", got)
+	}
+}
+
+func TestASoloSquadMatchIsWonByTheComputersWhenThePersonFallsAndPlaysAgain(t *testing.T) {
+	cfg := DefaultConfig()
+	h := newHub(cfg)
+	s := &squad{id: "q1", g: NewTeamGame(cfg, modeWeb, 4), winner: -1, pick: [2]int{pikachu, -1}, solo: true}
+	s.c[0] = &client{send: make(chan []byte, 8)}
+	s.foes = [2]*Bot{newBot(snorlax, 1), newBot(snorlax, 2)}
+	h.squads[s.id] = s
+	if !s.playing() {
+		t.Fatal("one person who has picked should be playing")
+	}
+	s.reset()
+	if s.g.Winner() != -1 {
+		t.Fatalf("a fresh solo match has a winner (%d)", s.g.Winner())
+	}
+	s.g.P[0].HP = 0
+	if s.g.Winner() != 1 {
+		t.Fatalf("with the person down the computers' side wins, got %d", s.g.Winner())
+	}
+}
+
+// ---- 1v2: the extra-HP slider ----
+
+func TestTheExtraHPOfASoloSquadRaisesOnlyItsPersonsHPAndTheSnapshotSaysTheFullHP(t *testing.T) {
+	srv := httptest.NewServer(newMux(DefaultConfig()))
+	defer srv.Close()
+	c := dialWith(t, srv, "play=vs2&mode=web")
+	next(t, c, "hi")
+	if err := c.WriteMessage(websocket.TextMessage, []byte(`{"bonus":50}`)); err != nil {
+		t.Fatal(err)
+	}
+	for { // the first lobby message is the greeting's; the one that follows carries the bonus
+		if next(t, c, "lobby")["bonus"] == float64(50) {
+			break
+		}
+	}
+	pick(t, c, pikachu)
+	s := next(t, c, "s")
+	ps, mx := s["p"].([]any), s["mx"].([]any)
+	base := float64(DefaultConfig().maxHPOf(pikachu))
+	if want := base * 1.5; ps[0].(map[string]any)["hp"] != want || mx[0] != want {
+		t.Fatalf("person's HP %v and full HP %v, want both %v", ps[0].(map[string]any)["hp"], mx[0], want)
+	}
+	foe := ps[1].(map[string]any)
+	if foe["hp"] != mx[1] || mx[1] != float64(DefaultConfig().maxHPOf(int(foe["k"].(float64)))) {
+		t.Fatalf("a computer's HP %v / full %v should be its character's own", foe["hp"], mx[1])
+	}
+}
+
+func TestTheExtraHPIsRefusedUnlessItIsASoloSquadBetweenMatchesAndAValidStep(t *testing.T) {
+	cfg := DefaultConfig()
+	solo := &squad{g: NewTeamGame(cfg, modeWeb, 4), solo: true, pick: [2]int{-1, -1}}
+	for _, bad := range []int{-10, 110, 15, 101} {
+		if solo.setBonus(bad) {
+			t.Errorf("a bonus of %d%% was accepted", bad)
+		}
+	}
+	if !solo.setBonus(100) || solo.bonus != 100 {
+		t.Fatal("100% is the most and must be accepted")
+	}
+	solo.c[0], solo.pick[0] = &client{send: make(chan []byte, 1)}, pikachu
+	if solo.setBonus(0) {
+		t.Error("the bonus changed while a match was on")
+	}
+	duo := &squad{g: NewTeamGame(cfg, modeWeb, 4), pick: [2]int{-1, -1}}
+	if duo.setBonus(50) {
+		t.Error("a 2v2 accepted an HP bonus")
+	}
+}
+
+func TestAnHPBoostScalesMaxHPAndSurvivesAReset(t *testing.T) {
+	g := newTeamTestGame(pikachu, snorlax, pikachu, snorlax)
+	g.Boost[0] = 100
+	g.Reset()
+	if want := 2 * g.cfg.maxHPOf(pikachu); g.P[0].HP != want || g.maxHP(0) != want {
+		t.Fatalf("HP %d / max %d, want %d", g.P[0].HP, g.maxHP(0), want)
+	}
+	g.Ease[0] = 50
+	if want := g.cfg.maxHPOf(pikachu) * 150 / 100; g.maxHP(0) != want { // a handicap and a boost simply add up
+		t.Fatalf("max HP %d, want %d", g.maxHP(0), want)
+	}
+}

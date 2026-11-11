@@ -79,7 +79,7 @@
 <div id="bar"></div>
 <button id="reconnect">連線中斷　重新連線</button>
 <div id="rooms"><h2>選擇房間</h2><div id="roomlist"></div><button id="newroom">開新房間</button><div class="hint">灰色表示對方可能已斷線；沒有人等待時會自動開房</div></div>
-<div id="pick"><h2>選擇你的寶可夢</h2><div id="playmodes"><button data-play="computer">打電腦</button><button data-play="player">打玩家</button><button data-play="dummy">打木樁</button><button data-play="squad">2v2</button></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="tools"><button id="botMain">單機對戰</button><button id="botOff">改和真人對戰</button><button id="easeBtn">放水 0%</button></div><div id="botpick"></div><div id="easebox"><label>放水 <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="playmodes"><button data-play="computer">打電腦</button><button data-play="player">打玩家</button><button data-play="dummy">打木樁</button><button data-play="squad">2v2</button><button data-play="vs2">1v2</button></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="tools"><button id="botMain">單機對戰</button><button id="botOff">改和真人對戰</button><button id="easeBtn">放水 0%</button></div><div id="botpick"></div><div id="easebox"><label><span id="easelabel">放水</span> <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
@@ -128,7 +128,7 @@ let radius = [16, 24, 26, 18, 14, 13]; // indexed by character
 const REF = [16, 24, 26, 18, 14, 13, 10, 30, 30, 20, 36, 28];
 const dummyHit = { n: 0, at: 0, hp: null }; // the last blow the dummy took: how much, and when
 const DUMMY = 11; // the practice dummy (only the computer's)
-const PLAY = (() => { const p = new URLSearchParams(location.search).get('play'); return p === 'player' || p === 'dummy' || p === 'squad' ? p : 'computer'; })(); // the way to play: against the computer (the default), a person, or the practice dummy
+const PLAY = (() => { const p = new URLSearchParams(location.search).get('play'); return p === 'player' || p === 'dummy' || p === 'squad' || p === 'vs2' ? p : 'computer'; })(); // the way to play: against the computer (the default), a person, or the practice dummy
 let maxHp = [100, 100, 120, 110, 100, 100]; // each character's full HP, from 'hi'
 let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
@@ -166,6 +166,8 @@ let fx = [], shake = 0;
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?menu=1&play=' + PLAY + '&mode=' + (PORTRAIT ? 'mobile' : 'web')); // no room number to type: when people are waiting the server sends their rooms to choose from, otherwise it opens one; the first player's view picks the court
 let picks = [-1, -1], here = [true, false], bots = [-1, -1], padKind = -1; // bots: the character a computer plays in each slot (-1 = a person or nobody)
 let ease = [0, 0]; // each slot's handicap in percent, from the lobby
+let bonus = 0; // a 1v2's extra HP for the person, in percent (the lobby's slider)
+let soloMode = false; // the squad is one person against the two computers (1v2)
 let squadMode = false; // the lobby is a 2v2's: two people on one side (their picks and presence are lists of two, in order of arrival)
 const TEAM_BIG = 6; // the two team sizes there are: 3 or 6 of the characters
 let teamMode = false, teamSize = TEAM_BIG, myOrder = [], sentOrder = ''; // the lobby's match type; the order I field my characters in, and the one the server has
@@ -192,13 +194,13 @@ ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
   if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
-    if (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1]) return; // a match is on: a refused pick changes nothing
+    if (m.on || (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1])) return; // a match is on: a refused pick changes nothing
     if (teamSize !== (m.size || TEAM_BIG)) { teamSize = m.size || TEAM_BIG; myOrder = []; sentOrder = ''; } // another team size: choose again
     if (teamMode !== !!m.team) { teamMode = !!m.team; myOrder = []; sentOrder = ''; } // another match type: choose again
     if (sentOrder && m.picks[you] < 0) { myOrder = []; sentOrder = ''; } // sent back to choose again
     endAim(false); // a match that ended while the tail was being aimed
     ease = m.ease || [0, 0];
-    squadMode = !!m.squad;
+    squadMode = !!m.squad; soloMode = !!m.solo; bonus = m.bonus || 0;
     picks = m.picks; here = m.here; bots = m.bot || [-1, -1]; waiting = !(here[0] && here[1]); snap = null; padKind = -1;
     document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
     showPick();
@@ -339,13 +341,16 @@ function showPick() {
     ord.style.display = teamMode && n >= 0 ? 'block' : 'none';
     ord.textContent = n + 1;
   });
-  if (document.activeElement !== easeEl) { easeEl.value = ease[me]; document.getElementById('easeval').textContent = ease[me] + '%'; }
-  document.getElementById('easeBtn').textContent = `放水 ${ease[me]}%${easeOpen ? ' ▲' : ' ▼'}`;
-  document.getElementById('easeBtn').classList.toggle('on', ease[me] > 0);
+  const amt = soloMode ? bonus : ease[me]; // the slider: the handicap, or in a 1v2 the extra HP
+  easeEl.max = soloMode ? 100 : 90;
+  document.getElementById('easelabel').textContent = soloMode ? '增加血量' : '放水';
+  if (document.activeElement !== easeEl) { easeEl.value = amt; document.getElementById('easeval').textContent = amt + '%'; }
+  document.getElementById('easeBtn').textContent = `${soloMode ? '增加血量 +' : '放水 '}${amt}%${easeOpen ? ' ▲' : ' ▼'}`;
+  document.getElementById('easeBtn').classList.toggle('on', amt > 0);
   document.getElementById('easebox').style.display = easeOpen ? 'block' : 'none';
-  document.getElementById('easemsg').textContent = `你的血量和移動速度減少 ${ease[me]}%` + (ease[1 - me] ? `　對手放水 ${ease[1 - me]}%` : '') + '（開打前設定）';
+  document.getElementById('easemsg').textContent = (soloMode ? `你的血量增加 ${amt}%（最高 100%）` : `你的血量和移動速度減少 ${amt}%`) + (!soloMode && ease[1 - me] ? `　對手放水 ${ease[1 - me]}%` : '') + '（開打前設定）';
   for (const b of document.querySelectorAll('#playmodes button')) b.classList.toggle('on', b.dataset.play === PLAY);
-  document.getElementById('tools').style.display = squadMode ? 'none' : ''; // no computer to pick and no handicap in a 2v2
+  document.getElementById('tools').style.display = squadMode && !soloMode ? 'none' : ''; // a 2v2 has no computer to pick and no handicap; a 1v2 has the extra-HP slider
   document.getElementById('modes').style.display = PLAY === 'player' && !squadMode ? '' : 'none'; // single or team match is for people; the computer and the dummy are single bouts // no team match against a dummy
   document.getElementById('mSingle').classList.toggle('on', !teamMode);
   document.getElementById('mTeam').classList.toggle('on', teamMode);
@@ -368,6 +373,11 @@ function showPick() {
   const mine = picks[me], theirs = picks[1 - me];
   const lines = [];
   if (squadMode) {
+    if (soloMode) {
+      lines.push(mine >= 0 ? `你選了${NAMES[mine]}` : '1v2：你一個人打兩隻隨機的電腦，點一隻寶可夢開始');
+      document.getElementById('pickmsg').innerHTML = lines.join('<br>');
+      return;
+    }
     if (!here[1 - me]) lines.push('2v2：等隊友加入…<br>隊友要從選單的房間列表（打玩家）選這個房間，對手是兩隻隨機的電腦');
     else if (mine < 0 && theirs >= 0) lines.push('隊友選了' + NAMES[theirs] + '，換你選');
     else if (mine >= 0 && theirs < 0) lines.push('隊友選擇中…');
@@ -395,7 +405,7 @@ let botOpen = false, easeOpen = false; // the opponent list and the handicap sli
 const send = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const easeEl = document.getElementById('ease');
 easeEl.oninput = () => { document.getElementById('easeval').textContent = easeEl.value + '%'; };
-easeEl.onchange = () => send({ ease: +easeEl.value });
+easeEl.onchange = () => send(soloMode ? { bonus: +easeEl.value } : { ease: +easeEl.value });
 for (const b of document.querySelectorAll('#playmodes button')) b.onclick = () => { if (b.dataset.play === PLAY) return; const q = new URLSearchParams(location.search); q.set('play', b.dataset.play); location.search = q.toString(); }; // a way to play is a different kind of room: connect again
 document.getElementById('mSingle').onclick = () => send({ team: false });
 document.getElementById('mTeam').onclick = () => send({ team: true });
@@ -2666,7 +2676,8 @@ function drawPlayer(i, p) {
     if (p.k === DUMMY) { const took = maxHp[DUMMY] - p.hp; ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe14d'; ctx.fillText(`已承受 ${took} 傷害`, 0, top - 56 * bs); if (dummyHit.at > performance.now() - 900) { ctx.fillStyle = '#ff7a5c'; ctx.font = `bold ${20 + Math.min(dummyHit.n, 40) * 0.4}px system-ui`; ctx.fillText(`-${dummyHit.n}`, 0, top - 74 * bs - (performance.now() - dummyHit.at) / 25); } }
     // HP bar follows the body.
     ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 36 * bs, 40, 6);
-    ctx.fillStyle = p.hp > 0.3 * maxHp[p.k] ? '#6fd36f' : '#e55'; ctx.fillRect(-20, top - 36 * bs, 40 * p.hp / maxHp[p.k], 6);
+    const full = (snap.mx && snap.mx[i]) || maxHp[p.k]; // a 1v2's person may have extra HP
+    ctx.fillStyle = p.hp > 0.3 * full ? '#6fd36f' : '#e55'; ctx.fillRect(-20, top - 36 * bs, 40 * Math.min(1, p.hp / full), 6);
   });
 }
 
