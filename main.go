@@ -745,6 +745,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 		"fbeam":   map[string]float64{"len": cfg.Vulpix.FreezeBeam.Length, "control": cfg.Vulpix.FreezeBeam.ControlDuration, "pillar": cfg.Vulpix.FreezeBeam.PillarRadius, "hp": float64(cfg.Vulpix.FreezeBeam.PillarHP), "life": cfg.Vulpix.FreezeBeam.PillarDuration},
 		"flyhigh": cfg.Rowlet.FlyHigh,
 		"drift":   map[string]float64{"radius": cfg.Rowlet.Tailwind.Radius, "speed": cfg.Rowlet.Tailwind.Speed, "duration": cfg.Rowlet.Tailwind.Duration},
+		"slash":   map[string]float64{"radius": cfg.Rowlet.Tailwind.Slash.Radius, "scale": cfg.Rowlet.Tailwind.Slash.Scale, "hp": float64(cfg.Rowlet.Tailwind.Slash.HP)},
 		"arrow":   map[string]float64{"radius": cfg.Rowlet.Arrows.Radius, "hp": float64(cfg.Rowlet.Arrows.HP), "slow": cfg.Rowlet.Arrows.SlowDuration, "count": float64(cfg.Rowlet.Arrows.Count), "angle": cfg.Rowlet.Arrows.Angle, "charge": cfg.Rowlet.Arrows.ChargeDuration, "scale": cfg.Rowlet.Arrows.Scale},
 		"tornado": map[string]float64{"radius": cfg.Rowlet.Tornado.Radius, "hp": float64(cfg.Rowlet.Tornado.HP), "charge": cfg.Rowlet.Tornado.ChargeDuration, "lift": cfg.Rowlet.Tornado.LiftHeight, "scale": cfg.Rowlet.Tornado.Scale},
 		"leaf":    map[string]float64{"radius": cfg.Chikorita.LeafSlash.SlashRadius, "scale": cfg.Chikorita.LeafSlash.LeafScale},
@@ -758,7 +759,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 		"fire":    map[string]float64{"radius": fb.Radius, "hp": float64(fb.HP)},
 		"toss":    map[string]float64{"radius": ts.Radius, "high": ts.High},
 		"fly":     map[string]float64{"height": cfg.Charizard.Fly.Height},
-		"volt":    map[string]float64{"radius": cfg.Pikachu.VoltTackle.Radius, "uses": float64(cfg.Pikachu.VoltTackle.MaxUses), "window": cfg.Pikachu.VoltTackle.UseWindow},
+		"volt":    map[string]float64{"radius": cfg.Pikachu.VoltTackle.Radius, "uses": float64(cfg.Pikachu.VoltTackle.MaxUses), "window": cfg.Pikachu.VoltTackle.UseWindow, "scale": cfg.Pikachu.VoltTackle.Scale},
 		// full cooldowns, so the pad's buttons can show how much of each is left
 		"cooldown": map[string]float64{"dash": cfg.Pikachu.VoltTackle.Cooldown, "thunder": th.Cooldown, "jump": cfg.Snorlax.Jump.Cooldown, "beam": hb.Cooldown, "gbeam": gb.Cooldown, "ball": cfg.Pikachu.ElectroBall.Cooldown, "punch": cfg.Snorlax.IcePunch.Cooldown,
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,

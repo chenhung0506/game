@@ -95,6 +95,7 @@ type Config struct {
 			ParalyzeDuration float64 `json:"paralyze_duration"`
 			Damage           int     `json:"damage"`
 			Mass             float64 `json:"mass"`
+			Scale            float64 `json:"scale"` // how big the ball of lightning Pikachu is wrapped in is drawn, as a multiple of `radius`; looks only
 		} `json:"volt_tackle"`
 		// Thunder: every bolt also takes `damage` off every projectile (fire balls, stones, pillars...) of the other player inside `radius`.
 		Thunder struct {
@@ -339,6 +340,21 @@ type Config struct {
 			Speed    float64 `json:"speed"`
 			Duration float64 `json:"duration"`
 			Cooldown float64 `json:"cooldown"` // counted from the start of the drift
+			// Slash (the page calls the skill Air Slash): while it drifts Rowlet throws `count` air slashes, evenly spread along the run
+			// (the last one as it ends), each flying at `speed` straight at the nearest opponent as it stood when thrown. A slash hurts
+			// (`damage`) what its `radius` touches at the heights of `min_height`..`max_height`, and is spent; it has `hp` that the
+			// opponent's skills can wear down and `mass` (see hyper_beam.mass). `scale` is how many times bigger it is drawn than its
+			// radius suggests; looks only. A count of 0 throws none.
+			Slash struct {
+				Reach
+				Count  int     `json:"count"`
+				Speed  float64 `json:"speed"`
+				Radius float64 `json:"radius"`
+				HP     int     `json:"hp"`
+				Damage int     `json:"damage"`
+				Mass   float64 `json:"mass"`
+				Scale  float64 `json:"scale"`
+			} `json:"slash"`
 		} `json:"tailwind"`
 		// Arrows: `count` arrows fan out at once, `angle` degrees apart and centred on the opponent, at `speed`. An
 		// arrow that touches the opponent hurts it (`damage`) and slows it by the fraction `slow` (0..1) for
@@ -678,6 +694,7 @@ func DefaultConfig() Config {
 	c.Pikachu.VoltTackle.ParalyzeDuration = 1.5
 	c.Pikachu.VoltTackle.Damage = 5
 	c.Pikachu.VoltTackle.Mass = 60
+	c.Pikachu.VoltTackle.Scale = 1
 	c.Pikachu.Thunder.Reach = anyHeight
 	c.Pikachu.ElectroBall.Reach = groundReach
 	c.Snorlax.Jump.Reach = groundReach
@@ -830,6 +847,13 @@ func DefaultConfig() Config {
 	c.Rowlet.Tailwind.Speed = 600
 	c.Rowlet.Tailwind.Duration = 0.5
 	c.Rowlet.Tailwind.Cooldown = 4
+	c.Rowlet.Tailwind.Slash.Reach = Reach{MinHeight: 0, MaxHeight: 15}
+	c.Rowlet.Tailwind.Slash.Speed = 650
+	c.Rowlet.Tailwind.Slash.Radius = 8
+	c.Rowlet.Tailwind.Slash.HP = 1
+	c.Rowlet.Tailwind.Slash.Damage = 2
+	c.Rowlet.Tailwind.Slash.Mass = 20
+	c.Rowlet.Tailwind.Slash.Scale = 0.5 // Count stays 0: no slashes unless config.json asks for them
 	c.Rowlet.Arrows.Reach = anyHeight
 	c.Rowlet.Arrows.Speed = 500
 	c.Rowlet.Arrows.Radius = 8
@@ -977,6 +1001,7 @@ func (c Config) validate() error {
 		{"pikachu.volt_tackle.duration", c.Pikachu.VoltTackle.Duration, 0},
 		{"pikachu.volt_tackle.max_uses", float64(c.Pikachu.VoltTackle.MaxUses), 0},
 		{"pikachu.volt_tackle.use_window", c.Pikachu.VoltTackle.UseWindow, 0},
+		{"pikachu.volt_tackle.scale", c.Pikachu.VoltTackle.Scale, 0},
 		{"pikachu.thunder.delay", c.Pikachu.Thunder.Delay, 0},
 		{"pikachu.thunder.radius", c.Pikachu.Thunder.Radius, 0},
 		{"pikachu.thunder.damage", float64(c.Pikachu.Thunder.Damage), 0},
@@ -1141,6 +1166,10 @@ func (c Config) validate() error {
 		{"rowlet.tailwind.radius", c.Rowlet.Tailwind.Radius, 0},
 		{"rowlet.tailwind.speed", c.Rowlet.Tailwind.Speed, 0},
 		{"rowlet.tailwind.duration", c.Rowlet.Tailwind.Duration, 0},
+		{"rowlet.tailwind.slash.speed", c.Rowlet.Tailwind.Slash.Speed, 0},
+		{"rowlet.tailwind.slash.radius", c.Rowlet.Tailwind.Slash.Radius, 0},
+		{"rowlet.tailwind.slash.hp", float64(c.Rowlet.Tailwind.Slash.HP), 0},
+		{"rowlet.tailwind.slash.scale", c.Rowlet.Tailwind.Slash.Scale, 0},
 		{"rowlet.arrows.speed", c.Rowlet.Arrows.Speed, 0},
 		{"rowlet.arrows.radius", c.Rowlet.Arrows.Radius, 0},
 		{"rowlet.arrows.hp", float64(c.Rowlet.Arrows.HP), 0},
@@ -1263,6 +1292,9 @@ func (c Config) validate() error {
 		{"vulpix.ice_storm.freeze_duration", c.Vulpix.IceStorm.FreezeDuration},
 		{"vulpix.freeze_beam.cooldown", c.Vulpix.FreezeBeam.Cooldown},
 		{"rowlet.tailwind.cooldown", c.Rowlet.Tailwind.Cooldown},
+		{"rowlet.tailwind.slash.count", float64(c.Rowlet.Tailwind.Slash.Count)},
+		{"rowlet.tailwind.slash.damage", float64(c.Rowlet.Tailwind.Slash.Damage)},
+		{"rowlet.tailwind.slash.mass", c.Rowlet.Tailwind.Slash.Mass},
 		{"rowlet.arrows.damage", float64(c.Rowlet.Arrows.Damage)},
 		{"rowlet.arrows.angle", c.Rowlet.Arrows.Angle},
 		{"rowlet.arrows.slow_duration", c.Rowlet.Arrows.SlowDuration},
@@ -1400,6 +1432,7 @@ func (c Config) validate() error {
 		"vulpix.frost_field":     c.Vulpix.FrostField.Reach,
 		"vulpix.ice_storm":       c.Vulpix.IceStorm.Reach,
 		"vulpix.freeze_beam":     c.Vulpix.FreezeBeam.Reach,
+		"rowlet.tailwind.slash":  c.Rowlet.Tailwind.Slash.Reach,
 		"rowlet.arrows":          c.Rowlet.Arrows.Reach,
 		"rowlet.tornado":         c.Rowlet.Tornado.Reach,
 		"gyarados.wave":          c.Gyarados.Wave.Reach,
@@ -1432,6 +1465,9 @@ func (c Config) validate() error {
 	}
 	if a := c.Chikorita.VineWhip.SweepAngle; !(a > 0 && a <= 180) {
 		return fmt.Errorf("chikorita.vine_whip.sweep_angle must be between 0 (exclusive) and 180, got %v", a)
+	}
+	if n := c.Rowlet.Tailwind.Slash.Count; n > 100 {
+		return fmt.Errorf("rowlet.tailwind.slash.count must be at most 100, got %d", n)
 	}
 	if n := c.Rowlet.Arrows.Count; n > 100 {
 		return fmt.Errorf("rowlet.arrows.count must be at most 100, got %d", n)

@@ -68,7 +68,7 @@ func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 		if p.DriftX*(other.Y-p.Y)-p.DriftY*(other.X-p.X) < 0 {
 			p.DriftS = -1 // the opponent is on the other side: curve that way
 		}
-		p.DriftT, p.DriftCD = dr.Duration, dr.Cooldown
+		p.DriftT, p.DriftCD, p.SlashN = dr.Duration, dr.Cooldown, 0
 	}
 
 	// ---- Tornado: charge, then let it go ----
@@ -117,6 +117,15 @@ func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 		if p.DriftT -= step; p.DriftT < 1e-9 {
 			p.DriftT = 0
 		}
+		if sl := dr.Slash; sl.Count > 0 { // the air slashes leave evenly along the run, the last as it ends
+			due := sl.Count
+			if p.DriftT > 0 {
+				due = int(float64(sl.Count)*(dr.Duration-p.DriftT)/dr.Duration + 1e-9)
+			}
+			for ; p.SlashN < due; p.SlashN++ {
+				g.throwSlash(i)
+			}
+		}
 	}
 	if p.ArrowT > 0 {
 		if p.ArrowT -= dt; p.ArrowT < 1e-9 {
@@ -135,6 +144,22 @@ func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 		}
 	}
 	return events, rooted
+}
+
+// throwSlash sends one air slash from where Rowlet is, straight at the nearest foe as it stands now (along the way it faces when they
+// are on the same spot).
+func (g *Game) throwSlash(i int) {
+	p, foe, sl := &g.P[i], &g.P[g.nearestFoe(i)], g.cfg.Rowlet.Tailwind.Slash
+	ux, uy := unit(foe.X-p.X, foe.Y-p.Y)
+	if ux == 0 && uy == 0 {
+		ux, uy = unit(float64(p.FX), float64(p.FY))
+	}
+	off := g.radius(i) + sl.Radius + 1 // starts just clear of the body
+	g.Balls = append(g.Balls, Ball{
+		K: ballSlash, Owner: i, HP: sl.HP, DX: ux, DY: uy,
+		X: math.Min(math.Max(p.X+ux*off, 0), g.court.Length),
+		Y: math.Min(math.Max(p.Y+uy*off, 0), g.court.Width),
+	})
 }
 
 // holding is the tornado that holds slot v, if any: one that caught it, or one that is recorded as holding nobody in

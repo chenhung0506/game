@@ -96,14 +96,14 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟', '鯉魚王', '小智', '怪力', '梗鬼'];
 const FORMS = [...NAMES, '紅色暴鯉龍']; // every kind a player can be in: Magikarp becomes the last one (nobody picks it)
-const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰山滑行・冰風暴・急凍光線', '滑翔・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '拔樹・百萬噸拳擊・岩石陣', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球'];
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰山滑行・冰風暴・急凍光線', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '拔樹・百萬噸拳擊・岩石陣', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球'];
 const HELP = [
   '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）',
   '你是噴火龍　移動 WASD　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　J＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　K＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
   '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　J＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　K＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）',
   '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
-  '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝滑翔（朝按住的方向衝出一道半月形弧線，彎向敵人那一側）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
+  '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝空氣斬（朝按住的方向衝出一道半月形弧線，彎向敵人那一側，沿途朝最近的敵人射出一道道白色的空氣斬擊，打得到貼地的敵人）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
   '你是真新鎮小智　移動 WASD　空白鍵＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）　L＝百萬噸拳擊（朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
   '你是怪力　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝子彈拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
@@ -134,9 +134,10 @@ let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
-let voltCfg = { radius: 16, uses: 3, window: 2 }; // Volt Tackle, from 'hi'
+let voltCfg = { radius: 16, uses: 3, window: 2, scale: 1 }; // Volt Tackle, from 'hi'
 let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
 let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8 }; // Vulpix's, from 'hi'
+let slashCfg = { radius: 8, scale: 0.5, hp: 1 }; // Rowlet's air slash, from 'hi'
 let arrowCfg = { radius: 8, hp: 2, slow: 2, count: 5, angle: 12, charge: 0.5, scale: 1 }, tornadoCfg = { radius: 50, hp: 40, charge: 0.4, lift: 200, scale: 1 }; // Rowlet's, from 'hi'
 const stormLook = perSlot(() => ({ x: null, y: 0 })), fbLook = perSlot(() => ({ x: null, y: 0 })); // per slot: the smoothed storm position and beam end
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
@@ -192,7 +193,7 @@ const beamSlots = () => (snap ? [...snap.p.keys()].filter((i) => hasBeam(snap.p[
 const slotsOf = (k) => (snap ? [...snap.p.keys()].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.on || (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1])) return; // a match is on: a refused pick changes nothing
     if (teamSize !== (m.size || TEAM_BIG)) { teamSize = m.size || TEAM_BIG; myOrder = []; sentOrder = ''; } // another team size: choose again
@@ -234,6 +235,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'kickhit') shake = 24;
       if (ev.t === 'evolve') shake = 14;
       if (ev.t === 'leaf') shake = 6;
+      if (ev.t === 'airhit') shake = Math.max(shake, 3);
       if (ev.t === 'freeze') shake = 10;
       if (ev.t === 'storm') shake = Math.max(shake, 5);
       if (ev.t === 'paralyze') shake = 8;
@@ -534,7 +536,7 @@ const PAD = [
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
   { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine', true]] }, // Chikorita
   { main: ['冰山', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
-  { main: ['滑翔', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
+  { main: ['空氣斬', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
   { main: ['拔樹', 'skill'], small: [['岩石陣', 'rock'], ['百萬噸', 'mega']] }, // Ash: the Comet Punch is the computer's, so a person has three skills like the others
   { main: ['飛膝踢', 'skill'], small: [['子彈拳', 'comet'], ['岩石陣', 'rock']] }, // Machamp: the kick in place of the tree
@@ -1233,13 +1235,16 @@ function drawBallCharge(p, d) {
   if (p.kt > 0) {
     const k = 1 - p.kt / ballCfg.charge, ux = p.ax, uy = p.ay;
     ctx.save();
-    ctx.strokeStyle = `rgba(255,235,90,${0.3 + 0.4 * k})`; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
-    ctx.beginPath(); ctx.moveTo(d.x + ux * 30, d.y + uy * 30); ctx.lineTo(d.x + ux * 220, d.y + uy * 220); ctx.stroke();
+    for (const [col, w] of [[`rgba(120,60,0,${0.35 + 0.35 * k})`, 6], [`rgba(255,200,20,${0.8 + 0.2 * k})`, 3]]) { // a dark underlay under the yellow, so the line shows on sand
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash([12, 10]);
+      ctx.beginPath(); ctx.moveTo(d.x + ux * 30, d.y + uy * 30); ctx.lineTo(d.x + ux * 220, d.y + uy * 220); ctx.stroke();
+    }
     ctx.setLineDash([]);
     const r = ballCfg.radius * (0.3 + 0.7 * k), ox = d.x + ux * (radius[0] + ballCfg.radius), oy = d.y + uy * (radius[0] + ballCfg.radius);
     const gr = ctx.createRadialGradient(ox, oy, 0, ox, oy, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.4, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(ox, oy, r * 1.8, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffe14a'; ctx.strokeStyle = '#b86a00'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(ox, oy, r, 0, 7); ctx.fill(); ctx.stroke(); // the orb itself, outlined
     ctx.restore();
   }
 }
@@ -1248,6 +1253,7 @@ function drawBall(b) {
   if (b.k === 2) { drawRazorLeaf(b); return; }
   if (b.k === 3) { drawPillar(b); return; }
   if (b.k === 4) { drawArrow(b); return; }
+  if (b.k === 10) { drawAirSlash(b); return; }
   if (b.k === 5) { drawTornado(b); return; }
   if (b.k === 6) { drawStone(b); return; }
   if (b.k === 7) { drawCometFist(b); return; }
@@ -1255,12 +1261,17 @@ function drawBall(b) {
   if (b.k === 9) { drawShadowOrb(b); return; }
   {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
-    gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
+    gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,170,20,0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.8, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; // crackling spark inside the orb
-    ctx.beginPath();
-    for (let a = 0; a < 5; a++) { const ang = Math.random() * 6.28; ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + Math.cos(ang) * r * 1.5, b.y + Math.sin(ang) * r * 1.5); }
-    ctx.stroke();
+    const core = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r); core.addColorStop(0, '#fff'); core.addColorStop(0.5, '#ffe14a'); core.addColorStop(1, '#ffb000');
+    ctx.fillStyle = core; ctx.strokeStyle = '#a85d00'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill(); ctx.stroke(); // a solid, outlined orb: a glow alone vanishes on sand
+    ctx.lineJoin = 'round'; // crackling spark inside the orb: a dark line under the white one
+    const sparks = Array.from({ length: 5 }, () => Math.random() * 6.28);
+    for (const [col, w] of [['rgba(120,60,0,.8)', 4], ['#fff', 2]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath();
+      for (const ang of sparks) { ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + Math.cos(ang) * r * 1.5, b.y + Math.sin(ang) * r * 1.5); }
+      ctx.stroke();
+    }
     upright(b.x, b.y, () => {
       ctx.fillStyle = '#000a'; ctx.fillRect(-14, -r - 16, 28, 4);
       ctx.fillStyle = '#ffe14a'; ctx.fillRect(-14, -r - 16, 28 * Math.max(b.hp, 0) / ballCfg.hp, 4);
@@ -1439,6 +1450,21 @@ function drawVolt() {
           }
         }
         ctx.restore();
+        { // Pikachu is wrapped in a ball of lightning, solid and outlined (a glow alone vanishes on sand); `scale` sets its size
+          const Rs = voltCfg.radius * voltCfg.scale * 1.2 * pulse;
+          const halo = ctx.createRadialGradient(0, cy, Rs * 0.9, 0, cy, Rs * 1.5); halo.addColorStop(0, 'rgba(255,160,20,0.5)'); halo.addColorStop(1, 'rgba(255,160,20,0)');
+          ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(0, cy, Rs * 1.5, 0, 7); ctx.fill();
+          const shell = ctx.createRadialGradient(0, cy, Rs * 0.1, 0, cy, Rs); shell.addColorStop(0, 'rgba(255,255,255,0.35)'); shell.addColorStop(0.6, 'rgba(255,235,90,0.38)'); shell.addColorStop(1, 'rgba(255,175,20,0.8)');
+          ctx.fillStyle = shell; ctx.strokeStyle = '#b86a00'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.arc(0, cy, Rs, 0, 7); ctx.fill(); ctx.stroke();
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, cy, Rs - 4, 0, 7); ctx.stroke();
+          ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+          const arcs = Array.from({ length: 6 }, () => [Math.random() * 6.283, Rs * (0.55 + Math.random() * 0.4)]);
+          for (const [col, w] of [['rgba(120,60,0,0.8)', 4], ['#fff', 2]]) { // sparks crackling inside: a dark line under the white one
+            ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath();
+            for (const [a, r1] of arcs) { ctx.moveTo(0, cy); ctx.lineTo(Math.cos(a + 0.3) * r1 * 0.5, cy + Math.sin(a + 0.3) * r1 * 0.5); ctx.lineTo(Math.cos(a) * r1, cy + Math.sin(a) * r1); }
+            ctx.stroke();
+          }
+        }
         ctx.strokeStyle = 'rgba(255,250,170,0.7)'; ctx.lineWidth = 2; // a ring that spins round the body
         for (let s = 0; s < 3; s++) { const a0 = performance.now() / 90 + s * 2.1; ctx.beginPath(); ctx.arc(0, cy, R * 1.1, a0, a0 + 1.2); ctx.stroke(); }
         voltTrail.push({ x: d.x, y: d.y, R, age: 0 }); // the afterimage of the charge, left behind
@@ -1772,8 +1798,8 @@ function drawMegaCharge(p, d) {
     ctx.save(); ctx.lineWidth = 3;
     for (let j = 0; j < 3; j++) { // three rings, one after another, each closing in to the least it goes
       const v = Math.min(Math.max(u * 1.5 - j * 0.25, 0), 1), r = (150 * (1 - v) + 10) * rs;
-      ctx.strokeStyle = `rgba(255,235,90,${0.25 + 0.7 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r, 0, 7); ctx.stroke();
-      ctx.strokeStyle = `rgba(20,20,40,${0.2 + 0.4 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r + 4, 0, 7); ctx.stroke();
+      ctx.lineWidth = 6; ctx.strokeStyle = `rgba(20,20,40,${0.35 + 0.5 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r + 2, 0, 7); ctx.stroke(); // dark underlay
+      ctx.lineWidth = 3.5; ctx.strokeStyle = `rgba(255,130,20,${0.55 + 0.45 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r, 0, 7); ctx.stroke(); // an orange ring on top: yellow vanishes on sand
     }
     ctx.fillStyle = `rgba(10,10,40,${0.15 + 0.35 * u})`; ctx.beginPath(); ctx.arc(hx, hy, 18 * rs, 0, 7); ctx.fill();
     ctx.restore();
@@ -2366,19 +2392,42 @@ function drawPillar(b) {
 }
 
 // ---- Rowlet ----
+// An air slash: a white crescent of wind, its points trailing behind the way it flies, with a few streaks of air behind it.
+function drawAirSlash(b) {
+  const ang = Math.atan2(b.dy || 0, b.dx || 0), sc = slashCfg.scale || 1, R = 40, a = 1.2, d = 30, r2 = Math.hypot(R * Math.cos(a) + d, R * Math.sin(a)), e = Math.atan2(R * Math.sin(a), R * Math.cos(a) + d);
+  ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang); ctx.scale(sc, sc); ctx.lineCap = 'round';
+  for (const [y, len, al] of [[-14, 70, 0.35], [0, 95, 0.45], [14, 70, 0.35]]) { // streaks of air behind it
+    const gr = ctx.createLinearGradient(-len - 10, 0, -10, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, `rgba(255,255,255,${al})`);
+    ctx.strokeStyle = gr; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-len - 10, y); ctx.lineTo(-10, y); ctx.stroke();
+  }
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.3); glow.addColorStop(0, 'rgba(255,255,255,.35)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, R * 1.3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, R, -a, a); ctx.arc(-d, 0, r2, e, -e, true); ctx.closePath(); // the crescent: the space between two arcs
+  const fill = ctx.createLinearGradient(-d, 0, R, 0); fill.addColorStop(0, 'rgba(235,248,255,.55)'); fill.addColorStop(1, 'rgba(255,255,255,.98)');
+  ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = 'rgba(120,190,255,.95)'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.restore();
+}
+// Where a slash lands: a white ring and a few short arcs flying out of it.
+function drawAirHit(f) {
+  const k = f.age / 0.3;
+  ctx.save(); ctx.translate(f.x, f.y); ctx.strokeStyle = `rgba(255,255,255,${1 - k})`; ctx.lineWidth = 3 * (1 - k) + 1; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(0, 0, 8 + 26 * k, 0, 7); ctx.stroke();
+  for (let n = 0; n < 4; n++) { const a = n * Math.PI / 2 + 0.6; ctx.beginPath(); ctx.arc(0, 0, 14 + 34 * k, a, a + 0.7); ctx.stroke(); }
+  ctx.restore();
+}
 // An arrow: a green shaft with a leaf-shaped head, pointing the way it flies, trailing a pale streak. A bar shows
 // its HP once the opponent's skills have worn it down.
 function drawArrow(b) {
   const ang = Math.atan2(b.dy || 0, b.dx || 0), L = 30, r = arrowCfg.radius, sc = arrowCfg.scale || 1;
   ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang); ctx.scale(sc, sc);
-  const gr = ctx.createLinearGradient(-L * 2.4, 0, -L * 0.6, 0); gr.addColorStop(0, 'rgba(170,235,120,0)'); gr.addColorStop(1, 'rgba(170,235,120,.5)');
-  ctx.fillStyle = gr; ctx.fillRect(-L * 2.4, -2.2, L * 1.8, 4.4);
-  ctx.lineCap = 'round'; ctx.strokeStyle = '#2b6a2f'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(L * 0.45, 0); ctx.stroke(); // the shaft
-  ctx.strokeStyle = '#7fd36a'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(L * 0.45, 0); ctx.stroke();
-  ctx.fillStyle = '#9be37b'; ctx.strokeStyle = '#2b6a2f'; ctx.lineWidth = 1.2; ctx.lineJoin = 'round';
+  const gr = ctx.createLinearGradient(-L * 2.4, 0, -L * 0.6, 0); gr.addColorStop(0, 'rgba(30,130,45,0)'); gr.addColorStop(1, 'rgba(30,130,45,.75)');
+  ctx.fillStyle = gr; ctx.fillRect(-L * 2.4, -3, L * 1.8, 6);
+  ctx.lineCap = 'round'; ctx.strokeStyle = '#0f3d14'; ctx.lineWidth = 5.6; ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(L * 0.45, 0); ctx.stroke(); // the shaft, outlined dark
+  ctx.strokeStyle = '#3fae3a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(L * 0.45, 0); ctx.stroke();
+  ctx.fillStyle = '#4fc043'; ctx.strokeStyle = '#0f3d14'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
   ctx.beginPath(); ctx.moveTo(L * 0.9, 0); ctx.quadraticCurveTo(L * 0.45, -r * 0.95, L * 0.28, 0); ctx.quadraticCurveTo(L * 0.45, r * 0.95, L * 0.9, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); // the leaf head
   for (const sgn of [-1, 1]) { // two feathers at the tail
-    ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(-L * 0.78, sgn * r * 0.9); ctx.lineTo(-L * 0.38, sgn * 1.2); ctx.closePath(); ctx.fillStyle = '#d6f2b0'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-L * 0.6, 0); ctx.lineTo(-L * 0.78, sgn * r * 0.9); ctx.lineTo(-L * 0.38, sgn * 1.2); ctx.closePath(); ctx.fillStyle = '#f2fbd8'; ctx.fill(); ctx.stroke();
   }
   ctx.restore();
   if (b.hp < arrowCfg.hp) {
@@ -2397,10 +2446,12 @@ function drawArrowAims() {
     if (!(p.at > 0)) continue;
     const d = disp[si], o = disp[foeOf(si)], k = 1 - p.at / Math.max(arrowCfg.charge, 1e-6), base = Math.atan2(o.y - d.y, o.x - d.x);
     ctx.save(); ctx.lineCap = 'round'; ctx.setLineDash([14, 10]); ctx.lineDashOffset = -performance.now() / 20;
-    ctx.strokeStyle = `rgba(150,235,110,${0.25 + 0.5 * k})`; ctx.lineWidth = 2 + 2 * k;
-    for (let n = 0; n < arrowCfg.count; n++) {
-      const a = base + (n - (arrowCfg.count - 1) / 2) * arrowCfg.angle * Math.PI / 180;
-      ctx.beginPath(); ctx.moveTo(d.x + Math.cos(a) * 30, d.y + Math.sin(a) * 30); ctx.lineTo(d.x + Math.cos(a) * 800, d.y + Math.sin(a) * 800); ctx.stroke();
+    for (const [col, w] of [[`rgba(10,60,20,${0.45 + 0.4 * k})`, 5 + 2 * k], [`rgba(60,200,70,${0.7 + 0.3 * k})`, 2.5 + 2 * k]]) { // a dark underlay, then the bright line, so it shows on sand
+      ctx.strokeStyle = col; ctx.lineWidth = w;
+      for (let n = 0; n < arrowCfg.count; n++) {
+        const a = base + (n - (arrowCfg.count - 1) / 2) * arrowCfg.angle * Math.PI / 180;
+        ctx.beginPath(); ctx.moveTo(d.x + Math.cos(a) * 30, d.y + Math.sin(a) * 30); ctx.lineTo(d.x + Math.cos(a) * 800, d.y + Math.sin(a) * 800); ctx.stroke();
+      }
     }
     ctx.restore();
   }
@@ -2918,6 +2969,7 @@ function frame() {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
       else if (f.t === 'explode') drawExplosion(f);
+      else if (f.t === 'airhit') drawAirHit(f);
       else if (f.t === 'freeze') drawFreezeBurst(f);
       else if (f.t === 'iceburst') drawIceBurst(f);
       else if (f.t === 'wave') drawWave(f);

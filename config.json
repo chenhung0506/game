@@ -18,7 +18,8 @@
       "cooldown": 5,
       "paralyze_duration": 1.5,
       "damage": 5,
-      "mass": 60
+      "mass": 60,
+      "scale": 1.5
     },
     "thunder": {
       "min_height": 0,
@@ -232,7 +233,18 @@
       "radius": 450,
       "speed": 650,
       "duration": 1,
-      "cooldown": 3.5
+      "cooldown": 3.5,
+      "slash": {
+        "min_height": 0,
+        "max_height": 15,
+        "count": 6,
+        "speed": 650,
+        "radius": 8,
+        "hp": 1,
+        "damage": 2,
+        "mass": 20,
+        "scale": 0.5
+      }
     },
     "arrows": {
       "min_height": 0,

@@ -555,6 +555,8 @@ func (c Config) ballSpeed(kind int) float64 {
 		return c.Chikorita.RazorLeaf.Speed
 	case ballArrow:
 		return c.Rowlet.Arrows.Speed
+	case ballSlash:
+		return c.Rowlet.Tailwind.Slash.Speed
 	case ballShadow:
 		return c.Gengar.ShadowBall.Speed
 	}

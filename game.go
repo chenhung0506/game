@@ -150,6 +150,7 @@ type Player struct {
 	BreathLeft float64 `json:"-"`   // the full duration, to tell how far along the breath is
 	// Seismic Toss: TossPhase is tossNone, tossDash (running at the target), tossRise (carrying it up) or tossFall.
 	TossAir   bool    `json:"-"` // the toss began in flight
+	SlashN    int     `json:"-"` // Rowlet: air slashes thrown in the drift that is running
 	TossFoe   int     `json:"-"` // the slot it has caught plus one, while it is carrying it up and down (0: not recorded, the nearest foe)
 	TossPhase int     `json:"gp"`
 	TossLeft  float64 `json:"-"` // dash distance left
@@ -300,14 +301,15 @@ const (
 const (
 	ballElectro = 0
 	ballFire    = 1
-	ballLeaf    = 2 // Chikorita's Razor Leaf
-	ballPillar  = 3 // Vulpix's ice pillar: it stands where it rose, blocks the other player and is worn down like a projectile
-	ballArrow   = 4 // Rowlet's arrow: it hurts and slows what it touches
-	ballTornado = 5 // Rowlet's tornado: it chases the opponent, carries it up and lets it fall; it is worn down like a projectile
-	ballStone   = 6 // Machamp's rock: it stands where it rose, blocks the other player and is worn down like a projectile (a pillar's way)
-	ballFist    = 7 // one of Machamp's Comet Punch fists: it hangs where it appeared, hits the opponent it touches once and has HP like a fire ball
-	ballGhost   = 8 // one of Gengar's Ghost Fire flames: it flies out, comes back to Gengar and hurts the opponent once; it has HP like a fire ball
-	ballShadow  = 9 // Gengar's Shadow Ball in charge mode: it flies straight like the Electro Ball, bursts where it is stopped and drags the opponent in; it has HP
+	ballLeaf    = 2  // Chikorita's Razor Leaf
+	ballPillar  = 3  // Vulpix's ice pillar: it stands where it rose, blocks the other player and is worn down like a projectile
+	ballArrow   = 4  // Rowlet's arrow: it hurts and slows what it touches
+	ballTornado = 5  // Rowlet's tornado: it chases the opponent, carries it up and lets it fall; it is worn down like a projectile
+	ballStone   = 6  // Machamp's rock: it stands where it rose, blocks the other player and is worn down like a projectile (a pillar's way)
+	ballFist    = 7  // one of Machamp's Comet Punch fists: it hangs where it appeared, hits the opponent it touches once and has HP like a fire ball
+	ballGhost   = 8  // one of Gengar's Ghost Fire flames: it flies out, comes back to Gengar and hurts the opponent once; it has HP like a fire ball
+	ballSlash   = 10 // one of Rowlet's air slashes (thrown during the Air Slash drift): it flies straight at the foe it was thrown at, hurts what it touches and is spent
+	ballShadow  = 9  // Gengar's Shadow Ball in charge mode: it flies straight like the Electro Ball, bursts where it is stopped and drags the opponent in; it has HP
 )
 
 // Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
@@ -574,6 +576,8 @@ func (g *Game) ballRadius(b *Ball) float64 {
 		return g.cfg.Gengar.ShadowBall.Radius
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Radius
+	case ballSlash:
+		return g.cfg.Rowlet.Tailwind.Slash.Radius
 	case ballTornado:
 		return g.cfg.Rowlet.Tornado.Radius
 	}
@@ -598,6 +602,8 @@ func (g *Game) ballMass(b *Ball) float64 {
 		return g.cfg.Rowlet.Tornado.Mass
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Mass
+	case ballSlash:
+		return g.cfg.Rowlet.Tailwind.Slash.Mass
 	}
 	return g.cfg.Pikachu.ElectroBall.Mass
 }
@@ -1162,6 +1168,25 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}
 			continue
 		}
+		if b.K == ballSlash {
+			if b.HP > 0 {
+				sl := g.cfg.Rowlet.Tailwind.Slash
+				x0, y0 := b.X, b.Y
+				b.X += b.DX * sl.Speed * dt
+				b.Y += b.DY * sl.Speed * dt
+				if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
+					return sl.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, b.X, b.Y) <= sl.Radius+rad
+				}); ok {
+					g.hit(foe, sl.Damage)
+					events = append(events, Event{T: "airhit", X: foe.X, Y: foe.Y})
+					continue
+				}
+				if b.X > 0 && b.X < g.court.Length && b.Y > 0 && b.Y < g.court.Width {
+					kept = append(kept, b)
+				}
+			}
+			continue
+		}
 		if b.K == ballArrow {
 			if b.HP > 0 {
 				x0, y0 := b.X, b.Y
@@ -1386,6 +1411,8 @@ func (g *Game) ballDamage(b *Ball) int {
 		return g.cfg.Gengar.ShadowBall.Damage
 	case ballArrow:
 		return g.cfg.Rowlet.Arrows.Damage
+	case ballSlash:
+		return g.cfg.Rowlet.Tailwind.Slash.Damage
 	case ballTornado:
 		return g.cfg.Rowlet.Tornado.SpinDamage
 	}

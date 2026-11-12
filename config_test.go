@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -230,5 +231,27 @@ func TestTheConfigRefusesACameraWindowBiggerThanTheCourtOrAZoomBackwards(t *test
 	cfg.Court.Web = CourtConfig{MinWidth: 900, MinLength: 1600, MaxWidth: 1200, MaxLength: 2000, ZoomInDistance: 700, ZoomOutDistance: 700, ZoomSpeed: 1}
 	if err := cfg.validate(); err != nil {
 		t.Errorf("a good camera was refused: %v", err)
+	}
+}
+
+// The ball of lightning round Pikachu in a Volt Tackle is drawn by the page at `scale` times the tackle's radius.
+func TestTheVoltTackleScaleReachesThePageAndMustBePositive(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Pikachu.VoltTackle.Scale != 1 {
+		t.Fatalf("default scale = %v, want 1", cfg.Pikachu.VoltTackle.Scale)
+	}
+	cfg.Pikachu.VoltTackle.Scale = 2.5
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	hi := next(t, dialIn(t, srv, "mobile"), "hi")
+	if v := hi["volt"].(map[string]any); v["scale"] != 2.5 {
+		t.Fatalf("hi.volt.scale = %v, want 2.5", v["scale"])
+	}
+	for _, bad := range []float64{0, -1} {
+		cfg := DefaultConfig()
+		cfg.Pikachu.VoltTackle.Scale = bad
+		if cfg.validate() == nil {
+			t.Errorf("a scale of %v was accepted", bad)
+		}
 	}
 }
