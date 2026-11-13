@@ -1265,27 +1265,46 @@ func TestVulpixBotFreezesTheOpponentWithTheBeamEvenWhenItMovesAcrossIt(t *testin
 	}
 }
 
-// The stick moves the beam's end toward the opponent from where the end is, not from where Vulpix stands; once the opponent stops
-// the beam the stick rests.
+// The stick moves the beam's end toward the opponent from where the end is, not from where Vulpix stands, in the exact direction;
+// once the end is on the opponent the stick rests.
 func TestVulpixBotSteersTheBeamsEndNotItsBody(t *testing.T) {
 	cfg := liveConfig(t)
 	g := duel(cfg, vulpix, snorlax)
 	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 600, 450, 700, 450
 	g.P[0].FBeamT, g.P[0].FBeamX, g.P[0].FBeamY = 3, 700, 150 // the end is far above the opponent; Vulpix faces it straight on
-	g.P[0].FBeamEX, g.P[0].FBeamEY = 700, 150
 	b := newBot(vulpix, 1)
-	var in Input
-	for k := 0; k < botReact+2; k++ {
-		in = b.Decide(g, 0)
+	in := b.Decide(g, 0)
+	if in.DX != 0 || in.DY != 1 || in.AimY < 0.9 {
+		t.Fatalf("stick (%d,%d) aim (%v,%v), want down: the end must come down onto the opponent", in.DX, in.DY, in.AimX, in.AimY)
 	}
-	if in.DX != 0 || in.DY != 1 {
-		t.Fatalf("stick (%d,%d), want (0,1): the end must come down onto the opponent", in.DX, in.DY)
+	g.P[0].FBeamX, g.P[0].FBeamY = 700, 450
+	if in = b.Decide(g, 0); in.DX != 0 || in.DY != 0 {
+		t.Fatalf("stick (%d,%d), want it at rest while the end is on the opponent", in.DX, in.DY)
 	}
-	g.P[0].FBeamEX, g.P[0].FBeamEY = 650, 450 // stopped by the opponent
-	for k := 0; k < botReact+2; k++ {
-		in = b.Decide(g, 0)
-	}
-	if in.DX != 0 || in.DY != 0 {
-		t.Fatalf("stick (%d,%d), want it at rest while the opponent holds the beam", in.DX, in.DY)
+}
+
+// An opponent that strafes across the beam is led: the end goes where it will be, so the beam keeps hitting until it freezes.
+func TestVulpixBotKeepsTheBeamOnAnOpponentThatStrafes(t *testing.T) {
+	cfg := liveConfig(t)
+	fb := cfg.Vulpix.FreezeBeam
+	for _, speed := range []float64{150, 250} {
+		g := duel(cfg, vulpix, snorlax)
+		g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 500, 450, 900, 300
+		b := newBot(vulpix, 5)
+		dir := 1.0
+		for k := 0; k < int(fb.ControlDuration*tickRate) && g.P[1].FrozenT == 0; k++ {
+			g.P[0].In = b.Decide(g, 0)
+			if g.P[0].FBeamT == 0 && g.P[0].FBeamCD == 0 {
+				g.P[0].In = Input{Freeze: true, AimX: 1}
+			}
+			if g.P[1].Y > 600 || g.P[1].Y < 300 {
+				dir = -dir
+			}
+			g.P[1].Y += dir * speed * dt // walks across the beam without stopping
+			g.Step(dt)
+		}
+		if g.P[1].FrozenT == 0 {
+			t.Errorf("a foe strafing at %v/s was not frozen: HP %d of %d", speed, g.P[1].HP, g.maxHP(1))
+		}
 	}
 }

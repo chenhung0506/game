@@ -160,7 +160,7 @@ func (g *Game) beamHits(i int) []Event {
 			continue
 		}
 		t := math.Max(0, (f.X-p.X)*ux+(f.Y-p.Y)*uy) - math.Sqrt(math.Max(0, r*r-d*d))
-		if t = math.Max(t, 0); t <= at {
+		if t = math.Min(math.Max(t, 0), l); t <= at { // a foe just past the end of the beam is touched by its rounded tip: the beam stays as it is
 			first, at = j, t
 		}
 	}

@@ -63,6 +63,9 @@ func (b *Bot) reset() {
 func (b *Bot) Decide(g *Game, me int) Input {
 	b.observe(g, me)
 	b.ticks++
+	if b.kind == vulpix && g.P[me].FBeamT > 0 {
+		return b.steerBeam(g, me) // the beam's end is chased on every tick, not every botEvery: a sidestep is only a few ticks long
+	}
 	if b.ticks%botEvery != 0 {
 		return b.held // the skill keys are not held: they were pressed once, on the tick they were decided
 	}
@@ -95,6 +98,35 @@ func (b *Bot) Decide(g *Game, me int) Input {
 }
 
 const dtBot = 1.0 / tickRate
+
+// steerBeam is the stick of a Vulpix casting the Freeze Beam: it pushes the end of the beam, in the exact direction (not the 8
+// ways), to where the nearest foe will be when the end gets there, judging its speed from the last few ticks. While the foe
+// holds the beam the stick rests; a foe that steps aside is followed, so the hits go on.
+func (b *Bot) steerBeam(g *Game, me int) Input {
+	p, fb := &g.P[me], g.cfg.Vulpix.FreezeBeam
+	f := g.P[g.nearestFoe(me)]
+	in := Input{AimX: p.AimX, AimY: p.AimY}
+	var vx, vy float64
+	if n := len(b.hist); n >= 4 {
+		old := b.hist[n-4].foe
+		vx, vy = (f.X-old.X)/(3*dtBot), (f.Y-old.Y)/(3*dtBot)
+	}
+	tx, ty := f.X, f.Y
+	for k := 0; k < 2; k++ { // the time the end needs to get there, with the foe moved on by then
+		t := math.Min(math.Hypot(tx-p.FBeamX, ty-p.FBeamY)/fb.Speed, 0.4)
+		tx, ty = f.X+vx*t, f.Y+vy*t
+	}
+	// The beam already on the foe (inside its width, with a margin): the stick rests, because every step of the end raises a pillar,
+	// and pillars shove the foe out of the beam. A foe that has stepped out of it is followed again.
+	if segDist(f.X, f.Y, p.X, p.Y, p.FBeamX, p.FBeamY) > fb.Width/2+g.radius(g.nearestFoe(me))-4 {
+		if dx, dy := tx-p.FBeamX, ty-p.FBeamY; math.Hypot(dx, dy) > 6 {
+			in.AimX, in.AimY = unit(dx, dy)
+			in.DX, in.DY = dir8(dx, dy) // the 8-way keys only say "the stick is pushed"; the beam goes the exact way
+		}
+	}
+	b.held = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY}
+	return in
+}
 
 func (b *Bot) observe(g *Game, me int) {
 	if len(b.hist) == botReact+1 {
@@ -995,13 +1027,6 @@ func (b *Bot) vulpix(c *bctx) Input {
 	fs, is, fb := g.cfg.Vulpix.FrostField, g.cfg.Vulpix.IceStorm, g.cfg.Vulpix.FreezeBeam
 	if p.FrozenT > 0 || p.Held || p.StunT > 0 {
 		return c.stay()
-	}
-	if p.FBeamT > 0 { // the stick moves the end of the beam: onto the opponent, which then stops it and takes its hits; once it is
-		in := c.stay() // on the opponent the stick rests, so the beam keeps hurting instead of sweeping past
-		if math.Hypot(p.FBeamEX-p.FBeamX, p.FBeamEY-p.FBeamY) < 1 || fb.Damage == 0 {
-			in.DX, in.DY = dir8(c.f.X-p.FBeamX, c.f.Y-p.FBeamY)
-		}
-		return in
 	}
 	if p.FrostT > 0 {
 		return c.move(c.ux, c.uy) // the ride cannot stop: it is aimed at the opponent

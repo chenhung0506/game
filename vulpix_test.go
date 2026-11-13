@@ -954,7 +954,7 @@ func TestTheBeamStopsAtTheFirstOpponentInItsWayAndOnlyThere(t *testing.T) {
 	if g.P[0].FBeamEX >= g.P[0].FBeamX {
 		t.Fatal("the beam was not cut")
 	}
-	g = beamAt(cfg, 440) // beyond the end of the beam: nothing in the way
+	g = beamAt(cfg, 500) // well beyond the end of the beam: nothing in the way
 	if g.P[0].FBeamEX != g.P[0].FBeamX || g.P[1].HP != cfg.Snorlax.MaxHP {
 		t.Fatalf("beam end %v (stick %v), opponent HP %d: an opponent past the end must change nothing", g.P[0].FBeamEX, g.P[0].FBeamX, g.P[1].HP)
 	}
@@ -1031,5 +1031,16 @@ func TestEachCastCountsItsHitsFromZeroAndASquadBeamIsStoppedByTheNearerFoe(t *te
 	}
 	if g.P[0].FBeamEX >= 450 {
 		t.Fatalf("beam end %v: the nearer foe at 450 did not stop it", g.P[0].FBeamEX)
+	}
+}
+
+func TestAnOpponentJustPastTheBeamsEndIsStillTouchedByItsTip(t *testing.T) {
+	cfg := beamConfig()
+	g := beamAt(cfg, 440) // the end is 400 from the body; the opponent's centre 440: within width/2 + radius of the end
+	if g.P[1].HP == cfg.Snorlax.MaxHP {
+		t.Fatal("an opponent within reach of the beam's tip was not hit")
+	}
+	if g.P[0].FBeamEX != g.P[0].FBeamX {
+		t.Fatalf("the beam was shortened to %v although the opponent is beyond its end (%v)", g.P[0].FBeamEX, g.P[0].FBeamX)
 	}
 }
