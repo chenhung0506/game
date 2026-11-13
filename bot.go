@@ -996,9 +996,11 @@ func (b *Bot) vulpix(c *bctx) Input {
 	if p.FrozenT > 0 || p.Held || p.StunT > 0 {
 		return c.stay()
 	}
-	if p.FBeamT > 0 { // the stick moves the end of the beam: toward the opponent, so the pillars line up in its way
-		in := c.stay()
-		in.DX, in.DY = dir8(c.ux, c.uy)
+	if p.FBeamT > 0 { // the stick moves the end of the beam: onto the opponent, which then stops it and takes its hits; once it is
+		in := c.stay() // on the opponent the stick rests, so the beam keeps hurting instead of sweeping past
+		if math.Hypot(p.FBeamEX-p.FBeamX, p.FBeamEY-p.FBeamY) < 1 || fb.Damage == 0 {
+			in.DX, in.DY = dir8(c.f.X-p.FBeamX, c.f.Y-p.FBeamY)
+		}
 		return in
 	}
 	if p.FrostT > 0 {
@@ -1020,9 +1022,13 @@ func (b *Bot) vulpix(c *bctx) Input {
 		in.Skill = true
 		return in
 	}
-	if p.FBeamCD == 0 && c.dist >= 120 && c.dist <= fb.Length*0.8 && !danger && c.rootedFor() == 0 && b.rng.Float64() < 0.25 {
+	chance := 0.25 // a wall of pillars, now and then
+	if fb.Damage > 0 && fb.Reach.hits(f) {
+		chance = 0.5 // the beam itself hurts and freezes: it is an attack
+	}
+	if p.FBeamCD == 0 && c.dist >= 120 && c.dist <= fb.Length*0.8 && !danger && c.rootedFor() == 0 && b.rng.Float64() < chance {
 		in := c.stay()
-		in.Freeze = true // aimed at the opponent: the first pillar rises toward it
+		in.Freeze = true // aimed at the opponent: the beam starts toward it
 		return in
 	}
 	const lo = 260.0

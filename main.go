@@ -742,7 +742,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 		"tail":    map[string]float64{"angle": cfg.Gyarados.TailWhip.Angle, "length": cfg.Gyarados.TailWhip.Length, "stun": cfg.Gyarados.TailWhip.StunDuration, "charge": cfg.Gyarados.TailWhip.ChargeDuration},
 		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "scale": cfg.Vulpix.FrostField.Scale, "duration": cfg.Vulpix.FrostField.Duration, "ride": cfg.Vulpix.FrostField.SprayDuration},
 		"storm":   map[string]float64{"radius": cfg.Vulpix.IceStorm.Radius, "interval": cfg.Vulpix.IceStorm.Interval, "strikes": float64(cfg.Vulpix.IceStorm.Strikes)},
-		"fbeam":   map[string]float64{"len": cfg.Vulpix.FreezeBeam.Length, "control": cfg.Vulpix.FreezeBeam.ControlDuration, "pillar": cfg.Vulpix.FreezeBeam.PillarRadius, "hp": float64(cfg.Vulpix.FreezeBeam.PillarHP), "life": cfg.Vulpix.FreezeBeam.PillarDuration},
+		"fbeam":   map[string]float64{"len": cfg.Vulpix.FreezeBeam.Length, "control": cfg.Vulpix.FreezeBeam.ControlDuration, "pillar": cfg.Vulpix.FreezeBeam.PillarRadius, "hp": float64(cfg.Vulpix.FreezeBeam.PillarHP), "life": cfg.Vulpix.FreezeBeam.PillarDuration, "width": cfg.Vulpix.FreezeBeam.Width},
 		"flyhigh": cfg.Rowlet.FlyHigh,
 		"drift":   map[string]float64{"radius": cfg.Rowlet.Tailwind.Radius, "speed": cfg.Rowlet.Tailwind.Speed, "duration": cfg.Rowlet.Tailwind.Duration},
 		"slash":   map[string]float64{"radius": cfg.Rowlet.Tailwind.Slash.Radius, "scale": cfg.Rowlet.Tailwind.Slash.Scale, "hp": float64(cfg.Rowlet.Tailwind.Slash.HP)},

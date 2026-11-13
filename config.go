@@ -312,7 +312,9 @@ type Config struct {
 		} `json:"ice_storm"`
 		// Freeze Beam: for `control_duration` seconds Vulpix stands still and breathes a beam from its mouth to a
 		// spot on the ground that the stick moves at `speed`, never farther than `length` from the mouth. The beam
-		// hurts nobody; where the spot passes, ice pillars rise (`pillar_radius` wide, `pillar_hp`, gone after
+		// is `width` wide and stops at the first opponent in its way (inside the height band): it hurts that opponent
+		// `damage` every `interval` seconds, and every `freeze_hits`-th hit of the cast freezes it for `freeze_duration`
+		// (0 hits = never). Where the spot passes, ice pillars rise (`pillar_radius` wide, `pillar_hp`, gone after
 		// `pillar_duration`). The other player cannot walk through a pillar while at a height inside
 		// min_height..max_height. Pillars are hurt by what already hurts a projectile.
 		FreezeBeam struct {
@@ -325,6 +327,11 @@ type Config struct {
 			PillarRadius    float64 `json:"pillar_radius"`
 			PillarHP        int     `json:"pillar_hp"`
 			PillarDuration  float64 `json:"pillar_duration"`
+			Width           float64 `json:"width"`
+			Damage          int     `json:"damage"`
+			Interval        float64 `json:"interval"`
+			FreezeHits      int     `json:"freeze_hits"`
+			FreezeDuration  float64 `json:"freeze_duration"`
 		} `json:"freeze_beam"`
 	} `json:"vulpix"`
 	Rowlet struct {
@@ -839,6 +846,7 @@ func DefaultConfig() Config {
 	c.Vulpix.FreezeBeam.PillarRadius = 24
 	c.Vulpix.FreezeBeam.PillarHP = 25
 	c.Vulpix.FreezeBeam.PillarDuration = 8
+	c.Vulpix.FreezeBeam.Interval = 0.5 // damage, freeze_hits and width stay 0: the beam only blocks and hurts when configured
 	c.Rowlet.MaxHP = 100
 	c.Rowlet.WalkSpeed = 150
 	c.Rowlet.Radius = 13
@@ -1067,6 +1075,7 @@ func (c Config) validate() error {
 		{"vulpix.freeze_beam.pillar_radius", c.Vulpix.FreezeBeam.PillarRadius, 0},
 		{"vulpix.freeze_beam.pillar_hp", float64(c.Vulpix.FreezeBeam.PillarHP), 0},
 		{"vulpix.freeze_beam.pillar_duration", c.Vulpix.FreezeBeam.PillarDuration, 0},
+		{"vulpix.freeze_beam.interval", c.Vulpix.FreezeBeam.Interval, 0},
 		{"rowlet.max_hp", float64(c.Rowlet.MaxHP), 0},
 		{"rowlet.walk_speed", c.Rowlet.WalkSpeed, 0},
 		{"rowlet.radius", c.Rowlet.Radius, 0},
@@ -1308,6 +1317,10 @@ func (c Config) validate() error {
 		{"rowlet.tornado.cooldown", c.Rowlet.Tornado.Cooldown},
 		{"rowlet.tornado.mass", c.Rowlet.Tornado.Mass},
 		{"vulpix.freeze_beam.start_distance", c.Vulpix.FreezeBeam.StartDistance},
+		{"vulpix.freeze_beam.width", c.Vulpix.FreezeBeam.Width},
+		{"vulpix.freeze_beam.damage", float64(c.Vulpix.FreezeBeam.Damage)},
+		{"vulpix.freeze_beam.freeze_hits", float64(c.Vulpix.FreezeBeam.FreezeHits)},
+		{"vulpix.freeze_beam.freeze_duration", c.Vulpix.FreezeBeam.FreezeDuration},
 		{"vulpix.frost_field.contact_damage", float64(c.Vulpix.FrostField.ContactDamage)},
 		{"magikarp.jump.highest_point_duration", c.Magikarp.Jump.HighestPointDuration},
 		{"magikarp.jump.cooldown", c.Magikarp.Jump.Cooldown},

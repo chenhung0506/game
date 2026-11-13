@@ -202,6 +202,12 @@ type Player struct {
 	FBeamX  float64 `json:"zx"`
 	FBeamY  float64 `json:"zy"`
 	FBeamCD float64 `json:"zcd"`
+	// Where the beam really ends: the stick's spot, or where the first opponent stops it. FBeamIn is the time to the next
+	// hit, FBeamHits the hits so far this cast.
+	FBeamEX   float64 `json:"zex"`
+	FBeamEY   float64 `json:"zey"`
+	FBeamIn   float64 `json:"-"`
+	FBeamHits int     `json:"-"`
 
 	// Rowlet. Tailwind: seconds of drift left, the unit heading it is on now, which way it turns (+1 or -1), the cooldown.
 	DriftT  float64 `json:"mt"`

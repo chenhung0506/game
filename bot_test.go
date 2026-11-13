@@ -1236,3 +1236,56 @@ func TestGengarUnderTheGroundWalksAtTheOpponentAndUsesNoSkill(t *testing.T) {
 		}
 	}
 }
+
+// A Vulpix bot that casts the Freeze Beam steers its end onto the opponent, which stops it, takes its hits and is frozen.
+func TestVulpixBotFreezesTheOpponentWithTheBeamEvenWhenItMovesAcrossIt(t *testing.T) {
+	cfg := liveConfig(t)
+	fb := cfg.Vulpix.FreezeBeam
+	frozen := 0
+	for _, side := range []float64{0, 120, -120} { // the opponent straight ahead, and off to either side of the beam's first aim
+		g := duel(cfg, vulpix, snorlax)
+		g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 600, 450, 1000, 450+side
+		b := newBot(vulpix, 3)
+		b.comboT = 5
+		for k := 0; k < int(fb.ControlDuration*tickRate)+60 && g.P[1].FrozenT == 0; k++ {
+			g.P[0].In = b.Decide(g, 0)
+			if g.P[0].FBeamT == 0 && g.P[0].FBeamCD == 0 { // make the cast certain: the dice are not what is tested
+				g.P[0].In = Input{Freeze: true, AimX: 1, AimY: 0}
+			}
+			g.Step(dt)
+		}
+		if g.P[1].FrozenT > 0 {
+			frozen++
+		} else {
+			t.Errorf("opponent %v off the line: not frozen, HP %d of %d", side, g.P[1].HP, g.maxHP(1))
+		}
+	}
+	if frozen != 3 {
+		t.Fatalf("frozen in %d of 3 scenes", frozen)
+	}
+}
+
+// The stick moves the beam's end toward the opponent from where the end is, not from where Vulpix stands; once the opponent stops
+// the beam the stick rests.
+func TestVulpixBotSteersTheBeamsEndNotItsBody(t *testing.T) {
+	cfg := liveConfig(t)
+	g := duel(cfg, vulpix, snorlax)
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 600, 450, 700, 450
+	g.P[0].FBeamT, g.P[0].FBeamX, g.P[0].FBeamY = 3, 700, 150 // the end is far above the opponent; Vulpix faces it straight on
+	g.P[0].FBeamEX, g.P[0].FBeamEY = 700, 150
+	b := newBot(vulpix, 1)
+	var in Input
+	for k := 0; k < botReact+2; k++ {
+		in = b.Decide(g, 0)
+	}
+	if in.DX != 0 || in.DY != 1 {
+		t.Fatalf("stick (%d,%d), want (0,1): the end must come down onto the opponent", in.DX, in.DY)
+	}
+	g.P[0].FBeamEX, g.P[0].FBeamEY = 650, 450 // stopped by the opponent
+	for k := 0; k < botReact+2; k++ {
+		in = b.Decide(g, 0)
+	}
+	if in.DX != 0 || in.DY != 0 {
+		t.Fatalf("stick (%d,%d), want it at rest while the opponent holds the beam", in.DX, in.DY)
+	}
+}

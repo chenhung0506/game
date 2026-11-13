@@ -136,10 +136,10 @@ const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let voltCfg = { radius: 16, uses: 3, window: 2, scale: 1 }; // Volt Tackle, from 'hi'
 let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
-let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8 }; // Vulpix's, from 'hi'
+let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8, width: 0 }; // Vulpix's, from 'hi'
 let slashCfg = { radius: 8, scale: 0.5, hp: 1 }; // Rowlet's air slash, from 'hi'
 let arrowCfg = { radius: 8, hp: 2, slow: 2, count: 5, angle: 12, charge: 0.5, scale: 1 }, tornadoCfg = { radius: 50, hp: 40, charge: 0.4, lift: 200, scale: 1 }; // Rowlet's, from 'hi'
-const stormLook = perSlot(() => ({ x: null, y: 0 })), fbLook = perSlot(() => ({ x: null, y: 0 })); // per slot: the smoothed storm position and beam end
+const stormLook = perSlot(() => ({ x: null, y: 0 })), fbLook = perSlot(() => ({ x: null, y: 0, ex: 0, ey: 0 })); // per slot: the smoothed storm position and beam end
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
@@ -2340,26 +2340,30 @@ function drawStormStrike(f) {
   ctx.restore();
 }
 
-// Freeze Beam: from the mouth to the spot on the ground the stick steers. The beam hurts nobody; a faint circle shows how far it can reach.
+// Freeze Beam: from the mouth to the spot on the ground the stick steers, cut short where an opponent stops it (p.zex/zey); the ring is where
+// the pillars rise. A faint circle shows how far it can reach.
 function drawFBeams() {
   for (const si of slotsOf(4)) {
     const p = snap.p[si], d = disp[si], fl = fbLook[si];
     if (!(p.zt > 0)) { fl.x = null; continue; }
-    if (fl.x === null) { fl.x = p.zx; fl.y = p.zy; }
-    fl.x += (p.zx - fl.x) * 0.5; fl.y += (p.zy - fl.y) * 0.5;
+    if (fl.x === null) { fl.x = p.zx; fl.y = p.zy; fl.ex = p.zex; fl.ey = p.zey; }
+    fl.x += (p.zx - fl.x) * 0.5; fl.y += (p.zy - fl.y) * 0.5; fl.ex += (p.zex - fl.ex) * 0.5; fl.ey += (p.zey - fl.ey) * 0.5;
     const bs = radius[4] / REF[4], dir = look[si].dir, t = performance.now() / 1000;
     const [mx, my] = dir === 3 ? [11, -1] : dir === 2 ? [-11, -1] : dir === 1 ? [0, -7] : [0, 2]; // the mouth, upright and in body units
-    const [ex, ey] = rv(fl.x - d.x, fl.y - d.y);
+    const [ex, ey] = rv(fl.ex - d.x, fl.ey - d.y), [px, py] = rv(fl.x - d.x, fl.y - d.y), cut = Math.hypot(fl.ex - fl.x, fl.ey - fl.y) > 4, bw = Math.max(26, fbeamCfg.width);
     upright(d.x, d.y, () => {
       const x0 = mx * bs, y0 = -d.z + my * bs, len = Math.hypot(ex - x0, ey - y0) || 1, ux = (ex - x0) / len, uy = (ey - y0) / len;
       ctx.lineCap = 'round';
-      for (const [w, col] of [[26, 'rgba(110,185,255,.30)'], [13, 'rgba(185,232,255,.80)'], [4.5, 'rgba(255,255,255,.95)']]) {
+      for (const [w, col] of [[bw, 'rgba(110,185,255,.30)'], [bw / 2, 'rgba(185,232,255,.80)'], [Math.max(4.5, bw / 6), 'rgba(255,255,255,.95)']]) {
         ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(ex, ey); ctx.stroke();
       }
       ctx.fillStyle = '#fff'; // sparkles streaming along it
       for (let s = (t * 220) % 46; s < len; s += 46) { const o = Math.sin(s * 0.3 + t * 8) * 6; ctx.beginPath(); ctx.arc(x0 + ux * s - uy * o, y0 + uy * s + ux * o, 2.4, 0, 7); ctx.fill(); }
       ctx.strokeStyle = 'rgba(200,238,255,.9)'; ctx.lineWidth = 2.5; // where it lands
-      ctx.beginPath(); ctx.ellipse(ex, ey, fbeamCfg.pillar * (0.8 + 0.12 * Math.sin(t * 10)), fbeamCfg.pillar * 0.8 * (0.8 + 0.12 * Math.sin(t * 10)), 0, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(px, py, fbeamCfg.pillar * (0.8 + 0.12 * Math.sin(t * 10)), fbeamCfg.pillar * 0.8 * (0.8 + 0.12 * Math.sin(t * 10)), 0, 0, 7); ctx.stroke();
+      if (cut) { // stopped by an opponent: a flash where it lands
+        ctx.fillStyle = 'rgba(235,250,255,.85)'; ctx.beginPath(); ctx.arc(ex, ey, bw * 0.45 * (0.85 + 0.15 * Math.sin(t * 24)), 0, 7); ctx.fill();
+      }
     });
     ctx.save(); // the beam's reach
     ctx.strokeStyle = 'rgba(190,235,255,.28)'; ctx.lineWidth = 2; ctx.setLineDash([10, 12]);

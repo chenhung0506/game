@@ -859,7 +859,7 @@ func TestVulpixSnapshotCarriesItsState(t *testing.T) {
 	steps(g, 2)
 	g.Balls = append(g.Balls, Ball{K: ballPillar, Owner: 0, X: 5, Y: 6, HP: 7, Life: 2.5})
 	raw, _ := json.Marshal(g.P[0])
-	for _, key := range []string{`"yt"`, `"ycd"`, `"wn"`, `"wx"`, `"wy"`, `"wcd"`, `"zt"`, `"zx"`, `"zy"`, `"zcd"`} {
+	for _, key := range []string{`"yt"`, `"ycd"`, `"wn"`, `"wx"`, `"wy"`, `"wcd"`, `"zt"`, `"zx"`, `"zy"`, `"zcd"`, `"zex"`, `"zey"`} {
 		if !strings.Contains(string(raw), key) {
 			t.Errorf("player json lacks %s: %s", key, raw)
 		}
@@ -919,5 +919,117 @@ func TestVulpixMirrorFrostIsEachOwnersBoostAndTheOtherOnesSlow(t *testing.T) {
 	}
 	if f := g.frostFactor(1); f != 1 {
 		t.Fatalf("slot 1 stands on neither: %v", f)
+	}
+}
+
+// ---- Freeze Beam: the beam hurts, freezes and is stopped by an opponent ----
+
+// beamConfig is vulpixConfig with a beam that hurts: 40 wide, 4 damage every half second, the 3rd hit freezes for 2 s.
+func beamConfig() Config {
+	cfg := vulpixConfig()
+	fb := &cfg.Vulpix.FreezeBeam
+	fb.Width, fb.Damage, fb.Interval, fb.FreezeHits, fb.FreezeDuration = 40, 4, 0.5, 3, 2
+	fb.StartDistance, fb.Length = 400, 500
+	return cfg
+}
+
+// beamAt starts the beam along +x from Vulpix at (300,250) with Snorlax x pixels in front of it, and returns after the first tick.
+func beamAt(cfg Config, x float64) *Game {
+	g := vg(cfg)
+	g.P[1].X, g.P[1].Y = 300+x, 250
+	g.P[0].AimX, g.P[0].AimY = 1, 0
+	g.P[0].In.Freeze = true
+	steps(g, 1)
+	g.P[0].In = Input{}
+	return g
+}
+
+func TestTheBeamStopsAtTheFirstOpponentInItsWayAndOnlyThere(t *testing.T) {
+	cfg := beamConfig()
+	r := cfg.Snorlax.Radius
+	g := beamAt(cfg, 300) // the end is 400 away: the opponent is in the way
+	if got, want := g.P[0].FBeamEX, 300+300-r-cfg.Vulpix.FreezeBeam.Width/2; math.Abs(got-want) > 1e-6 || g.P[0].FBeamEY != 250 {
+		t.Fatalf("beam ends at %v,%v, want %v,250 (the near edge of the opponent's reach)", got, g.P[0].FBeamEY, want)
+	}
+	if g.P[0].FBeamEX >= g.P[0].FBeamX {
+		t.Fatal("the beam was not cut")
+	}
+	g = beamAt(cfg, 440) // beyond the end of the beam: nothing in the way
+	if g.P[0].FBeamEX != g.P[0].FBeamX || g.P[1].HP != cfg.Snorlax.MaxHP {
+		t.Fatalf("beam end %v (stick %v), opponent HP %d: an opponent past the end must change nothing", g.P[0].FBeamEX, g.P[0].FBeamX, g.P[1].HP)
+	}
+}
+
+func TestTheBeamsWidthDecidesWhoIsInIt(t *testing.T) {
+	cfg := beamConfig()
+	gap := cfg.Snorlax.Radius + 10 // beside the line by more than the radius alone, less than radius + half the width
+	g := vg(cfg)
+	g.P[1].X, g.P[1].Y = 500, 250+gap
+	g.P[0].AimX, g.P[0].AimY = 1, 0
+	g.P[0].In.Freeze = true
+	steps(g, 1)
+	if g.P[1].HP == cfg.Snorlax.MaxHP {
+		t.Fatalf("an opponent %v beside the line was missed by a beam 40 wide", gap)
+	}
+	cfg.Vulpix.FreezeBeam.Width = 0
+	g = vg(cfg)
+	g.P[1].X, g.P[1].Y = 500, 250+gap
+	g.P[0].AimX, g.P[0].AimY = 1, 0
+	g.P[0].In.Freeze = true
+	steps(g, 3)
+	if g.P[1].HP != cfg.Snorlax.MaxHP {
+		t.Fatal("a beam of no width hit an opponent clear of the line")
+	}
+}
+
+func TestTheBeamHurtsOncePerIntervalAndFreezesOnEveryThirdHit(t *testing.T) {
+	cfg := beamConfig()
+	g := beamAt(cfg, 200)
+	hp := func() int { return cfg.Snorlax.MaxHP - g.P[1].HP }
+	if hp() != 4 {
+		t.Fatalf("the first tick did %d damage, want 4: the beam hurts as soon as it touches", hp())
+	}
+	steps(g, 10) // 0.33 s: inside the interval
+	if hp() != 4 {
+		t.Fatalf("%d damage inside the interval, want still 4", hp())
+	}
+	steps(g, 8) // past 0.5 s
+	if hp() != 8 || g.P[1].FrozenT != 0 {
+		t.Fatalf("%d damage / frozen %v after the second hit, want 8 and not frozen", hp(), g.P[1].FrozenT)
+	}
+	steps(g, 16) // past 1 s: the third hit
+	if hp() != 12 || g.P[1].FrozenT <= 0 {
+		t.Fatalf("%d damage / frozen %v after the third hit, want 12 and frozen", hp(), g.P[1].FrozenT)
+	}
+}
+
+func TestTheBeamHitsOnlyOpponentsInTheHeightBand(t *testing.T) {
+	cfg := beamConfig()
+	g := vg(cfg)
+	g.P[1].X, g.P[1].Y, g.P[1].Z = 500, 250, 100 // above the band
+	g.P[0].AimX, g.P[0].AimY = 1, 0
+	g.P[0].In.Freeze = true
+	steps(g, 3)
+	if g.P[1].HP != cfg.Snorlax.MaxHP || g.P[0].FBeamEX != g.P[0].FBeamX {
+		t.Fatalf("an opponent above the band stopped or hurt the beam: HP %d, end %v", g.P[1].HP, g.P[0].FBeamEX)
+	}
+}
+
+func TestEachCastCountsItsHitsFromZeroAndASquadBeamIsStoppedByTheNearerFoe(t *testing.T) {
+	cfg := beamConfig()
+	g := newTeamTestGame(vulpix, snorlax, pikachu, snorlax)
+	g.cfg = cfg
+	g.P[0].X, g.P[0].Y = 300, 250
+	g.P[1].X, g.P[1].Y = 700, 250 // far, on the line
+	g.P[3].X, g.P[3].Y = 450, 250 // near, on the line
+	g.P[2].X, g.P[2].Y = 380, 250 // a teammate in the way: no stop, no hurt
+	g.P[0].AimX, g.P[0].AimY = 1, 0
+	g.P[0].In.Freeze = true
+	steps(g, 1)
+	if g.P[3].HP == g.maxHP(3) || g.P[1].HP != g.maxHP(1) || g.P[2].HP != g.maxHP(2) {
+		t.Fatalf("HP of foes %d and %d and the teammate %d: only the nearer foe may be hurt", g.P[3].HP, g.P[1].HP, g.P[2].HP)
+	}
+	if g.P[0].FBeamEX >= 450 {
+		t.Fatalf("beam end %v: the nearer foe at 450 did not stop it", g.P[0].FBeamEX)
 	}
 }

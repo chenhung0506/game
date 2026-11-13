@@ -217,11 +217,16 @@
       "speed": 600,
       "cooldown": 12,
       "control_duration": 4,
-      "length": 500,
+      "length": 800,
       "start_distance": 50,
       "pillar_radius": 30,
       "pillar_hp": 10,
-      "pillar_duration": 8
+      "pillar_duration": 8,
+      "width": 40,
+      "damage": 3,
+      "interval": 0.5,
+      "freeze_hits": 3,
+      "freeze_duration": 2
     }
   },
   "rowlet": {

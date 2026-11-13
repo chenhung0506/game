@@ -26,7 +26,7 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 	var events []Event
 	p, other := &g.P[i], &g.P[g.nearestFoe(i)] // other: the foe its storm follows
 	fs, is, fb := g.cfg.Vulpix.FrostField, g.cfg.Vulpix.IceStorm, g.cfg.Vulpix.FreezeBeam
-	for _, cd := range []*float64{&p.FrostCD, &p.StormCD, &p.FBeamCD} {
+	for _, cd := range []*float64{&p.FrostCD, &p.StormCD, &p.FBeamCD, &p.FBeamIn} {
 		if *cd > 0 {
 			if *cd -= dt; *cd < 1e-9 {
 				*cd = 0
@@ -117,7 +117,7 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 
 	// ---- Freeze Beam ----
 	if in.Freeze && p.FBeamT == 0 && p.FBeamCD == 0 && p.FrostT == 0 { // not while riding: the beam roots it
-		p.FBeamT, p.FBeamCD = fb.ControlDuration, fb.Cooldown
+		p.FBeamT, p.FBeamCD, p.FBeamIn, p.FBeamHits = fb.ControlDuration, fb.Cooldown, 0, 0
 		p.FBeamX, p.FBeamY = g.clampBeamEnd(p, p.X+p.AimX*fb.StartDistance, p.Y+p.AimY*fb.StartDistance)
 		g.raisePillars(i, p.FBeamX, p.FBeamY, p.FBeamX, p.FBeamY)
 	} else if p.FBeamT > 0 {
@@ -126,9 +126,57 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 			p.FBeamX, p.FBeamY = g.clampBeamEnd(p, x0+p.AimX*fb.Speed*dt, y0+p.AimY*fb.Speed*dt)
 		}
 		g.raisePillars(i, x0, y0, p.FBeamX, p.FBeamY)
+	}
+	if p.FBeamT > 0 {
+		events = append(events, g.beamHits(i)...)
 		if p.FBeamT -= dt; p.FBeamT < 1e-9 {
 			p.FBeamT = 0
 		}
+	}
+	return events
+}
+
+// beamHits cuts slot i's beam short at the first opponent in its way and hurts that opponent once per `interval`. The beam is a
+// band `width` wide from the body to the stick's spot; an opponent inside the height band stops it where it first touches it,
+// which is the surface of the body nearest Vulpix, not its centre.
+func (g *Game) beamHits(i int) []Event {
+	p, fb := &g.P[i], g.cfg.Vulpix.FreezeBeam
+	p.FBeamEX, p.FBeamEY = p.FBeamX, p.FBeamY
+	l := math.Hypot(p.FBeamX-p.X, p.FBeamY-p.Y)
+	if l == 0 {
+		return nil
+	}
+	ux, uy := (p.FBeamX-p.X)/l, (p.FBeamY-p.Y)/l
+	var events []Event
+	first, at := -1, l
+	for _, j := range g.foes(i) {
+		f := &g.P[j]
+		if f.HP <= 0 || !fb.Reach.hits(f) {
+			continue
+		}
+		r := fb.Width/2 + g.radius(j)
+		d := segDist(f.X, f.Y, p.X, p.Y, p.FBeamX, p.FBeamY)
+		if d > r {
+			continue
+		}
+		t := math.Max(0, (f.X-p.X)*ux+(f.Y-p.Y)*uy) - math.Sqrt(math.Max(0, r*r-d*d))
+		if t = math.Max(t, 0); t <= at {
+			first, at = j, t
+		}
+	}
+	if first < 0 {
+		return nil
+	}
+	p.FBeamEX, p.FBeamEY = p.X+ux*at, p.Y+uy*at
+	if p.FBeamIn > 0 {
+		return nil
+	}
+	foe := &g.P[first]
+	g.hit(foe, fb.Damage)
+	p.FBeamIn = fb.Interval
+	if p.FBeamHits++; fb.FreezeHits > 0 && p.FBeamHits%fb.FreezeHits == 0 {
+		foe.FrozenT = math.Max(foe.FrozenT, fb.FreezeDuration)
+		events = append(events, Event{T: "freeze", X: foe.X, Y: foe.Y})
 	}
 	return events
 }
