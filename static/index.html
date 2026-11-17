@@ -37,6 +37,10 @@
   .knob { position: absolute; left: 38px; top: 38px; width: 60px; height: 60px; border-radius: 50%; background: #ffffff88; pointer-events: none; }
   .btn { display: flex; align-items: center; justify-content: center; background: #ffffff2a; border: 2px solid #ffffff66; color: #fff; font-weight: bold; }
   .btn.on { background: #ffffff77; }
+  .btn.ult { border-color: #ffd84a99; font-size: 12px; }
+  .btn.ult.ready { border-color: #ffe14a; background: #ffd84a55; box-shadow: 0 0 14px 4px #ffe14acc; animation: ultpulse .8s ease-in-out infinite alternate; }
+  @keyframes ultpulse { from { box-shadow: 0 0 8px 2px #ffe14a99; } to { box-shadow: 0 0 20px 7px #ffe14aee; } }
+  .btn .pct { position: absolute; bottom: 5px; left: 0; right: 0; font-size: 11px; text-align: center; pointer-events: none; color: #ffe9a0; }
   .aimring, .aimdot { position: absolute; left: 50%; top: 50%; border-radius: 50%; pointer-events: none; display: none; }
   .aimring { width: 150px; height: 150px; margin: -75px 0 0 -75px; border: 2px dashed #ffffff88; }
   .aimdot { width: 26px; height: 26px; margin: -13px 0 0 -13px; background: #ffd27acc; }
@@ -98,7 +102,7 @@ const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '�
 const FORMS = [...NAMES, '紅色暴鯉龍']; // every kind a player can be in: Magikarp becomes the last one (nobody picks it)
 const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰山滑行・冰風暴・急凍光線', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '拔樹・百萬噸拳擊・岩石陣', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球'];
 const HELP = [
-  '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）',
+  '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　Z＝千萬伏特（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能放；朝四周放出一圈閃電，之後追著敵人跑、碰到會擊退，時間到全部爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）',
   '你是噴火龍　移動 WASD　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　J＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　K＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
   '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　J＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　K＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）',
@@ -135,6 +139,7 @@ let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice P
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let voltCfg = { radius: 16, uses: 3, window: 2, scale: 1 }; // Volt Tackle, from 'hi'
+let ultCfg = [], tvoltCfg = { radius: 20, hp: 10, rrad: 220, boom: 120, time: 5, link: 9, tip: 0.6, charge: 2.4, ring: 0.6, bstart: 1.2, bcount: 6, bint: 0.2, boffs: [0], rscale: 1, bscale: 1 }; // per kind, the charge its ultimate (Z) needs (0 = it has none); Thousand Volt's, from 'hi'
 let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
 let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8, width: 0 }; // Vulpix's, from 'hi'
 let slashCfg = { radius: 8, scale: 0.5, hp: 1 }; // Rowlet's air slash, from 'hi'
@@ -143,6 +148,7 @@ const stormLook = perSlot(() => ({ x: null, y: 0 })), fbLook = perSlot(() => ({ 
 let fireCfg = { radius: 10, hp: 10 }, tossCfg = { radius: 45, high: 180 }, flyCfg = { height: 90 }; // Charizard's, from 'hi'
 let cdCfg = { dash: 0, thunder: 0, jump: 0, beam: 0, ball: 0, punch: 0, fly: 0, fire: 0, toss: 0 }; // full cooldowns, from 'hi'
 const cdBtns = []; // { span, field, total }: the pad's cooldown overlays
+let ultBtn = null; // the pad's ultimate button, when the character has one: { b, pct }
 let usesBadge = null; // Pikachu's main button: how many Volt Tackles are left
 const shadow = perSlot(() => ({ x: null, y: null })); // per slot: the smoothed thunder shadow position
 const smoke = []; // puffs rising off Snorlax while it recharges
@@ -193,7 +199,7 @@ const beamSlots = () => (snap ? [...snap.p.keys()].filter((i) => hasBeam(snap.p[
 const slotsOf = (k) => (snap ? [...snap.p.keys()].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.on || (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1])) return; // a match is on: a refused pick changes nothing
     if (teamSize !== (m.size || TEAM_BIG)) { teamSize = m.size || TEAM_BIG; myOrder = []; sentOrder = ''; } // another team size: choose again
@@ -227,6 +233,8 @@ ws.onmessage = (e) => {
       if (ev.t === 'gslam') shake = 12;
       if (ev.t === 'thunder') shake = 10;
       if (ev.t === 'explode') shake = 14;
+      if (ev.t === 'ult') shake = 10;
+      if (ev.t === 'voltburst') shake = Math.max(shake, 5);
       if (ev.t === 'iceburst') shake = 12;
       if (ev.t === 'wave') shake = 16;
       if (ev.t === 'tree') shake = 18;
@@ -441,7 +449,7 @@ function drawCards() {
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false }; // the pad's buttons
+const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false, ult: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -484,7 +492,7 @@ function sendInput() {
     razor: k('j') || touch.razor, vine: touch.vine,
     storm: k('j') || touch.storm, freeze: k('k') || touch.freeze,
     arrow: k('j') || touch.arrow, twister: k('k') || touch.twister,
-    comet: k('j') || touch.comet, rock: k('k') || touch.rock, mega: k('l') || touch.mega, gfire: k('j') || touch.gfire, sball: touch.sball,
+    comet: k('j') || touch.comet, rock: k('k') || touch.rock, mega: k('l') || touch.mega, gfire: k('j') || touch.gfire, sball: touch.sball, ult: k('z') || touch.ult, // Z is the third skill, the ultimate: a character without one ignores it
     tail: touch.tail, tx: Math.round(cast.x * 100) / 100 || 0, ty: Math.round(cast.y * 100) / 100 || 0, // the tail and the vines are cast when the button is let go (see endAim), not while it is held
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
@@ -529,9 +537,10 @@ if (PORTRAIT) {
 }
 
 // The pad: a stick bottom-left, and bottom-right a big main button with small ones around it.
-// A small slot that is null is reserved and not drawn.
+// A small slot that is null is reserved and not drawn. A character that has an ultimate (`ult`, the third skill, Z) gets three small
+// buttons in an arc round the main one, the ultimate on top; the others keep their two.
 const PAD = [
-  { main: ['伏特攻擊', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball', true]] }, // Pikachu
+  { main: ['伏特攻擊', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball', true]], ult: ['千萬伏特', 'ult'] }, // Pikachu
   { main: ['跳躍', 'skill'], small: [['死光', 'beam'], ['冰拳', 'punch']] }, // Snorlax
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
   { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine', true]] }, // Chikorita
@@ -545,7 +554,7 @@ const PAD = [
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
-  cdBtns.length = 0; usesBadge = null;
+  cdBtns.length = 0; usesBadge = null; ultBtn = null;
   const el = (cls) => { const d = document.createElement('div'); d.className = cls; document.body.append(d); return d; };
 
   const base = el('stick'), knob = document.createElement('div'); knob.className = 'knob'; base.append(knob);
@@ -571,7 +580,9 @@ function buildPad() {
   const hold = (b, label, name, aimed) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
-    cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1] });
+    if (name === 'ult') { // no cooldown: the dark pie is the charge still missing, and the button lights up when it is full
+      const pct = document.createElement('div'); pct.className = 'pct'; b.append(pct); b.classList.add('ult'); ultBtn = { b, span, pct };
+    } else cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1] });
     if (padKind === 0 && name === 'skill') { usesBadge = document.createElement('div'); usesBadge.className = 'uses'; b.append(usesBadge); }
     if (aimed) { // the button turns into a stick while it is held: the way it is dragged is the way the skill goes
       const ring = document.createElement('div'), dot = document.createElement('div'); ring.className = 'aimring'; dot.className = 'aimdot'; b.append(ring, dot);
@@ -600,12 +611,15 @@ function buildPad() {
   const mcx = EDGE + MAIN / 2, mcy = BOTTOM + MAIN / 2; // centre of the main button, from the right / bottom edges
   const [mainLabel, mainKey] = PAD[padKind].main;
   const main = el('btn'); place(main, MAIN, mcx, mcy); main.style.fontSize = '20px'; hold(main, mainLabel, mainKey);
-  const R = MAIN / 2 + SMALL / 2 + 8;
-  [[165, R], [105, R], [135, R + 50]].forEach(([deg, rr], n) => { // slot angles: round the upper-left of the main button; the third sits farther out
-    const def = PAD[padKind].small[n];
+  const R = MAIN / 2 + SMALL / 2 + 8, withUlt = PAD[padKind].ult && ultCfg[padKind] > 0;
+  // slot angles: round the upper-left of the main button; the third sits farther out. With an ultimate the three are one arc, 42 degrees
+  // apart (just clear of each other), from the left of the main button up to its top: J, K, then Z.
+  const slots = withUlt ? [[180, R], [138, R], [96, R]] : [[165, R], [105, R], [135, R + 50]];
+  slots.forEach(([deg, rr], n) => {
+    const def = withUlt ? [...PAD[padKind].small, PAD[padKind].ult][n] : PAD[padKind].small[n];
     if (!def) return;
     const b = el('btn'), a = deg * Math.PI / 180;
-    place(b, SMALL, mcx - rr * Math.cos(a), mcy + rr * Math.sin(a)); b.style.fontSize = '14px'; hold(b, def[0], def[1], def[2]);
+    place(b, SMALL, mcx - rr * Math.cos(a), mcy + rr * Math.sin(a)); b.style.fontSize = def[1] === 'ult' ? '12px' : '14px'; hold(b, def[0], def[1], def[2]);
   });
 }
 
@@ -1254,6 +1268,7 @@ function drawTelegraph() {
   for (const si of slotsOf(10)) drawTailWarning(snap.p[si], disp[si]);
   for (const si of [...slotsOf(7), ...slotsOf(8)]) drawTreeWarning(snap.p[si], disp[si]);
   for (const si of slotsOf(7)) drawMegaCharge(snap.p[si], disp[si]);
+  for (const si of slotsOf(0)) drawVoltCharge(si);
   if (aiming && AIMED[snap.p[you].k] === aiming.name) drawAimFan(snap.p[you], disp[you]);
 }
 // The fan of an aimed skill the player is choosing, drawn for them only (the opponent's page never gets it; it is not sent) until the cast, when the
@@ -1362,6 +1377,44 @@ function drawBallCharge(p, d) {
     ctx.restore();
   }
 }
+// One of Thousand Volt's bolts: a ball of electricity (the Electro Ball's look, `tip_ball_scale` x its radius big) with a thick line of
+// lightning running from it to where its flight out ended, and from there back to its Pikachu.
+function drawVoltBolt(b) {
+  const r = tvoltCfg.radius, j = (a) => (Math.random() - 0.5) * a;
+  const path = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); };
+  const o = b.sd ? disp[b.sd - 1] : null; // its Pikachu
+  if (o) {
+    const ax = b.ax ?? b.x, ay = b.ay ?? b.y;
+    const jag = (x0, y0, x1, y1) => { // a jagged run of lightning from (x0, y0) to (x1, y1)
+      const dd = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / (dd || 1), uy = (y1 - y0) / (dd || 1), nn = Math.max(2, Math.round(dd / 26)), pts = [[x0, y0]];
+      for (let k = 1; k < nn; k++) { const u = k / nn; pts.push([x0 + (x1 - x0) * u - uy * j(16), y0 + (y1 - y0) * u + ux * j(16)]); }
+      pts.push([x1, y1]); return pts;
+    };
+    const dp = Math.hypot(ax - o.x, ay - o.y), sx = o.x + (ax - o.x) / (dp || 1) * 10, sy = o.y + (ay - o.y) / (dp || 1) * 10; // from just in front of Pikachu
+    const run = [...jag(sx, sy, ax, ay), ...jag(ax, ay, b.x, b.y).slice(1)], W = tvoltCfg.link;
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    for (const [col, w] of [['rgba(150,80,0,.7)', W], ['rgba(255,200,30,.95)', W * 0.6], ['rgba(255,250,200,1)', W * 0.27]]) { ctx.strokeStyle = col; ctx.lineWidth = w; path(run); }
+    const kn = ctx.createRadialGradient(ax, ay, 0, ax, ay, W * 1.1); // a knot of light where the line bends
+    kn.addColorStop(0, 'rgba(255,255,255,.95)'); kn.addColorStop(0.5, 'rgba(255,220,70,.6)'); kn.addColorStop(1, 'rgba(255,190,30,0)');
+    ctx.fillStyle = kn; ctx.beginPath(); ctx.arc(ax, ay, W * 1.1, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  if (!(tvoltCfg.tip > 0)) return;
+  const R = r * tvoltCfg.tip, g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, R * 1.9);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,235,90,.7)'); g.addColorStop(1, 'rgba(255,190,30,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, R * 1.9, 0, 7); ctx.fill();
+  const core = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, R); core.addColorStop(0, '#fff'); core.addColorStop(0.5, '#ffe14a'); core.addColorStop(1, '#ffb000');
+  ctx.fillStyle = core; ctx.strokeStyle = '#eea83a'; ctx.lineWidth = Math.max(1.5, R * 0.18); ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, 7); ctx.fill(); ctx.stroke();
+  sparkBurst(b.x, b.y, R * 1.5, 5); // the same crackle as the Electro Ball's
+}
+// The ring Thousand Volt sets off: a shock wave out to the ring the bolts fly to.
+function drawUltRing(f) {
+  const k = f.age / 0.5, a = 1 - k;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = `rgba(255,235,90,${a})`; ctx.lineWidth = 10 * a + 2; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * Math.min(1, k * 1.6), 0, 7); ctx.stroke();
+  ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 0.6 * Math.min(1, k * 1.6), 0, 7); ctx.stroke();
+  ctx.restore();
+}
 function drawBall(b) {
   if (b.k === 1) { drawFireBall(b); return; }
   if (b.k === 2) { drawRazorLeaf(b); return; }
@@ -1373,6 +1426,7 @@ function drawBall(b) {
   if (b.k === 7) { drawCometFist(b); return; }
   if (b.k === 8) { drawGhostFlame(b.x, b.y, gengarCfg.fire); return; }
   if (b.k === 9) { drawShadowOrb(b); return; }
+  if (b.k === 11) { drawVoltBolt(b); return; }
   {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,170,20,0)');
@@ -1895,18 +1949,24 @@ function discLightning(R, black, bolts) {
 // black and white disc that swells, with lightning crackling inside it.
 function drawMegaCharge(p, d) {
   if (!(p.mgt > 0)) return;
-  const rs = megaCfg.rscale, bs = megaCfg.bscale, k = Math.min(Math.max(1 - p.mgt / Math.max(megaCfg.charge, 1e-6), 0), 1), base = Math.atan2(p.mgy, p.mgx);
+  const k = Math.min(Math.max(1 - p.mgt / Math.max(megaCfg.charge, 1e-6), 0), 1), base = Math.atan2(p.mgy, p.mgx);
   const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
   ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(base);
   ctx.fillStyle = `rgba(255,50,40,${0.1 + 0.3 * k})`; ctx.strokeStyle = `rgba(255,${120 + 80 * pulse | 0},60,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
   if (megaCfg.warn) { ctx.beginPath(); ctx.rect(0, -megaCfg.radius, megaCfg.dist, megaCfg.radius * 2); ctx.fill(); ctx.stroke(); } // the line of the fist, unless the config turns it off
   ctx.restore();
+  megaChargeFx(d, megaCfg, p.mgt, base);
+}
+// The gathering of a punch or of Thousand Volt: the bolts from the sky onto the hand, then the rings closing in on it, then the black and white ball
+// swelling. c is the look from the config (megaCfg, or tvoltCfg, which has the same keys), left the seconds of the gathering to go, base the way the hand points.
+function megaChargeFx(d, c, left, base) {
+  const rs = c.rscale, bs = c.bscale;
   const hx = d.x + Math.cos(base) * 24, hy = d.y + Math.sin(base) * 24;
-  const e = megaCfg.charge - p.mgt, ringT = megaCfg.ring, BOLT = 0.22; // e: seconds since the charge began
-  for (let n = 0; n < megaCfg.bcount; n++) { // the bolts from the sky onto the hand, and the flash each makes
-    const since = e - (megaCfg.bstart + n * megaCfg.bint);
+  const e = c.charge - left, ringT = c.ring, BOLT = 0.22; // e: seconds since the charge began
+  for (let n = 0; n < c.bcount; n++) { // the bolts from the sky onto the hand, and the flash each makes
+    const since = e - (c.bstart + n * c.bint);
     if (since < 0 || since >= BOLT) continue;
-    const a = 1 - since / BOLT, sy = screenY(hx, hy), off = megaCfg.boffs.length ? megaCfg.boffs[n % megaCfg.boffs.length] : 0;
+    const a = 1 - since / BOLT, sy = screenY(hx, hy), off = c.boffs.length ? c.boffs[n % c.boffs.length] : 0;
     upright(hx, hy, () => {
       ctx.fillStyle = `rgba(255,185,40,${0.65 * a})`; ctx.beginPath(); ctx.arc(0, 0, 70 * (e < ringT ? rs : bs), 0, 7); ctx.fill();
       ctx.lineJoin = 'round';
@@ -1925,8 +1985,15 @@ function drawMegaCharge(p, d) {
     ctx.restore();
     return;
   }
-  const v = Math.min((e - ringT) / Math.max(megaCfg.charge - ringT, 1e-6), 1), black = megaBlack(55), R = (16 + 30 * v) * bs;
+  const v = Math.min((e - ringT) / Math.max(c.charge - ringT, 1e-6), 1), black = megaBlack(55), R = (16 + 30 * v) * bs;
   megaBall(hx, hy, R, black);
+}
+// Pikachu gathering Thousand Volt: the Megaton Punch's gathering at its hand, on the side of the foe it will go for.
+function drawVoltCharge(i) {
+  const p = snap.p[i], d = disp[i];
+  if (!(p.uct > 0)) return;
+  const o = disp[foeOf(i)];
+  megaChargeFx(d, tvoltCfg, p.uct, Math.atan2(o.y - d.y, o.x - d.x));
 }
 // The black and white ball of the charge, flickering, with lightning inside it and a dashed ring round it (also the one that goes forward with Ash).
 function megaBall(hx, hy, R, black) {
@@ -2853,6 +2920,11 @@ function drawPlayer(i, p) {
     ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 36 * bs, 40, 6);
     const full = (snap.mx && snap.mx[i]) || maxHp[p.k]; // a 1v2's person may have extra HP
     ctx.fillStyle = p.hp > 0.3 * full ? '#6fd36f' : '#e55'; ctx.fillRect(-20, top - 36 * bs, 40 * Math.min(1, p.hp / full), 6);
+    if (ultCfg[p.k] > 0) { // the ultimate's charge, a thin bar under the HP; it flashes once it is full
+      const ch = Math.min(1, p.uc / ultCfg[p.k]);
+      ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 29 * bs, 40, 4);
+      ctx.fillStyle = ch >= 1 ? (Math.floor(performance.now() / 200) % 2 ? '#fff6a8' : '#ffd21f') : '#e0b020'; ctx.fillRect(-20, top - 29 * bs, 40 * ch, 4);
+    }
   });
 }
 
@@ -2865,6 +2937,12 @@ function drawCooldowns() {
   for (const c of cdBtns) {
     const total = cdCfg[c.total], left = snap.p[you][c.field];
     c.span.style.setProperty('--cd', (total > 0 ? Math.min(Math.max(left / total, 0), 1) * 360 : 0) + 'deg');
+  }
+  if (ultBtn) {
+    const need = ultCfg[snap.p[you].k] || 1, ch = Math.min(Math.max(snap.p[you].uc / need, 0), 1);
+    ultBtn.span.style.setProperty('--cd', (1 - ch) * 360 + 'deg');
+    ultBtn.b.classList.toggle('ready', ch >= 1);
+    ultBtn.pct.textContent = ch >= 1 ? 'Z' : Math.floor(ch * 100) + '%';
   }
   if (usesBadge) { const n = voltUses(snap.p[you]); usesBadge.textContent = '×' + n; usesBadge.classList.toggle('out', n === 0); }
 }
@@ -3088,11 +3166,12 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' ? 0.5 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' ? 0.5 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
-      else if (f.t === 'explode') drawExplosion(f);
+      else if (f.t === 'explode' || f.t === 'voltburst') drawExplosion(f);
+      else if (f.t === 'ult') drawUltRing(f);
       else if (f.t === 'airhit') drawAirHit(f);
       else if (f.t === 'freeze') drawFreezeBurst(f);
       else if (f.t === 'iceburst') drawIceBurst(f);

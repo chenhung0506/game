@@ -147,7 +147,7 @@ func (g *Game) whip(i int) []Event {
 		d := math.Hypot(dx, dy)
 		if tw.Reach.hits(other) && d <= tw.Length+g.radius(j) && (d < 1e-9 || (dx*ux+dy*uy)/d >= math.Cos(tw.Angle/2*math.Pi/180)) {
 			g.knockBack(p.X, p.Y, other, tw.Knockback, ux, uy)
-			other.StunT = math.Max(other.StunT, tw.StunDuration)
+			g.stun(other, tw.StunDuration)
 		}
 	}
 	return []Event{{T: "tail", X: p.X, Y: p.Y, R: tw.Length, DX: ux, DY: uy}}

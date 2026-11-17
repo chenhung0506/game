@@ -511,6 +511,8 @@ func (c *bctx) hazards() []hazard {
 		}
 		switch bl.K {
 		case ballPillar, ballGhost: // a ghost flame turns round, so a straight line is wrong for it: see flames
+		case ballVolt: // a bolt flies out and then chases, like a tornado
+			chase(bl.X, bl.Y, cfg.Pikachu.ThousandVolt.FollowSpeed, cfg.Pikachu.ThousandVolt.Radius)
 		case ballTornado:
 			if !bl.Caught {
 				chase(bl.X, bl.Y, cfg.Rowlet.Tornado.Speed, cfg.Rowlet.Tornado.Radius)
@@ -672,10 +674,15 @@ func (c *bctx) stay() Input { return Input{AimX: c.ux, AimY: c.uy} }
 func (b *Bot) pikachu(c *bctx) Input {
 	g, p, f := c.g, c.p, c.f
 	vt, bc := g.cfg.Pikachu.VoltTackle, g.cfg.Pikachu.ElectroBall
-	if p.ThunderLeft > 0 || p.BallT > 0 || p.FrozenT > 0 || p.Held {
+	if p.ThunderLeft > 0 || p.BallT > 0 || p.UltT > 0 || p.FrozenT > 0 || p.Held {
 		return c.stay() // rooted: nothing to decide
 	}
 	th := c.th
+	if p.Charge >= g.cfg.Pikachu.Ultimate.Max && g.cfg.Pikachu.ThousandVolt.Reach.hits(f) { // the ultimate is charged: the bolts find the opponent wherever it goes
+		in := c.stay()
+		in.Ult = true
+		return in
+	}
 	volley := f.Kind == rowlet && f.ArrowT > 0 // the arrows go where it stands when they leave: do not be rooted
 	canDash := p.DashT == 0 && (p.VoltLeft > 0 || p.DashCD == 0) && p.ParalyzeT == 0
 	// aligned reports whether a dash along the best 8-way direction would touch the opponent.

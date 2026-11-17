@@ -105,8 +105,9 @@ func (g *Game) stepVulpix(i int, in Input, dt float64) []Event {
 				if foe := &g.P[j]; is.Reach.hits(foe) && math.Hypot(foe.X-p.StormX, foe.Y-p.StormY) <= is.Radius+g.radius(j) {
 					g.hit(foe, is.Damage)
 					if p.StormHits++; p.StormHits%is.FreezeHits == 0 {
-						foe.FrozenT = math.Max(foe.FrozenT, is.FreezeDuration)
-						events = append(events, Event{T: "freeze", X: foe.X, Y: foe.Y})
+						if g.freeze(foe, is.FreezeDuration) {
+							events = append(events, Event{T: "freeze", X: foe.X, Y: foe.Y})
+						}
 					}
 				}
 			}
@@ -175,8 +176,9 @@ func (g *Game) beamHits(i int) []Event {
 	g.hit(foe, fb.Damage)
 	p.FBeamIn = fb.Interval
 	if p.FBeamHits++; fb.FreezeHits > 0 && p.FBeamHits%fb.FreezeHits == 0 {
-		foe.FrozenT = math.Max(foe.FrozenT, fb.FreezeDuration)
-		events = append(events, Event{T: "freeze", X: foe.X, Y: foe.Y})
+		if g.freeze(foe, fb.FreezeDuration) {
+			events = append(events, Event{T: "freeze", X: foe.X, Y: foe.Y})
+		}
 	}
 	return events
 }

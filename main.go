@@ -752,6 +752,9 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 		"razor":   map[string]float64{"radius": cfg.Chikorita.RazorLeaf.Radius, "scale": cfg.Chikorita.RazorLeaf.LeafScale, "hp": float64(cfg.Chikorita.RazorLeaf.LeafHP)},
 		"vine":    map[string]float64{"len": cfg.Chikorita.VineWhip.Length, "w": cfg.Chikorita.VineWhip.Width, "angle": cfg.Chikorita.VineWhip.SweepAngle, "duration": cfg.Chikorita.VineWhip.SweepDuration, "charge": cfg.Chikorita.VineWhip.ChargeDuration, "recharge": cfg.Chikorita.VineWhip.RechargeDuration},
 		"punch":   map[string]float64{"charge": cfg.Snorlax.IcePunch.ChargeDuration, "radius": cfg.Snorlax.IcePunch.Radius, "freeze": cfg.Snorlax.IcePunch.FreezeDuration, "distance": cfg.Snorlax.IcePunch.Distance},
+		"ult":     ultMax(cfg), // per kind: the charge its third skill (Z) needs, 0 = it has none
+		"tvolt": map[string]any{"radius": cfg.Pikachu.ThousandVolt.Radius, "hp": float64(cfg.Pikachu.ThousandVolt.HP), "rrad": cfg.Pikachu.ThousandVolt.RingRadius, "boom": cfg.Pikachu.ThousandVolt.ExplosionRadius, "time": cfg.Pikachu.ThousandVolt.TerminalTime,
+			"charge": cfg.Pikachu.ThousandVolt.RingDuration + cfg.Pikachu.ThousandVolt.BallDuration, "ring": cfg.Pikachu.ThousandVolt.RingDuration, "bstart": cfg.Pikachu.ThousandVolt.BoltStart, "bcount": cfg.Pikachu.ThousandVolt.BoltCount, "bint": cfg.Pikachu.ThousandVolt.BoltInterval, "boffs": cfg.Pikachu.ThousandVolt.BoltOffsets, "link": cfg.Pikachu.ThousandVolt.LinkWidth, "tip": cfg.Pikachu.ThousandVolt.TipBallScale, "rscale": cfg.Pikachu.ThousandVolt.RingScale, "bscale": cfg.Pikachu.ThousandVolt.BallScale},
 		"ball":    map[string]float64{"radius": cfg.Pikachu.ElectroBall.Radius, "hp": float64(cfg.Pikachu.ElectroBall.HP), "charge": cfg.Pikachu.ElectroBall.ChargeTime},
 		"beam":    map[string]float64{"len": hb.Length, "w": hb.Width, "charge": hb.ChargeDuration, "angle": hb.SweepAngle},
 		"gbeam":   map[string]float64{"len": gb.Length, "w": gb.Width, "charge": gb.ChargeDuration, "angle": gb.SweepAngle}, // Gyarados's own
@@ -867,6 +870,17 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 		r.g.P[idx].In = in
 		r.mu.Unlock()
 	}
+}
+
+// ultMax is, for each kind, the charge its ultimate needs (0 for a kind that has none), for the page's pad and its gauge.
+func ultMax(cfg Config) []float64 {
+	out := make([]float64, allForms)
+	for k := range out {
+		if u, ok := cfg.ultimateOf(k); ok {
+			out[k] = u.Max
+		}
+	}
+	return out
 }
 
 // b2f is 1 for true and 0 for false, for the numbers the page is sent.

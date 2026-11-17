@@ -67,6 +67,7 @@ type Input struct {
 	Mega    bool `json:"mega"`    // Ash only: Megaton Punch
 	Kick    bool `json:"kick"`    // Ash only, and only the computer's (a person's is dropped on the way in): High Jump Kick, which is Machamp's Skill
 	GFire   bool `json:"gfire"`   // Gengar only: Ghost Fire
+	Ult     bool `json:"ult"`     // the third skill (Z, the ultimate): it works once the character's charge is full
 	SBall   bool `json:"sball"`   // Gengar only: Shadow Ball (aimed like the Vine Whip, see CastX)
 	Shade   bool `json:"shade"`   // Gengar only, and only the computer's (a person's is dropped on the way in): Night Shade, the lobbed ball (aimed by CastX/CastY, whose length is how far)
 	// The stick's exact direction, a vector of any length (0,0 = none). Walking stays 8-way on DX/DY; this
@@ -87,6 +88,9 @@ type Player struct {
 	VZ   float64 `json:"-"`
 	HP   int     `json:"hp"`
 	In   Input   `json:"-"`
+	// The ultimate's charge, 0..Ultimate.Max of the character; only a character that has an ultimate gains any.
+	Charge float64 `json:"uc"`
+	UltT   float64 `json:"uct"` // Thousand Volt: seconds of its gathering left (Pikachu is rooted meanwhile)
 
 	FX           int     `json:"fx"` // last non-zero direction held; a dash with no keys goes this way, and so does the ball
 	FY           int     `json:"fy"`
@@ -315,36 +319,41 @@ const (
 	ballFist    = 7  // one of Machamp's Comet Punch fists: it hangs where it appeared, hits the opponent it touches once and has HP like a fire ball
 	ballGhost   = 8  // one of Gengar's Ghost Fire flames: it flies out, comes back to Gengar and hurts the opponent once; it has HP like a fire ball
 	ballSlash   = 10 // one of Rowlet's air slashes (thrown during the Air Slash drift): it flies straight at the foe it was thrown at, hurts what it touches and is spent
+	ballVolt    = 11 // one of Pikachu's Thousand Volt bolts: it flies out, chases the foe, pushes it back and explodes when its time is up; it has HP like a fire ball
 	ballShadow  = 9  // Gengar's Shadow Ball in charge mode: it flies straight like the Electro Ball, bursts where it is stopped and drags the opponent in; it has HP
 )
 
 // Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
 // touches the opponent, runs out of range or HP, or reaches a wall.
 type Ball struct {
-	K         int     `json:"k,omitempty"`  // ballElectro | ballFire | ballLeaf
-	Owner     int     `json:"-"`            // the slot that threw it; the other slot is its target
-	Side      int     `json:"sd,omitempty"` // a fist or a stone: its owner's slot + 1, for the page to tell Ash's from Machamp's
-	Left      float64 `json:"-"`            // fire ball: range left
-	X         float64 `json:"x"`
-	Y         float64 `json:"y"`
-	DX        float64 `json:"dx,omitempty"` // unit direction
-	DY        float64 `json:"dy,omitempty"`
-	Delay     float64 `json:"-"`           // leaf: seconds before it shoots
-	Wait      bool    `json:"w,omitempty"` // leaf: still hanging around Chikorita
-	HP        int     `json:"hp"`
-	LastSweep int     `json:"-"`            // the Hyper Beam sweep that last hit it
-	HitCD     float64 `json:"-"`            // until the beam may hit it again (hyper_beam.hit_interval)
-	LastPunch int     `json:"-"`            // the Ice Punch that last hit it
-	X0, Y0    float64 `json:"-"`            // where it was at the start of this step, for the projectile clash
-	Life      float64 `json:"lf,omitempty"` // pillar: seconds before it melts; tornado: seconds before it is gone (once it holds someone, the spin time left)
-	Caught    bool    `json:"cg,omitempty"` // tornado: it holds the opponent
-	GrindCD   float64 `json:"-"`            // pillar: until a tornado may wear it down again (spin_interval)
-	Carried   bool    `json:"-"`            // pillar: a tornado holds it up
-	Z         float64 `json:"z,omitempty"`  // pillar: height above the ground while a tornado carries it
-	Back      bool    `json:"bk,omitempty"` // ghost fire: it has flown out and is coming back to its owner
-	Hit       bool    `json:"-"`            // ghost fire: it has hurt the opponent already
-	FoeCD     float64 `json:"-"`            // ghost fire: until it may hurt the opponent again (rehit_interval)
-	Prey      int     `json:"-"`            // tornado: the slot it holds plus one (0: not recorded, whichever foe it is holding)
+	K         int             `json:"k,omitempty"`  // ballElectro | ballFire | ballLeaf
+	Owner     int             `json:"-"`            // the slot that threw it; the other slot is its target
+	Side      int             `json:"sd,omitempty"` // a fist or a stone: its owner's slot + 1, for the page to tell Ash's from Machamp's
+	Left      float64         `json:"-"`            // fire ball: range left
+	X         float64         `json:"x"`
+	Y         float64         `json:"y"`
+	DX        float64         `json:"dx,omitempty"` // unit direction
+	DY        float64         `json:"dy,omitempty"`
+	Delay     float64         `json:"-"`           // leaf: seconds before it shoots
+	Wait      bool            `json:"w,omitempty"` // leaf: still hanging around Chikorita
+	HP        int             `json:"hp"`
+	LastSweep int             `json:"-"`            // the Hyper Beam sweep that last hit it
+	HitCD     float64         `json:"-"`            // until the beam may hit it again (hyper_beam.hit_interval)
+	LastPunch int             `json:"-"`            // the Ice Punch that last hit it
+	X0, Y0    float64         `json:"-"`            // where it was at the start of this step, for the projectile clash
+	Life      float64         `json:"lf,omitempty"` // pillar: seconds before it melts; tornado: seconds before it is gone (once it holds someone, the spin time left)
+	Caught    bool            `json:"cg,omitempty"` // tornado: it holds the opponent
+	GrindCD   float64         `json:"-"`            // pillar: until a tornado may wear it down again (spin_interval)
+	Carried   bool            `json:"-"`            // pillar: a tornado holds it up
+	Z         float64         `json:"z,omitempty"`  // pillar: height above the ground while a tornado carries it
+	Back      bool            `json:"bk,omitempty"` // ghost fire: it has flown out and is coming back to its owner
+	Hit       bool            `json:"-"`            // ghost fire: it has hurt the opponent already
+	FoeCD     float64         `json:"-"`            // ghost fire: until it may hurt the opponent again (rehit_interval)
+	AnchorX   float64         `json:"ax,omitempty"` // thousand volt: where it finished flying out, which the line to its Pikachu runs through
+	AnchorY   float64         `json:"ay,omitempty"`
+	Hits      int             `json:"-"` // thousand volt: how many times it has touched a foe
+	Burst     *[maxSlots]bool `json:"-"` // thousand volt: the foes the explosions of its cast have hurt already (shared by the bolts of one cast)
+	Prey      int             `json:"-"` // tornado: the slot it holds plus one (0: not recorded, whichever foe it is holding)
 }
 
 // Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
@@ -578,6 +587,8 @@ func (g *Game) ballRadius(b *Ball) float64 {
 		return g.brawler(b.Owner).CometPunch.Radius
 	case ballGhost:
 		return g.cfg.Gengar.GhostFire.Radius
+	case ballVolt:
+		return g.cfg.Pikachu.ThousandVolt.Radius
 	case ballShadow:
 		return g.cfg.Gengar.ShadowBall.Radius
 	case ballArrow:
@@ -602,6 +613,8 @@ func (g *Game) ballMass(b *Ball) float64 {
 		return g.brawler(b.Owner).CometPunch.Mass
 	case ballGhost:
 		return g.cfg.Gengar.GhostFire.Mass
+	case ballVolt:
+		return g.cfg.Pikachu.ThousandVolt.Mass
 	case ballShadow:
 		return g.cfg.Gengar.ShadowBall.Mass
 	case ballTornado:
@@ -689,6 +702,10 @@ var (
 // Step advances the simulation by dt seconds and returns the effects to show.
 func (g *Game) Step(dt float64) []Event {
 	var events []Event
+	var hp0 [maxSlots]int // everyone's HP as the tick begins, for the ultimate's charge
+	for i := range g.P {
+		hp0[i] = g.P[i].HP
+	}
 	for i := range g.P {
 		p, other := &g.P[i], &g.P[g.nearestFoe(i)] // other: the foe the aimed skills turn to; the damage is dealt to every foe in reach (g.foes)
 		if len(g.P) > 2 && p.HP <= 0 {
@@ -710,11 +727,11 @@ func (g *Game) Step(dt float64) []Event {
 				}
 			}
 			in = Input{}
-			p.DashT, p.BallT, p.BreathT = 0, 0, 0 // a dash, a charge or a breath in progress is cut short
-			g.dropToss(i)                         // a Charizard caught mid-toss lets go
-			g.dropLeaf(i)                         // a Chikorita mid-hop or mid-slash is stopped
-			g.dropMachamp(i)                      // so is a Machamp mid-jump, mid-smash or mid-flurry
-			g.dropGengar(i)                       // and a Gengar comes up out of the ground
+			p.DashT, p.BallT, p.BreathT, p.UltT = 0, 0, 0, 0 // a dash, a charge, a breath or a gathering ultimate in progress is cut short
+			g.dropToss(i)                                    // a Charizard caught mid-toss lets go
+			g.dropLeaf(i)                                    // a Chikorita mid-hop or mid-slash is stopped
+			g.dropMachamp(i)                                 // so is a Machamp mid-jump, mid-smash or mid-flurry
+			g.dropGengar(i)                                  // and a Gengar comes up out of the ground
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
 			p.FrostT, p.FBeamT = 0, 0                              // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
 			p.DriftT, p.TwistT, p.TwistRecT, p.ArrowT = 0, 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
@@ -726,6 +743,11 @@ func (g *Game) Step(dt float64) []Event {
 		}
 		if p.SilentT > 0 { // under a Gengar's shadow: it can walk, but no skill starts
 			in = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY, CastX: in.CastX, CastY: in.CastY}
+		}
+		if p.UltT > 0 { // gathering the ultimate: no other skill starts
+			in = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY, CastX: in.CastX, CastY: in.CastY}
+		} else if p.Kind == pikachu && g.cfg.Pikachu.ThousandVolt.RootedWhileBolts && g.voltBoltsOut(i) {
+			in.Skill = false // its bolts are out and it stays where it is: no Volt Tackle either
 		}
 		for _, t := range []*float64{&p.BoundT, &p.ParalyzeT, &p.SlowT, &p.SilentT} {
 			if *t > 0 {
@@ -983,6 +1005,10 @@ func (g *Game) Step(dt float64) []Event {
 			}
 		}
 
+		ev, rooted := g.stepUltimate(i, in, dt)
+		events = append(events, ev...)
+		casting = casting || rooted
+
 		if p.DashT > 0 {
 			// Steering is locked while dashing. The last step is clipped so the
 			// total distance is exact whatever the tick length.
@@ -1071,7 +1097,9 @@ func (g *Game) Step(dt float64) []Event {
 	g.stepWells(dt)
 	g.stepWaves(dt)
 	events = append(events, g.stepBalls(dt)...)
-	return append(events, g.stepTwirl(dt)...)
+	events = append(events, g.stepTwirl(dt)...)
+	g.gainCharge(hp0, dt)
+	return events
 }
 
 // stepIcePunch runs Snorlax's Ice Punch: charge -> dash -> recharge, rooted through all three. The aim is
@@ -1271,6 +1299,14 @@ func (g *Game) stepBalls(dt float64) []Event {
 			events = append(events, g.shadowBlast(b.Owner, b.X, b.Y)...)
 			continue
 		}
+		if b.K == ballVolt {
+			alive, ev := g.stepVoltBolt(&b, dt)
+			events = append(events, ev...)
+			if alive {
+				kept = append(kept, b)
+			}
+			continue
+		}
 		if b.K == ballGhost {
 			if b.HP > 0 {
 				gf, owner := g.cfg.Gengar.GhostFire, &g.P[b.Owner]
@@ -1413,6 +1449,8 @@ func (g *Game) ballDamage(b *Ball) int {
 		return g.brawler(b.Owner).CometPunch.Damage
 	case ballGhost:
 		return g.cfg.Gengar.GhostFire.Damage
+	case ballVolt:
+		return g.cfg.Pikachu.ThousandVolt.ContactDamage
 	case ballShadow:
 		return g.cfg.Gengar.ShadowBall.Damage
 	case ballArrow:
@@ -1882,7 +1920,9 @@ func (g *Game) land(w, v int) []Event {
 		ip := g.cfg.Snorlax.IcePunch
 		p.PunchHit = true
 		g.hit(victim, ip.Damage)
-		victim.FrozenT = math.Max(victim.FrozenT, ip.FreezeDuration)
+		if !g.freeze(victim, ip.FreezeDuration) {
+			return nil
+		}
 		return []Event{{T: "freeze", X: victim.X, Y: victim.Y}}
 	case charizard:
 		victim.Held, victim.VZ = true, 0

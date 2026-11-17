@@ -67,6 +67,17 @@ type HyperBeamCfg struct {
 	Width            float64 `json:"width"`
 }
 
+// Ultimate is the charge a character's third skill (Z) needs. It starts the round empty and the skill only works once the charge
+// reaches `max`; casting empties it. It fills in three independent ways, each in charge points: `gain_taken` for every HP of
+// damage the character takes, `gain_dealt` for every HP of damage its foes take (in a 2v2 whoever hurt them, every foe of the
+// victim's counts), and `gain_per_second` just for time passing.
+type Ultimate struct {
+	Max           float64 `json:"max"`
+	GainTaken     float64 `json:"gain_taken"`
+	GainDealt     float64 `json:"gain_dealt"`
+	GainPerSecond float64 `json:"gain_per_second"`
+}
+
 // Config holds the tuning values. Distances are in game units and times are in seconds.
 type Config struct {
 	// Length runs between the two players (left-right on the web page, up-down on a phone), width
@@ -123,6 +134,45 @@ type Config struct {
 			Cooldown        float64 `json:"cooldown"`  // before the next ball; counted from the start of the charge
 			Mass            float64 `json:"mass"`      // see hyper_beam.mass: a heavier beam pushes the ball back by the difference
 		} `json:"electro_ball"`
+		// Thousand Volt (Z, the ultimate; the button is lit once `ultimate` is full, and the cast empties the charge): Pikachu first
+		// gathers, rooted, for `ring_duration` + `ball_duration` seconds (like the Megaton Punch: rings closing in on the hand, then a
+		// black and white ball swelling; being frozen, stunned or held breaks it, and the charge is gone). Only the look is set by
+		// `bolt_start`/`bolt_count`/`bolt_interval`/`bolt_offsets` (the bolts from the sky onto the hand, as the Megaton Punch's) and
+		// `ring_scale`/`ball_scale`. Then `count` bolts of lightning
+		// leave Pikachu all round it, fly out `ring_radius` at `spread_speed`, then each heads for the nearest foe at `follow_speed`
+		// wherever it goes. A bolt is a projectile (`radius` big, `hp` and `mass`: the foe's skills and projectiles wear it down; at 0 it
+		// is gone). Touching a foe it hurts it for `contact_damage` and pushes it `knockback` straight away from the bolt, and again
+		// every `rehit_interval` seconds it still overlaps (0: once). `terminal_time` seconds after the cast every bolt left blows up (sooner for a bolt that has touched a foe `hits_to_explode` times: it blows up at that touch):
+		// within `explosion_radius` a foe is hurt `explosion_damage`, once for the whole cast however many bolts reach it.
+		ThousandVolt struct {
+			Reach
+			RingDuration     float64   `json:"ring_duration"`
+			BallDuration     float64   `json:"ball_duration"`
+			BoltStart        float64   `json:"bolt_start"`
+			BoltCount        int       `json:"bolt_count"` // 0..20
+			BoltInterval     float64   `json:"bolt_interval"`
+			BoltOffsets      []float64 `json:"bolt_offsets"`
+			RingScale        float64   `json:"ring_scale"`
+			BallScale        float64   `json:"ball_scale"`
+			RingRadius       float64   `json:"ring_radius"`
+			SpreadSpeed      float64   `json:"spread_speed"`
+			FollowSpeed      float64   `json:"follow_speed"`
+			ContactDamage    int       `json:"contact_damage"`
+			Count            int       `json:"count"`
+			Radius           float64   `json:"radius"`
+			RehitInterval    float64   `json:"rehit_interval"`
+			HP               int       `json:"hp"`
+			Mass             float64   `json:"mass"`
+			Knockback        float64   `json:"knockback"`
+			TerminalTime     float64   `json:"terminal_time"`
+			TipBallScale     float64   `json:"tip_ball_scale"`     // how big the ball of electricity a bolt is drawn as is, as a multiple of `radius` (looks only; 0: no ball drawn)
+			LinkWidth        float64   `json:"link_width"`         // how thick the line of lightning joining a bolt to its Pikachu is drawn (looks only)
+			RootedWhileBolts bool      `json:"rooted_while_bolts"` // Pikachu cannot walk or dash from the cast until none of its bolts is left (gone or exploded)
+			HitsToExplode    int       `json:"hits_to_explode"`    // a bolt blows up at once on its Nth touch of a foe (0: never early)
+			ExplosionDamage  int       `json:"explosion_damage"`
+			ExplosionRadius  float64   `json:"explosion_radius"`
+		} `json:"thousand_volt"`
+		Ultimate Ultimate `json:"ultimate"` // how fast the charge for Thousand Volt fills
 	} `json:"pikachu"`
 	Snorlax struct {
 		MaxHP     int     `json:"max_hp"`
@@ -724,6 +774,14 @@ func DefaultConfig() Config {
 	c.Pikachu.ElectroBall.ExplosionDamage = 25
 	c.Pikachu.ElectroBall.Knockback = 120
 	c.Pikachu.ElectroBall.Cooldown = 3
+	tv := &c.Pikachu.ThousandVolt
+	tv.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	tv.RingDuration, tv.BallDuration, tv.BoltStart, tv.BoltCount, tv.BoltInterval = 0.6, 1.8, 1.2, 6, 0.2
+	tv.LinkWidth, tv.TipBallScale = 9, 0.6
+	tv.BoltOffsets, tv.RingScale, tv.BallScale = []float64{60, -60, -120, 120, 60, -60}, 2.2, 2
+	tv.RingRadius, tv.SpreadSpeed, tv.FollowSpeed, tv.ContactDamage, tv.Count, tv.Radius = 220, 400, 260, 4, 10, 16
+	tv.RehitInterval, tv.HP, tv.Mass, tv.Knockback, tv.TerminalTime, tv.ExplosionDamage, tv.ExplosionRadius = 0.5, 10, 20, 40, 5, 20, 110
+	c.Pikachu.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
 	c.Snorlax.MaxHP = maxHP
 	c.Snorlax.WalkSpeed = speed
 	c.Snorlax.Radius = snorlaxRadius
@@ -1087,6 +1145,14 @@ func (c Config) validate() error {
 		{"magikarp.jump.duration", c.Magikarp.Jump.Duration, 0},
 		{"magikarp.jump.air_speed_first_half", c.Magikarp.Jump.AirSpeedFirstHalf, 0},
 		{"magikarp.jump.air_speed_second_half", c.Magikarp.Jump.AirSpeedSecondHalf, 0},
+		{"pikachu.thousand_volt.ring_radius", c.Pikachu.ThousandVolt.RingRadius, 0},
+		{"pikachu.thousand_volt.spread_speed", c.Pikachu.ThousandVolt.SpreadSpeed, 0},
+		{"pikachu.thousand_volt.count", float64(c.Pikachu.ThousandVolt.Count), 0},
+		{"pikachu.thousand_volt.radius", c.Pikachu.ThousandVolt.Radius, 0},
+		{"pikachu.thousand_volt.hp", float64(c.Pikachu.ThousandVolt.HP), 0},
+		{"pikachu.thousand_volt.mass", c.Pikachu.ThousandVolt.Mass, 0},
+		{"pikachu.thousand_volt.terminal_time", c.Pikachu.ThousandVolt.TerminalTime, 0},
+		{"pikachu.ultimate.max", c.Pikachu.Ultimate.Max, 0},
 		{"gyarados.max_hp", float64(c.Gyarados.MaxHP), 0},
 		{"gyarados.walk_speed", c.Gyarados.WalkSpeed, 0},
 		{"gyarados.radius", c.Gyarados.Radius, 0},
@@ -1383,6 +1449,24 @@ func (c Config) validate() error {
 		{"gengar.shadow_sneak.cooldown", c.Gengar.ShadowSneak.Cooldown},
 		{"gengar.shadow_sneak.shadow_speed_first_half", c.Gengar.ShadowSneak.ShadowSpeedFirstHalf},
 		{"gengar.shadow_sneak.shadow_speed_second_half", c.Gengar.ShadowSneak.ShadowSpeedSecondHalf},
+		{"pikachu.thousand_volt.ring_duration", c.Pikachu.ThousandVolt.RingDuration},
+		{"pikachu.thousand_volt.ball_duration", c.Pikachu.ThousandVolt.BallDuration},
+		{"pikachu.thousand_volt.bolt_start", c.Pikachu.ThousandVolt.BoltStart},
+		{"pikachu.thousand_volt.bolt_interval", c.Pikachu.ThousandVolt.BoltInterval},
+		{"pikachu.thousand_volt.link_width", c.Pikachu.ThousandVolt.LinkWidth},
+		{"pikachu.thousand_volt.tip_ball_scale", c.Pikachu.ThousandVolt.TipBallScale},
+		{"pikachu.thousand_volt.ring_scale", c.Pikachu.ThousandVolt.RingScale},
+		{"pikachu.thousand_volt.ball_scale", c.Pikachu.ThousandVolt.BallScale},
+		{"pikachu.thousand_volt.follow_speed", c.Pikachu.ThousandVolt.FollowSpeed},
+		{"pikachu.thousand_volt.contact_damage", float64(c.Pikachu.ThousandVolt.ContactDamage)},
+		{"pikachu.thousand_volt.rehit_interval", c.Pikachu.ThousandVolt.RehitInterval},
+		{"pikachu.thousand_volt.knockback", c.Pikachu.ThousandVolt.Knockback},
+		{"pikachu.thousand_volt.explosion_damage", float64(c.Pikachu.ThousandVolt.ExplosionDamage)},
+		{"pikachu.thousand_volt.explosion_radius", c.Pikachu.ThousandVolt.ExplosionRadius},
+		{"pikachu.thousand_volt.hits_to_explode", float64(c.Pikachu.ThousandVolt.HitsToExplode)},
+		{"pikachu.ultimate.gain_taken", c.Pikachu.Ultimate.GainTaken},
+		{"pikachu.ultimate.gain_dealt", c.Pikachu.Ultimate.GainDealt},
+		{"pikachu.ultimate.gain_per_second", c.Pikachu.Ultimate.GainPerSecond},
 		{"gengar.ghost_fire.cooldown", c.Gengar.GhostFire.Cooldown},
 		{"gengar.ghost_fire.rehit_interval", c.Gengar.GhostFire.RehitInterval},
 		{"gengar.ghost_fire.damage", float64(c.Gengar.GhostFire.Damage)},
@@ -1424,6 +1508,12 @@ func (c Config) validate() error {
 			return fmt.Errorf("%s must be >= 0, got %v", f.name, f.v)
 		}
 	}
+	if n := c.Pikachu.ThousandVolt.BoltCount; n < 0 || n > 20 {
+		return fmt.Errorf("pikachu.thousand_volt.bolt_count must be 0..20, got %d", n)
+	}
+	if n := c.Pikachu.ThousandVolt.Count; n > maxVoltBolts {
+		return fmt.Errorf("pikachu.thousand_volt.count must be at most %d, got %d", maxVoltBolts, n)
+	}
 	if n := c.Ash.MegatonPunch.BoltCount; n < 0 || n > 20 {
 		return fmt.Errorf("ash.megaton_punch.bolt_count must be 0..20, got %d", n)
 	}
@@ -1433,6 +1523,7 @@ func (c Config) validate() error {
 		"pikachu.volt_tackle":    c.Pikachu.VoltTackle.Reach,
 		"pikachu.thunder":        c.Pikachu.Thunder.Reach,
 		"pikachu.electro_ball":   c.Pikachu.ElectroBall.Reach,
+		"pikachu.thousand_volt":  c.Pikachu.ThousandVolt.Reach,
 		"snorlax.jump":           c.Snorlax.Jump.Reach,
 		"snorlax.ice_punch":      c.Snorlax.IcePunch.Reach,
 		"snorlax.hyper_beam":     c.Snorlax.HyperBeam.Reach,

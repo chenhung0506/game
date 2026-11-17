@@ -303,7 +303,7 @@ func (g *Game) kickStep(i int, dt float64) []Event {
 		return nil
 	}
 	g.hit(other, hk.Damage)
-	other.StunT = math.Max(other.StunT, hk.StunDuration)
+	g.stun(other, hk.StunDuration)
 	g.knockBack(p.X, p.Y, other, hk.Knockback, p.KickX, p.KickY)
 	return []Event{{T: "kickhit", X: other.X, Y: other.Y, DX: p.KickX, DY: p.KickY}}
 }
@@ -348,7 +348,7 @@ func (g *Game) megatonPunch(i int) []Event {
 	for _, j := range hits {
 		other := &g.P[j]
 		g.hit(other, mp.Damage)
-		other.StunT = math.Max(other.StunT, mp.StunDuration)
+		g.stun(other, mp.StunDuration)
 		g.knockBack(p.X, p.Y, other, mp.Knockback, p.MegaX, p.MegaY)
 		events = append(events, Event{T: "megahit", X: other.X, Y: other.Y, DX: p.MegaX, DY: p.MegaY})
 	}
@@ -378,7 +378,7 @@ func (g *Game) smashTree(i int) []Event {
 	for _, j := range g.foes(i) {
 		if other := &g.P[j]; ts.Reach.hits(other) && treeHits(p.X, p.Y, p.TreeX, p.TreeY, other.X, other.Y, g.radius(j), ts.TrunkLength, ts.TrunkWidth, ts.LeafRadius, ts.LeafAngle) {
 			g.hit(other, ts.Damage)
-			other.StunT = math.Max(other.StunT, ts.StunDuration)
+			g.stun(other, ts.StunDuration)
 		}
 	}
 	return []Event{{T: "tree", X: p.X, Y: p.Y, R: ts.TrunkLength, DX: p.TreeX, DY: p.TreeY, K: p.Kind}}
