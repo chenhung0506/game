@@ -771,8 +771,8 @@ function artSnorlax(c, x, y, t, pose) {
     ov(c, -11, 17 - Math.max(0, sw) * 3, 7, 4.3, C); ov(c, 11, 17 - Math.max(0, -sw) * 3, 7, 4.3, C);
     ov(c, 0, 3, 22, 18, D);
     if (back) ov(c, 0, 3, 14, 11, DD, 0, null); else ov(c, 0, 6, 15, 12, C, 0, null);
-    ov(c, -16.8, -1.6 + sw * 2, 6, 8, D, 0.65); ov(c, 16.8, -1.6 - sw * 2, 6, 8, D, -0.65); // from high up by the neck, a little short, angled out: the belly is too big for them to hang straight
-    if (!back) { ov(c, -21.8, 5.2 + sw * 2, 4, 3, C, 0, null); ov(c, 21.8, 5.2 - sw * 2, 4, 3, C, 0, null); }
+    ov(c, -18, -1.6 + sw * 2, 6, 8, D, 0.65); ov(c, 18, -1.6 - sw * 2, 6, 8, D, -0.65); // from high up by the neck, a little short, angled out: the belly is too big for them to hang straight
+    if (!back) { ov(c, -23, 5.2 + sw * 2, 4, 3, C, 0, null); ov(c, 23, 5.2 - sw * 2, 4, 3, C, 0, null); }
     poly(c, [[-15, -20], [-13, -31], [-6, -24]], D); poly(c, [[15, -20], [13, -31], [6, -24]], D);
     ov(c, 0, -13, 16, 12.5, D);
     if (!back) {
