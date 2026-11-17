@@ -1075,8 +1075,52 @@ function artGyarados(c, x, y, t, pose) {
   c.restore();
 }
 
+// Charizard seen from the front: orange body and cream belly, a flame at the tail tip and two big teal wings. The wings beat all
+// the time, a lazy flutter standing and a hard fast beat in flight, with a small fast tremor on top.
+function artCharizardFront(c, x, y, t, flap) {
+  const beat = flap ? Math.sin(t * 26) * 0.5 : Math.sin(t * 9) * 0.14;
+  const ang = beat + Math.sin(t * 61) * 0.035; // the tremor
+  c.save();
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  // tail curling up behind, with a flickering flame on the tip
+  c.strokeStyle = '#d9622a'; c.lineWidth = 7;
+  c.beginPath(); c.moveTo(x + 7, y + 15); c.bezierCurveTo(x + 22, y + 23, x + 33, y + 11, x + 29, y - 3); c.stroke();
+  const fk = 1 + 0.22 * Math.sin(t * 31) + 0.12 * Math.sin(t * 47), tx = x + 29, ty = y - 5;
+  c.fillStyle = '#ff7a1a'; c.beginPath(); c.moveTo(tx - 5, ty + 2); c.quadraticCurveTo(tx - 6, ty - 8 * fk, tx + 1, ty - 17 * fk); c.quadraticCurveTo(tx + 7, ty - 8 * fk, tx + 5, ty + 2); c.closePath(); c.fill();
+  c.fillStyle = '#ffd84a'; c.beginPath(); c.moveTo(tx - 2.5, ty + 1); c.quadraticCurveTo(tx - 3, ty - 5 * fk, tx + 1, ty - 10 * fk); c.quadraticCurveTo(tx + 4, ty - 5 * fk, tx + 2.5, ty + 1); c.closePath(); c.fill();
+  // wings, behind the body: a bone along the front edge, a teal membrane with a scalloped back edge, narrow at the body and wide at the tip
+  for (const sd of [-1, 1]) {
+    c.save(); c.translate(x + sd * 8, y - 9); c.scale(sd, 1); c.rotate(-0.75 - ang);
+    c.fillStyle = '#2e9aa8'; c.strokeStyle = '#17606b'; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.lineTo(52, 27); c.lineTo(46, 18); c.lineTo(39, 30); c.lineTo(33, 18); c.lineTo(26, 24); c.lineTo(19, 12); c.lineTo(12, 15); c.lineTo(6, 8); c.lineTo(0, 7); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = '#17606b'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(54, -8); c.lineTo(52, 27); c.moveTo(54, -8); c.lineTo(39, 30); c.moveTo(54, -8); c.lineTo(26, 24); c.moveTo(54, -8); c.lineTo(12, 15); c.stroke();
+    c.strokeStyle = '#e8762a'; c.lineWidth = 3.2; c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.stroke(); // the leading bone
+    el(c, 55.5, -8.5, 2.6, 2.6, '#f6d58a'); // the claw at the wing's tip
+    c.restore();
+  }
+  // feet, body, belly, arms
+  el(c, x - 8, y + 21, 6.5, 4.5, '#d9622a'); el(c, x + 8, y + 21, 6.5, 4.5, '#d9622a');
+  el(c, x, y + 5, 15, 18, '#f08030');
+  el(c, x, y + 9, 9, 13, '#f6d58a');
+  c.strokeStyle = '#e0b866'; c.lineWidth = 1;
+  for (let r = 0; r < 4; r++) { c.beginPath(); c.moveTo(x - 7, y + 3 + r * 5); c.quadraticCurveTo(x, y + 5 + r * 5, x + 7, y + 3 + r * 5); c.stroke(); }
+  el(c, x - 16.5, y + 3, 4.5, 8, '#f08030', 0.25); el(c, x + 16.5, y + 3, 4.5, 8, '#f08030', -0.25);
+  // head: horns swept back, snout, eyes
+  c.fillStyle = '#c4501f';
+  c.beginPath(); c.moveTo(x - 6, y - 22); c.lineTo(x - 13, y - 33); c.lineTo(x - 2, y - 25); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(x + 6, y - 22); c.lineTo(x + 13, y - 33); c.lineTo(x + 2, y - 25); c.closePath(); c.fill();
+  el(c, x, y - 16, 11.5, 10, '#f08030');
+  c.strokeStyle = '#8a3a14'; c.lineWidth = 1; c.beginPath(); // a tiny pair of nostril slits and a small mouth, instead of a flat pink muzzle
+  c.moveTo(x - 1.9, y - 13.4); c.lineTo(x - 1.5, y - 12.2); c.moveTo(x + 1.9, y - 13.4); c.lineTo(x + 1.5, y - 12.2);
+  c.moveTo(x - 4, y - 8.6); c.quadraticCurveTo(x, y - 6.8, x + 4, y - 8.6); c.stroke();
+  el(c, x - 5.2, y - 19, 2.7, 3.1, '#fff'); el(c, x + 5.2, y - 19, 2.7, 3.1, '#fff');
+  el(c, x - 5.2, y - 18.4, 1.4, 2, '#1b5e8c'); el(c, x + 5.2, y - 18.4, 1.4, 2, '#1b5e8c');
+  c.restore();
+}
+
 // Charizard: an orange dragon with a cream belly, two horns swept back, a flame at the tail tip and two big wings (teal inside,
-// orange outside). Drawn per view like the others: pose.dir 0 front, 1 back, 2 left, 3 right (the side view faces right and is
+// orange outside). Drawn per view like the others: pose.dir 0 front (the original drawing), 1 back, 2 left, 3 right (the side view faces right and is
 // mirrored for left); the legs and arms swing with pose.ph while it runs. The wings beat all the time, a lazy flutter standing and
 // a hard fast beat in flight (flap), with a small fast tremor on top.
 function artCharizard(c, x, y, t, flap, pose = IDLE) {
@@ -1084,6 +1128,7 @@ function artCharizard(c, x, y, t, flap, pose = IDLE) {
   const beat = flap ? Math.sin(t * 26) * 0.5 : Math.sin(t * 9) * 0.14;
   const ang = beat + Math.sin(t * 61) * 0.035; // the tremor
   const O = '#f28a30', OD = '#cf5d1f', OL = '#fbb36a', CR = '#f8e2a4', CRD = '#dfb768', TE = '#34a8b6', TEF = '#237f8b', TED = '#17606b', HORN = '#b64a1c', CLAW = '#f6efd8', EYE = '#1f86b8';
+  if (dir === 0) return artCharizardFront(c, x, y + bob, t, flap); // the front is the first drawing, which reads better than a detailed one
   const sway = Math.sin(t * 3) * 2;
   const claw = (cx, cy, a, l = 3.4) => poly(c, [[cx - 1.2, cy], [cx + 1.2, cy], [cx + Math.sin(a) * l, cy + Math.cos(a) * l]], CLAW, 'rgba(90,60,20,.5)');
   const flame = (fx, fy, s = 1) => { // a flickering flame whose tip is at (fx, fy - height)
@@ -1114,8 +1159,9 @@ function artCharizard(c, x, y, t, flap, pose = IDLE) {
   };
   c.save(); c.translate(x, y + bob);
   c.lineJoin = 'round'; c.lineCap = 'round';
-  if (dir === 0 || dir === 1) {
-    const back = dir === 1;
+  if (dir === 2) c.scale(-1, 1); // the side view faces right; a left run is it mirrored
+  if (dir === 1) {
+    const back = true;
     const wings = () => { for (const sd of [-1, 1]) { c.save(); c.translate(sd * 8, -9); c.scale(sd, 1); c.rotate(-0.75 - ang); wing(back, false); c.restore(); } };
     const tl = () => tail(() => { c.beginPath(); c.moveTo(back ? 3 : 7, 15); c.bezierCurveTo(22, 24, 33, 11, 29, -3 + sway); }, 29, -4 + sway);
     if (!back) { tl(); wings(); }
