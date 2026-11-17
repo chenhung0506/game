@@ -681,7 +681,7 @@ function artPikachu(c, x, y, t, pose) {
     ov(c, -6, 15 - Math.max(0, sw) * 3, 4.5, 3, Y); ov(c, 6, 15 - Math.max(0, -sw) * 3, 4.5, 3, Y);
     ov(c, 0, 6, 10, 9.5, Y);
     if (back) { ov(c, 0, 3, 6.5, 1.3, BR, 0, null); ov(c, 0, 7, 6.5, 1.3, BR, 0, null); }
-    ov(c, -10.5, 6 + sw * 2, 3, 4.8, Y, 0.2); ov(c, 10.5, 6 - sw * 2, 3, 4.8, Y, -0.2);
+    ov(c, -9.5, 6 + sw * 2, 3, 4.8, Y, 0.2); ov(c, 9.5, 6 - sw * 2, 3, 4.8, Y, -0.2);
     for (const m of [-1, 1]) { // ears behind the head, black tips
       ov(c, m * 10, -20, 3.6, 9, Y, m * 0.35 + twitch * m); ov(c, m * 12.6, -27, 3.2, 3.6, '#222', m * 0.35 + twitch * m, null);
     }
@@ -752,7 +752,7 @@ function pikaCrawl(c, dir, sw, wag, twitch) {
   } else { // running away
     for (const m of [-1, 1]) { ov(c, m * 9, -12, 3.2, 7.5, Y, m * 0.7 + twitch * m); ov(c, m * 12.8, -16.5, 2.8, 3.1, '#222', m * 0.7 + twitch * m, null); }
     ov(c, 0, -4, 11, 9, Y);
-    ov(c, -9, -2 + sw * 2.5, 3, 2.8, YD); ov(c, 9, -2 - sw * 2.5, 3, 2.8, YD);
+    ov(c, -8.5, -2 + sw * 2.5, 3, 2.8, YD); ov(c, 8.5, -2 - sw * 2.5, 3, 2.8, YD);
     ov(c, 0, 6, 10.5, 8.5, Y);
     ov(c, 0, 3, 6.5, 1.3, BR, 0, null); ov(c, 0, 7, 6.5, 1.3, BR, 0, null);
     ov(c, -8, 14 - up(sw) * 3, 5, 3.3, Y); ov(c, 8, 14 - up(-sw) * 3, 5, 3.3, Y);
@@ -771,8 +771,8 @@ function artSnorlax(c, x, y, t, pose) {
     ov(c, -11, 17 - Math.max(0, sw) * 3, 7, 4.3, C); ov(c, 11, 17 - Math.max(0, -sw) * 3, 7, 4.3, C);
     ov(c, 0, 3, 22, 18, D);
     if (back) ov(c, 0, 3, 14, 11, DD, 0, null); else ov(c, 0, 6, 15, 12, C, 0, null);
-    ov(c, -18.2, -0.3 + sw * 2, 6, 9, D, 0.55); ov(c, 18.2, -0.3 - sw * 2, 6, 9, D, -0.55); // from high up by the neck, a little short, angled out: the belly is too big for them to hang straight
-    if (!back) { ov(c, -23.8, 8.3 + sw * 2, 4, 3, C, 0, null); ov(c, 23.8, 8.3 - sw * 2, 4, 3, C, 0, null); }
+    ov(c, -16.8, -1.6 + sw * 2, 6, 8, D, 0.65); ov(c, 16.8, -1.6 - sw * 2, 6, 8, D, -0.65); // from high up by the neck, a little short, angled out: the belly is too big for them to hang straight
+    if (!back) { ov(c, -21.8, 5.2 + sw * 2, 4, 3, C, 0, null); ov(c, 21.8, 5.2 - sw * 2, 4, 3, C, 0, null); }
     poly(c, [[-15, -20], [-13, -31], [-6, -24]], D); poly(c, [[15, -20], [13, -31], [6, -24]], D);
     ov(c, 0, -13, 16, 12.5, D);
     if (!back) {
@@ -1007,7 +1007,7 @@ function artAsh(c, x, y, t, pose) {
   ov(c, 0, 17, 13, 3.5, JEAND); // the belt line
   for (const m of [-1, 1]) { // arms swing against the legs; white sleeves, black gloves
     const swing = sw * m * 4;
-    ov(c, m * 12.8, 2.3 + swing, 4.5, 10, WHITE, -m * 0.2); ov(c, m * 15.5, 13.3 + swing, 4, 4, BLK); // the shoulder is where the sleeve starts (about 10.8 out, by the neck); the arm and hand angle out from there // the shoulders sit by the neck
+    ov(c, m * 11.8, 2.3 + swing, 4.5, 10, WHITE, -m * 0.2); ov(c, m * 14.5, 13.3 + swing, 4, 4, BLK); // the shoulder is where the sleeve starts (about 10.8 out, by the neck); the arm and hand angle out from there // the shoulders sit by the neck
   }
   ov(c, 0, -11, 11, 10.5, SKIN); // head
   if (back) ov(c, 0, -13, 11.5, 10.5, BLK); // the hair, all there is to see from behind
@@ -1075,6 +1075,13 @@ function artGyarados(c, x, y, t, pose) {
   c.restore();
 }
 
+// A tail along a cubic bezier given as [x0,y0, x1,y1, x2,y2, x3,y3], w0 wide at its root and w1 at its tip.
+function bezTail(c, p, w0, w1, col) {
+  const q = (u) => { const m = 1 - u; return [m * m * m * p[0] + 3 * m * m * u * p[2] + 3 * m * u * u * p[4] + u * u * u * p[6], m * m * m * p[1] + 3 * m * m * u * p[3] + 3 * m * u * u * p[5] + u * u * u * p[7]]; };
+  const N = 16; c.lineCap = 'round'; c.strokeStyle = col;
+  for (let k = 0; k < N; k++) { const a = q(k / N), b = q((k + 1) / N); c.lineWidth = w0 + (w1 - w0) * (k + 0.5) / N; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+}
+
 // Charizard seen from the front: orange body and cream belly, a flame at the tail tip and two big teal wings. The wings beat all
 // the time, a lazy flutter standing and a hard fast beat in flight, with a small fast tremor on top.
 function artCharizardFront(c, x, y, t, flap) {
@@ -1083,8 +1090,7 @@ function artCharizardFront(c, x, y, t, flap) {
   c.save();
   c.lineJoin = 'round'; c.lineCap = 'round';
   // tail curling up behind, with a flickering flame on the tip
-  c.strokeStyle = '#d9622a'; c.lineWidth = 7;
-  c.beginPath(); c.moveTo(x + 7, y + 15); c.bezierCurveTo(x + 22, y + 23, x + 33, y + 11, x + 29, y - 3); c.stroke();
+  bezTail(c, [x + 7, y + 15, x + 22, y + 23, x + 33, y + 11, x + 29, y - 3], 13, 5.5, '#d9622a'); // thick at the body, thinner to the flame
   const fk = 1 + 0.22 * Math.sin(t * 31) + 0.12 * Math.sin(t * 47), tx = x + 29, ty = y - 5;
   c.fillStyle = '#ff7a1a'; c.beginPath(); c.moveTo(tx - 5, ty + 2); c.quadraticCurveTo(tx - 6, ty - 8 * fk, tx + 1, ty - 17 * fk); c.quadraticCurveTo(tx + 7, ty - 8 * fk, tx + 5, ty + 2); c.closePath(); c.fill();
   c.fillStyle = '#ffd84a'; c.beginPath(); c.moveTo(tx - 2.5, ty + 1); c.quadraticCurveTo(tx - 3, ty - 5 * fk, tx + 1, ty - 10 * fk); c.quadraticCurveTo(tx + 4, ty - 5 * fk, tx + 2.5, ty + 1); c.closePath(); c.fill();
@@ -1093,8 +1099,9 @@ function artCharizardFront(c, x, y, t, flap) {
     c.save(); c.translate(x + sd * 8, y - 9); c.scale(sd, 1); c.rotate(-0.75 - ang);
     c.fillStyle = '#2e9aa8'; c.strokeStyle = '#17606b'; c.lineWidth = 1.4;
     c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.lineTo(52, 27); c.lineTo(46, 18); c.lineTo(39, 30); c.lineTo(33, 18); c.lineTo(26, 24); c.lineTo(19, 12); c.lineTo(12, 15); c.lineTo(6, 8); c.lineTo(0, 7); c.closePath(); c.fill(); c.stroke();
-    c.strokeStyle = '#17606b'; c.lineWidth = 1;
-    c.beginPath(); c.moveTo(54, -8); c.lineTo(52, 27); c.moveTo(54, -8); c.lineTo(39, 30); c.moveTo(54, -8); c.lineTo(26, 24); c.moveTo(54, -8); c.lineTo(12, 15); c.stroke();
+    for (const [w, col] of [[2.8, '#17606b'], [1.5, '#ee7a2a']]) { // the finger bones are orange too, out to the far edge of the wing
+      c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(54, -8); c.lineTo(52, 27); c.moveTo(54, -8); c.lineTo(39, 30); c.moveTo(54, -8); c.lineTo(26, 24); c.moveTo(54, -8); c.lineTo(12, 15); c.stroke();
+    }
     c.strokeStyle = '#e8762a'; c.lineWidth = 3.2; c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.stroke(); // the leading bone
     el(c, 55.5, -8.5, 2.6, 2.6, '#f6d58a'); // the claw at the wing's tip
     c.restore();
@@ -1137,11 +1144,8 @@ function artCharizard(c, x, y, t, flap, pose = IDLE) {
     c.fillStyle = '#ffb21e'; c.beginPath(); c.moveTo(fx - 3.4 * s, fy + 1.5); c.quadraticCurveTo(fx - 4 * s, fy - 6 * fk, fx + lean * 0.7, fy - 13 * fk); c.quadraticCurveTo(fx + 5 * s, fy - 6 * fk, fx + 3.4 * s, fy + 1.5); c.closePath(); c.fill();
     c.fillStyle = '#fff0a0'; c.beginPath(); c.moveTo(fx - 1.7 * s, fy + 1); c.quadraticCurveTo(fx - 2 * s, fy - 3 * fk, fx + lean * 0.4, fy - 7 * fk); c.quadraticCurveTo(fx + 2.6 * s, fy - 3 * fk, fx + 1.7 * s, fy + 1); c.closePath(); c.fill();
   };
-  const tail = (path, fx, fy) => { // a thick tail along a path, outlined, paler underneath, and the flame on its tip
-    c.lineCap = 'round';
-    c.strokeStyle = OUTLINE; c.lineWidth = 8.6; path(); c.stroke();
-    c.strokeStyle = O; c.lineWidth = 6.8; path(); c.stroke();
-    c.strokeStyle = OL; c.lineWidth = 2; path(); c.stroke();
+  const tail = (p, fx, fy) => { // a tail along a bezier, thick at the body, outlined, paler along the top, and the flame on its tip
+    bezTail(c, p, 15, 7.4, OUTLINE); bezTail(c, p, 13, 5.6, O); bezTail(c, p, 3.4, 1.6, OL);
     flame(fx, fy);
   };
   // a wing in its own frame, the root at (0, 0) and the leading bone along +x; back = seen from behind (the orange outside), far = the one on the other side
@@ -1151,8 +1155,9 @@ function artCharizard(c, x, y, t, flap, pose = IDLE) {
     c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.lineTo(52, 27); c.lineTo(46, 18); c.lineTo(39, 30); c.lineTo(33, 18); c.lineTo(26, 24); c.lineTo(19, 12); c.lineTo(12, 15); c.lineTo(6, 8); c.lineTo(0, 7); c.closePath(); c.fill(); c.stroke();
     c.fillStyle = back ? 'rgba(90,30,0,.18)' : 'rgba(255,255,255,.15)'; // the lit part of the membrane near the bone
     c.beginPath(); c.moveTo(5, 1); c.lineTo(50, -6); c.lineTo(47, 13); c.lineTo(20, 8); c.closePath(); c.fill();
-    c.strokeStyle = edge; c.lineWidth = 1;
-    c.beginPath(); c.moveTo(54, -8); c.lineTo(52, 27); c.moveTo(54, -8); c.lineTo(39, 30); c.moveTo(54, -8); c.lineTo(26, 24); c.moveTo(54, -8); c.lineTo(12, 15); c.stroke(); // the finger bones
+    for (const [w, col] of [[2.8, edge], [1.5, back ? '#f0832e' : '#ee7a2a']]) { // the finger bones are orange too, out to the far edge of the wing
+      c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(54, -8); c.lineTo(52, 27); c.moveTo(54, -8); c.lineTo(39, 30); c.moveTo(54, -8); c.lineTo(26, 24); c.moveTo(54, -8); c.lineTo(12, 15); c.stroke();
+    }
     c.lineCap = 'round'; c.strokeStyle = OD; c.lineWidth = 5; c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.stroke(); // the leading bone, with an outline
     c.strokeStyle = back ? '#e8762a' : '#f08030'; c.lineWidth = 3.2; c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.stroke();
     ov(c, 55.5, -8.5, 2.8, 2.8, CLAW);
@@ -1163,7 +1168,7 @@ function artCharizard(c, x, y, t, flap, pose = IDLE) {
   if (dir === 1) {
     const back = true;
     const wings = () => { for (const sd of [-1, 1]) { c.save(); c.translate(sd * 8, -9); c.scale(sd, 1); c.rotate(-0.75 - ang); wing(back, false); c.restore(); } };
-    const tl = () => tail(() => { c.beginPath(); c.moveTo(back ? 3 : 7, 15); c.bezierCurveTo(22, 24, 33, 11, 29, -3 + sway); }, 29, -4 + sway);
+    const tl = () => tail([back ? 3 : 7, 15, 22, 24, 33, 11, 29, -3 + sway], 29, -4 + sway);
     if (!back) { tl(); wings(); }
     for (const s of [-1, 1]) { // legs and feet: the one that steps lifts
       const lift = Math.max(0, s * sw) * 3;
@@ -1201,7 +1206,7 @@ function artCharizard(c, x, y, t, flap, pose = IDLE) {
   } else { // side view, facing right
     const a = sw * 0.8;
     const wingAt = (far) => { c.save(); c.translate(far ? -3 : -1, -9); c.rotate(-2.4 + ang + (far ? 0.18 : 0)); c.scale(0.86, -0.82); wing(false, far); c.restore(); };
-    tail(() => { c.beginPath(); c.moveTo(-8, 13); c.bezierCurveTo(-22, 23 + sway, -37, 15, -35, -1 + sway); }, -35, -2 + sway);
+    tail([-8, 13, -22, 23 + sway, -37, 15, -35, -1 + sway], -35, -2 + sway);
     wingAt(true);
     pikaLimb(c, -5, 15, 8, -a, 4.4, OD); claw(-5 + Math.sin(-a) * 8 + 5, 15 + Math.cos(-a) * 8 + 2.4, 1.2, 3);                 // the far leg
     pikaLimb(c, 4, -1, 9, 0.5 + sw * 0.5, 3.2, OD);                                                                              // the far arm
