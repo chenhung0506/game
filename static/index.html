@@ -139,7 +139,7 @@ let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice P
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let voltCfg = { radius: 16, uses: 3, window: 2, scale: 1 }; // Volt Tackle, from 'hi'
-let ultCfg = [], tvoltCfg = { radius: 20, hp: 10, rrad: 220, boom: 120, time: 5, link: 9, tip: 0.6, charge: 2.4, ring: 0.6, bstart: 1.2, bcount: 6, bint: 0.2, boffs: [0], rscale: 1, bscale: 1 }; // per kind, the charge its ultimate (Z) needs (0 = it has none); Thousand Volt's, from 'hi'
+let ultCfg = [], tvoltCfg = { jump: 0, radius: 20, hp: 10, rrad: 220, boom: 120, time: 5, link: 9, tip: 0.6, charge: 2.4, ring: 0.6, bstart: 1.2, bcount: 6, bint: 0.2, boffs: [0], rscale: 1, bscale: 1 }; // per kind, the charge its ultimate (Z) needs (0 = it has none); Thousand Volt's, from 'hi'
 let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
 let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8, width: 0 }; // Vulpix's, from 'hi'
 let slashCfg = { radius: 8, scale: 0.5, hp: 1 }; // Rowlet's air slash, from 'hi'
@@ -2873,7 +2873,12 @@ function drawPlayer(i, p) {
     }
   });
   if (p.k === 4 && p.yt > 0) drawIceberg(d, p);
-  drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose, p.tw === 1 ? performance.now() / 1000 * 14 : 0); // the body floats d.z above the ground; Charizard beats its wings hard in flight
+  let spin = p.tw === 1 ? performance.now() / 1000 * 14 : 0;
+  if (p.k === 0 && tvoltCfg.jump > 0) { // Thousand Volt's front flip: one turn over the rise, then upright for the stay and the way down
+    d.fl = p.z < 1 ? 0 : Math.min(1, Math.max(d.fl || 0, p.z / tvoltCfg.jump));
+    if (d.fl < 1) spin = d.fl * 2 * Math.PI;
+  }
+  drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose, spin); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
   if (p.kkp > 0) drawKickLeg(p, d, bs);
   if (p.bd > 0) drawBound(d, p);

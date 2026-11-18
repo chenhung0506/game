@@ -167,6 +167,7 @@ type Config struct {
 			TerminalTime     float64   `json:"terminal_time"`
 			TipBallScale     float64   `json:"tip_ball_scale"`     // how big the ball of electricity a bolt is drawn as is, as a multiple of `radius` (looks only; 0: no ball drawn)
 			LinkWidth        float64   `json:"link_width"`         // how thick the line of lightning joining a bolt to its Pikachu is drawn (looks only)
+			JumpHeight       float64   `json:"jump_height"`        // how high Pikachu flips up while it gathers and stays until its bolts are done (it rises and comes down over ring_duration)
 			RootedWhileBolts bool      `json:"rooted_while_bolts"` // Pikachu cannot walk or dash from the cast until none of its bolts is left (gone or exploded)
 			HitsToExplode    int       `json:"hits_to_explode"`    // a bolt blows up at once on its Nth touch of a foe (0: never early)
 			ExplosionDamage  int       `json:"explosion_damage"`
@@ -777,7 +778,7 @@ func DefaultConfig() Config {
 	tv := &c.Pikachu.ThousandVolt
 	tv.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	tv.RingDuration, tv.BallDuration, tv.BoltStart, tv.BoltCount, tv.BoltInterval = 0.6, 1.8, 1.2, 6, 0.2
-	tv.LinkWidth, tv.TipBallScale = 9, 0.6
+	tv.LinkWidth, tv.TipBallScale, tv.JumpHeight = 9, 0.6, 80
 	tv.BoltOffsets, tv.RingScale, tv.BallScale = []float64{60, -60, -120, 120, 60, -60}, 2.2, 2
 	tv.RingRadius, tv.SpreadSpeed, tv.FollowSpeed, tv.ContactDamage, tv.Count, tv.Radius = 220, 400, 260, 4, 10, 16
 	tv.RehitInterval, tv.HP, tv.Mass, tv.Knockback, tv.TerminalTime, tv.ExplosionDamage, tv.ExplosionRadius = 0.5, 10, 20, 40, 5, 20, 110
@@ -1454,6 +1455,7 @@ func (c Config) validate() error {
 		{"pikachu.thousand_volt.bolt_start", c.Pikachu.ThousandVolt.BoltStart},
 		{"pikachu.thousand_volt.bolt_interval", c.Pikachu.ThousandVolt.BoltInterval},
 		{"pikachu.thousand_volt.link_width", c.Pikachu.ThousandVolt.LinkWidth},
+		{"pikachu.thousand_volt.jump_height", c.Pikachu.ThousandVolt.JumpHeight},
 		{"pikachu.thousand_volt.tip_ball_scale", c.Pikachu.ThousandVolt.TipBallScale},
 		{"pikachu.thousand_volt.ring_scale", c.Pikachu.ThousandVolt.RingScale},
 		{"pikachu.thousand_volt.ball_scale", c.Pikachu.ThousandVolt.BallScale},

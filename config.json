@@ -70,6 +70,7 @@
       "terminal_time": 5,
       "hits_to_explode": 3,
       "link_width": 14,
+      "jump_height": 80,
       "tip_ball_scale": 0.8,
       "rooted_while_bolts": true,
       "explosion_damage": 5,

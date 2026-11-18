@@ -98,6 +98,30 @@ func (g *Game) stepUltimate(i int, in Input, dt float64) ([]Event, bool) {
 	return nil, true
 }
 
+// liftUltimate flips Pikachu up to jump_height while it gathers and keeps it there until its bolts are done, then lets it down. The rise and
+// the fall each take ring_duration. A Pikachu a Charizard holds is moved by the toss instead.
+func (g *Game) liftUltimate(i int, dt float64) {
+	p, tv := &g.P[i], g.cfg.Pikachu.ThousandVolt
+	if p.Kind != pikachu || p.Held {
+		return
+	}
+	want := 0.0
+	if p.UltT > 0 || (tv.RootedWhileBolts && g.voltBoltsOut(i)) {
+		want = tv.JumpHeight
+		p.Lifted = true
+	}
+	if !p.Lifted {
+		return
+	}
+	defer func() { p.Lifted = p.Z > 0 }()
+	if tv.RingDuration <= 0 {
+		p.Z = want
+		return
+	}
+	step := tv.JumpHeight / tv.RingDuration * dt
+	p.Z = math.Min(math.Max(want, p.Z-step), p.Z+step)
+}
+
 // thousandVolt lets the ring of bolts out round Pikachu slot i.
 func (g *Game) thousandVolt(i int) []Event {
 	p, tv := &g.P[i], g.cfg.Pikachu.ThousandVolt

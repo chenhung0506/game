@@ -536,6 +536,7 @@ func TestOnceTheBallOfAGatheringSwellsItsCasterCannotBeStunnedOrFrozen(t *testin
 
 func TestAnIcePunchDoesNotFreezeAPikachuGatheringItsBallButFreezesOneStillInTheRings(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Pikachu.ThousandVolt.JumpHeight = 0 // this is about the freeze, not the height the punch reaches
 	tv := cfg.Pikachu.ThousandVolt
 	for _, ball := range []bool{true, false} {
 		g := duel(cfg, pikachu, snorlax)
@@ -558,5 +559,29 @@ func TestAnIcePunchDoesNotFreezeAPikachuGatheringItsBallButFreezesOneStillInTheR
 		if ball && g.P[0].UltT <= 0 {
 			t.Fatal("the gathering was cut short though the freeze was shrugged off")
 		}
+	}
+}
+
+func TestThousandVoltLiftsPikachuToJumpHeightAndKeepsItThereUntilTheBoltsAreDone(t *testing.T) {
+	cfg := DefaultConfig()
+	tv := &cfg.Pikachu.ThousandVolt
+	tv.JumpHeight, tv.TerminalTime, tv.HitsToExplode, tv.ExplosionDamage, tv.RootedWhileBolts = 123, 1, 0, 0, true
+	g := pika(cfg, snorlax, true)
+	g.P[1].X, g.P[1].Y = 2000, 900
+	gpress(g, Input{Ult: true})
+	steps(g, int(tv.RingDuration*tickRate)+1)
+	if z := g.P[0].Z; z != 123 {
+		t.Fatalf("after the rise Z is %v, want 123", z)
+	}
+	ultimate(g)
+	if len(volts(g)) == 0 || g.P[0].Z != 123 {
+		t.Fatalf("with the bolts out Z is %v (bolts %d), want 123", g.P[0].Z, len(volts(g)))
+	}
+	for n := 0; len(volts(g)) > 0 && n < 5*tickRate; n++ {
+		g.Step(dt)
+	}
+	steps(g, int(tv.RingDuration*tickRate)+2)
+	if g.P[0].Z != 0 {
+		t.Fatalf("after the bolts are gone Z is %v, want 0", g.P[0].Z)
 	}
 }

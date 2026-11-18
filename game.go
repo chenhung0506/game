@@ -90,6 +90,7 @@ type Player struct {
 	In   Input   `json:"-"`
 	// The ultimate's charge, 0..Ultimate.Max of the character; only a character that has an ultimate gains any.
 	Charge float64 `json:"uc"`
+	Lifted bool    `json:"-"`   // Thousand Volt has Pikachu off the ground (so nothing else's Z is touched)
 	UltT   float64 `json:"uct"` // Thousand Volt: seconds of its gathering left (Pikachu is rooted meanwhile)
 
 	FX           int     `json:"fx"` // last non-zero direction held; a dash with no keys goes this way, and so does the ball
@@ -1008,6 +1009,7 @@ func (g *Game) Step(dt float64) []Event {
 		ev, rooted := g.stepUltimate(i, in, dt)
 		events = append(events, ev...)
 		casting = casting || rooted
+		g.liftUltimate(i, dt)
 
 		if p.DashT > 0 {
 			// Steering is locked while dashing. The last step is clipped so the
