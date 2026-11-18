@@ -74,7 +74,7 @@
       "sky_dark": 0.4,
       "flash_every": 15,
       "flash_alpha": 0.25,
-      "bolt_colors": ["#facc15", "#ff8c1a", "#ff3e3e"],
+      "bolt_colors": ["#facc15", "#ff8c1a", "#ff3e6c"],
       "tip_ball_scale": 0.8,
       "rooted_while_bolts": true,
       "explosion_damage": 4,
