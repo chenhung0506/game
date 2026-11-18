@@ -1247,12 +1247,13 @@ function artCharizard(c, x, y, t, flap, pose = IDLE) {
 }
 
 // (x, y) is a ground point in the world and lift is the height above it, which is up on screen.
-function drawBody(kind, X, Y, alpha, lift = 0, flap = 0, pose = IDLE, spin = 0) {
+function drawBody(kind, X, Y, alpha, lift = 0, flap = 0, pose = IDLE, spin = 0, tumble = 0) {
   const bs = radius[kind] / REF[kind];
   ctx.save(); ctx.translate(X, Y); ctx.rotate(-ROT); // upright whatever the view
   ctx.scale(bs, bs);
   ctx.globalAlpha = alpha;
   if (spin) { ctx.translate(0, -lift / bs); ctx.rotate(spin); ctx.translate(0, lift / bs); } // turned about its own centre (a tornado is spinning it)
+  if (tumble) { ctx.translate(0, -lift / bs); ctx.scale(1, Math.cos(tumble)); ctx.translate(0, lift / bs); } // a flip towards or away from the viewer: squashed flat and over
   art(ctx, kind, 0, -lift / bs, performance.now() / 1000, flap, pose); // lift is a height in world units, so it is not scaled
   ctx.restore();
 }
@@ -1960,7 +1961,7 @@ function drawMegaCharge(p, d) {
 }
 // The gathering of a punch or of Thousand Volt: the bolts from the sky onto the hand, then the rings closing in on it, then the black and white ball
 // swelling. c is the look from the config (megaCfg, or tvoltCfg, which has the same keys), left the seconds of the gathering to go, base the way the hand points.
-function megaChargeFx(d, c, left, base) {
+function megaChargeFx(d, c, left, base, yellow = false) {
   const rs = c.rscale, bs = c.bscale;
   const hx = d.x + Math.cos(base) * 24, hy = d.y + Math.sin(base) * 24;
   const e = c.charge - left, ringT = c.ring, BOLT = 0.22; // e: seconds since the charge began
@@ -1987,7 +1988,7 @@ function megaChargeFx(d, c, left, base) {
     return;
   }
   const v = Math.min((e - ringT) / Math.max(c.charge - ringT, 1e-6), 1), black = megaBlack(55), R = (16 + 30 * v) * bs;
-  megaBall(hx, hy, R, black);
+  if (yellow) voltBall(hx, hy, R); else megaBall(hx, hy, R, black);
 }
 // Pikachu gathering Thousand Volt: the Megaton Punch's gathering at its hand, on the side of the foe it will go for.
 function drawVoltCharge(i) {
@@ -1995,7 +1996,18 @@ function drawVoltCharge(i) {
   if (!(p.uct > 0)) return;
   const o = disp[foeOf(i)];
   const lu = toWorld(0, -d.z); // it gathers up in the air: the ring and the ball are at its height
-  megaChargeFx({ x: d.x + lu.x, y: d.y + lu.y }, tvoltCfg, p.uct, Math.atan2(o.y - d.y, o.x - d.x));
+  megaChargeFx({ x: d.x + lu.x, y: d.y + lu.y }, tvoltCfg, p.uct, Math.atan2(o.y - d.y, o.x - d.x), true);
+}
+// Pikachu's ball of the charge: a yellow orb of electricity (the Electro Ball's colours) with a crackle and a dashed ring, the black and white one is Ash's.
+function voltBall(hx, hy, R) {
+  const gr = ctx.createRadialGradient(hx, hy, R * 0.5, hx, hy, R * 2.2);
+  gr.addColorStop(0, 'rgba(255,225,70,.6)'); gr.addColorStop(1, 'rgba(255,190,30,0)');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(hx, hy, R * 2.2, 0, 7); ctx.fill();
+  const core = ctx.createRadialGradient(hx, hy, 0, hx, hy, R); core.addColorStop(0, '#fff'); core.addColorStop(0.5, '#ffe14a'); core.addColorStop(1, '#ffb000');
+  ctx.fillStyle = core; ctx.strokeStyle = '#eea83a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(hx, hy, R, 0, 7); ctx.fill(); ctx.stroke();
+  sparkBurst(hx, hy, R * 1.4, 7);
+  ctx.save(); ctx.strokeStyle = 'rgba(238,168,58,.8)'; ctx.lineWidth = 2; ctx.setLineDash([8, 7]); ctx.lineDashOffset = -performance.now() / 20;
+  ctx.beginPath(); ctx.arc(hx, hy, R * 1.35, 0, 7); ctx.stroke(); ctx.restore();
 }
 // The black and white ball of the charge, flickering, with lightning inside it and a dashed ring round it (also the one that goes forward with Ash).
 function megaBall(hx, hy, R, black) {
@@ -2875,12 +2887,15 @@ function drawPlayer(i, p) {
     }
   });
   if (p.k === 4 && p.yt > 0) drawIceberg(d, p);
-  let spin = p.tw === 1 ? performance.now() / 1000 * 14 : 0;
+  let spin = p.tw === 1 ? performance.now() / 1000 * 14 : 0, tumble = 0;
   if (p.k === 0 && tvoltCfg.jump > 0) { // Thousand Volt's front flip: one turn over the rise, then upright for the stay and the way down
     d.fl = p.z < 1 ? 0 : Math.min(1, Math.max(d.fl || 0, p.z / tvoltCfg.jump));
-    if (d.fl < 1) spin = d.fl * 2 * Math.PI;
+    if (d.fl < 1) { // a front flip turns the way it faces: clockwise facing right, the other way facing left, and over towards or away from the viewer facing down or up
+      const a = d.fl * 2 * Math.PI;
+      if (pose.dir === 3) spin = a; else if (pose.dir === 2) spin = -a; else tumble = a;
+    }
   }
-  drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose, spin); // the body floats d.z above the ground; Charizard beats its wings hard in flight
+  drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose, spin, tumble); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
   if (p.kkp > 0) drawKickLeg(p, d, bs);
   if (p.bd > 0) drawBound(d, p);
