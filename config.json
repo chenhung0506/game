@@ -59,7 +59,7 @@
       "ball_scale": 1.8,
       "ring_radius": 280,
       "spread_speed": 800,
-      "follow_speed": 300,
+      "follow_speed": 500,
       "contact_damage": 2,
       "count": 10,
       "radius": 20,
