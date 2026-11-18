@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strconv"
+	"strings"
 )
 
 // CourtSize is the playing field in game units.
@@ -154,6 +156,10 @@ type Config struct {
 			BoltOffsets      []float64 `json:"bolt_offsets"`
 			RingScale        float64   `json:"ring_scale"`
 			BallScale        float64   `json:"ball_scale"`
+			BoltColors       []string  `json:"bolt_colors"` // "#rrggbb": bolt n of a cast gets the (n mod how many there are)-th
+			SkyDark          float64   `json:"sky_dark"`    // 0..1: how dark the screen goes while a Thousand Volt is on (looks only; fades in and out)
+			FlashEvery       int       `json:"flash_every"` // the screen flashes white, clear, black, clear, each for this many frames while it is on; 0 = no flashing (looks only)
+			FlashAlpha       float64   `json:"flash_alpha"` // 0..1: how strong the flash is
 			RingRadius       float64   `json:"ring_radius"`
 			SpreadSpeed      float64   `json:"spread_speed"`
 			FollowSpeed      float64   `json:"follow_speed"`
@@ -779,6 +785,8 @@ func DefaultConfig() Config {
 	tv.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	tv.RingDuration, tv.BallDuration, tv.BoltStart, tv.BoltCount, tv.BoltInterval = 0.6, 1.8, 1.2, 6, 0.2
 	tv.LinkWidth, tv.TipBallScale, tv.JumpHeight = 9, 0.6, 80
+	tv.SkyDark, tv.FlashEvery, tv.FlashAlpha = 0.4, 15, 0.25
+	tv.BoltColors = []string{"#a855f7", "#ff8c1a", "#15151f"}
 	tv.BoltOffsets, tv.RingScale, tv.BallScale = []float64{60, -60, -120, 120, 60, -60}, 2.2, 2
 	tv.RingRadius, tv.SpreadSpeed, tv.FollowSpeed, tv.ContactDamage, tv.Count, tv.Radius = 220, 400, 260, 4, 10, 16
 	tv.RehitInterval, tv.HP, tv.Mass, tv.Knockback, tv.TerminalTime, tv.ExplosionDamage, tv.ExplosionRadius = 0.5, 10, 20, 40, 5, 20, 110
@@ -1512,6 +1520,17 @@ func (c Config) validate() error {
 	}
 	if n := c.Pikachu.ThousandVolt.BoltCount; n < 0 || n > 20 {
 		return fmt.Errorf("pikachu.thousand_volt.bolt_count must be 0..20, got %d", n)
+	}
+	if tv := c.Pikachu.ThousandVolt; tv.SkyDark < 0 || tv.SkyDark > 1 || tv.FlashAlpha < 0 || tv.FlashAlpha > 1 || tv.FlashEvery < 0 {
+		return fmt.Errorf("pikachu.thousand_volt: sky_dark and flash_alpha must be 0..1 and flash_every >= 0, got %v, %v, %d", tv.SkyDark, tv.FlashAlpha, tv.FlashEvery)
+	}
+	if len(c.Pikachu.ThousandVolt.BoltColors) == 0 {
+		return errors.New("pikachu.thousand_volt.bolt_colors needs at least one colour")
+	}
+	for _, s := range c.Pikachu.ThousandVolt.BoltColors {
+		if _, err := strconv.ParseUint(strings.TrimPrefix(s, "#"), 16, 32); err != nil || len(s) != 7 || s[0] != '#' {
+			return fmt.Errorf("pikachu.thousand_volt.bolt_colors: %q is not #rrggbb", s)
+		}
 	}
 	if n := c.Pikachu.ThousandVolt.Count; n > maxVoltBolts {
 		return fmt.Errorf("pikachu.thousand_volt.count must be at most %d, got %d", maxVoltBolts, n)

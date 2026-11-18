@@ -131,7 +131,7 @@ func (g *Game) thousandVolt(i int) []Event {
 		a := 2 * math.Pi * float64(n) / float64(tv.Count)
 		ux, uy := math.Cos(a), math.Sin(a)
 		reach := math.Max(off, tv.RingRadius) // where the bolt ends its flight out
-		g.Balls = append(g.Balls, Ball{K: ballVolt, Owner: i, Side: i + 1, X: p.X + ux*off, Y: p.Y + uy*off, AnchorX: math.Min(math.Max(p.X+ux*reach, 0), g.court.Length), AnchorY: math.Min(math.Max(p.Y+uy*reach, 0), g.court.Width), DX: ux, DY: uy, Left: math.Max(0, tv.RingRadius-off), HP: tv.HP, Life: tv.TerminalTime, Burst: burst})
+		g.Balls = append(g.Balls, Ball{K: ballVolt, Idx: n, Owner: i, Side: i + 1, X: p.X + ux*off, Y: p.Y + uy*off, AnchorX: math.Min(math.Max(p.X+ux*reach, 0), g.court.Length), AnchorY: math.Min(math.Max(p.Y+uy*reach, 0), g.court.Width), DX: ux, DY: uy, Left: math.Max(0, tv.RingRadius-off), HP: tv.HP, Life: tv.TerminalTime, Burst: burst})
 	}
 	return []Event{{T: "ult", X: p.X, Y: p.Y, R: tv.RingRadius, K: p.Kind}}
 }

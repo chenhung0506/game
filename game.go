@@ -350,6 +350,7 @@ type Ball struct {
 	Back      bool            `json:"bk,omitempty"` // ghost fire: it has flown out and is coming back to its owner
 	Hit       bool            `json:"-"`            // ghost fire: it has hurt the opponent already
 	FoeCD     float64         `json:"-"`            // ghost fire: until it may hurt the opponent again (rehit_interval)
+	Idx       int             `json:"ix,omitempty"` // thousand volt: which bolt of the cast it is (the client colours it by this)
 	AnchorX   float64         `json:"ax,omitempty"` // thousand volt: where it finished flying out, which the line to its Pikachu runs through
 	AnchorY   float64         `json:"ay,omitempty"`
 	Hits      int             `json:"-"` // thousand volt: how many times it has touched a foe

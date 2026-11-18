@@ -333,6 +333,24 @@ func TestUltimateConfigIsValidated(t *testing.T) {
 	if cfg.validate() == nil {
 		t.Fatal("a negative charge rate was accepted")
 	}
+	for _, bad := range []func(*Config){
+		func(c *Config) { c.Pikachu.ThousandVolt.SkyDark = 1.5 },
+		func(c *Config) { c.Pikachu.ThousandVolt.FlashAlpha = -0.1 },
+		func(c *Config) { c.Pikachu.ThousandVolt.FlashEvery = -1 },
+	} {
+		cfg = DefaultConfig()
+		bad(&cfg)
+		if cfg.validate() == nil {
+			t.Fatal("a sky that is out of range was accepted")
+		}
+	}
+	for _, colors := range [][]string{nil, {"purple"}, {"#a855f7", "#12"}, {"a855f7x"}} {
+		cfg = DefaultConfig()
+		cfg.Pikachu.ThousandVolt.BoltColors = colors
+		if cfg.validate() == nil {
+			t.Fatalf("bolt_colors %q was accepted", colors)
+		}
+	}
 }
 
 func TestThePikachuBotCastsTheUltimateOnlyOnceItIsCharged(t *testing.T) {
