@@ -158,7 +158,7 @@ type Config struct {
 			BallScale        float64   `json:"ball_scale"`
 			BoltColors       []string  `json:"bolt_colors"` // "#rrggbb": bolt n of a cast gets the (n mod how many there are)-th
 			SkyDark          float64   `json:"sky_dark"`    // 0..1: how dark the screen goes while a Thousand Volt is on (looks only; fades in and out)
-			FlashEvery       int       `json:"flash_every"` // the screen flashes white, clear, black, clear, each for this many frames while it is on; 0 = no flashing (looks only)
+			FlashEvery       int       `json:"flash_every"` // the screen flashes white, clear, black, clear, each for this many frames, on each Thousand Volt explosion and Thunder strike; 0 = no flashing (looks only)
 			FlashAlpha       float64   `json:"flash_alpha"` // 0..1: how strong the flash is
 			RingRadius       float64   `json:"ring_radius"`
 			SpreadSpeed      float64   `json:"spread_speed"`

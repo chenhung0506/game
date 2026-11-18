@@ -234,7 +234,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'thunder') { shake = 10; flashT = 4 * tvoltCfg.fevery; } // a strike lands: one white and black flash
       if (ev.t === 'explode') shake = 14;
       if (ev.t === 'ult') shake = 10;
-      if (ev.t === 'voltburst') shake = Math.max(shake, 5);
+      if (ev.t === 'voltburst') { shake = Math.max(shake, 5); flashT = 4 * tvoltCfg.fevery; } // an explosion: one white and black flash (the bolts of a cast go off together, still one flash)
       if (ev.t === 'iceburst') shake = 12;
       if (ev.t === 'wave') shake = 16;
       if (ev.t === 'tree') shake = 18;
@@ -3155,22 +3155,20 @@ function drawIsland() {
   ctx.restore();
 }
 
-// While a Thousand Volt is on (its gathering, then its bolts out) the sky goes dark and the screen flashes white and black all the while; while a Thunder
-// is on (from the cast until the last strike) the sky goes dark and the screen flashes once for each strike that lands. For everyone watching. Both use
-// pikachu.thousand_volt's sky_dark, flash_every and flash_alpha.
-let skyK = 0, skyFrames = 0, flashT = 0; // flashT: frames left of the flash a Thunder strike set off
+// While a Thousand Volt is on (its gathering, then its bolts out) the sky goes dark, and the screen flashes white and black once for each explosion; while a
+// Thunder is on (from the cast until the last strike) the sky goes dark and the screen flashes once for each strike that lands. For everyone watching.
+// Both use pikachu.thousand_volt's sky_dark, flash_every and flash_alpha.
+let skyK = 0, flashT = 0; // flashT: frames left of the flash an explosion or a Thunder strike set off
 const calm = matchMedia('(prefers-reduced-motion: reduce)'); // whoever asks the system for less motion gets the dark sky and no flashing
 function drawStormSky(dt) {
-  const volt = snap.p.some((p, i) => p.k === 0 && (p.uct > 0 || (snap.b || []).some((b) => b.k === 11 && b.sd === i + 1)));
-  const on = volt || snap.p.some((p) => p.k === 0 && p.tn > 0);
+  const on = snap.p.some((p, i) => p.k === 0 && (p.uct > 0 || (snap.b || []).some((b) => b.k === 11 && b.sd === i + 1))) || snap.p.some((p) => p.k === 0 && p.tn > 0);
   skyK = Math.min(1, Math.max(0, skyK + (on ? 1 : -1) * dt / 0.4)); // fades over 0.4 s
   const N = tvoltCfg.fevery;
-  if (skyK <= 0 && !(flashT > 0)) { skyFrames = 0; return; }
+  if (skyK <= 0 && !(flashT > 0)) return;
   ctx.fillStyle = `rgba(8,12,34,${tvoltCfg.dark * skyK})`; ctx.fillRect(0, 0, cv.width, cv.height);
   if (!(N > 0) || calm.matches) { flashT = 0; return; }
-  let s = -1; // white, clear, black, clear
-  if (volt) s = Math.floor(skyFrames++ / N) % 4;
-  else if (flashT > 0) s = Math.floor((4 * N - flashT--) / N) % 4;
+  if (!(flashT > 0)) return;
+  const s = Math.floor((4 * N - flashT--) / N) % 4; // white, clear, black, clear
   if (s === 0 || s === 2) { ctx.fillStyle = s === 0 ? `rgba(255,255,255,${tvoltCfg.falpha})` : `rgba(0,0,0,${tvoltCfg.falpha})`; ctx.fillRect(0, 0, cv.width, cv.height); }
 }
 
