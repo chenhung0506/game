@@ -1390,7 +1390,8 @@ function drawVoltBolt(b) {
       for (let k = 1; k < nn; k++) { const u = k / nn; pts.push([x0 + (x1 - x0) * u - uy * j(16), y0 + (y1 - y0) * u + ux * j(16)]); }
       pts.push([x1, y1]); return pts;
     };
-    const dp = Math.hypot(ax - o.x, ay - o.y), sx = o.x + (ax - o.x) / (dp || 1) * 10, sy = o.y + (ay - o.y) / (dp || 1) * 10; // from just in front of Pikachu
+    const lu = toWorld(0, -o.z), ox = o.x + lu.x, oy = o.y + lu.y; // Pikachu is up in the air while it holds the bolts out: the line starts at its height
+    const dp = Math.hypot(ax - ox, ay - oy), sx = ox + (ax - ox) / (dp || 1) * 10, sy = oy + (ay - oy) / (dp || 1) * 10; // from just in front of Pikachu
     const run = [...jag(sx, sy, ax, ay), ...jag(ax, ay, b.x, b.y).slice(1)], W = tvoltCfg.link;
     ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     for (const [col, w] of [['rgba(150,80,0,.7)', W], ['rgba(255,200,30,.95)', W * 0.6], ['rgba(255,250,200,1)', W * 0.27]]) { ctx.strokeStyle = col; ctx.lineWidth = w; path(run); }
@@ -1993,7 +1994,8 @@ function drawVoltCharge(i) {
   const p = snap.p[i], d = disp[i];
   if (!(p.uct > 0)) return;
   const o = disp[foeOf(i)];
-  megaChargeFx(d, tvoltCfg, p.uct, Math.atan2(o.y - d.y, o.x - d.x));
+  const lu = toWorld(0, -d.z); // it gathers up in the air: the ring and the ball are at its height
+  megaChargeFx({ x: d.x + lu.x, y: d.y + lu.y }, tvoltCfg, p.uct, Math.atan2(o.y - d.y, o.x - d.x));
 }
 // The black and white ball of the charge, flickering, with lightning inside it and a dashed ring round it (also the one that goes forward with Ash).
 function megaBall(hx, hy, R, black) {
