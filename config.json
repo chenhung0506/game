@@ -520,7 +520,7 @@
       "ball_follow_duration": 0.3,
       "ball_hit_scale": 0.6,
       "ball_hit_duration": 0.6,
-      "flash_every": 10
+      "flash_every": 5
     },
     "comet_punch": {
       "min_height": 0,
