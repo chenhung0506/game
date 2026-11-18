@@ -721,6 +721,7 @@ type BrawlerCfg struct {
 		BallFollowDuration float64   `json:"ball_follow_duration"` // ...and how long it stays
 		BallHitScale       float64   `json:"ball_hit_scale"`       // the black ball that bursts in lightning on the opponent it hits: its size (times ball_scale)...
 		BallHitDuration    float64   `json:"ball_hit_duration"`    // ...and how long the burst lasts
+		FlashEvery         int       `json:"flash_every"`          // Ash only: while the ball swells (`ball_duration`) the screen flashes white, clear, black, clear, each for this many frames; 0 = no flashing (looks only)
 	} `json:"megaton_punch"`
 	// Rock Tomb (K): Machamp jumps `height` up for `duration` seconds, steered in the air at `air_speed_first_half`
 	// then `air_speed_second_half`, and the landing raises `count` stones in a ring `ring_radius` from where it lands
@@ -985,6 +986,7 @@ func DefaultConfig() Config {
 	mp.Distance, mp.Radius, mp.Damage, mp.StunDuration, mp.Knockback, mp.Cooldown = 420, 45, 40, 1.5, 250, 14
 	mp.RingScale, mp.BallScale, mp.FistScale, mp.ImpactScale = 1, 1, 1, 1
 	mp.BallFollowScale, mp.BallFollowDuration, mp.BallHitScale, mp.BallHitDuration = 1, 0.3, 1, 0.6
+	mp.FlashEvery = 15
 	mp.LungeDistance, mp.ShowWarning, mp.ShowText = 120, true, true
 	mp.JumpDistance, mp.JumpDuration, mp.JumpHeight = 200, 0.4, 50
 	mp.FistStart, mp.FistEnd = 24, mp.Distance
@@ -1425,6 +1427,7 @@ func (c Config) validate() error {
 		{"ash.megaton_punch.bolt_interval", c.Ash.MegatonPunch.BoltInterval},
 		{"ash.megaton_punch.ball_follow_duration", c.Ash.MegatonPunch.BallFollowDuration},
 		{"ash.megaton_punch.ball_hit_duration", c.Ash.MegatonPunch.BallHitDuration},
+		{"ash.megaton_punch.flash_every", float64(c.Ash.MegatonPunch.FlashEvery)},
 		{"ash.megaton_punch.damage", float64(c.Ash.MegatonPunch.Damage)},
 		{"ash.megaton_punch.stun_duration", c.Ash.MegatonPunch.StunDuration},
 		{"ash.megaton_punch.knockback", c.Ash.MegatonPunch.Knockback},

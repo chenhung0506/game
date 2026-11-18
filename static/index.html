@@ -122,7 +122,7 @@ const beamLook = perSlot(() => ({ ang: null, tail: null })); // per slot: the sm
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, ctime: 0.8, pull: 1, orb: 30, orbhp: 30, nscale: 1, nslam: 110, nflight: 0.9, nlob: 150, sfire: 20 }; // Gengar's, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
-let megaCfg = { charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
+let megaCfg = { fevery: 0, charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
 const beamCfgOf = (k) => (k === 10 ? gbeamCfg : beamCfg);
@@ -3167,13 +3167,15 @@ function drawStormSky(dt) {
   const on = snap.p.some((p, i) => p.k === 0 && (p.uct > 0 || (snap.b || []).some((b) => b.k === 11 && b.sd === i + 1))) || snap.p.some((p) => p.k === 0 && p.tn > 0) || snap.p.some((p) => p.k === 7 && p.mgt > 0);
   const ball = snap.p.some((p) => p.k === 7 && p.mgt > 0 && p.mgt <= megaCfg.charge - megaCfg.ring); // the ball of a Megaton Punch is swelling
   skyK = Math.min(1, Math.max(0, skyK + (on ? 1 : -1) * dt / 0.4)); // fades over 0.4 s
-  const N = tvoltCfg.fevery;
+  const N = tvoltCfg.fevery, bn = megaCfg.fevery; // the frames a flash lasts: for the explosions and strikes, and for the ball of a Megaton Punch
   if (skyK <= 0 && !(flashT > 0) && !ball) return;
   ctx.fillStyle = `rgba(8,12,34,${tvoltCfg.dark * skyK})`; ctx.fillRect(0, 0, cv.width, cv.height);
-  if (!(N > 0) || calm.matches) { flashT = 0; return; }
+  if (calm.matches) { flashT = ballFrames = 0; return; }
+  let s = -1; // white, clear, black, clear
+  if (ball && bn > 0) s = Math.floor(ballFrames++ / bn) % 4;
+  else if (!ball && flashT > 0 && N > 0) s = Math.floor((4 * N - flashT--) / N) % 4;
   if (!ball) ballFrames = 0;
-  if (!ball && !(flashT > 0)) return;
-  const s = ball ? Math.floor(ballFrames++ / N) % 4 : Math.floor((4 * N - flashT--) / N) % 4; // white, clear, black, clear
+  if (!(N > 0)) flashT = 0;
   if (s === 0 || s === 2) { ctx.fillStyle = s === 0 ? `rgba(255,255,255,${tvoltCfg.falpha})` : `rgba(0,0,0,${tvoltCfg.falpha})`; ctx.fillRect(0, 0, cv.width, cv.height); }
 }
 

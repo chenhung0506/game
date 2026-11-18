@@ -519,7 +519,8 @@
       "ball_follow_scale": 1,
       "ball_follow_duration": 0.3,
       "ball_hit_scale": 0.6,
-      "ball_hit_duration": 0.6
+      "ball_hit_duration": 0.6,
+      "flash_every": 10
     },
     "comet_punch": {
       "min_height": 0,
@@ -530,10 +531,10 @@
       "cooldown": 8,
       "mass": 100,
       "ball_knockback": 120,
-      "knockback": 100,
+      "knockback": 50,
       "duration": 3,
       "quantity": 120,
-      "random_offset_angle": 75,
+      "random_offset_angle": 70,
       "distance": 500,
       "scatter_min_distance": 0,
       "scatter_max_distance": 100,
