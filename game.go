@@ -632,9 +632,6 @@ func (g *Game) ballMass(b *Ball) float64 {
 // knockBack pushes target d units straight away from (sx, sy), stopping at the walls. Standing exactly
 // on it there is no "away", so it goes along (fx, fy).
 func (g *Game) knockBack(sx, sy float64, target *Player, d, fx, fy float64) {
-	if target.Kind == dummy {
-		return // the dummy is planted
-	}
 	target.X, target.Y = g.pushedAway(target.X, target.Y, sx, sy, d, fx, fy)
 }
 

@@ -67,9 +67,10 @@
   #playmodes, #modes, #teambar, #tools, #botpick { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 0 0 12px; }
   #botpick { display: none; }
   #teambar { margin: 12px 0 0; }
-  #pick button, #repick { font: bold 15px system-ui; padding: 9px 16px; border-radius: 10px; border: 2px solid #3d4a40; background: #1b1f27; color: #eee; cursor: pointer; }
+  #pick button, #repick, #exitdummy { font: bold 15px system-ui; padding: 9px 16px; border-radius: 10px; border: 2px solid #3d4a40; background: #1b1f27; color: #eee; cursor: pointer; }
   #pick button.on { border-color: #6fd36f; background: #243026; }
   #pick button:disabled { opacity: .4; cursor: default; }
+  #exitdummy { position: fixed; right: 10px; top: 10px; z-index: 3; display: none; font-size: 14px; padding: 8px 14px; opacity: .85; }
   #repick { position: fixed; left: 50%; top: 56%; transform: translateX(-50%); z-index: 3; display: none; font-size: 18px; padding: 12px 26px; background: #243026; border-color: #6fd36f; }
   .card { position: relative; }
   .card .ord { position: absolute; top: 4px; left: 4px; min-width: 24px; height: 24px; line-height: 24px; border-radius: 12px; background: #6fd36f; color: #111; font: bold 15px/24px system-ui; font-style: normal; display: none; }
@@ -84,7 +85,7 @@
 <button id="reconnect">連線中斷　重新連線</button>
 <div id="rooms"><h2>選擇房間</h2><div id="roomlist"></div><button id="newroom">開新房間</button><div class="hint">灰色表示對方可能已斷線；沒有人等待時會自動開房</div></div>
 <div id="pick"><h2>選擇你的寶可夢</h2><div id="playmodes"><button data-play="computer">打電腦</button><button data-play="player">打玩家</button><button data-play="dummy">打木樁</button><button data-play="squad">2v2</button><button data-play="vs2">1v2</button></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="tools"><button id="botMain">單機對戰</button><button id="botOff">改和真人對戰</button><button id="easeBtn">放水 0%</button></div><div id="botpick"></div><div id="easebox"><label><span id="easelabel">放水</span> <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
-<button id="repick">重選角色</button>
+<button id="repick">重選角色</button><button id="exitdummy">退出木樁</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
 <script>
@@ -433,6 +434,7 @@ document.getElementById('botOff').onclick = () => { botOpen = false; send({ bot:
 document.getElementById('tClear').onclick = () => { myOrder = []; showPick(); };
 document.getElementById('tOk').onclick = () => { send({ order: myOrder }); sentOrder = myOrder.join(); showPick(); };
 document.getElementById('repick').onclick = () => send({ repick: true });
+document.getElementById('exitdummy').onclick = () => { const q = new URLSearchParams(location.search); q.set('play', 'computer'); location.search = q.toString(); }; // practice has no end: leave for the computer's room, whose lobby has the other ways to play
 // The cards show the real art, moving: the same drawing the arena uses.
 function drawCards() {
   if (document.getElementById('pick').style.display !== 'flex') return;
@@ -3240,6 +3242,7 @@ function frame() {
     drawResult();
   }
   ctx.restore();
+  document.getElementById('exitdummy').style.display = PLAY === 'dummy' && snap ? 'block' : 'none';
   document.getElementById('repick').style.display = snap && snap.w >= 0 && (!snap.tm || snap.tm.o) ? 'block' : 'none';
 
   bar.innerHTML = waiting ? '等待對手加入… 有人上線就會自動配對<br>（電腦橫式版：在網址後面加上 ?landscape）' : status === '連線中…' ? '' : status;

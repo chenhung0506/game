@@ -600,7 +600,7 @@ type Config struct {
 			GhostFireDamage         int     `json:"ghost_fire_damage"`
 		} `json:"night_shade"`
 	} `json:"gengar"`
-	// The practice dummy (the mode "打木樁"): a stump that never moves or hits back, with `max_hp` so high that a practice
+	// The practice dummy (the mode "打木樁"): a stump that stands still and never hits back (a blow can still knock it back, and it stays where it lands), with `max_hp` so high that a practice
 	// session does not end it, `radius` wide. It is only ever the computer's, in a room opened for practice.
 	Dummy struct {
 		MaxHP  int     `json:"max_hp"`

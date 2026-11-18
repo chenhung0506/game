@@ -60,8 +60,9 @@ type room struct {
 	team        bool
 	size        int // characters per side in a team match: teamSize3 or teamSize6; 0 is teamSize6
 	order       [2][teamSize6]int
-	ease        [2]int // each slot's handicap in percent, chosen in the lobby
-	cur         [2]int // index into order of the character each side is fielding
+	botPicked   [2]bool // a computer the person chose (the "換對手" list): it stays; the others are drawn again each time the character is picked again
+	ease        [2]int  // each slot's handicap in percent, chosen in the lobby
+	cur         [2]int  // index into order of the character each side is fielding
 	matchOver   bool
 	matchWinner int
 }
@@ -130,7 +131,7 @@ func sit(r *room, c *client) (idx int, ok bool) {
 	}
 	for i := range r.c { // no free slot: a person takes the place of the computer
 		if r.c[i] == nil {
-			r.c[i], r.bot[i] = c, nil
+			r.c[i], r.bot[i], r.botPicked[i] = c, nil, false
 			r.pick[i], r.ease[i] = -1, 0
 			r.overAt, r.winner, r.matchOver = time.Time{}, -1, false
 			return i, true
@@ -430,13 +431,13 @@ func (r *room) setBot(idx, kind int) bool {
 		return false
 	}
 	if kind < 0 {
-		r.bot[o], r.pick[o] = nil, -1
+		r.bot[o], r.pick[o], r.botPicked[o] = nil, -1, false
 		return true
 	}
 	if !botCanPlay(kind) {
 		return false
 	}
-	r.bot[o], r.pick[o], r.ease[o] = newBot(kind, uint64(time.Now().UnixNano())), kind, 0
+	r.bot[o], r.pick[o], r.ease[o], r.botPicked[o] = newBot(kind, uint64(time.Now().UnixNano())), kind, 0, true
 	r.startIfReady()
 	return true
 }
@@ -527,9 +528,24 @@ func (r *room) repick() bool {
 	if r.overAt.IsZero() || !r.matchEnded() {
 		return false
 	}
+	r.drawBots()
 	r.clearPicks()
 	r.overAt, r.winner, r.matchOver = time.Time{}, -1, false
 	return true
+}
+
+// drawBots gives every computer the person did not choose a new random character, for the next match. The dummy and a team match are left alone.
+// Must be called with r.mu held.
+func (r *room) drawBots() {
+	if r.dummy || r.team {
+		return
+	}
+	for i, b := range r.bot {
+		if b != nil && !r.botPicked[i] {
+			kind := botKinds[rand.IntN(len(botKinds))]
+			r.bot[i] = newBot(kind, uint64(time.Now().UnixNano()))
+		}
+	}
 }
 
 // matchEnded is whether the bout that just finished ends the match: always for a single match.

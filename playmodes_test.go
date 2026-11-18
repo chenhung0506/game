@@ -73,7 +73,7 @@ func TestThePracticeRoomHoldsADummyAshMayBePlayedAndNobodyElseGetsIn(t *testing.
 	}
 }
 
-func TestADummyIsNotMovedByAKnockbackButTakesTheHit(t *testing.T) {
+func TestADummyIsKnockedBackAndTakesTheHit(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Ash.MegatonPunch.JumpDuration = 0
 	g := duel(cfg, ash, dummy)
@@ -81,7 +81,7 @@ func TestADummyIsNotMovedByAKnockbackButTakesTheHit(t *testing.T) {
 	g.P[1].X = 600
 	press(g, 0, Input{Mega: true})
 	steps(g, int((cfg.Ash.MegatonPunch.RingDuration+cfg.Ash.MegatonPunch.BallDuration)/dt)+2)
-	if g.P[1].X != 600 || g.P[1].HP != cfg.Dummy.MaxHP-cfg.Ash.MegatonPunch.Damage {
+	if g.P[1].X <= 600 || g.P[1].HP != cfg.Dummy.MaxHP-cfg.Ash.MegatonPunch.Damage {
 		t.Fatalf("dummy at x=%v HP=%d", g.P[1].X, g.P[1].HP)
 	}
 }
@@ -144,5 +144,33 @@ func TestTheWarningLineCanBeSwitchedOffInTheConfigTheClientIsSent(t *testing.T) 
 			t.Fatalf("show_warning %v: client sent %v", on, hi["mega"])
 		}
 		srv.Close()
+	}
+}
+
+func TestAComputerOpponentIsDrawnAgainWhenCharactersAreChosenAgainUnlessThePersonChoseIt(t *testing.T) {
+	h := newHub(DefaultConfig())
+	r := h.open(modeWeb)
+	r.bot[1], r.pick[1] = newBot(pikachu, 1), pikachu
+	seen := map[int]bool{}
+	for n := 0; n < 200; n++ {
+		r.drawBots()
+		seen[r.bot[1].kind] = true
+	}
+	if len(seen) < 3 {
+		t.Fatalf("an opponent nobody chose stayed among %v", seen)
+	}
+	r.botPicked[1] = true
+	r.bot[1] = newBot(snorlax, 1)
+	for n := 0; n < 50; n++ {
+		r.drawBots()
+	}
+	if r.bot[1].kind != snorlax {
+		t.Fatalf("the opponent the person chose was changed to %d", r.bot[1].kind)
+	}
+	r.botPicked[1], r.dummy = false, true
+	r.bot[1] = newBot(dummy, 1)
+	r.drawBots()
+	if r.bot[1].kind != dummy {
+		t.Fatal("the dummy was drawn again")
 	}
 }
