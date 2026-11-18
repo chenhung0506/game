@@ -101,7 +101,7 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟', '鯉魚王', '小智', '怪力', '梗鬼'];
 const FORMS = [...NAMES, '紅色暴鯉龍']; // every kind a player can be in: Magikarp becomes the last one (nobody picks it)
-const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰山滑行・冰風暴・急凍光線', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '拔樹・百萬噸拳擊・岩石陣', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球'];
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰山滑行・冰風暴・急凍光線', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球'];
 const HELP = [
   '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　Z＝千萬伏特（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能放；朝四周放出一圈閃電，之後追著敵人跑、碰到會擊退，時間到全部爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）',
@@ -110,7 +110,7 @@ const HELP = [
   '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
   '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝空氣斬（朝按住的方向衝出一道半月形弧線，彎向敵人那一側，沿途朝最近的敵人射出一道道白色的空氣斬擊，打得到貼地的敵人）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
-  '你是真新鎮小智　移動 WASD　空白鍵＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）　L＝百萬噸拳擊（朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
+  '你是真新鎮小智　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人）　Z＝百萬噸拳擊（絕招，蓄能滿了才能放；天色會變暗。朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），蓄力後半段畫面會閃爍，朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
   '你是怪力　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝子彈拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
   '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才發射；輕點就朝敵人；定身蓄力一下後，球筆直飛出去，碰到敵人、牆或被打爆就爆炸，會把範圍內的敵人往中心吸過去一陣子，並向外炸出一圈不會回頭的紫色火焰；球有血量，敵人的招式和飛行物可以提早打爆它）',
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
@@ -451,7 +451,7 @@ function drawCards() {
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false, ult: false }; // the pad's buttons
+const touch = { tree: false, skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false, ult: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -495,7 +495,7 @@ function sendInput() {
     razor: k('j') || touch.razor, vine: touch.vine,
     storm: k('j') || touch.storm, freeze: k('k') || touch.freeze,
     arrow: k('j') || touch.arrow, twister: k('k') || touch.twister,
-    comet: k('j') || touch.comet, rock: k('k') || touch.rock, mega: k('l') || touch.mega, gfire: k('j') || touch.gfire, sball: touch.sball, ult: k('z') || touch.ult, // Z is the third skill, the ultimate: a character without one ignores it
+    comet: (padKind === 7 ? k('k') : k('j')) || touch.comet, tree: k('j') || touch.tree, rock: k('k') || touch.rock, mega: k('l') || touch.mega, gfire: k('j') || touch.gfire, sball: touch.sball, ult: k('z') || touch.ult, // Z is the third skill, the ultimate: a character without one ignores it
     tail: touch.tail, tx: Math.round(cast.x * 100) / 100 || 0, ty: Math.round(cast.y * 100) / 100 || 0, // the tail and the vines are cast when the button is let go (see endAim), not while it is held
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
@@ -550,7 +550,7 @@ const PAD = [
   { main: ['冰山', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
   { main: ['空氣斬', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
-  { main: ['拔樹', 'skill'], small: [['岩石陣', 'rock'], ['百萬噸', 'mega']] }, // Ash: the Comet Punch is the computer's, so a person has three skills like the others
+  { main: ['飛膝踢', 'skill'], small: [['拔樹', 'tree'], ['百裂拳', 'comet']], ult: ['百萬噸', 'ult'] }, // Ash: the kick is the main skill (sent as Skill, personsInput on the server sorts out what it is), the tree and the Comet Punch the small ones, the Megaton Punch the ultimate
   { main: ['飛膝踢', 'skill'], small: [['子彈拳', 'comet'], ['岩石陣', 'rock']] }, // Machamp: the kick in place of the tree
   { main: ['暗影潛行', 'skill'], small: [['鬼火', 'gfire'], ['影子球', 'sball', true]] }, // Gengar
   { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
@@ -579,7 +579,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['trcd', 'tree'], rock: ['rkcd', 'rock'], mega: ['mgcd', 'mega'] }, { skill: ['kkcd', 'kick'], comet: ['cpcd', 'mcomet'], rock: ['rkcd', 'mrock'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['kkcd', 'akick'], tree: ['trcd', 'tree'], comet: ['cpcd', 'comet'] }, { skill: ['kkcd', 'kick'], comet: ['cpcd', 'mcomet'], rock: ['rkcd', 'mrock'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
   const hold = (b, label, name, aimed) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -3159,18 +3159,21 @@ function drawIsland() {
 
 // While a Thousand Volt is on (its gathering, then its bolts out) the sky goes dark, and the screen flashes white and black once for each explosion; while a
 // Thunder is on (from the cast until the last strike) the sky goes dark and the screen flashes once for each strike that lands. For everyone watching.
-// Both use pikachu.thousand_volt's sky_dark, flash_every and flash_alpha.
-let skyK = 0, flashT = 0; // flashT: frames left of the flash an explosion or a Thunder strike set off
+// Ash's Megaton Punch makes the sky dark from the start of its gathering, and the screen flashes all through the second half of it (the ball).
+// All use pikachu.thousand_volt's sky_dark, flash_every and flash_alpha.
+let skyK = 0, flashT = 0, ballFrames = 0; // flashT: frames left of the flash an explosion or a Thunder strike set off; ballFrames: how long the ball of a Megaton Punch has flashed
 const calm = matchMedia('(prefers-reduced-motion: reduce)'); // whoever asks the system for less motion gets the dark sky and no flashing
 function drawStormSky(dt) {
-  const on = snap.p.some((p, i) => p.k === 0 && (p.uct > 0 || (snap.b || []).some((b) => b.k === 11 && b.sd === i + 1))) || snap.p.some((p) => p.k === 0 && p.tn > 0);
+  const on = snap.p.some((p, i) => p.k === 0 && (p.uct > 0 || (snap.b || []).some((b) => b.k === 11 && b.sd === i + 1))) || snap.p.some((p) => p.k === 0 && p.tn > 0) || snap.p.some((p) => p.k === 7 && p.mgt > 0);
+  const ball = snap.p.some((p) => p.k === 7 && p.mgt > 0 && p.mgt <= megaCfg.charge - megaCfg.ring); // the ball of a Megaton Punch is swelling
   skyK = Math.min(1, Math.max(0, skyK + (on ? 1 : -1) * dt / 0.4)); // fades over 0.4 s
   const N = tvoltCfg.fevery;
-  if (skyK <= 0 && !(flashT > 0)) return;
+  if (skyK <= 0 && !(flashT > 0) && !ball) return;
   ctx.fillStyle = `rgba(8,12,34,${tvoltCfg.dark * skyK})`; ctx.fillRect(0, 0, cv.width, cv.height);
   if (!(N > 0) || calm.matches) { flashT = 0; return; }
-  if (!(flashT > 0)) return;
-  const s = Math.floor((4 * N - flashT--) / N) % 4; // white, clear, black, clear
+  if (!ball) ballFrames = 0;
+  if (!ball && !(flashT > 0)) return;
+  const s = ball ? Math.floor(ballFrames++ / N) % 4 : Math.floor((4 * N - flashT--) / N) % 4; // white, clear, black, clear
   if (s === 0 || s === 2) { ctx.fillStyle = s === 0 ? `rgba(255,255,255,${tvoltCfg.falpha})` : `rgba(0,0,0,${tvoltCfg.falpha})`; ctx.fillRect(0, 0, cv.width, cv.height); }
 }
 

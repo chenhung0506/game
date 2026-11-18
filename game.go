@@ -64,7 +64,8 @@ type Input struct {
 	Tail    bool `json:"tail"`    // Gyarados only: Tail whip
 	Comet   bool `json:"comet"`   // Machamp only: Comet Punch
 	Rock    bool `json:"rock"`    // Machamp only: Rock Tomb
-	Mega    bool `json:"mega"`    // Ash only: Megaton Punch
+	Mega    bool `json:"mega"`    // Ash only: Megaton Punch (his ultimate: a person's comes from Ult, see personsInput; it needs the charge full)
+	Tree    bool `json:"tree"`    // Ash only, and only a person's: Tree Slam (the page's second button; personsInput turns it into Skill)
 	Kick    bool `json:"kick"`    // Ash only, and only the computer's (a person's is dropped on the way in): High Jump Kick, which is Machamp's Skill
 	GFire   bool `json:"gfire"`   // Gengar only: Ghost Fire
 	Ult     bool `json:"ult"`     // the third skill (Z, the ultimate): it works once the character's charge is full

@@ -43,8 +43,11 @@ const maxVoltBolts = 40
 
 // ultimateOf is the charge rule of a character's ultimate, and whether that character has one.
 func (c Config) ultimateOf(kind int) (Ultimate, bool) {
-	if kind == pikachu {
+	switch kind {
+	case pikachu:
 		return c.Pikachu.Ultimate, true
+	case ash:
+		return c.Ash.Ultimate, true
 	}
 	return Ultimate{}, false
 }
@@ -76,7 +79,7 @@ func (g *Game) gainCharge(hp0 [maxSlots]int, dt float64) {
 func (g *Game) stepUltimate(i int, in Input, dt float64) ([]Event, bool) {
 	p := &g.P[i]
 	u, ok := g.cfg.ultimateOf(p.Kind)
-	if !ok {
+	if !ok || p.Kind != pikachu { // Ash's is the Megaton Punch, started by stepMachamp
 		return nil, false
 	}
 	held := p.Kind == pikachu && g.cfg.Pikachu.ThousandVolt.RootedWhileBolts && g.voltBoltsOut(i) // the bolts it let go are still out

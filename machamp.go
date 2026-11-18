@@ -212,8 +212,8 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	}
 
 	// ---- Megaton Punch (Ash only): leap along the stick, then stand and gather, then one huge fist ----
-	if in.Mega && p.Kind == ash && idle && p.MegaCD == 0 {
-		p.MegaCD = mp.Cooldown
+	if in.Mega && p.Kind == ash && idle && p.MegaCD == 0 && p.Charge >= g.cfg.Ash.Ultimate.Max { // his ultimate: it needs the charge full, and empties it
+		p.Charge, p.MegaCD = 0, mp.Cooldown
 		if mp.JumpDuration > 0 {
 			p.MegaJX, p.MegaJY = unit(float64(in.DX), float64(in.DY)) // no stick: it leaps on the spot
 			p.MegaJT = mp.JumpDuration

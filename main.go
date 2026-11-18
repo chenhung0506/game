@@ -784,7 +784,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,
 			"frost": cfg.Vulpix.FrostField.Cooldown, "storm": cfg.Vulpix.IceStorm.Cooldown, "fbeam": cfg.Vulpix.FreezeBeam.Cooldown,
 			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown,
-			"mega": cfg.Ash.MegatonPunch.Cooldown, "tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "kick": cfg.Machamp.HighJumpKick.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
+			"mega": cfg.Ash.MegatonPunch.Cooldown, "tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "kick": cfg.Machamp.HighJumpKick.Cooldown, "akick": cfg.Ash.HighJumpKick.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
 	})
 	return hi
 }
@@ -876,16 +876,23 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			r.mu.Unlock()
 			continue
 		}
-		in := m.Input
-		in.DX, in.DY = clampDir(in.DX), clampDir(in.DY)
-		in.Shade = false // Night Shade has no key yet
-		in.Kick = false  // the kick key is the computer's Ash's; Machamp's person kicks with Skill
-		if r.g.P[idx].Kind == ash {
-			in.Comet = false // a person's Ash has three skills, like the others: the Comet Punch (and the kick) are the computer's
-		}
-		r.g.P[idx].In = in
+		r.g.P[idx].In = personsInput(r.g.P[idx].Kind, m.Input)
 		r.mu.Unlock()
 	}
+}
+
+// personsInput is what a person's keys mean for the character they play. The page sends the same keys for everyone, and the server
+// keeps those that fit. Machamp's person kicks with Skill. Ash's main button is the High Jump Kick (the page sends it as Skill), his two
+// small ones the Tree Slam (Tree) and the Comet Punch, and Z the Megaton Punch (Ult); the Rock Tomb has no button, and the rest is the computer's.
+func personsInput(kind int, in Input) Input {
+	in.DX, in.DY = clampDir(in.DX), clampDir(in.DY)
+	in.Shade = false // Night Shade has no key yet
+	in.Kick = false
+	if kind == ash {
+		in.Kick, in.Skill, in.Mega, in.Rock = in.Skill, in.Tree, in.Ult, false
+	}
+	in.Tree = false
+	return in
 }
 
 // ultMax is, for each kind, the charge its ultimate needs (0 for a kind that has none), for the page's pad and its gauge.

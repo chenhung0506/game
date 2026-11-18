@@ -610,9 +610,10 @@ type Config struct {
 
 // BrawlerCfg is the numbers of one of the two brawlers (Ash and Machamp): the tree slam, the comet punch and the rock tomb.
 type BrawlerCfg struct {
-	MaxHP     int     `json:"max_hp"`
-	WalkSpeed float64 `json:"walk_speed"`
-	Radius    float64 `json:"radius"`
+	MaxHP     int      `json:"max_hp"`
+	WalkSpeed float64  `json:"walk_speed"`
+	Radius    float64  `json:"radius"`
+	Ultimate  Ultimate `json:"ultimate"` // Ash only (Machamp has none): the charge the Megaton Punch, which is his ultimate (Z), needs
 	// Tree slam (the main button): Machamp jumps `jump_distance` along the direction held (else the way it faces) in
 	// `jump_duration` seconds, `jump_height` up; on landing it pulls a tree out of the ground and holds it up for
 	// `charge_duration` seconds (rooted, with the shape it will smash down drawn on the ground for the opponent), then
@@ -791,6 +792,7 @@ func DefaultConfig() Config {
 	tv.RingRadius, tv.SpreadSpeed, tv.FollowSpeed, tv.ContactDamage, tv.Count, tv.Radius = 220, 400, 260, 4, 10, 16
 	tv.RehitInterval, tv.HP, tv.Mass, tv.Knockback, tv.TerminalTime, tv.ExplosionDamage, tv.ExplosionRadius = 0.5, 10, 20, 40, 5, 20, 110
 	c.Pikachu.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
+	c.Ash.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
 	c.Snorlax.MaxHP = maxHP
 	c.Snorlax.WalkSpeed = speed
 	c.Snorlax.Radius = snorlaxRadius
@@ -1162,6 +1164,7 @@ func (c Config) validate() error {
 		{"pikachu.thousand_volt.mass", c.Pikachu.ThousandVolt.Mass, 0},
 		{"pikachu.thousand_volt.terminal_time", c.Pikachu.ThousandVolt.TerminalTime, 0},
 		{"pikachu.ultimate.max", c.Pikachu.Ultimate.Max, 0},
+		{"ash.ultimate.max", c.Ash.Ultimate.Max, 0},
 		{"gyarados.max_hp", float64(c.Gyarados.MaxHP), 0},
 		{"gyarados.walk_speed", c.Gyarados.WalkSpeed, 0},
 		{"gyarados.radius", c.Gyarados.Radius, 0},
@@ -1477,6 +1480,9 @@ func (c Config) validate() error {
 		{"pikachu.ultimate.gain_taken", c.Pikachu.Ultimate.GainTaken},
 		{"pikachu.ultimate.gain_dealt", c.Pikachu.Ultimate.GainDealt},
 		{"pikachu.ultimate.gain_per_second", c.Pikachu.Ultimate.GainPerSecond},
+		{"ash.ultimate.gain_taken", c.Ash.Ultimate.GainTaken},
+		{"ash.ultimate.gain_dealt", c.Ash.Ultimate.GainDealt},
+		{"ash.ultimate.gain_per_second", c.Ash.Ultimate.GainPerSecond},
 		{"gengar.ghost_fire.cooldown", c.Gengar.GhostFire.Cooldown},
 		{"gengar.ghost_fire.rehit_interval", c.Gengar.GhostFire.RehitInterval},
 		{"gengar.ghost_fire.damage", float64(c.Gengar.GhostFire.Damage)},

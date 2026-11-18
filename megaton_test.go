@@ -4,8 +4,6 @@ import (
 	"math"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/gorilla/websocket"
 )
 
 // megaDuel is Ash (slot 0, at 300,250) against a Snorlax (slot 1) `d` ahead of it on the same line.
@@ -20,7 +18,7 @@ func TestMegatonPunchGathersRootedThenHurtsStunsAndKnocksBackWhatItReaches(t *te
 	cfg := DefaultConfig()
 	mp := cfg.Ash.MegatonPunch
 	g := megaDuel(cfg, 300)
-	press(g, 0, Input{Mega: true, DX: 1}) // the stick does not move it: it is rooted
+	pressMega(g, 0, Input{Mega: true, DX: 1}) // the stick does not move it: it is rooted
 	n := 1
 	for g.P[0].MegaT > 0 {
 		if g.P[1].HP != g.maxHP(1) || g.P[1].StunT > 0 {
@@ -59,7 +57,7 @@ func TestMegatonPunchFliesTheLineTheStickHoldsSoABodyBesideItIsMissed(t *testing
 	cfg := DefaultConfig()
 	mp := cfg.Ash.MegatonPunch
 	g := megaDuel(cfg, 300)
-	press(g, 0, Input{Mega: true, AimX: 1})
+	pressMega(g, 0, Input{Mega: true, AimX: 1})
 	g.P[1].Y = 250 + mp.Radius + g.radius(1) + 10 // out of the line the stick holds
 	for range int((mp.RingDuration+mp.BallDuration)/dt) + 2 {
 		g.P[0].In = Input{AimX: 1}
@@ -69,7 +67,7 @@ func TestMegatonPunchFliesTheLineTheStickHoldsSoABodyBesideItIsMissed(t *testing
 		t.Fatal("hit a body that was beside the line")
 	}
 	g = megaDuel(cfg, mp.Distance+g.radius(1)+mp.Radius+20)
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	steps(g, int((mp.RingDuration+mp.BallDuration)/dt)+2)
 	if g.P[1].HP != g.maxHP(1) {
 		t.Fatal("hit a body beyond its reach")
@@ -82,25 +80,25 @@ func TestMegatonPunchHasItsHeightBandAndCooldownAndBelongsToAshAlone(t *testing.
 	mp := cfg.Ash.MegatonPunch
 	g := flyer(cfg, mp.MaxHeight+30)
 	g.P[1].X, g.P[1].Y = 600, 250
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	steps(g, int((mp.RingDuration+mp.BallDuration)/dt)+2)
 	if g.P[1].HP != g.maxHP(1) {
 		t.Fatal("hit something above its band")
 	}
 	g.P[0].MegaT = 0
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	if g.P[0].MegaT != 0 {
 		t.Fatal("a second punch started during the cooldown")
 	}
 	g.P[0].MegaCD = 0
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	if g.P[0].MegaT == 0 {
 		t.Fatal("it would not start once the cooldown was over")
 	}
 
 	m := megaDuel(cfg, 300)
 	m.SetKinds(machamp, snorlax)
-	press(m, 0, Input{Mega: true})
+	pressMega(m, 0, Input{Mega: true})
 	if m.P[0].MegaT != 0 || m.P[0].MegaCD != 0 {
 		t.Fatal("Machamp threw the Megaton Punch")
 	}
@@ -108,7 +106,7 @@ func TestMegatonPunchHasItsHeightBandAndCooldownAndBelongsToAshAlone(t *testing.
 
 func TestBeingStunnedCutsTheMegatonChargeShort(t *testing.T) {
 	g := megaDuel(DefaultConfig(), 300)
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	g.P[0].StunT = 0.5
 	steps(g, 3)
 	if g.P[0].MegaT != 0 || g.P[1].HP != g.maxHP(1) {
@@ -118,7 +116,7 @@ func TestBeingStunnedCutsTheMegatonChargeShort(t *testing.T) {
 
 func TestAnyOtherSkillWaitsWhileTheMegatonPunchGathers(t *testing.T) {
 	g := megaDuel(DefaultConfig(), 300)
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	press(g, 0, Input{Skill: true, Comet: true, Rock: true})
 	if g.P[0].TreePhase != treeNone || g.P[0].CometT != 0 || g.P[0].RockT != 0 {
 		t.Fatal("another skill started in the middle of the charge")
@@ -129,7 +127,7 @@ func TestMegatonPunchWithNoChargeLandsOnTheTickItIsPressed(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Ash.MegatonPunch.RingDuration, cfg.Ash.MegatonPunch.BallDuration = 0, 0
 	g := megaDuel(cfg, 300)
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	if g.P[1].HP != g.maxHP(1)-cfg.Ash.MegatonPunch.Damage {
 		t.Fatal("no immediate hit")
 	}
@@ -200,6 +198,7 @@ func TestAshBotThrowsTheMegatonPunchAtAnOpponentThatCannotMove(t *testing.T) {
 	g := ashDuel()
 	g.P[0].CometCD, g.P[0].TreeCD, g.P[0].RockCD = 99, 99, 99
 	g.P[1].StunT = 5
+	g.P[0].Charge = g.cfg.Ash.Ultimate.Max // it is his ultimate
 	b := newBot(ash, 1)
 	in, ok := firstAct(b, g, 0, 30)
 	if !ok || !in.Mega {
@@ -218,7 +217,7 @@ func TestTheBotRunsAwayFromAMegatonPunchThatIsGathering(t *testing.T) {
 			g.P[1].X, g.P[1].Y = 1300, 450
 			g.P[0].X, g.P[0].Y = 1300-300, 450 // in the line
 			g.P[1].CometCD, g.P[1].TreeCD, g.P[1].RockCD = 99, 99, 99
-			press(g, 1, Input{Mega: true})
+			pressMega(g, 1, Input{Mega: true})
 			b := newBot(kind, seed)
 			for i := 0; i < 8; i++ {
 				b.observe(g, 0)
@@ -286,7 +285,7 @@ func TestMegatonPunchLeapsAlongTheStickAndOnlyGathersOnceItHasLanded(t *testing.
 	mp := cfg.Ash.MegatonPunch
 	g := mach(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 900, 250
-	press(g, 0, Input{Mega: true, DX: 0, DY: 1}) // stick down, the opponent is to the right
+	pressMega(g, 0, Input{Mega: true, DX: 0, DY: 1}) // stick down, the opponent is to the right
 	peak := 0.0
 	n := 1
 	for g.P[0].MegaJT > 0 {
@@ -319,14 +318,14 @@ func TestMegatonPunchLeapsAlongTheStickAndOnlyGathersOnceItHasLanded(t *testing.
 func TestMegatonPunchWithoutTheStickLeapsOnTheSpotAndNoLeapGathersAtOnce(t *testing.T) {
 	cfg := DefaultConfig()
 	g := megaDuelLeap(cfg, 300)
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	steps(g, int(cfg.Ash.MegatonPunch.JumpDuration/dt)+1)
 	if g.P[0].X != 300 || g.P[0].Y != 250 || g.P[0].MegaT <= 0 {
 		t.Fatalf("at %v,%v charge %v", g.P[0].X, g.P[0].Y, g.P[0].MegaT)
 	}
 	cfg.Ash.MegatonPunch.JumpDuration = 0
 	g = megaDuelLeap(cfg, 300)
-	press(g, 0, Input{Mega: true, DX: 1})
+	pressMega(g, 0, Input{Mega: true, DX: 1})
 	if g.P[0].MegaJT != 0 || g.P[0].MegaT <= 0 || g.P[0].X != 300 {
 		t.Fatal("with no leap it should gather where it stands")
 	}
@@ -341,7 +340,7 @@ func megaDuelLeap(cfg Config, d float64) *Game {
 func TestTheLeapStaysInTheCourtAndCannotBeStartedOrSkippedBySomethingElse(t *testing.T) {
 	g := megaDuelLeap(DefaultConfig(), 300)
 	g.P[0].X = 5
-	press(g, 0, Input{Mega: true, DX: -1})
+	pressMega(g, 0, Input{Mega: true, DX: -1})
 	steps(g, 40)
 	if g.P[0].X < 0 {
 		t.Fatalf("left the court: x = %v", g.P[0].X)
@@ -349,7 +348,7 @@ func TestTheLeapStaysInTheCourtAndCannotBeStartedOrSkippedBySomethingElse(t *tes
 	cfg := DefaultConfig()
 	cfg.Ash.MegatonPunch.JumpHeight = 0 // flat leap: only the leap's own state keeps the others out
 	g = megaDuelLeap(cfg, 300)
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	press(g, 0, Input{Skill: true, Comet: true, Rock: true})
 	if g.P[0].TreePhase != treeNone || g.P[0].CometT != 0 || g.P[0].RockT != 0 {
 		t.Fatal("another skill started in the middle of the leap")
@@ -358,7 +357,7 @@ func TestTheLeapStaysInTheCourtAndCannotBeStartedOrSkippedBySomethingElse(t *tes
 
 func TestBeingStunnedInTheMiddleOfTheLeapBringsItDownAndCancelsThePunch(t *testing.T) {
 	g := megaDuelLeap(DefaultConfig(), 300)
-	press(g, 0, Input{Mega: true, DX: 1})
+	pressMega(g, 0, Input{Mega: true, DX: 1})
 	steps(g, 3)
 	if g.P[0].Z <= 0 {
 		t.Fatal("not in the air")
@@ -370,30 +369,54 @@ func TestBeingStunnedInTheMiddleOfTheLeapBringsItDownAndCancelsThePunch(t *testi
 	}
 }
 
-func TestAPersonsAshHasNoCometPunchButTheComputersDoes(t *testing.T) {
-	srv := httptest.NewServer(newMux(DefaultConfig()))
-	defer srv.Close()
-	c := dialPlay(t, srv, "dummy")
-	next(t, c, "hi")
-	pick(t, c, ash)
-	c.WriteMessage(websocket.TextMessage, []byte(`{"comet":true}`))
-	for i := 0; i < 30; i++ {
-		p := next(t, c, "s")["p"].([]any)[0].(map[string]any)
-		if p["cpt"] != nil && p["cpt"].(float64) > 0 || p["cpcd"] != nil && p["cpcd"].(float64) > 0 {
-			t.Fatalf("a person's Ash threw the Comet Punch: %v", p)
-		}
+func TestAPersonsKeysMeanTheirOwnCharactersSkills(t *testing.T) {
+	// Ash: the main button (sent as Skill) is the kick, the second one the tree, Z the Megaton Punch, and the rock has no button.
+	in := personsInput(ash, Input{Skill: true, Tree: true, Comet: true, Rock: true, Ult: true, Kick: true, Mega: true})
+	if !in.Kick || !in.Skill || !in.Comet || !in.Mega || in.Rock || in.Tree {
+		t.Fatalf("Ash: %+v", in)
 	}
-	g := duel(DefaultConfig(), ash, snorlax)
-	press(g, 0, Input{Comet: true})
-	if g.P[0].CometT == 0 {
-		t.Fatal("the game itself must still let Ash use it, for the computer")
+	in = personsInput(ash, Input{Skill: true})
+	if !in.Kick || in.Skill || in.Mega {
+		t.Fatalf("Ash, only the main button: %+v", in)
+	}
+	// the others are left as they were (and the computer's Kick, Tree and Night Shade are not a person's)
+	in = personsInput(machamp, Input{Skill: true, Tree: true, Kick: true, Mega: true, Rock: true, Shade: true, DX: 7})
+	if !in.Skill || in.Kick || in.Tree || !in.Mega || !in.Rock || in.Shade || in.DX != 1 {
+		t.Fatalf("Machamp: %+v", in)
+	}
+}
+
+func TestTheMegatonPunchIsAshsUltimateAndNeedsTheChargeFull(t *testing.T) {
+	cfg := DefaultConfig()
+	g := megaDuel(cfg, 300)
+	g.P[0].Charge = cfg.Ash.Ultimate.Max - 1
+	press(g, 0, Input{Mega: true})
+	steps(g, 5)
+	if g.P[0].MegaT != 0 || g.P[0].MegaJT != 0 || g.P[0].MegaCD != 0 {
+		t.Fatal("the Megaton Punch started with the charge not full")
+	}
+	g.P[0].Charge = cfg.Ash.Ultimate.Max
+	g.P[0].MegaCD = 0
+	press(g, 0, Input{Mega: true})
+	if g.P[0].Charge >= 1 || (g.P[0].MegaT == 0 && g.P[0].MegaJT == 0) {
+		t.Fatalf("charge %v, gathering %v, leap %v: the cast did not start and empty the charge", g.P[0].Charge, g.P[0].MegaT, g.P[0].MegaJT)
+	}
+	// the charge fills like Pikachu's: by the damage taken and dealt, and by time
+	cfg.Ash.Ultimate = Ultimate{Max: 100, GainTaken: 2, GainDealt: 3, GainPerSecond: 0}
+	g = megaDuel(cfg, 300)
+	hp0 := [maxSlots]int{g.P[0].HP, g.P[1].HP}
+	g.P[0].HP -= 5
+	g.P[1].HP -= 4
+	g.gainCharge(hp0, dt)
+	if g.P[0].Charge != 2*5+3*4 {
+		t.Fatalf("charge %v, want %v", g.P[0].Charge, 2*5+3*4)
 	}
 }
 
 func TestTheStickTurnsTheMegatonFistWhileItGathersAndWithoutItTheFistFollowsTheOpponent(t *testing.T) {
 	cfg := DefaultConfig()
 	g := megaDuel(cfg, 300) // the opponent is straight ahead, on the right
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	if g.P[0].MegaX != 1 || g.P[0].MegaY != 0 {
 		t.Fatalf("starts aimed at %v,%v, want the opponent", g.P[0].MegaX, g.P[0].MegaY)
 	}
@@ -437,7 +460,7 @@ func TestMegatonChargeIsRingPlusBallAndTheBoltsReachThePage(t *testing.T) {
 	mp.RingDuration, mp.BallDuration, mp.BoltStart, mp.BoltCount, mp.BoltInterval, mp.BoltOffsets = 0.3, 0.7, 0.2, 3, 0.25, []float64{-80, 120}
 	mp.JumpDuration = 0
 	g := megaDuel(cfg, 300)
-	press(g, 0, Input{Mega: true})
+	pressMega(g, 0, Input{Mega: true})
 	if got := g.P[0].MegaT; math.Abs(got-(1.0-dt)) > 1e-9 { // one tick of it has already run
 		t.Fatalf("charge = %v, want ring + ball = 1 less a tick", got)
 	}
@@ -462,7 +485,7 @@ func TestMegatonEventNamesTheThrowerAndTheBallSettingsReachThePage(t *testing.T)
 			g.P[0].Kind, g.P[1].Kind = snorlax, ash
 			g.P[0].X, g.P[1].X = 600, 300
 		}
-		ev := press(g, slot, Input{Mega: true})
+		ev := pressMega(g, slot, Input{Mega: true})
 		if len(ev) == 0 || ev[0].T != "mega" || ev[0].S != slot {
 			t.Fatalf("slot %d: events = %+v", slot, ev)
 		}
@@ -480,7 +503,7 @@ func TestMegatonPunchHeldByAVineLeapsAndLungesNowhere(t *testing.T) {
 	mp := cfg.Ash.MegatonPunch
 	g := mach(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 900, 250
-	press(g, 0, Input{Mega: true, DY: 1})
+	pressMega(g, 0, Input{Mega: true, DY: 1})
 	steps(g, 2) // in the air already
 	x, y := g.P[0].X, g.P[0].Y
 	g.P[0].BoundT = 10
@@ -491,4 +514,10 @@ func TestMegatonPunchHeldByAVineLeapsAndLungesNowhere(t *testing.T) {
 	if g.P[0].MegaT != 0 || g.P[0].MegaJT != 0 {
 		t.Fatal("the punch did not run its course")
 	}
+}
+
+// pressMega is press for a Megaton Punch: it is Ash's ultimate, so the charge is made full first.
+func pressMega(g *Game, i int, in Input) []Event {
+	g.P[i].Charge = g.cfg.Ash.Ultimate.Max
+	return press(g, i, in)
 }

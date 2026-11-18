@@ -449,6 +449,12 @@
     "max_hp": 150,
     "walk_speed": 150,
     "radius": 30,
+    "ultimate": {
+      "max": 100,
+      "gain_taken": 1,
+      "gain_dealt": 1,
+      "gain_per_second": 1
+    },
     "high_jump_kick": {
       "min_height": 0,
       "max_height": 60,

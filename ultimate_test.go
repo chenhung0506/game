@@ -334,6 +334,8 @@ func TestUltimateConfigIsValidated(t *testing.T) {
 		t.Fatal("a negative charge rate was accepted")
 	}
 	for _, bad := range []func(*Config){
+		func(c *Config) { c.Ash.Ultimate.Max = 0 },
+		func(c *Config) { c.Ash.Ultimate.GainDealt = -1 },
 		func(c *Config) { c.Pikachu.ThousandVolt.SkyDark = 1.5 },
 		func(c *Config) { c.Pikachu.ThousandVolt.FlashAlpha = -0.1 },
 		func(c *Config) { c.Pikachu.ThousandVolt.FlashEvery = -1 },
