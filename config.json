@@ -59,8 +59,8 @@
       "ball_scale": 2.0,
       "ring_radius": 280,
       "spread_speed": 800,
-      "follow_speed": 320,
-      "contact_damage": 3,
+      "follow_speed": 300,
+      "contact_damage": 2,
       "count": 10,
       "radius": 20,
       "rehit_interval": 0.5,
@@ -73,7 +73,7 @@
       "jump_height": 80,
       "tip_ball_scale": 0.8,
       "rooted_while_bolts": true,
-      "explosion_damage": 5,
+      "explosion_damage": 4,
       "explosion_radius": 120
     },
     "ultimate": {
