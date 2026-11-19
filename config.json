@@ -197,9 +197,11 @@
       "swing_duration": 0.2,
       "trunk_length": 320,
       "trunk_width": 80,
+      "tip_width": 20,
       "trunk_scale": 1,
       "damage": 8,
-      "stun_duration": 0.3,
+      "slow_duration": 3,
+      "slow": 0.5,
       "linger": 0.7
     },
     "leaf_slash": {

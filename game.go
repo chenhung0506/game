@@ -225,6 +225,7 @@ type Player struct {
 	ArrowCD float64 `json:"acd"`
 	ArrowT  float64 `json:"at"` // seconds of aiming left before the volley leaves (0 = not aiming)
 	SlowT   float64 `json:"sl"`
+	SlowK   float64 `json:"-"` // the share of its walking speed the slow takes: the strongest of the slows it is under (see slow)
 	// Tornado: seconds of charge left, seconds of recovery left after it is let go, the cooldown.
 	TwistT    float64 `json:"qt"`
 	TwistRecT float64 `json:"qr"`
@@ -761,6 +762,9 @@ func (g *Game) Step(dt float64) []Event {
 				}
 			}
 		}
+		if p.SlowT == 0 {
+			p.SlowK = 0
+		}
 		if in.DX != 0 || in.DY != 0 {
 			p.FX, p.FY = in.DX, in.DY
 		}
@@ -1056,7 +1060,7 @@ func (g *Game) Step(dt float64) []Event {
 			v *= float64(100-g.ease(i)) / 100 // the handicap slows every way of walking, flying and steering in the air
 			v *= g.frostFactor(i)             // so does Vulpix's frost, or speeds it up
 			if p.SlowT > 0 {
-				v *= 1 - g.cfg.Rowlet.Arrows.Slow // and an arrow's slow
+				v *= 1 - p.SlowK // and a slow: an arrow's, or a giant vine's
 			}
 			p.X += float64(in.DX) / n * v * dt
 			p.Y += float64(in.DY) / n * v * dt
@@ -1237,7 +1241,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 					return ar.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, b.X, b.Y) <= ar.Radius+rad
 				}); ok {
 					g.hit(foe, ar.Damage)
-					foe.SlowT = math.Max(foe.SlowT, ar.SlowDuration)
+					g.slow(foe, ar.SlowDuration, ar.Slow)
 					events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
 					continue
 				}

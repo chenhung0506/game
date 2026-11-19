@@ -332,7 +332,7 @@ type Config struct {
 		// on a ring of `ring_radius` round that spot, one every `interval` seconds. Each stands up for `charge_duration` seconds, locked on the foe
 		// as it was when it came out (the shape it will hit is drawn on the ground, like the Tree Slam's trunk, `trunk_length` long and
 		// `trunk_width` wide from where it stands), then comes down in `swing_duration` seconds and hits whoever is in that shape when it lands:
-		// `damage` and `stun_duration` (0 = no stun) each. It lies there for `linger` seconds and is gone. Chikorita cannot move until the last
+		// `damage` and a slow (`slow_duration` seconds, taking the share `slow` of its walking speed; 0 seconds = no slow) each. It lies there for `linger` seconds and is gone. Chikorita cannot move until the last
 		// one has landed. `head_radius` is how near the head must get to count as touching; `head_width` and `trunk_scale` only change how
 		// big the head and the vines are drawn.
 		GiantVines struct {
@@ -347,10 +347,12 @@ type Config struct {
 			ChargeDuration float64 `json:"charge_duration"`
 			SwingDuration  float64 `json:"swing_duration"`
 			TrunkLength    float64 `json:"trunk_length"`
-			TrunkWidth     float64 `json:"trunk_width"`
+			TrunkWidth     float64 `json:"trunk_width"` // how wide it is where it comes out of the ground...
+			TipWidth       float64 `json:"tip_width"`   // ...and at its tip: what it hits is that root-shaped taper
 			TrunkScale     float64 `json:"trunk_scale"`
 			Damage         int     `json:"damage"`
-			StunDuration   float64 `json:"stun_duration"`
+			SlowDuration   float64 `json:"slow_duration"`
+			Slow           float64 `json:"slow"` // 0..1
 			Linger         float64 `json:"linger"`
 		} `json:"giant_vines"`
 	} `json:"chikorita"`
@@ -915,7 +917,7 @@ func DefaultConfig() Config {
 	gv.Reach = groundReach
 	gv.FollowSpeed, gv.TerminalTime, gv.HeadRadius, gv.HeadWidth = 260, 4, 40, 50
 	gv.Count, gv.RingRadius, gv.Interval, gv.ChargeDuration, gv.SwingDuration = 10, 200, 0.25, 0.5, 0.2
-	gv.TrunkLength, gv.TrunkWidth, gv.TrunkScale, gv.Damage, gv.StunDuration, gv.Linger = 320, 80, 1, 8, 0.3, 0.7
+	gv.TrunkLength, gv.TrunkWidth, gv.TipWidth, gv.TrunkScale, gv.Damage, gv.SlowDuration, gv.Slow, gv.Linger = 320, 80, 20, 1, 8, 3, 0.5, 0.7
 	c.Vulpix.MaxHP = 100
 	c.Vulpix.WalkSpeed = 160
 	c.Vulpix.Radius = 14
@@ -1535,7 +1537,8 @@ func (c Config) validate() error {
 		{"chikorita.giant_vines.charge_duration", c.Chikorita.GiantVines.ChargeDuration},
 		{"chikorita.giant_vines.swing_duration", c.Chikorita.GiantVines.SwingDuration},
 		{"chikorita.giant_vines.damage", float64(c.Chikorita.GiantVines.Damage)},
-		{"chikorita.giant_vines.stun_duration", c.Chikorita.GiantVines.StunDuration},
+		{"chikorita.giant_vines.slow_duration", c.Chikorita.GiantVines.SlowDuration},
+		{"chikorita.giant_vines.tip_width", c.Chikorita.GiantVines.TipWidth},
 		{"chikorita.giant_vines.linger", c.Chikorita.GiantVines.Linger},
 		{"gengar.ghost_fire.cooldown", c.Gengar.GhostFire.Cooldown},
 		{"gengar.ghost_fire.rehit_interval", c.Gengar.GhostFire.RehitInterval},
@@ -1660,6 +1663,12 @@ func (c Config) validate() error {
 	}
 	if n := c.Rowlet.Arrows.Count; n > 100 {
 		return fmt.Errorf("rowlet.arrows.count must be at most 100, got %d", n)
+	}
+	if v := c.Chikorita.GiantVines.Slow; !(v >= 0 && v <= 1) {
+		return fmt.Errorf("chikorita.giant_vines.slow must be between 0 and 1, got %v", v)
+	}
+	if c.Chikorita.GiantVines.TipWidth > c.Chikorita.GiantVines.TrunkWidth {
+		return fmt.Errorf("chikorita.giant_vines.tip_width (%v) must not be wider than trunk_width (%v)", c.Chikorita.GiantVines.TipWidth, c.Chikorita.GiantVines.TrunkWidth)
 	}
 	if v := c.Rowlet.Arrows.Slow; !(v >= 0 && v <= 1) { // 1 = a slowed body cannot walk at all
 		return fmt.Errorf("rowlet.arrows.slow must be between 0 and 1, got %v", v)

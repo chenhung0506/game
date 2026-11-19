@@ -27,6 +27,31 @@ func (g *Game) giantOut(i int) bool {
 	return false
 }
 
+// slow slows p by the share k of its walking speed for at least d seconds (nothing happens for d <= 0). Slows do not add up: while it lasts
+// the strongest of them counts.
+func (g *Game) slow(p *Player, d, k float64) {
+	if d <= 0 {
+		return
+	}
+	p.SlowT, p.SlowK = math.Max(p.SlowT, d), math.Max(p.SlowK, k)
+}
+
+// vineHits is whether a body of radius r at (bx, by) touches a giant vine standing at (x, y) and pointing along the unit vector (ux, uy): the
+// shape of a root, `w0` wide where it comes out of the ground and `w1` wide at its tip, `length` away.
+func vineHits(x, y, ux, uy, bx, by, r, length, w0, w1 float64) bool {
+	t, s := (bx-x)*ux+(by-y)*uy, -(bx-x)*uy+(by-y)*ux // along the root, and across it
+	if t >= 0 && t <= length && math.Abs(s) <= (w0+(w1-w0)*t/length)/2 {
+		return true
+	}
+	a, b, c, d := [2]float64{0, -w0 / 2}, [2]float64{length, -w1 / 2}, [2]float64{length, w1 / 2}, [2]float64{0, w0 / 2}
+	for _, e := range [4][2][2]float64{{a, b}, {b, c}, {c, d}, {d, a}} {
+		if segDist(t, s, e[0][0], e[0][1], e[1][0], e[1][1]) <= r {
+			return true
+		}
+	}
+	return false
+}
+
 // stepGiantCast is Chikorita's Z: with a full charge, and nothing else going on, the press empties the charge and sends the head out. It says
 // whether Chikorita is rooted by the skill this tick.
 func (g *Game) stepGiantCast(i int, in Input, u Ultimate) ([]Event, bool) {
@@ -65,11 +90,12 @@ func (g *Game) stepGiantHead(b *Ball, dt float64) (alive bool, born []Ball, even
 	if touched {
 		cx, cy = foe.X, foe.Y // it comes up under the foe, which the ring then closes round
 	}
-	start := math.Atan2(b.DY, b.DX) + math.Pi // the first vine is where the head came from
+	start := math.Atan2(b.DY, b.DX) + math.Pi // the vines are spread round the ring from where the head came from, and come out in any order
+	turn := g.rng.Perm(gv.Count)              // the n-th place on the ring comes out turn[n]-th
 	for n := 0; n < gv.Count && n < maxGiantVines; n++ {
 		a := start + 2*math.Pi*float64(n)/float64(gv.Count)
 		born = append(born, Ball{
-			K: ballGiantVine, Owner: b.Owner, Side: b.Side, Idx: n, Phase: vineWait, Delay: float64(n) * gv.Interval,
+			K: ballGiantVine, Owner: b.Owner, Side: b.Side, Idx: n, Phase: vineWait, Delay: float64(turn[n]) * gv.Interval,
 			X: math.Min(math.Max(cx+math.Cos(a)*gv.RingRadius, 0), g.court.Length),
 			Y: math.Min(math.Max(cy+math.Sin(a)*gv.RingRadius, 0), g.court.Width),
 		})
@@ -106,9 +132,9 @@ func (g *Game) stepGiantVine(b *Ball, dt float64) (alive bool, events []Event) {
 			b.Phase, b.Life = vineSwing, gv.SwingDuration
 		case vineSwing:
 			for _, j := range g.foes(b.Owner) {
-				if foe := &g.P[j]; gv.Reach.hits(foe) && treeHits(b.X, b.Y, b.DX, b.DY, foe.X, foe.Y, g.radius(j), gv.TrunkLength, gv.TrunkWidth, 0, 0) {
+				if foe := &g.P[j]; gv.Reach.hits(foe) && vineHits(b.X, b.Y, b.DX, b.DY, foe.X, foe.Y, g.radius(j), gv.TrunkLength, gv.TrunkWidth, gv.TipWidth) {
 					g.hit(foe, gv.Damage)
-					g.stun(foe, gv.StunDuration)
+					g.slow(foe, gv.SlowDuration, gv.Slow)
 				}
 			}
 			b.Phase, b.Life = vineLie, gv.Linger

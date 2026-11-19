@@ -341,7 +341,7 @@ func (c *bctx) findThreat() threat {
 		hits := func(x, y float64) bool {
 			for i := range c.balls {
 				if b := &c.balls[i]; b.K == ballGiantVine && c.g.side(b.Owner) != c.g.side(c.me) && (b.Phase == vineUp || b.Phase == vineSwing) &&
-					treeHits(b.X, b.Y, b.DX, b.DY, x, y, c.pr+15, gv.TrunkLength, gv.TrunkWidth, 0, 0) {
+					vineHits(b.X, b.Y, b.DX, b.DY, x, y, c.pr+15, gv.TrunkLength, gv.TrunkWidth, gv.TipWidth) {
 					return true
 				}
 			}
@@ -354,7 +354,7 @@ func (c *bctx) findThreat() threat {
 				if b.Phase == vineUp {
 					e += gv.SwingDuration
 				}
-				if treeHits(b.X, b.Y, b.DX, b.DY, p.X, p.Y, c.pr+15, gv.TrunkLength, gv.TrunkWidth, 0, 0) {
+				if vineHits(b.X, b.Y, b.DX, b.DY, p.X, p.Y, c.pr+15, gv.TrunkLength, gv.TrunkWidth, gv.TipWidth) {
 					eta = math.Min(eta, e)
 				}
 			}

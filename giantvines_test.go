@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"fmt"
+	"math/rand/v2"
+	"testing"
+)
 
 // gvGame is Chikorita (slot 0, at 300,250) against a Snorlax `d` ahead of it, with a full charge and nothing in the way.
 func gvGame(cfg Config, d float64) *Game {
@@ -95,10 +99,10 @@ func TestTheGiantVinesHeadSurfacesWhereItIsWhenItsTimeIsUp(t *testing.T) {
 	}
 }
 
-func TestEachGiantVineLocksOnTheFoeAsItComesOutThenHitsOnceItLandsAndStuns(t *testing.T) {
+func TestEachGiantVineLocksOnTheFoeAsItComesOutThenHitsOnceItLandsAndSlows(t *testing.T) {
 	cfg := DefaultConfig()
 	gv := &cfg.Chikorita.GiantVines
-	gv.Count, gv.Interval, gv.ChargeDuration, gv.SwingDuration, gv.StunDuration, gv.Damage = 4, 0.5, 0.4, 0.2, 0.3, 7
+	gv.Count, gv.Interval, gv.ChargeDuration, gv.SwingDuration, gv.Damage = 4, 0.5, 0.4, 0.2, 7
 	g := gvGame(cfg, 100) // the head is on it at once
 	hp := g.P[1].HP
 	gvCast(g)
@@ -137,19 +141,105 @@ func TestGiantVinesHitOnlyWhatIsInTheirShape(t *testing.T) {
 	}
 }
 
-func TestGiantVinesWithNoStunDoNotStun(t *testing.T) {
+func TestGiantVinesSlowWhatTheyHitAndNeverStunIt(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Chikorita.GiantVines.StunDuration = 0
+	gv := &cfg.Chikorita.GiantVines
+	gv.SlowDuration, gv.Slow = 2, 0.6
+	g := gvGame(cfg, 100)
+	gvCast(g)
+	slowed := false
+	for n := 0; n < 8*tickRate; n++ {
+		g.Step(dt)
+		if g.P[1].StunT != 0 {
+			t.Fatal("a giant vine stunned the foe")
+		}
+		if g.P[1].SlowT > 0 && g.P[1].SlowK == 0.6 {
+			slowed = true
+		}
+	}
+	if !slowed {
+		t.Fatal("the foe was never slowed by 0.6")
+	}
+	// and the walking is what it says
+	g = gvGame(cfg, 600)
+	g.P[1].SlowT, g.P[1].SlowK = 5, 0.6
+	x0 := g.P[1].X
+	g.P[1].In = Input{DX: 1}
+	steps(g, tickRate)
+	if got, want := g.P[1].X-x0, cfg.Snorlax.WalkSpeed*0.4; got < want*0.95 || got > want*1.05 {
+		t.Fatalf("a foe slowed by 0.6 walked %v in a second, want about %v", got, want)
+	}
+}
+
+func TestGiantVinesWithNoSlowDoNotSlow(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Chikorita.GiantVines.SlowDuration = 0
 	g := gvGame(cfg, 100)
 	gvCast(g)
 	for n := 0; n < 8*tickRate; n++ {
 		g.Step(dt)
-		if g.P[1].StunT != 0 {
-			t.Fatal("the foe was stunned with stun_duration 0")
+		if g.P[1].SlowT != 0 || g.P[1].StunT != 0 {
+			t.Fatal("the foe was slowed or stunned with slow_duration 0")
 		}
 	}
 	if g.P[1].HP == 100000 {
 		t.Fatal("and it was not hurt either")
+	}
+}
+
+func TestAGiantVineIsARootThickAtTheFootAndThinAtTheTip(t *testing.T) {
+	// 300 long, 100 wide at the foot and 20 at the tip, along +x from the origin; a body of radius 5
+	hit := func(x, y float64) bool { return vineHits(0, 0, 1, 0, x, y, 5, 300, 100, 20) }
+	for _, c := range []struct {
+		x, y float64
+		want bool
+	}{
+		{10, 0, true}, {10, 45, true}, // wide at the foot
+		{290, 0, true}, {290, 14, true},
+		{290, 40, false}, // the same offset that is well inside near the foot is outside near the tip
+		{150, 30, true}, {150, 50, false},
+		{-3, 0, true}, {-20, 0, false}, // a little behind the foot (the body's radius), not far
+		{303, 0, true}, {320, 0, false}, // and past the tip
+	} {
+		if got := hit(c.x, c.y); got != c.want {
+			t.Errorf("body at (%v, %v): hit %v, want %v", c.x, c.y, got, c.want)
+		}
+	}
+}
+
+func TestTheGiantVinesComeOutInAnyOrderNotRoundTheRing(t *testing.T) {
+	cfg := DefaultConfig()
+	gv := &cfg.Chikorita.GiantVines
+	gv.Count, gv.Interval = 10, 0.5
+	orders := map[string]bool{}
+	for seed := uint64(1); seed <= 8; seed++ {
+		g := gvGame(cfg, 100)
+		g.rng = rand.New(rand.NewPCG(seed, 9))
+		gvCast(g)
+		for headOf(g) != nil {
+			g.Step(dt)
+		}
+		var delays []float64
+		seen := map[float64]bool{}
+		for _, b := range g.Balls { // in ring order
+			if b.K == ballGiantVine {
+				delays = append(delays, b.Delay)
+				if seen[b.Delay] {
+					t.Fatalf("two vines come out together at %v", b.Delay)
+				}
+				seen[b.Delay] = true
+			}
+		}
+		if len(delays) != 10 {
+			t.Fatalf("%d vines", len(delays))
+		}
+		orders[fmt.Sprint(delays)] = true
+		if seen[0] == false || !seen[4.5] {
+			t.Fatalf("the turns are not 0, 0.5, ... 4.5: %v", delays)
+		}
+	}
+	if len(orders) < 4 {
+		t.Fatalf("only %d different orders in 8 casts", len(orders))
 	}
 }
 
@@ -197,7 +287,9 @@ func TestGiantVinesConfigIsValidated(t *testing.T) {
 	for name, edit := range map[string]func(*Config){
 		"no vines":      func(c *Config) { c.Chikorita.GiantVines.Count = 0 },
 		"too many":      func(c *Config) { c.Chikorita.GiantVines.Count = maxGiantVines + 1 },
-		"negative stun": func(c *Config) { c.Chikorita.GiantVines.StunDuration = -1 },
+		"negative slow": func(c *Config) { c.Chikorita.GiantVines.SlowDuration = -1 },
+		"slow over 1":   func(c *Config) { c.Chikorita.GiantVines.Slow = 1.5 },
+		"tip wider":     func(c *Config) { c.Chikorita.GiantVines.TipWidth = c.Chikorita.GiantVines.TrunkWidth + 1 },
 		"no speed":      func(c *Config) { c.Chikorita.GiantVines.FollowSpeed = 0 },
 		"no time":       func(c *Config) { c.Chikorita.GiantVines.TerminalTime = 0 },
 		"no charge":     func(c *Config) { c.Chikorita.Ultimate.Max = 0 },
@@ -209,7 +301,7 @@ func TestGiantVinesConfigIsValidated(t *testing.T) {
 		}
 	}
 	c := DefaultConfig()
-	c.Chikorita.GiantVines.StunDuration, c.Chikorita.GiantVines.Interval, c.Chikorita.GiantVines.ChargeDuration = 0, 0, 0
+	c.Chikorita.GiantVines.SlowDuration, c.Chikorita.GiantVines.Interval, c.Chikorita.GiantVines.ChargeDuration = 0, 0, 0
 	if err := c.validate(); err != nil {
 		t.Errorf("zeros that are allowed were refused: %v", err)
 	}
@@ -250,7 +342,7 @@ func TestABotWalksOutOfTheShapeOfAGiantVine(t *testing.T) {
 	g.Balls = append(g.Balls, Ball{K: ballGiantVine, Owner: 1, Side: 2, X: 500, Y: 500, DX: 1, Phase: vineUp, Life: gv.ChargeDuration}) // standing up, aimed along the line at the bot
 	b := newBot(snorlax, 1)
 	hits := func(p *Player) bool {
-		return treeHits(500, 500, 1, 0, p.X, p.Y, g.radius(0), gv.TrunkLength, gv.TrunkWidth, 0, 0)
+		return vineHits(500, 500, 1, 0, p.X, p.Y, g.radius(0), gv.TrunkLength, gv.TrunkWidth, gv.TipWidth)
 	}
 	if !hits(&g.P[0]) {
 		t.Fatal("the scene is wrong: the bot is not in the shape")
