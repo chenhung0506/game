@@ -54,7 +54,7 @@ func TestTheRowletBotLandsTheWholeVolleyThenSpinsAnOpponentItHasSlowedAndLandsAn
 		t.Logf("seed %d: drops %v slowed at %.1f held at %.1f", seed, lg.drops, lg.slowedAt, lg.heldAt)
 		var volleys []int // the ticks in which arrows hurt it (the air slashes of the run are smaller, and the tornado's spin is not an arrow's)
 		for _, d := range lg.drops {
-			if d >= ar.Damage {
+			if d >= 2*ar.Damage { // more than the tornado's landing (which can be as much as one arrow) or a slash or a spin
 				volleys = append(volleys, d)
 			}
 		}
