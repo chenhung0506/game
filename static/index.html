@@ -101,12 +101,12 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟', '鯉魚王', '小智', '怪力', '梗鬼'];
 const FORMS = [...NAMES, '紅色暴鯉龍']; // every kind a player can be in: Magikarp becomes the last one (nobody picks it)
-const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭', '冰山滑行・冰風暴・急凍光線', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球'];
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭・大藤蔓（絕招）', '冰山滑行・冰風暴・急凍光線', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球'];
 const HELP = [
   '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　Z＝千萬伏特（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能放；朝四周放出一圈閃電，之後追著敵人跑、碰到會擊退，時間到全部爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）',
   '你是噴火龍　移動 WASD　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　J＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　K＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
-  '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　J＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　K＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）',
+  '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　J＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　K＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）　Z＝大藤蔓（絕招，蓄能滿了才能放；一根粗藤蔓從地底追著敵人跑，碰到敵人或時間到就在那裡冒出來，周圍一圈大藤蔓依序衝出地面，各自鎖定敵人朝下拍打，打中的人受傷並被打暈；整個過程無法移動）',
   '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
   '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝空氣斬（朝按住的方向衝出一道半月形弧線，彎向敵人那一側，沿途朝最近的敵人射出一道道白色的空氣斬擊，打得到貼地的敵人）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
@@ -122,6 +122,7 @@ const beamLook = perSlot(() => ({ ang: null, tail: null })); // per slot: the sm
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, ctime: 0.8, pull: 1, orb: 30, orbhp: 30, nscale: 1, nslam: 110, nflight: 0.9, nlob: 150, sfire: 20 }; // Gengar's, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
+let gvCfg = { hw: 50, hr: 40, len: 320, w: 80, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
 let megaCfg = { fevery: 0, charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
@@ -200,7 +201,7 @@ const beamSlots = () => (snap ? [...snap.p.keys()].filter((i) => hasBeam(snap.p[
 const slotsOf = (k) => (snap ? [...snap.p.keys()].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (m.on || (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1])) return; // a match is on: a refused pick changes nothing
     if (teamSize !== (m.size || TEAM_BIG)) { teamSize = m.size || TEAM_BIG; myOrder = []; sentOrder = ''; } // another team size: choose again
@@ -235,6 +236,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'thunder') { shake = 10; flashT = 4 * tvoltCfg.fevery; } // a strike lands: one white and black flash
       if (ev.t === 'explode') shake = 14;
       if (ev.t === 'ult') shake = 10;
+      if (ev.t === 'gvcast' || ev.t === 'gvplant' || ev.t === 'gvrise' || ev.t === 'gvslam') gvBurst(ev);
       if (ev.t === 'voltburst') { shake = Math.max(shake, 5); flashT = 4 * tvoltCfg.fevery; } // an explosion: one white and black flash (the bolts of a cast go off together, still one flash)
       if (ev.t === 'iceburst') shake = 12;
       if (ev.t === 'wave') shake = 16;
@@ -546,7 +548,7 @@ const PAD = [
   { main: ['伏特攻擊', 'skill'], small: [['打雷', 'thunder'], ['電球', 'ball', true]], ult: ['千萬伏特', 'ult'] }, // Pikachu
   { main: ['跳躍', 'skill'], small: [['死光', 'beam'], ['冰拳', 'punch']] }, // Snorlax
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
-  { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine', true]] }, // Chikorita
+  { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine', true]], ult: ['大藤蔓', 'ult'] }, // Chikorita
   { main: ['冰山', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
   { main: ['空氣斬', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
@@ -1362,6 +1364,7 @@ function drawBalls() {
   for (const pi of slotsOf(0)) drawBallCharge(snap.p[pi], disp[pi]);
   for (const pi of slotsOf(9)) drawShadowCharge(snap.p[pi], disp[pi]);
   for (const b of snap.b || []) drawBall(b);
+  drawGvBits();
 }
 function drawBallCharge(p, d) {
   if (p.kt > 0) {
@@ -1435,6 +1438,8 @@ function drawBall(b) {
   if (b.k === 8) { drawGhostFlame(b.x, b.y, gengarCfg.fire); return; }
   if (b.k === 9) { drawShadowOrb(b); return; }
   if (b.k === 11) { drawVoltBolt(b); return; }
+  if (b.k === 12) { drawGiantHead(b); return; }
+  if (b.k === 13) { drawGiantVine(b); return; }
   {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,170,20,0)');
@@ -1930,6 +1935,149 @@ function drawTreeSlam(f) {
   const k = f.age / 0.6, base = Math.atan2(f.dy || 0, f.dx || 0), bounce = Math.max(0, 0.12 - f.age) * 2.5; // a small rebound off the ground
   drawTreeArt(f.x, f.y, base, bounce, 1 - Math.max(0, k - 0.5) * 2, treeCfgs[brawlerIdx(f.k)]);
   ctx.save(); ctx.strokeStyle = `rgba(255,235,200,${(1 - k) * 0.8})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(f.x, f.y, 30 + 160 * k, 0, 7); ctx.stroke(); ctx.restore();
+}
+
+// ---- Chikorita's Giant Vines ----
+// Bits of dirt, stone, leaf and white shards thrown up by the vines. (x, y) is on the ground, z above it; they are drawn upright so "up" is up on the
+// screen whichever way the arena is turned.
+let gvBits = [];
+const GV_MAX_BITS = 400;
+function gvAdd(n, make) { for (let i = 0; i < n && gvBits.length < GV_MAX_BITS; i++) gvBits.push(make(i)); }
+const gvRand = (a, b) => a + Math.random() * (b - a);
+function gvBurst(ev) { // the dirt of each moment of the skill, as it happens
+  const at = (x, y) => ({ x, y });
+  if (ev.t === 'gvcast') {
+    gvAdd(8, () => ({ ...at(ev.x, ev.y), z: 4, vx: gvRand(-60, 60), vy: gvRand(-60, 60), vz: gvRand(60, 140), age: 0, life: gvRand(0.4, 0.7), kind: 'dirt', sz: gvRand(3, 6) }));
+  } else if (ev.t === 'gvplant') {
+    shake = Math.max(shake, 8);
+    gvAdd(14, () => ({ ...at(ev.x, ev.y), z: 4, vx: gvRand(-120, 120), vy: gvRand(-120, 120), vz: gvRand(120, 280), age: 0, life: gvRand(0.6, 1), kind: 'dirt', sz: gvRand(4, 9) }));
+    gvAdd(6, () => ({ ...at(ev.x, ev.y), z: 4, vx: gvRand(-160, 160), vy: gvRand(-160, 160), vz: gvRand(200, 380), age: 0, life: gvRand(0.8, 1.2), kind: 'rock', sz: gvRand(6, 11), rot: gvRand(0, 6.28), spin: gvRand(-8, 8) }));
+  } else if (ev.t === 'gvrise') {
+    shake = Math.max(shake, 4);
+    gvAdd(10, () => ({ ...at(ev.x, ev.y), z: 4, vx: gvRand(-90, 90), vy: gvRand(-90, 90), vz: gvRand(140, 300), age: 0, life: gvRand(0.5, 0.9), kind: 'dirt', sz: gvRand(4, 9) }));
+    gvAdd(5, () => ({ ...at(ev.x, ev.y), z: 4, vx: gvRand(-140, 140), vy: gvRand(-140, 140), vz: gvRand(220, 420), age: 0, life: gvRand(0.7, 1.1), kind: 'rock', sz: gvRand(6, 12), rot: gvRand(0, 6.28), spin: gvRand(-9, 9) }));
+  } else if (ev.t === 'gvslam') {
+    shake = Math.max(shake, 7);
+    const L = ev.r * gvCfg.scale, tx = ev.x + ev.dx * L, ty = ev.y + ev.dy * L; // it lands with its tip out at the end
+    gvAdd(16, () => ({ ...at(tx, ty), z: 4, vx: gvRand(-170, 170), vy: gvRand(-170, 170), vz: gvRand(120, 300), age: 0, life: gvRand(0.6, 1.1), kind: 'dirt', sz: gvRand(5, 11) }));
+    gvAdd(7, () => ({ ...at(tx, ty), z: 4, vx: gvRand(-200, 200), vy: gvRand(-200, 200), vz: gvRand(260, 480), age: 0, life: gvRand(0.8, 1.3), kind: 'rock', sz: gvRand(7, 13), rot: gvRand(0, 6.28), spin: gvRand(-10, 10) }));
+    gvAdd(14, () => ({ ...at(tx, ty), z: 6, vx: gvRand(-220, 220), vy: gvRand(-220, 220), vz: gvRand(150, 360), age: 0, life: gvRand(0.8, 1.4), kind: 'leaf', sz: gvRand(5, 9), rot: gvRand(0, 6.28), spin: gvRand(-12, 12) }));
+  }
+}
+function drawGvBits() {
+  const dt = 1 / 60;
+  gvBits = gvBits.filter((p) => (p.age += dt) < p.life);
+  for (const p of gvBits) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz -= 900 * dt;
+    if (p.z < 0) { p.z = 0; p.vz = 0; p.vx *= 0.6; p.vy *= 0.6; if (p.spin) p.spin *= 0.5; }
+    if (p.spin) p.rot += p.spin * dt;
+    const a = Math.min(1, (p.life - p.age) / 0.25);
+    upright(p.x, p.y, () => {
+      ctx.globalAlpha = a; const y = -p.z;
+      if (p.kind === 'dirt') { ctx.fillStyle = '#7a5a34'; ctx.beginPath(); ctx.arc(0, y, p.sz, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(210,170,110,.5)'; ctx.beginPath(); ctx.arc(-p.sz * 0.25, y - p.sz * 0.25, p.sz * 0.45, 0, 7); ctx.fill(); }
+      else if (p.kind === 'rock') {
+        ctx.save(); ctx.translate(0, y); ctx.rotate(p.rot); ctx.fillStyle = '#8a8548'; ctx.strokeStyle = '#4f4c26'; ctx.lineWidth = 1.5; ctx.beginPath();
+        for (let q = 0; q < 5; q++) { const t = q / 5 * 6.283, r = p.sz * (0.75 + 0.35 * Math.sin(q * 7.1 + p.sz)); ctx[q ? 'lineTo' : 'moveTo'](Math.cos(t) * r, Math.sin(t) * r * 0.8); }
+        ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(255,250,200,.25)'; ctx.fillRect(-p.sz * 0.4, -p.sz * 0.5, p.sz * 0.5, p.sz * 0.25); ctx.restore();
+      } else if (p.kind === 'leaf') { ctx.save(); ctx.translate(0, y); ctx.rotate(p.rot); ctx.fillStyle = '#4ccf4a'; ctx.beginPath(); ctx.ellipse(0, 0, p.sz, p.sz * 0.32, 0, 0, 7); ctx.fill(); ctx.restore(); }
+      ctx.globalAlpha = 1;
+    });
+  }
+}
+// The white spikes that tear up where a vine comes out of the ground (kind 0) or lands (kind 1, out at its tip, with a ring that opens out
+// over the ground as well).
+function drawGvSpikes(f, kind) {
+  const k = Math.min(1, f.age / 0.5), a = 1 - k;
+  const L = f.r * gvCfg.scale, x = kind ? f.x + f.dx * L : f.x, y = kind ? f.y + f.dy * L : f.y, size = kind ? 46 : 36;
+  upright(x, y, () => {
+    ctx.save(); ctx.fillStyle = `rgba(255,255,245,${0.9 * a})`;
+    const n = kind ? 9 : 7;
+    for (let q = 0; q < n; q++) {
+      const t = (q / n) * 6.283 + seeded(q + f.x) * 0.5, h = size * (0.6 + 0.6 * seeded(q * 3 + f.y)) * Math.min(1, k * 4), w = size * 0.1;
+      ctx.save(); ctx.translate(Math.cos(t) * size * 0.45 * k * 2, Math.sin(t) * size * 0.2 * k * 2); ctx.beginPath();
+      ctx.moveTo(-w, 0); ctx.lineTo(0, -h); ctx.lineTo(w, 0); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+    ctx.restore();
+  });
+  if (kind) { // the ring that opens out over the ground
+    ctx.save(); ctx.strokeStyle = `rgba(255,255,240,${0.85 * a})`; ctx.lineWidth = 6 * a + 1; ctx.beginPath(); ctx.ellipse(x, y, 20 + 150 * k, (20 + 150 * k), 0, 0, 7); ctx.stroke(); ctx.restore();
+  }
+}
+// Where the head surfaces: the ring the vines will come out on, drawn once on the ground and fading, with cracks running out to it.
+function drawGvRing(f) {
+  const k = Math.min(1, f.age / 0.7), a = 1 - k;
+  ctx.save(); ctx.lineCap = 'round';
+  ctx.strokeStyle = `rgba(90,55,25,${0.7 * a})`; ctx.lineWidth = 8; ctx.setLineDash([22, 14]); ctx.beginPath(); ctx.arc(f.x, f.y, f.r * Math.min(1, k * 3), 0, 7); ctx.stroke();
+  ctx.strokeStyle = `rgba(255,235,190,${0.8 * a})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * Math.min(1, k * 3), 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = `rgba(50,30,10,${0.6 * a})`; ctx.lineWidth = 3;
+  for (let q = 0; q < 8; q++) { const t = q * 0.785 + 0.2, r = f.r * Math.min(1, k * 3); jagPath(f.x, f.y, f.x + Math.cos(t) * r, f.y + Math.sin(t) * r, 6, 7); ctx.stroke(); }
+  ctx.restore();
+}
+// The head, running under the ground: a ridge of earth pushed up behind a mound, with dirt thrown off it.
+const gvTrails = {};
+function drawGiantHead(b) {
+  const tr = gvTrails[b.sd] || (gvTrails[b.sd] = []);
+  if (tr.t && performance.now() - tr.t > 300) tr.length = 0; // a new head: the ridge of the last one is forgotten
+  tr.t = performance.now();
+  const last = tr[tr.length - 1];
+  if (!last || Math.hypot(b.x - last.x, b.y - last.y) > 7) { tr.push({ x: b.x, y: b.y }); if (tr.length > 34) tr.shift(); }
+  const hw = gvCfg.hw;
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let i = 1; i < tr.length; i++) { // the ridge grows from nothing at the old end to the width of the head
+    const u = i / tr.length, w = hw * (0.15 + 0.85 * u);
+    ctx.strokeStyle = `rgba(60,38,18,${0.55 * u})`; ctx.lineWidth = w * 1.15; ctx.beginPath(); ctx.moveTo(tr[i - 1].x, tr[i - 1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
+    ctx.strokeStyle = `rgba(135,98,56,${0.8 * u})`; ctx.lineWidth = w * 0.7; ctx.beginPath(); ctx.moveTo(tr[i - 1].x, tr[i - 1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
+  }
+  ctx.restore();
+  upright(b.x, b.y, () => { // the mound
+    const g = ctx.createRadialGradient(-hw * 0.2, -hw * 0.45, 2, 0, -hw * 0.2, hw);
+    g.addColorStop(0, '#b0834c'); g.addColorStop(0.6, '#7b5530'); g.addColorStop(1, '#4a2f16');
+    ctx.fillStyle = g; ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, -hw * 0.2, hw * 0.9, hw * 0.65, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(40,24,8,.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(-hw * 0.15, -hw * 0.3, hw * 0.45, 3.6, 5.6); ctx.stroke();
+  });
+  if (Math.random() < 0.8) gvAdd(1, () => ({ x: b.x + gvRand(-hw * 0.5, hw * 0.5), y: b.y + gvRand(-hw * 0.5, hw * 0.5), z: 6, vx: gvRand(-40, 40), vy: gvRand(-40, 40), vz: gvRand(80, 200), age: 0, life: gvRand(0.3, 0.6), kind: 'dirt', sz: gvRand(2.5, 5) }));
+}
+// A giant vine: a thick trunk with rings of bark and a round tip, standing up out of the ground and brought down like the Tree Slam's trunk
+// (the same foreshortening as drawTreeArt: `pitch` is how far it is raised about the foot).
+function drawGiantVineArt(x, y, base, pitch, alpha) {
+  const ts = gvCfg.scale, len = gvCfg.len * ts, W = gvCfg.w * ts, th = ROT + base, cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const wAt = (u) => W / 2 * (1.05 - 0.4 * u); // a little thinner towards the tip
+  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(-ROT);
+  ctx.transform(Math.cos(th) * cp, Math.sin(th) * cp - TREE_UP * sp, -Math.sin(th), Math.cos(th), 0, 0);
+  const g = ctx.createLinearGradient(0, -W / 2, 0, W / 2);
+  g.addColorStop(0, '#b27a42'); g.addColorStop(0.45, '#7a4e26'); g.addColorStop(1, '#4a2c14');
+  ctx.fillStyle = g; ctx.strokeStyle = '#2f1b09'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(0, -wAt(0)); ctx.lineTo(len, -wAt(1)); ctx.arc(len, 0, wAt(1), -Math.PI / 2, Math.PI / 2); ctx.lineTo(0, wAt(0)); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(35,18,6,.5)'; ctx.lineWidth = 2.5; // the rings of bark, bulging towards the tip
+  for (let u = 0.1; u < 0.97; u += 0.13) { ctx.beginPath(); ctx.moveTo(len * u, -wAt(u)); ctx.quadraticCurveTo(len * u + W * 0.12, 0, len * u, wAt(u)); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(255,215,160,.2)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(len * 0.04, -W * 0.28); ctx.lineTo(len * 0.96, -W * 0.2); ctx.stroke(); // the light along the top
+  ctx.restore();
+}
+function drawGiantVine(b) {
+  if (!(b.ph > 0)) return; // still underground
+  const base = Math.atan2(b.dy, b.dx), left = b.lf || 0;
+  const mound = () => upright(b.x, b.y, () => { // the heap of earth it came out of, with stones
+    ctx.fillStyle = '#5b3d1f'; ctx.strokeStyle = '#33200e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, -2, gvCfg.w * 0.75, gvCfg.w * 0.34, 0, 0, 7); ctx.fill(); ctx.stroke();
+    for (let q = 0; q < 5; q++) { const t = q * 1.3 + (b.ix || 0), r = gvCfg.w * 0.6; ctx.fillStyle = '#8a8548'; ctx.beginPath(); ctx.ellipse(Math.cos(t) * r, Math.sin(t) * r * 0.45 - 2, 7, 5, t, 0, 7); ctx.fill(); }
+  });
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
+  const warn = (k) => { // the shape it will hit, on the ground, filling with colour as the time runs out
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(base);
+    ctx.fillStyle = `rgba(255,70,40,${0.12 + 0.3 * k})`; ctx.strokeStyle = `rgba(255,${120 + 80 * pulse | 0},60,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.rect(0, -gvCfg.w / 2, gvCfg.len, gvCfg.w); ctx.fill(); ctx.stroke(); ctx.restore();
+  };
+  mound();
+  if (b.ph === 1) { // standing up: out of the ground quickly, then held, trembling
+    const t = 1 - left / Math.max(gvCfg.charge, 1e-6), rise = Math.min(1, t * 3);
+    warn(t);
+    drawGiantVineArt(b.x, b.y, base, 0.2 + (TREE_RAISED - 0.2) * (1 - (1 - rise) * (1 - rise)) + Math.sin(performance.now() / 45) * 0.02 * t, 0.95);
+  } else if (b.ph === 2) { // coming down, faster and faster
+    const t = 1 - left / Math.max(gvCfg.swing, 1e-6);
+    warn(1);
+    drawGiantVineArt(b.x, b.y, base, Math.max(0, TREE_RAISED * (1 - t * t)), 0.95);
+  } else { // lying where it landed, until it is gone
+    drawGiantVineArt(b.x, b.y, base, 0, Math.min(1, left / Math.max(gvCfg.linger * 0.5, 1e-6)));
+  }
 }
 // ---- Ash's Megaton Punch ----
 // The fist and the charge flicker black and white; `on` is which of the two it is this instant.
@@ -3218,7 +3366,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' ? 0.5 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' ? 0.5 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -3236,6 +3384,10 @@ function frame() {
       else if (f.t === 'gslam') drawGhostSlam(f);
       else if (f.t === 'gwell') drawPullWell(f);
       else if (f.t === 'evolve') drawEvolve(f);
+      else if (f.t === 'gvplant') drawGvRing(f);
+      else if (f.t === 'gvrise') drawGvSpikes(f, 0);
+      else if (f.t === 'gvslam') drawGvSpikes(f, 1);
+      else if (f.t === 'gvcast') { /* only the dirt (gvBurst) */ }
       else if (f.t === 'storm') drawStormStrike(f);
       else if (f.t === 'paralyze') drawParalyzeBurst(f);
       else if (f.t === 'leaf') drawLeafSpark(f);

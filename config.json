@@ -4,7 +4,7 @@
     "web": { "min_width": 900, "min_length": 1600, "max_width": 1200, "max_length": 2000, "zoom_in_distance": 700, "zoom_out_distance": 1100, "zoom_speed": 0.5, "sea_margin": 350 }
   },
   "pikachu": {
-    "max_hp": 110,
+    "max_hp": 130,
     "walk_speed": 170,
     "radius": 8,
     "volt_tackle": {
@@ -88,7 +88,7 @@
     }
   },
   "snorlax": {
-    "max_hp": 150,
+    "max_hp": 210,
     "walk_speed": 120,
     "radius": 30,
     "ice_punch": {
@@ -131,7 +131,7 @@
     }
   },
   "charizard": {
-    "max_hp": 120,
+    "max_hp": 180,
     "walk_speed": 140,
     "radius": 20,
     "fly": {
@@ -174,9 +174,34 @@
     }
   },
   "chikorita": {
-    "max_hp": 120,
+    "max_hp": 170,
     "walk_speed": 150,
     "radius": 10,
+    "ultimate": {
+      "max": 100,
+      "gain_taken": 1,
+      "gain_dealt": 1,
+      "gain_per_second": 1
+    },
+    "giant_vines": {
+      "min_height": 0,
+      "max_height": 60,
+      "follow_speed": 260,
+      "terminal_time": 4,
+      "head_radius": 40,
+      "head_width": 50,
+      "count": 10,
+      "ring_radius": 200,
+      "interval": 0.25,
+      "charge_duration": 0.5,
+      "swing_duration": 0.2,
+      "trunk_length": 320,
+      "trunk_width": 80,
+      "trunk_scale": 1,
+      "damage": 8,
+      "stun_duration": 0.3,
+      "linger": 0.7
+    },
     "leaf_slash": {
       "min_height": 0,
       "max_height": 20,
@@ -221,7 +246,7 @@
     }
   },
   "vulpix": {
-    "max_hp": 100,
+    "max_hp": 150,
     "walk_speed": 140,
     "radius": 14,
     "frost_field": {
@@ -270,8 +295,8 @@
     }
   },
   "rowlet": {
-    "max_hp": 100,
-    "walk_speed": 175,
+    "max_hp": 130,
+    "walk_speed": 160,
     "radius": 13,
     "fly_high": 30,
     "tailwind": {
@@ -297,7 +322,7 @@
       "speed": 400,
       "radius": 8,
       "hp": 2,
-      "damage": 20,
+      "damage": 15,
       "count": 5,
       "angle": 13,
       "slow_duration": 5,
@@ -328,7 +353,7 @@
     }
   },
   "magikarp": {
-    "max_hp": 180,
+    "max_hp": 250,
     "walk_speed": 95,
     "radius": 10,
     "evolve_hops": 5,
@@ -342,7 +367,7 @@
     }
   },
   "gengar": {
-    "max_hp": 120,
+    "max_hp": 150,
     "walk_speed": 155,
     "radius": 18,
     "shadow_sneak": {
@@ -402,7 +427,7 @@
     }
   },
   "gyarados": {
-    "max_hp": 720,
+    "max_hp": 750,
     "walk_speed": 130,
     "radius": 75,
     "wave": {
@@ -446,7 +471,7 @@
     "radius": 28
   },
   "ash": {
-    "max_hp": 150,
+    "max_hp": 170,
     "walk_speed": 150,
     "radius": 30,
     "ultimate": {
@@ -556,7 +581,7 @@
     }
   },
   "machamp": {
-    "max_hp": 130,
+    "max_hp": 170,
     "walk_speed": 140,
     "radius": 30,
     "high_jump_kick": {
@@ -618,7 +643,7 @@
       "height": 80,
       "duration": 0.8,
       "cooldown": 10,
-      "air_speed_first_half": 170,
+      "air_speed_first_half": 220,
       "air_speed_second_half": 100,
       "count": 20,
       "stone_radius": 35,

@@ -336,6 +336,35 @@ func (c *bctx) findThreat() threat {
 		}
 	}
 
+	if gv := cfg.Chikorita.GiantVines; f.Kind == chikorita { // Giant Vines: every vine that is up or coming down has its shape on the ground; leave all of them, by the soonest way out
+		eta, shapes := math.Inf(1), 0
+		hits := func(x, y float64) bool {
+			for i := range c.balls {
+				if b := &c.balls[i]; b.K == ballGiantVine && c.g.side(b.Owner) != c.g.side(c.me) && (b.Phase == vineUp || b.Phase == vineSwing) &&
+					treeHits(b.X, b.Y, b.DX, b.DY, x, y, c.pr+15, gv.TrunkLength, gv.TrunkWidth, 0, 0) {
+					return true
+				}
+			}
+			return false
+		}
+		for i := range c.balls {
+			if b := &c.balls[i]; b.K == ballGiantVine && c.g.side(b.Owner) != c.g.side(c.me) && (b.Phase == vineUp || b.Phase == vineSwing) {
+				shapes++
+				e := b.Life
+				if b.Phase == vineUp {
+					e += gv.SwingDuration
+				}
+				if treeHits(b.X, b.Y, b.DX, b.DY, p.X, p.Y, c.pr+15, gv.TrunkLength, gv.TrunkWidth, 0, 0) {
+					eta = math.Min(eta, e)
+				}
+			}
+		}
+		if shapes > 0 && !math.IsInf(eta, 1) {
+			ax, ay := c.wayOutOf(hits)
+			consider(threat{thTree, math.Max(0, eta-lag), ax, ay})
+		}
+	}
+
 	if isBrawler(f.Kind) && f.KickPhase != kickNone { // a High Jump Kick: the line it flies along is fixed once the slide ends, at where the bot stands now
 		hk := cfg.brawlerOf(f.Kind).HighJumpKick
 		sx, sy, kx, ky, left, eta := f.X, f.Y, f.KickX, f.KickY, hk.KickDistance-f.KickD, 0.0
@@ -849,14 +878,19 @@ func (b *Bot) snorlax(c *bctx) Input {
 func (b *Bot) chikorita(c *bctx) Input {
 	g, p, f := c.g, c.p, c.f
 	ls, rl, vw := g.cfg.Chikorita.LeafSlash, g.cfg.Chikorita.RazorLeaf, g.cfg.Chikorita.VineWhip
-	if p.FrozenT > 0 || p.Held || p.vineBusy() || p.LeafPhase != leafNone {
-		return c.stay() // rooted, or the leaf slash is moving it
+	if p.FrozenT > 0 || p.Held || p.vineBusy() || p.LeafPhase != leafNone || g.giantOut(c.me) {
+		return c.stay() // rooted (the Giant Vines root it too), or the leaf slash is moving it
 	}
 	th := c.th
 	if th.kind != thNone && th.eta <= botHorizon {
 		return c.move(th.ax, th.ay)
 	}
 	danger := f.Kind == rowlet && f.ArrowT > 0
+	if gv := g.cfg.Chikorita.GiantVines; p.Charge >= g.cfg.Chikorita.Ultimate.Max && gv.Reach.hits(f) && !danger && c.dist <= gv.FollowSpeed*gv.TerminalTime*0.7 {
+		in := c.stay()
+		in.Ult = true // the head runs out and the vines come up where it catches the opponent
+		return in
+	}
 	vineRange := vw.Length + c.fr - 20
 	if p.VineCD == 0 && vw.Reach.hits(f) && c.dist <= vineRange && !danger && (c.rootedFor() > 0.4 || b.rng.Float64() < 0.5) {
 		in := c.stay()

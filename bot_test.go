@@ -10,7 +10,7 @@ import (
 // ---- the computer player ----
 
 func hasAct(in Input) bool {
-	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Mega || in.Kick || in.Toss || in.GFire || in.SBall || in.Storm || in.Freeze || in.Arrow || in.Twister
+	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Mega || in.Kick || in.Toss || in.GFire || in.SBall || in.Storm || in.Freeze || in.Arrow || in.Twister || in.Ult
 }
 
 // firstAct runs the bot for n ticks on a scene that does not change and returns the first decision that presses a
@@ -463,7 +463,7 @@ func TestBotsFightToAFinishWithoutGettingStuck(t *testing.T) {
 		{chikorita, snorlax}, {snorlax, chikorita}, {chikorita, pikachu}, {ash, pikachu}, {pikachu, ash}, {ash, snorlax}, {ash, chikorita}, {chikorita, ash}, {ash, ash}, {chikorita, chikorita},
 		{charizard, pikachu}, {pikachu, charizard}, {charizard, snorlax}, {snorlax, charizard}, {charizard, chikorita}, {ash, charizard}, {charizard, charizard},
 		{gengar, pikachu}, {pikachu, gengar}, {gengar, snorlax}, {snorlax, gengar}, {gengar, chikorita}, {gengar, ash}, {gengar, charizard}, {gengar, gengar},
-		{rowlet, pikachu}, {pikachu, rowlet}, {rowlet, snorlax}, {snorlax, rowlet}, {rowlet, chikorita}, {rowlet, ash}, {ash, rowlet}, {rowlet, charizard}, {rowlet, gengar}, {rowlet, rowlet}}
+		{chikorita, rowlet}, {rowlet, pikachu}, {pikachu, rowlet}, {rowlet, snorlax}, {snorlax, rowlet}, {rowlet, chikorita}, {rowlet, ash}, {ash, rowlet}, {rowlet, charizard}, {rowlet, gengar}, {rowlet, rowlet}}
 	for _, pr := range pairs {
 		wins, timeouts, total := [2]int{}, 0, 0.0
 		const n = 20

@@ -48,6 +48,8 @@ func (c Config) ultimateOf(kind int) (Ultimate, bool) {
 		return c.Pikachu.Ultimate, true
 	case ash:
 		return c.Ash.Ultimate, true
+	case chikorita:
+		return c.Chikorita.Ultimate, true
 	}
 	return Ultimate{}, false
 }
@@ -79,6 +81,9 @@ func (g *Game) gainCharge(hp0 [maxSlots]int, dt float64) {
 func (g *Game) stepUltimate(i int, in Input, dt float64) ([]Event, bool) {
 	p := &g.P[i]
 	u, ok := g.cfg.ultimateOf(p.Kind)
+	if ok && p.Kind == chikorita {
+		return g.stepGiantCast(i, in, u)
+	}
 	if !ok || p.Kind != pikachu { // Ash's is the Megaton Punch, started by stepMachamp
 		return nil, false
 	}

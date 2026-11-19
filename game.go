@@ -311,18 +311,20 @@ const (
 // The two kinds of projectile. Both live in Game.Balls and are hurt by the same skills; a fire ball is
 // Charizard's and a plain Ball is Pikachu's Electro Ball.
 const (
-	ballElectro = 0
-	ballFire    = 1
-	ballLeaf    = 2  // Chikorita's Razor Leaf
-	ballPillar  = 3  // Vulpix's ice pillar: it stands where it rose, blocks the other player and is worn down like a projectile
-	ballArrow   = 4  // Rowlet's arrow: it hurts and slows what it touches
-	ballTornado = 5  // Rowlet's tornado: it chases the opponent, carries it up and lets it fall; it is worn down like a projectile
-	ballStone   = 6  // Machamp's rock: it stands where it rose, blocks the other player and is worn down like a projectile (a pillar's way)
-	ballFist    = 7  // one of Machamp's Comet Punch fists: it hangs where it appeared, hits the opponent it touches once and has HP like a fire ball
-	ballGhost   = 8  // one of Gengar's Ghost Fire flames: it flies out, comes back to Gengar and hurts the opponent once; it has HP like a fire ball
-	ballSlash   = 10 // one of Rowlet's air slashes (thrown during the Air Slash drift): it flies straight at the foe it was thrown at, hurts what it touches and is spent
-	ballVolt    = 11 // one of Pikachu's Thousand Volt bolts: it flies out, chases the foe, pushes it back and explodes when its time is up; it has HP like a fire ball
-	ballShadow  = 9  // Gengar's Shadow Ball in charge mode: it flies straight like the Electro Ball, bursts where it is stopped and drags the opponent in; it has HP
+	ballElectro   = 0
+	ballFire      = 1
+	ballLeaf      = 2  // Chikorita's Razor Leaf
+	ballPillar    = 3  // Vulpix's ice pillar: it stands where it rose, blocks the other player and is worn down like a projectile
+	ballArrow     = 4  // Rowlet's arrow: it hurts and slows what it touches
+	ballTornado   = 5  // Rowlet's tornado: it chases the opponent, carries it up and lets it fall; it is worn down like a projectile
+	ballStone     = 6  // Machamp's rock: it stands where it rose, blocks the other player and is worn down like a projectile (a pillar's way)
+	ballFist      = 7  // one of Machamp's Comet Punch fists: it hangs where it appeared, hits the opponent it touches once and has HP like a fire ball
+	ballGhost     = 8  // one of Gengar's Ghost Fire flames: it flies out, comes back to Gengar and hurts the opponent once; it has HP like a fire ball
+	ballSlash     = 10 // one of Rowlet's air slashes (thrown during the Air Slash drift): it flies straight at the foe it was thrown at, hurts what it touches and is spent
+	ballGiantHead = 12 // the thick vine that runs underground after the foe in Chikorita's Giant Vines (it has no HP and nothing touches it)
+	ballGiantVine = 13 // one of the giant vines of that skill (waiting underground, standing up, coming down, or lying there); HP 0, so no projectile meets it
+	ballVolt      = 11 // one of Pikachu's Thousand Volt bolts: it flies out, chases the foe, pushes it back and explodes when its time is up; it has HP like a fire ball
+	ballShadow    = 9  // Gengar's Shadow Ball in charge mode: it flies straight like the Electro Ball, bursts where it is stopped and drags the opponent in; it has HP
 )
 
 // Ball is a flying projectile: an Electro Ball flies straight until it explodes, a fire ball until it
@@ -351,6 +353,7 @@ type Ball struct {
 	Back      bool            `json:"bk,omitempty"` // ghost fire: it has flown out and is coming back to its owner
 	Hit       bool            `json:"-"`            // ghost fire: it has hurt the opponent already
 	FoeCD     float64         `json:"-"`            // ghost fire: until it may hurt the opponent again (rehit_interval)
+	Phase     int             `json:"ph,omitempty"` // giant vine: vineWait, vineUp, vineSwing or vineLie; its Life is the time left in it (Delay while it waits)
 	Idx       int             `json:"ix,omitempty"` // thousand volt: which bolt of the cast it is (the client colours it by this)
 	AnchorX   float64         `json:"ax,omitempty"` // thousand volt: where it finished flying out, which the line to its Pikachu runs through
 	AnchorY   float64         `json:"ay,omitempty"`
@@ -748,6 +751,8 @@ func (g *Game) Step(dt float64) []Event {
 			in = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY, CastX: in.CastX, CastY: in.CastY}
 		} else if p.Kind == pikachu && g.cfg.Pikachu.ThousandVolt.RootedWhileBolts && g.voltBoltsOut(i) {
 			in.Skill = false // its bolts are out and it stays where it is: no Volt Tackle either
+		} else if p.Kind == chikorita && (g.giantOut(i) || (in.Ult && p.Charge >= g.cfg.Chikorita.Ultimate.Max)) { // Giant Vines is on, or starts now: nothing else does
+			in = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY, CastX: in.CastX, CastY: in.CastY, Ult: in.Ult}
 		}
 		for _, t := range []*float64{&p.BoundT, &p.ParalyzeT, &p.SlowT, &p.SilentT} {
 			if *t > 0 {
@@ -1170,6 +1175,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 	type blast struct{ x, y float64 }
 	var blasts []blast
 	kept := g.Balls[:0]
+	var born []Ball // what the balls of this tick give birth to: they are put in after the loop, not in the array it is going through
 	for _, b := range g.Balls {
 		b.X0, b.Y0 = b.X, b.Y
 		if b.K == ballPillar || b.K == ballStone {
@@ -1300,6 +1306,23 @@ func (g *Game) stepBalls(dt float64) []Event {
 			events = append(events, g.shadowBlast(b.Owner, b.X, b.Y)...)
 			continue
 		}
+		if b.K == ballGiantHead {
+			alive, nb, ev := g.stepGiantHead(&b, dt)
+			born = append(born, nb...)
+			events = append(events, ev...)
+			if alive {
+				kept = append(kept, b)
+			}
+			continue
+		}
+		if b.K == ballGiantVine {
+			alive, ev := g.stepGiantVine(&b, dt)
+			events = append(events, ev...)
+			if alive {
+				kept = append(kept, b)
+			}
+			continue
+		}
 		if b.K == ballVolt {
 			alive, ev := g.stepVoltBolt(&b, dt)
 			events = append(events, ev...)
@@ -1423,7 +1446,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}
 		}
 	}
-	g.Balls = kept
+	g.Balls = append(kept, born...)
 	g.clashBalls()
 	g.grindPillars(dt)
 	// The blast burns the fire balls near it; they are gone on the next step.

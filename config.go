@@ -326,6 +326,33 @@ type Config struct {
 			BindDuration     float64 `json:"bind_duration"`
 			Cooldown         float64 `json:"cooldown"` // counted from the start of the swing
 		} `json:"vine_whip"`
+		Ultimate Ultimate `json:"ultimate"` // the charge Giant Vines (Z) needs
+		// Giant Vines (the ultimate): a very thick vine runs underground at `follow_speed` after the nearest foe and, when it touches it, or
+		// `terminal_time` seconds after it set off (wherever it has got to by then), surfaces there. `count` giant vines burst out of the ground
+		// on a ring of `ring_radius` round that spot, one every `interval` seconds. Each stands up for `charge_duration` seconds, locked on the foe
+		// as it was when it came out (the shape it will hit is drawn on the ground, like the Tree Slam's trunk, `trunk_length` long and
+		// `trunk_width` wide from where it stands), then comes down in `swing_duration` seconds and hits whoever is in that shape when it lands:
+		// `damage` and `stun_duration` (0 = no stun) each. It lies there for `linger` seconds and is gone. Chikorita cannot move until the last
+		// one has landed. `head_radius` is how near the head must get to count as touching; `head_width` and `trunk_scale` only change how
+		// big the head and the vines are drawn.
+		GiantVines struct {
+			Reach
+			FollowSpeed    float64 `json:"follow_speed"`
+			TerminalTime   float64 `json:"terminal_time"`
+			HeadRadius     float64 `json:"head_radius"`
+			HeadWidth      float64 `json:"head_width"`
+			Count          int     `json:"count"` // 1..maxGiantVines
+			RingRadius     float64 `json:"ring_radius"`
+			Interval       float64 `json:"interval"`
+			ChargeDuration float64 `json:"charge_duration"`
+			SwingDuration  float64 `json:"swing_duration"`
+			TrunkLength    float64 `json:"trunk_length"`
+			TrunkWidth     float64 `json:"trunk_width"`
+			TrunkScale     float64 `json:"trunk_scale"`
+			Damage         int     `json:"damage"`
+			StunDuration   float64 `json:"stun_duration"`
+			Linger         float64 `json:"linger"`
+		} `json:"giant_vines"`
 	} `json:"chikorita"`
 	Vulpix struct {
 		MaxHP     int     `json:"max_hp"`
@@ -883,6 +910,12 @@ func DefaultConfig() Config {
 	c.Chikorita.VineWhip.Damage = 10
 	c.Chikorita.VineWhip.BindDuration = 2
 	c.Chikorita.VineWhip.Cooldown = 5
+	c.Chikorita.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
+	gv := &c.Chikorita.GiantVines
+	gv.Reach = groundReach
+	gv.FollowSpeed, gv.TerminalTime, gv.HeadRadius, gv.HeadWidth = 260, 4, 40, 50
+	gv.Count, gv.RingRadius, gv.Interval, gv.ChargeDuration, gv.SwingDuration = 10, 200, 0.25, 0.5, 0.2
+	gv.TrunkLength, gv.TrunkWidth, gv.TrunkScale, gv.Damage, gv.StunDuration, gv.Linger = 320, 80, 1, 8, 0.3, 0.7
 	c.Vulpix.MaxHP = 100
 	c.Vulpix.WalkSpeed = 160
 	c.Vulpix.Radius = 14
@@ -1167,6 +1200,14 @@ func (c Config) validate() error {
 		{"pikachu.thousand_volt.terminal_time", c.Pikachu.ThousandVolt.TerminalTime, 0},
 		{"pikachu.ultimate.max", c.Pikachu.Ultimate.Max, 0},
 		{"ash.ultimate.max", c.Ash.Ultimate.Max, 0},
+		{"chikorita.ultimate.max", c.Chikorita.Ultimate.Max, 0},
+		{"chikorita.giant_vines.follow_speed", c.Chikorita.GiantVines.FollowSpeed, 0},
+		{"chikorita.giant_vines.terminal_time", c.Chikorita.GiantVines.TerminalTime, 0},
+		{"chikorita.giant_vines.head_radius", c.Chikorita.GiantVines.HeadRadius, 0},
+		{"chikorita.giant_vines.ring_radius", c.Chikorita.GiantVines.RingRadius, 0},
+		{"chikorita.giant_vines.trunk_length", c.Chikorita.GiantVines.TrunkLength, 0},
+		{"chikorita.giant_vines.trunk_width", c.Chikorita.GiantVines.TrunkWidth, 0},
+		{"chikorita.giant_vines.trunk_scale", c.Chikorita.GiantVines.TrunkScale, 0},
 		{"gyarados.max_hp", float64(c.Gyarados.MaxHP), 0},
 		{"gyarados.walk_speed", c.Gyarados.WalkSpeed, 0},
 		{"gyarados.radius", c.Gyarados.Radius, 0},
@@ -1486,6 +1527,16 @@ func (c Config) validate() error {
 		{"ash.ultimate.gain_taken", c.Ash.Ultimate.GainTaken},
 		{"ash.ultimate.gain_dealt", c.Ash.Ultimate.GainDealt},
 		{"ash.ultimate.gain_per_second", c.Ash.Ultimate.GainPerSecond},
+		{"chikorita.ultimate.gain_taken", c.Chikorita.Ultimate.GainTaken},
+		{"chikorita.ultimate.gain_dealt", c.Chikorita.Ultimate.GainDealt},
+		{"chikorita.ultimate.gain_per_second", c.Chikorita.Ultimate.GainPerSecond},
+		{"chikorita.giant_vines.head_width", c.Chikorita.GiantVines.HeadWidth},
+		{"chikorita.giant_vines.interval", c.Chikorita.GiantVines.Interval},
+		{"chikorita.giant_vines.charge_duration", c.Chikorita.GiantVines.ChargeDuration},
+		{"chikorita.giant_vines.swing_duration", c.Chikorita.GiantVines.SwingDuration},
+		{"chikorita.giant_vines.damage", float64(c.Chikorita.GiantVines.Damage)},
+		{"chikorita.giant_vines.stun_duration", c.Chikorita.GiantVines.StunDuration},
+		{"chikorita.giant_vines.linger", c.Chikorita.GiantVines.Linger},
 		{"gengar.ghost_fire.cooldown", c.Gengar.GhostFire.Cooldown},
 		{"gengar.ghost_fire.rehit_interval", c.Gengar.GhostFire.RehitInterval},
 		{"gengar.ghost_fire.damage", float64(c.Gengar.GhostFire.Damage)},
@@ -1541,6 +1592,9 @@ func (c Config) validate() error {
 			return fmt.Errorf("pikachu.thousand_volt.bolt_colors: %q is not #rrggbb", s)
 		}
 	}
+	if n := c.Chikorita.GiantVines.Count; n < 1 || n > maxGiantVines {
+		return fmt.Errorf("chikorita.giant_vines.count must be 1..%d, got %d", maxGiantVines, n)
+	}
 	if n := c.Pikachu.ThousandVolt.Count; n > maxVoltBolts {
 		return fmt.Errorf("pikachu.thousand_volt.count must be at most %d, got %d", maxVoltBolts, n)
 	}
@@ -1563,6 +1617,7 @@ func (c Config) validate() error {
 		"chikorita.leaf_slash":   c.Chikorita.LeafSlash.Reach,
 		"chikorita.razor_leaf":   c.Chikorita.RazorLeaf.Reach,
 		"chikorita.vine_whip":    c.Chikorita.VineWhip.Reach,
+		"chikorita.giant_vines":  c.Chikorita.GiantVines.Reach,
 		"vulpix.frost_field":     c.Vulpix.FrostField.Reach,
 		"vulpix.ice_storm":       c.Vulpix.IceStorm.Reach,
 		"vulpix.freeze_beam":     c.Vulpix.FreezeBeam.Reach,
