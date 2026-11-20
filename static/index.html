@@ -106,7 +106,7 @@ const HELP = [
   '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　Z＝千萬伏特（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能放；朝四周放出一圈閃電，之後追著敵人跑、碰到會擊退，時間到全部爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）',
   '你是噴火龍　移動 WASD　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　J＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　K＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
-  '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　J＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　K＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）　Z＝大藤蔓（絕招，蓄能滿了才能放；一根粗藤蔓從地底追著敵人跑，碰到敵人或時間到就在那裡冒出來，周圍一圈大藤蔓依序衝出地面，各自鎖定敵人朝下拍打，打中的人受傷並被打暈；整個過程無法移動）',
+  '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　J＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　K＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）　Z＝大藤蔓（絕招，蓄能滿了才能放；一根粗藤蔓從地底追著敵人跑，碰到敵人或時間到就在那裡冒出來，周圍一圈大藤蔓依序衝出地面，各自鎖定敵人朝下拍打，打中的人受傷、變慢，被藤蔓打中好幾次還會被打暈；整個過程無法移動）',
   '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
   '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝空氣斬（朝按住的方向衝出一道半月形弧線，彎向敵人那一側，沿途朝最近的敵人射出一道道白色的空氣斬擊，打得到貼地的敵人）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
@@ -122,7 +122,7 @@ const beamLook = perSlot(() => ({ ang: null, tail: null })); // per slot: the sm
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, ctime: 0.8, pull: 1, orb: 30, orbhp: 30, nscale: 1, nslam: 110, nflight: 0.9, nlob: 150, sfire: 20 }; // Gengar's, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
-let gvCfg = { hw: 50, wo: 100, wi: 100, hr: 40, len: 320, w: 80, tw: 20, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
+let gvCfg = { hw: 50, wo: 100, wi: 100, hr: 40, len: 320, w: 80, tw: 20, rs: 0.8, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
 let megaCfg = { fevery: 0, charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
@@ -2137,8 +2137,8 @@ function drawGvSpread(b) {
 }
 // A giant vine: a thick trunk with rings of bark and a round tip, standing up out of the ground and brought down like the Tree Slam's trunk
 // (the same foreshortening as drawTreeArt: `pitch` is how far it is raised about the foot).
-function drawGiantVineArt(x, y, base, pitch, alpha) {
-  const ts = gvCfg.scale, len = gvCfg.len * ts, W = gvCfg.w * ts, T = gvCfg.tw * ts, th = ROT + base, cp = Math.cos(pitch), sp = Math.sin(pitch);
+function drawGiantVineArt(x, y, base, pitch, alpha, ext = 1) { // ext: how much of its length is out of the ground (0..1)
+  const ts = gvCfg.scale, len = gvCfg.len * ts * ext, W = gvCfg.w * ts, T = gvCfg.tw * ts, th = ROT + base, cp = Math.cos(pitch), sp = Math.sin(pitch);
   const wAt = (u) => (W + (T - W) * u) / 2; // a root: thick where it leaves the ground, thin at the end (the shape it hits, drawn bigger by trunk_scale)
   const body = 0.9; // the body runs to here and the last of it is the point
   ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(-ROT);
@@ -2155,10 +2155,13 @@ function drawGiantVineArt(x, y, base, pitch, alpha) {
 }
 function drawGiantVine(b) {
   if (!(b.ph > 0)) { drawGvSpread(b); return; } // still underground: the earth it pushes up as it makes its way out to its place
-  const base = Math.atan2(b.dy, b.dx), left = b.lf || 0;
-  const mound = () => upright(b.x, b.y, () => { // the heap of earth it came out of, with stones
-    ctx.fillStyle = '#5b3d1f'; ctx.strokeStyle = '#33200e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, -2, gvCfg.w * 0.75, gvCfg.w * 0.34, 0, 0, 7); ctx.fill(); ctx.stroke();
-    for (let q = 0; q < 5; q++) { const t = q * 1.3 + (b.ix || 0), r = gvCfg.w * 0.6; ctx.fillStyle = '#8a8548'; ctx.beginPath(); ctx.ellipse(Math.cos(t) * r, Math.sin(t) * r * 0.45 - 2, 7, 5, t, 0, 7); ctx.fill(); }
+  const base = Math.atan2(b.dy, b.dx), left = b.lf || 0, w = gvCfg.w;
+  const hole = () => upright(b.x, b.y, () => { // the hole it comes out of, dark: the vine is drawn over it
+    ctx.fillStyle = '#2a190a'; ctx.strokeStyle = '#33200e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, -2, w * 0.75, w * 0.34, 0, 0, 7); ctx.fill(); ctx.stroke();
+  });
+  const lip = () => upright(b.x, b.y, () => { // the near half of the heap of earth round the hole, over the foot of the vine so it comes out of the ground, with stones
+    ctx.fillStyle = '#5b3d1f'; ctx.strokeStyle = '#33200e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, -2, w * 0.8, w * 0.38, 0, 0, Math.PI); ctx.closePath(); ctx.fill(); ctx.stroke();
+    for (let q = 0; q < 5; q++) { const t = q * 0.6 + 0.2 + (b.ix || 0) * 0.37, r = w * 0.62; ctx.fillStyle = '#8a8548'; ctx.beginPath(); ctx.ellipse(Math.cos(t) * r, Math.sin(t) * r * 0.5 - 2, 7, 5, t, 0, 7); ctx.fill(); }
   });
   const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
   const warn = (k) => { // the shape it will hit, on the ground, filling with colour as the time runs out
@@ -2166,11 +2169,13 @@ function drawGiantVine(b) {
     ctx.fillStyle = `rgba(255,70,40,${0.12 + 0.3 * k})`; ctx.strokeStyle = `rgba(255,${120 + 80 * pulse | 0},60,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(0, -gvCfg.w / 2); ctx.lineTo(gvCfg.len, -gvCfg.tw / 2); ctx.lineTo(gvCfg.len, gvCfg.tw / 2); ctx.lineTo(0, gvCfg.w / 2); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
   };
-  mound();
-  if (b.ph === 1) { // standing up: out of the ground quickly, then held, trembling
-    const t = 1 - left / Math.max(gvCfg.charge, 1e-6), rise = Math.min(1, t * 3);
+  hole();
+  if (b.ph === 1) { // first it is pushed up out of the ground, nearly upright, longer and longer; then it is held there, trembling, before it comes down
+    const t = 1 - left / Math.max(gvCfg.charge, 1e-6), e = Math.min(1, t / 0.55), ext = 0.08 + 0.92 * (1 - (1 - e) * (1 - e));
     warn(t);
-    drawGiantVineArt(b.x, b.y, base, 0.2 + (TREE_RAISED - 0.2) * (1 - (1 - rise) * (1 - rise)) + Math.sin(performance.now() / 45) * 0.02 * t, 0.95);
+    chargeRings(b.x, b.y, t, gvCfg.rs); // the rings that close in while it is held up: the same as the Thousand Volt's while it gathers
+    drawGiantVineArt(b.x, b.y, base, TREE_RAISED + Math.sin(performance.now() / 45) * 0.02 * t, 0.95, ext);
+    if (e < 1 && Math.random() < 0.7) gvAdd(1, () => ({ x: b.x + gvRand(-w * 0.4, w * 0.4), y: b.y + gvRand(-w * 0.2, w * 0.2), z: 6, vx: gvRand(-40, 40), vy: gvRand(-20, 20), vz: gvRand(80, 220), age: 0, life: gvRand(0.3, 0.6), kind: 'dirt', sz: gvRand(2.5, 5) })); // earth falling off it as it comes up
   } else if (b.ph === 2) { // coming down, faster and faster
     const t = 1 - left / Math.max(gvCfg.swing, 1e-6);
     warn(1);
@@ -2178,6 +2183,7 @@ function drawGiantVine(b) {
   } else { // lying where it landed, until it is gone
     drawGiantVineArt(b.x, b.y, base, 0, Math.min(1, left / Math.max(gvCfg.linger * 0.5, 1e-6)));
   }
+  lip();
 }
 // ---- Ash's Megaton Punch ----
 // The fist and the charge flicker black and white; `on` is which of the two it is this instant.
@@ -2215,6 +2221,17 @@ function drawMegaCharge(p, d) {
 }
 // The gathering of a punch or of Thousand Volt: the bolts from the sky onto the hand, then the rings closing in on it, then the black and white ball
 // swelling. c is the look from the config (megaCfg, or tvoltCfg, which has the same keys), left the seconds of the gathering to go, base the way the hand points.
+// The rings of a gathering: three, one after another, each closing in on (hx, hy) (`u` is how far the gathering has got, 0..1; `rs` the size).
+function chargeRings(hx, hy, u, rs) {
+  ctx.save(); ctx.lineWidth = 3;
+  for (let j = 0; j < 3; j++) {
+    const v = Math.min(Math.max(u * 1.5 - j * 0.25, 0), 1), r = (150 * (1 - v) + 10) * rs;
+    ctx.lineWidth = 6; ctx.strokeStyle = `rgba(190,100,10,${0.3 + 0.45 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r + 2, 0, 7); ctx.stroke(); // a deep amber underlay, not black
+    ctx.lineWidth = 3.5; ctx.strokeStyle = `rgba(255,185,30,${0.6 + 0.4 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r, 0, 7); ctx.stroke(); // an orange-yellow ring on top
+  }
+  ctx.fillStyle = `rgba(150,80,10,${0.15 + 0.35 * u})`; ctx.beginPath(); ctx.arc(hx, hy, 18 * rs, 0, 7); ctx.fill();
+  ctx.restore();
+}
 function megaChargeFx(d, c, left, base, yellow = false) {
   const rs = c.rscale, bs = c.bscale;
   const ahead = yellow ? 0 : 24; // Ash gathers at his fist, in front of him; Pikachu gathers round itself
@@ -2230,18 +2247,7 @@ function megaChargeFx(d, c, left, base, yellow = false) {
       for (const [w, col] of [[16, `rgba(255,170,30,${0.65 * a})`], [6, `rgba(255,252,230,${a})`]]) { ctx.strokeStyle = col; ctx.lineWidth = w; jagPath(off + (Math.random() - 0.5) * 24, -sy - 10, 0, 0, Math.max(4, sy / 38 | 0), 22); ctx.stroke(); }
     });
   }
-  if (e < ringT) {
-    const u = ringT > 0 ? e / ringT : 1;
-    ctx.save(); ctx.lineWidth = 3;
-    for (let j = 0; j < 3; j++) { // three rings, one after another, each closing in to the least it goes
-      const v = Math.min(Math.max(u * 1.5 - j * 0.25, 0), 1), r = (150 * (1 - v) + 10) * rs;
-      ctx.lineWidth = 6; ctx.strokeStyle = `rgba(190,100,10,${0.3 + 0.45 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r + 2, 0, 7); ctx.stroke(); // a deep amber underlay, not black
-      ctx.lineWidth = 3.5; ctx.strokeStyle = `rgba(255,185,30,${0.6 + 0.4 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r, 0, 7); ctx.stroke(); // an orange-yellow ring on top
-    }
-    ctx.fillStyle = `rgba(150,80,10,${0.15 + 0.35 * u})`; ctx.beginPath(); ctx.arc(hx, hy, 18 * rs, 0, 7); ctx.fill();
-    ctx.restore();
-    return;
-  }
+  if (e < ringT) { chargeRings(hx, hy, ringT > 0 ? e / ringT : 1, rs); return; }
   const v = Math.min((e - ringT) / Math.max(c.charge - ringT, 1e-6), 1), black = megaBlack(55), R = (16 + 30 * v) * bs;
   if (yellow) voltBall(hx, hy, R); else megaBall(hx, hy, R, black);
 }

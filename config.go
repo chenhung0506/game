@@ -355,7 +355,10 @@ type Config struct {
 			TrunkScale     float64 `json:"trunk_scale"`
 			Damage         int     `json:"damage"`
 			SlowDuration   float64 `json:"slow_duration"`
-			Slow           float64 `json:"slow"` // 0..1
+			Slow           float64 `json:"slow"`          // 0..1
+			StunHits       int     `json:"stun_hits"`     // a foe that has been hit by this many vines of one cast (and again every this many more) is stunned for stun_duration seconds; 0 = never
+			StunDuration   float64 `json:"stun_duration"` // 0 = no stun
+			RingScale      float64 `json:"ring_scale"`    // looks only: the size of the rings that close in on a vine as it stands up (the Thousand Volt's ring_duration look)
 			Linger         float64 `json:"linger"`
 		} `json:"giant_vines"`
 	} `json:"chikorita"`
@@ -921,6 +924,7 @@ func DefaultConfig() Config {
 	gv.FollowSpeed, gv.TerminalTime, gv.HeadRadius, gv.HeadWidth, gv.WormOut, gv.WormIn = 260, 4, 40, 50, 100, 100
 	gv.Count, gv.RingRadius, gv.SpreadTime, gv.Interval, gv.ChargeDuration, gv.SwingDuration = 10, 200, 0.4, 0.25, 0.5, 0.2
 	gv.TrunkLength, gv.TrunkWidth, gv.TipWidth, gv.TrunkScale, gv.Damage, gv.SlowDuration, gv.Slow, gv.Linger = 320, 80, 20, 1, 8, 3, 0.5, 0.7
+	gv.StunHits, gv.StunDuration, gv.RingScale = 5, 1, 0.8
 	c.Vulpix.MaxHP = 100
 	c.Vulpix.WalkSpeed = 160
 	c.Vulpix.Radius = 14
@@ -1544,6 +1548,9 @@ func (c Config) validate() error {
 		{"chikorita.giant_vines.swing_duration", c.Chikorita.GiantVines.SwingDuration},
 		{"chikorita.giant_vines.damage", float64(c.Chikorita.GiantVines.Damage)},
 		{"chikorita.giant_vines.slow_duration", c.Chikorita.GiantVines.SlowDuration},
+		{"chikorita.giant_vines.stun_hits", float64(c.Chikorita.GiantVines.StunHits)},
+		{"chikorita.giant_vines.stun_duration", c.Chikorita.GiantVines.StunDuration},
+		{"chikorita.giant_vines.ring_scale", c.Chikorita.GiantVines.RingScale},
 		{"chikorita.giant_vines.tip_width", c.Chikorita.GiantVines.TipWidth},
 		{"chikorita.giant_vines.linger", c.Chikorita.GiantVines.Linger},
 		{"gengar.ghost_fire.cooldown", c.Gengar.GhostFire.Cooldown},

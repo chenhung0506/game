@@ -141,10 +141,10 @@ func TestGiantVinesHitOnlyWhatIsInTheirShape(t *testing.T) {
 	}
 }
 
-func TestGiantVinesSlowWhatTheyHitAndNeverStunIt(t *testing.T) {
+func TestGiantVinesSlowWhatTheyHitAndDoNotStunIfStunHitsIsZero(t *testing.T) {
 	cfg := DefaultConfig()
 	gv := &cfg.Chikorita.GiantVines
-	gv.SlowDuration, gv.Slow = 2, 0.6
+	gv.SlowDuration, gv.Slow, gv.StunHits = 2, 0.6, 0
 	g := gvGame(cfg, 100)
 	gvCast(g)
 	slowed := false
@@ -173,7 +173,7 @@ func TestGiantVinesSlowWhatTheyHitAndNeverStunIt(t *testing.T) {
 
 func TestGiantVinesWithNoSlowDoNotSlow(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Chikorita.GiantVines.SlowDuration = 0
+	cfg.Chikorita.GiantVines.SlowDuration, cfg.Chikorita.GiantVines.StunHits = 0, 0
 	g := gvGame(cfg, 100)
 	gvCast(g)
 	for n := 0; n < 8*tickRate; n++ {
@@ -294,6 +294,8 @@ func TestGiantVinesConfigIsValidated(t *testing.T) {
 		"too many":      func(c *Config) { c.Chikorita.GiantVines.Count = maxGiantVines + 1 },
 		"negative slow": func(c *Config) { c.Chikorita.GiantVines.SlowDuration = -1 },
 		"slow over 1":   func(c *Config) { c.Chikorita.GiantVines.Slow = 1.5 },
+		"negative stun": func(c *Config) { c.Chikorita.GiantVines.StunDuration = -1 },
+		"negative hits": func(c *Config) { c.Chikorita.GiantVines.StunHits = -1 },
 		"tip wider":     func(c *Config) { c.Chikorita.GiantVines.TipWidth = c.Chikorita.GiantVines.TrunkWidth + 1 },
 		"no speed":      func(c *Config) { c.Chikorita.GiantVines.FollowSpeed = 0 },
 		"no time":       func(c *Config) { c.Chikorita.GiantVines.TerminalTime = 0 },
@@ -359,5 +361,77 @@ func TestABotWalksOutOfTheShapeOfAGiantVine(t *testing.T) {
 	}
 	if hits(&g.P[0]) {
 		t.Fatal("the bot stayed in the shape of the vine")
+	}
+}
+
+func TestAFoeHitByEnoughVinesOfOneCastIsStunned(t *testing.T) {
+	cfg := DefaultConfig()
+	gv := &cfg.Chikorita.GiantVines
+	gv.Count, gv.Interval, gv.SpreadTime, gv.ChargeDuration, gv.SwingDuration, gv.Linger = 6, 0.5, 0.2, 0.2, 0.1, 5
+	gv.StunHits, gv.StunDuration = 3, 1.5
+	g := gvGame(cfg, 100)
+	gvCast(g)
+	hits, stunnedAt := 0, 0
+	var stuns []float64
+	for n := 0; n < 10*tickRate; n++ {
+		hp := g.P[1].HP
+		stun0 := g.P[1].StunT
+		g.Step(dt)
+		if g.P[1].HP < hp {
+			hits++
+		}
+		if g.P[1].StunT > stun0+0.5 { // stunned just now
+			stunnedAt = hits
+			stuns = append(stuns, g.P[1].StunT)
+		}
+		g.P[1].StunT = 0 // let it recover at once, to see each stun on its own
+	}
+	if hits != 6 {
+		t.Fatalf("%d hits, want 6", hits)
+	}
+	if len(stuns) != 2 || stuns[0] != 1.5 || stunnedAt != 6 {
+		t.Fatalf("stuns %v (the last on hit %d): want two of 1.5, on the 3rd and the 6th hit", stuns, stunnedAt)
+	}
+}
+
+func TestVinesNeverStunWithNoStunHitsOrNoStunTime(t *testing.T) {
+	for _, edit := range []func(*Config){
+		func(c *Config) { c.Chikorita.GiantVines.StunHits = 0 },
+		func(c *Config) { c.Chikorita.GiantVines.StunDuration = 0 },
+	} {
+		cfg := DefaultConfig()
+		edit(&cfg)
+		g := gvGame(cfg, 100)
+		gvCast(g)
+		for n := 0; n < 10*tickRate; n++ {
+			g.Step(dt)
+			if g.P[1].StunT != 0 {
+				t.Fatal("stunned")
+			}
+		}
+		if g.P[1].HP == 100000 {
+			t.Fatal("not even hurt: the scene is wrong")
+		}
+	}
+}
+
+func TestEachCastCountsItsHitsAgain(t *testing.T) {
+	cfg := DefaultConfig()
+	gv := &cfg.Chikorita.GiantVines
+	gv.Count, gv.Interval, gv.SpreadTime, gv.ChargeDuration, gv.SwingDuration, gv.Linger = 2, 0.3, 0.1, 0.1, 0.1, 0.1
+	gv.StunHits, gv.StunDuration = 3, 1
+	g := gvGame(cfg, 100)
+	for c := 0; c < 2; c++ { // two casts of 2 hits each: 4 hits in all but never 3 in one cast
+		g.P[0].Charge = cfg.Chikorita.Ultimate.Max
+		gvCast(g)
+		for n := 0; n < 5*tickRate; n++ {
+			g.Step(dt)
+			if g.P[1].StunT != 0 {
+				t.Fatalf("cast %d: stunned by two hits of three", c)
+			}
+		}
+	}
+	if g.P[1].HP != 100000-4*cfg.Chikorita.GiantVines.Damage {
+		t.Fatalf("HP %d: the four hits did not all land, the test shows nothing", g.P[1].HP)
 	}
 }

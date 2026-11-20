@@ -91,12 +91,13 @@ func (g *Game) stepGiantHead(b *Ball, dt float64) (alive bool, born []Ball, even
 		cx, cy = foe.X, foe.Y // it comes up under the foe, which the ring then closes round
 	}
 	start := math.Atan2(b.DY, b.DX) + math.Pi // the vines are spread round the ring from where the head came from, and come out in any order
+	strikes := new([maxSlots]int)             // the hits of this cast, counted for each foe
 	turn := g.rng.Perm(gv.Count)              // the n-th place on the ring comes out turn[n]-th
 	for n := 0; n < gv.Count && n < maxGiantVines; n++ {
 		a := start + 2*math.Pi*float64(n)/float64(gv.Count)
 		wait := gv.SpreadTime + float64(turn[n])*gv.Interval // the first has the spread time to get to its place, each later one a little longer
 		born = append(born, Ball{
-			K: ballGiantVine, Owner: b.Owner, Side: b.Side, Idx: n, Phase: vineWait, Delay: wait, Life: wait, // Life is the whole wait, for the page to spread it out at the right speed
+			K: ballGiantVine, Owner: b.Owner, Side: b.Side, Strikes: strikes, Idx: n, Phase: vineWait, Delay: wait, Life: wait, // Life is the whole wait, for the page to spread it out at the right speed
 			X: math.Min(math.Max(cx+math.Cos(a)*gv.RingRadius, 0), g.court.Length),
 			Y: math.Min(math.Max(cy+math.Sin(a)*gv.RingRadius, 0), g.court.Width),
 		})
@@ -136,6 +137,9 @@ func (g *Game) stepGiantVine(b *Ball, dt float64) (alive bool, events []Event) {
 				if foe := &g.P[j]; gv.Reach.hits(foe) && vineHits(b.X, b.Y, b.DX, b.DY, foe.X, foe.Y, g.radius(j), gv.TrunkLength, gv.TrunkWidth, gv.TipWidth) {
 					g.hit(foe, gv.Damage)
 					g.slow(foe, gv.SlowDuration, gv.Slow)
+					if b.Strikes[j]++; gv.StunHits > 0 && b.Strikes[j]%gv.StunHits == 0 { // every N-th vine that hits it stuns it
+						g.stun(foe, gv.StunDuration)
+					}
 				}
 			}
 			b.Phase, b.Life = vineLie, gv.Linger

@@ -355,6 +355,7 @@ type Ball struct {
 	Hit       bool            `json:"-"`            // ghost fire: it has hurt the opponent already
 	FoeCD     float64         `json:"-"`            // ghost fire: until it may hurt the opponent again (rehit_interval)
 	Phase     int             `json:"ph,omitempty"` // giant vine: vineWait, vineUp, vineSwing or vineLie; its Life is the time left in it (Delay while it waits)
+	Strikes   *[maxSlots]int  `json:"-"`            // giant vine: how many vines of its cast have hit each foe (shared by the vines of one cast)
 	Idx       int             `json:"ix,omitempty"` // thousand volt: which bolt of the cast it is (the client colours it by this)
 	AnchorX   float64         `json:"ax,omitempty"` // thousand volt: where it finished flying out, which the line to its Pikachu runs through
 	AnchorY   float64         `json:"ay,omitempty"`
