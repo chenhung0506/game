@@ -122,7 +122,7 @@ const beamLook = perSlot(() => ({ ang: null, tail: null })); // per slot: the sm
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, ctime: 0.8, pull: 1, orb: 30, orbhp: 30, nscale: 1, nslam: 110, nflight: 0.9, nlob: 150, sfire: 20 }; // Gengar's, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
-let gvCfg = { hw: 50, hr: 40, len: 320, w: 80, tw: 20, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
+let gvCfg = { hw: 50, wo: 100, wi: 100, hr: 40, len: 320, w: 80, tw: 20, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
 let megaCfg = { fevery: 0, charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
 let beamCfg = { len: 450, w: 50, charge: 0.6, angle: 30 }, gbeamCfg = beamCfg; // Snorlax's and Gyarados's Hyper Beam, replaced by the server's values in 'hi'
@@ -1363,6 +1363,7 @@ function drawBeam(i, p, d, beamLook) {
 function drawBalls() {
   for (const pi of slotsOf(0)) drawBallCharge(snap.p[pi], disp[pi]);
   for (const pi of slotsOf(9)) drawShadowCharge(snap.p[pi], disp[pi]);
+  drawGvWorms();
   for (const b of snap.b || []) drawBall(b);
   drawGvBits();
 }
@@ -1941,6 +1942,7 @@ function drawTreeSlam(f) {
 // Bits of dirt, stone, leaf and white shards thrown up by the vines. (x, y) is on the ground, z above it; they are drawn upright so "up" is up on the
 // screen whichever way the arena is turned.
 let gvBits = [];
+const gvPlant = {}; // per owner (its slot + 1): where the head last surfaced, and when
 const GV_MAX_BITS = 400;
 function gvAdd(n, make) { for (let i = 0; i < n && gvBits.length < GV_MAX_BITS; i++) gvBits.push(make(i)); }
 const gvRand = (a, b) => a + Math.random() * (b - a);
@@ -1949,6 +1951,7 @@ function gvBurst(ev) { // the dirt of each moment of the skill, as it happens
   if (ev.t === 'gvcast') {
     gvAdd(8, () => ({ ...at(ev.x, ev.y), z: 4, vx: gvRand(-60, 60), vy: gvRand(-60, 60), vz: gvRand(60, 140), age: 0, life: gvRand(0.4, 0.7), kind: 'dirt', sz: gvRand(3, 6) }));
   } else if (ev.t === 'gvplant') {
+    gvPlant[ev.k] = { x: ev.x, y: ev.y, t0: performance.now() }; // where and when the head surfaced: the vines spread out from there (drawGvSpread)
     shake = Math.max(shake, 8);
     gvAdd(14, () => ({ ...at(ev.x, ev.y), z: 4, vx: gvRand(-120, 120), vy: gvRand(-120, 120), vz: gvRand(120, 280), age: 0, life: gvRand(0.6, 1), kind: 'dirt', sz: gvRand(4, 9) }));
     gvAdd(6, () => ({ ...at(ev.x, ev.y), z: 4, vx: gvRand(-160, 160), vy: gvRand(-160, 160), vz: gvRand(200, 380), age: 0, life: gvRand(0.8, 1.2), kind: 'rock', sz: gvRand(6, 11), rot: gvRand(0, 6.28), spin: gvRand(-8, 8) }));
@@ -2006,6 +2009,7 @@ function drawGvSpikes(f, kind) {
 // Where the head surfaces: the ring the vines will come out on, drawn once on the ground and fading, with cracks running out to it.
 function drawGvRing(f) {
   const k = Math.min(1, f.age / 0.7), a = 1 - k;
+  gvHole(f.x, f.y, gvCfg.hw * 0.8); // the head came up here, and the vines go out from it
   ctx.save(); ctx.lineCap = 'round';
   ctx.strokeStyle = `rgba(90,55,25,${0.7 * a})`; ctx.lineWidth = 8; ctx.setLineDash([22, 14]); ctx.beginPath(); ctx.arc(f.x, f.y, f.r * Math.min(1, k * 3), 0, 7); ctx.stroke();
   ctx.strokeStyle = `rgba(255,235,190,${0.8 * a})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * Math.min(1, k * 3), 0, 7); ctx.stroke(); ctx.setLineDash([]);
@@ -2013,29 +2017,123 @@ function drawGvRing(f) {
   for (let q = 0; q < 8; q++) { const t = q * 0.785 + 0.2, r = f.r * Math.min(1, k * 3); jagPath(f.x, f.y, f.x + Math.cos(t) * r, f.y + Math.sin(t) * r, 6, 7); ctx.stroke(); }
   ctx.restore();
 }
-// The head, running under the ground: a ridge of earth pushed up behind a mound, with dirt thrown off it.
+// A point `s` pixels back along the path `pts` (newest first), and the way it is going there.
+function gvAlong(pts, cum, s) {
+  let i = 1; while (i < pts.length - 1 && cum[i] < s) i++;
+  const a = pts[i - 1], b = pts[i], span = cum[i] - cum[i - 1] || 1, u = Math.min(1, Math.max(0, (s - cum[i - 1]) / span));
+  return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
+}
+// One stretch of the vine's back, thrown out of the ground like a rainbow: from the hole it starts at it draws a half circle in the air and comes
+// down into the hole it ends in, and then it stays as it is, standing still. Only the dark rings of bark across it run along it (towards where the
+// vine is going), as if the vine went on through it like water in a pipe. `grow` (0..1) is how far along the arc its tip has got; `phase` (0..1)
+// is where the rings are in their run.
+function gvArch(pts, cum, s0, len, h, w, grow, phase) {
+  const n = 24, up = (v) => toWorld(0, -v), all = [];
+  for (let j = 0; j <= n; j++) {
+    const u = j / n, p = gvAlong(pts, cum, s0 + u * len), lift = h * Math.sqrt(Math.max(0, 1 - (2 * u - 1) * (2 * u - 1))), o = up(lift); // a half circle
+    all.push({ x: p.x + o.x, y: p.y + o.y, u, w: w * (0.5 + 0.5 * Math.sqrt(Math.sin(Math.PI * u))) });
+  }
+  const m = Math.min(1, Math.max(0, grow)) * n, line = all.slice(0, Math.floor(m) + 1);
+  if (m - Math.floor(m) > 1e-6 && Math.floor(m) < n) { const a = all[Math.floor(m)], b = all[Math.floor(m) + 1], t = m - Math.floor(m); line.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, u: m / n, w: a.w + (b.w - a.w) * t }); }
+  if (line.length < 2) return;
+  const at = (u) => { // a point on the arch, and the way across it, at u (0..1) along it
+    const f = Math.min(line.length - 1 - 1e-9, u * n), k = Math.floor(f), t = f - k, a = line[k], b = line[k + 1];
+    const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t, w = a.w + (b.w - a.w) * t, dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
+    return { x, y, w, nx: -dy / d, ny: dx / d };
+  };
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const [col, k, dy] of [['#2f1b09', 1.18, 0], ['#8a5a2e', 1, 0], ['#b98650', 0.55, -0.16]]) { // the outline, the bark, the light along its top
+    for (let j = 1; j < line.length; j++) {
+      const a = line[j - 1], b = line[j], o = up(b.w * dy);
+      ctx.strokeStyle = col; ctx.lineWidth = b.w * k; ctx.beginPath(); ctx.moveTo(a.x + o.x, a.y + o.y); ctx.lineTo(b.x + o.x, b.y + o.y); ctx.stroke();
+    }
+  }
+  ctx.lineWidth = 3; // the rings of bark across it, running along: new ones come out of the hole behind and are gone into the one ahead
+  const gap = 0.12, reach = line[line.length - 1].u;
+  for (let r = -1; r < 1 / gap + 1; r++) {
+    const u = (r + phase) * gap;
+    if (u <= 0.03 || u >= Math.min(0.97, reach)) continue;
+    const q = at(u), edge = Math.pow(Math.sin(Math.PI * u), 0.6);
+    ctx.strokeStyle = `rgba(30,15,4,${0.6 * edge})`; ctx.beginPath(); ctx.moveTo(q.x - q.nx * q.w * 0.5, q.y - q.ny * q.w * 0.5); ctx.lineTo(q.x + q.nx * q.w * 0.5, q.y + q.ny * q.w * 0.5); ctx.stroke();
+  }
+  ctx.restore();
+}
+// A hole in the ground where the vine goes in or comes out: a ring of earth heaped round a dark mouth.
+function gvHole(x, y, r) {
+  upright(x, y, () => {
+    ctx.fillStyle = '#6b4826'; ctx.strokeStyle = '#33200e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, 0, r * 1.15, r * 0.55, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#1d1208'; ctx.beginPath(); ctx.ellipse(0, 0, r * 0.7, r * 0.32, 0, 0, 7); ctx.fill();
+  });
+}
+// The head, running under the ground like a worm: the earth it pushes up shows all the way back along where it has been, and its body comes up out of
+// the ground for `worm_out_length`, goes under for `worm_in_length`, comes up again, and so on. A stretch that has come out stays out where it is
+// until the skill is over (drawGvWorms, which also draws what is left of the path once the head has surfaced); only the dark rings of bark across
+// it run along it, as if the vine went on through it like water in a pipe. The page keeps the path of each owner in gvTrails.
 const gvTrails = {};
 function drawGiantHead(b) {
   const tr = gvTrails[b.sd] || (gvTrails[b.sd] = []);
-  if (tr.t && performance.now() - tr.t > 300) tr.length = 0; // a new head: the ridge of the last one is forgotten
-  tr.t = performance.now();
+  tr.born = tr.born || {}; tr.landed = tr.landed || {}; tr.head = { x: b.x, y: b.y }; tr.goneAt = undefined;
   const last = tr[tr.length - 1];
-  if (!last || Math.hypot(b.x - last.x, b.y - last.y) > 7) { tr.push({ x: b.x, y: b.y }); if (tr.length > 34) tr.shift(); }
+  if ((!last || Math.hypot(b.x - last.x, b.y - last.y) > 7) && tr.length < 3000) tr.push({ x: b.x, y: b.y });
   const hw = gvCfg.hw;
-  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (let i = 1; i < tr.length; i++) { // the ridge grows from nothing at the old end to the width of the head
-    const u = i / tr.length, w = hw * (0.15 + 0.85 * u);
-    ctx.strokeStyle = `rgba(60,38,18,${0.55 * u})`; ctx.lineWidth = w * 1.15; ctx.beginPath(); ctx.moveTo(tr[i - 1].x, tr[i - 1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
-    ctx.strokeStyle = `rgba(135,98,56,${0.8 * u})`; ctx.lineWidth = w * 0.7; ctx.beginPath(); ctx.moveTo(tr[i - 1].x, tr[i - 1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
-  }
-  ctx.restore();
-  upright(b.x, b.y, () => { // the mound
-    const g = ctx.createRadialGradient(-hw * 0.2, -hw * 0.45, 2, 0, -hw * 0.2, hw);
+  upright(b.x, b.y, () => { // the earth heaped over the head
+    const g = ctx.createRadialGradient(-hw * 0.15, -hw * 0.35, 2, 0, -hw * 0.15, hw * 0.7);
     g.addColorStop(0, '#b0834c'); g.addColorStop(0.6, '#7b5530'); g.addColorStop(1, '#4a2f16');
-    ctx.fillStyle = g; ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, -hw * 0.2, hw * 0.9, hw * 0.65, 0, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = 'rgba(40,24,8,.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(-hw * 0.15, -hw * 0.3, hw * 0.45, 3.6, 5.6); ctx.stroke();
+    ctx.fillStyle = g; ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(0, -hw * 0.15, hw * 0.6, hw * 0.42, 0, 0, 7); ctx.fill(); ctx.stroke();
   });
-  if (Math.random() < 0.8) gvAdd(1, () => ({ x: b.x + gvRand(-hw * 0.5, hw * 0.5), y: b.y + gvRand(-hw * 0.5, hw * 0.5), z: 6, vx: gvRand(-40, 40), vy: gvRand(-40, 40), vz: gvRand(80, 200), age: 0, life: gvRand(0.3, 0.6), kind: 'dirt', sz: gvRand(2.5, 5) }));
+  if (Math.random() < 0.8) gvAdd(1, () => ({ x: b.x + gvRand(-hw * 0.4, hw * 0.4), y: b.y + gvRand(-hw * 0.4, hw * 0.4), z: 6, vx: gvRand(-40, 40), vy: gvRand(-40, 40), vz: gvRand(80, 200), age: 0, life: gvRand(0.3, 0.6), kind: 'dirt', sz: gvRand(2.5, 5) }));
+}
+// The path of every Giant Vines that is on, under the vines: the earth over it and the stretches of the worm that have come out. It is forgotten when its
+// skill is over (no head and no vine that has yet to land).
+function drawGvWorms() {
+  const live = {};
+  for (const b of snap.b || []) if (b.k === 12 || (b.k === 13 && b.ph !== 3)) live[b.sd] = b.k === 12 ? 2 : Math.max(live[b.sd] || 0, 1);
+  for (const sd of Object.keys(gvTrails)) {
+    const tr = gvTrails[sd];
+    if (!live[sd]) { delete gvTrails[sd]; continue; }
+    if (live[sd] === 1) tr.head = null; // the head has surfaced: the path ends where it did
+    drawGvPath(tr);
+  }
+}
+function drawGvPath(tr) {
+  const hw = gvCfg.hw, pts = tr.head ? [...tr, tr.head] : tr, cum = [0];
+  if (pts.length < 2) return;
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+  const total = cum[cum.length - 1];
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const ridge = (from, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); pts.slice(from).forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke(); };
+  ridge(0, 'rgba(60,38,18,.5)', hw * 0.5); ridge(0, 'rgba(135,98,56,.7)', hw * 0.32); // the earth over the pipe, all the way back
+  if (tr.head) { const near = Math.max(0, pts.length - 14); ridge(near, 'rgba(60,38,18,.6)', hw * 0.75); ridge(near, 'rgba(135,98,56,.85)', hw * 0.5); } // heaped up higher round the head
+  ctx.restore();
+  const out = Math.max(gvCfg.wo, 1), per = out + Math.max(gvCfg.wi, 0), now = performance.now(), phase = (now / 1000 * 0.7) % 1;
+  if (!tr.head && tr.goneAt === undefined) tr.goneAt = now; // the head has surfaced: what is still being thrown out is finished off
+  for (let k = 0; k * per <= total; k++) { // out for `wo`, under for `wi`, and again: the k-th stretch is thrown out as the head runs over it
+    const s0 = k * per, a = gvAlong(pts, cum, s0), z = gvAlong(pts, cum, s0 + out);
+    if (tr.born[k] === undefined) { tr.born[k] = now; gvAdd(6, () => ({ x: a.x, y: a.y, z: 4, vx: gvRand(-60, 60), vy: gvRand(-60, 60), vz: gvRand(100, 260), age: 0, life: gvRand(0.4, 0.8), kind: 'dirt', sz: gvRand(3, 6) })); }
+    // its tip is over the head: it goes along the arc as the head goes along the ground, and lands in its hole as the head gets there
+    const t = Math.min(1, Math.max(0, (total - s0) / out)), fin = tr.goneAt === undefined ? 0 : Math.min(1, (now - tr.goneAt) / 250), grow = Math.max(t, fin);
+    if (grow >= 1 && !tr.landed[k]) { tr.landed[k] = true; gvAdd(8, () => ({ x: z.x, y: z.y, z: 4, vx: gvRand(-70, 70), vy: gvRand(-70, 70), vz: gvRand(100, 260), age: 0, life: gvRand(0.4, 0.8), kind: 'dirt', sz: gvRand(3, 6) })); } // it comes down into the hole
+    gvHole(a.x, a.y, hw * 0.5); if (grow > 0.9) gvHole(z.x, z.y, hw * 0.5);
+    gvArch(pts, cum, s0, out, out * 0.5, hw * 0.9, grow, phase);
+  }
+}
+// A vine still underground, on its way from where the head surfaced out to its place on the ring: the earth it pushes up, with a mound at its front.
+// It gets there when it comes out (b.lf is how long that takes from the moment the head surfaced), so the ones that come out later go slower.
+function drawGvSpread(b) {
+  const pl = gvPlant[b.sd];
+  if (!pl) return;
+  const T = Math.max(b.lf || 0, 0.05), u = Math.min(1, (performance.now() - pl.t0) / 1000 / T), hx = pl.x + (b.x - pl.x) * u, hy = pl.y + (b.y - pl.y) * u;
+  const w = gvCfg.hw * 0.55;
+  ctx.save(); ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(60,38,18,.55)'; ctx.lineWidth = w * 1.2; ctx.beginPath(); ctx.moveTo(pl.x, pl.y); ctx.lineTo(hx, hy); ctx.stroke();
+  ctx.strokeStyle = 'rgba(135,98,56,.8)'; ctx.lineWidth = w * 0.7; ctx.beginPath(); ctx.moveTo(pl.x, pl.y); ctx.lineTo(hx, hy); ctx.stroke();
+  ctx.restore();
+  upright(hx, hy, () => {
+    const g = ctx.createRadialGradient(-w * 0.2, -w * 0.4, 1, 0, -w * 0.15, w);
+    g.addColorStop(0, '#b0834c'); g.addColorStop(0.6, '#7b5530'); g.addColorStop(1, '#4a2f16');
+    ctx.fillStyle = g; ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, -w * 0.15, w * 0.85, w * 0.6, 0, 0, 7); ctx.fill(); ctx.stroke();
+  });
+  if (u < 1 && Math.random() < 0.5) gvAdd(1, () => ({ x: hx + gvRand(-6, 6), y: hy + gvRand(-6, 6), z: 4, vx: gvRand(-30, 30), vy: gvRand(-30, 30), vz: gvRand(60, 150), age: 0, life: gvRand(0.3, 0.5), kind: 'dirt', sz: gvRand(2, 4) }));
 }
 // A giant vine: a thick trunk with rings of bark and a round tip, standing up out of the ground and brought down like the Tree Slam's trunk
 // (the same foreshortening as drawTreeArt: `pitch` is how far it is raised about the foot).
@@ -2056,7 +2154,7 @@ function drawGiantVineArt(x, y, base, pitch, alpha) {
   ctx.restore();
 }
 function drawGiantVine(b) {
-  if (!(b.ph > 0)) return; // still underground
+  if (!(b.ph > 0)) { drawGvSpread(b); return; } // still underground: the earth it pushes up as it makes its way out to its place
   const base = Math.atan2(b.dy, b.dx), left = b.lf || 0;
   const mound = () => upright(b.x, b.y, () => { // the heap of earth it came out of, with stones
     ctx.fillStyle = '#5b3d1f'; ctx.strokeStyle = '#33200e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, -2, gvCfg.w * 0.75, gvCfg.w * 0.34, 0, 0, 7); ctx.fill(); ctx.stroke();

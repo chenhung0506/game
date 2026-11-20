@@ -210,7 +210,7 @@ func TestAGiantVineIsARootThickAtTheFootAndThinAtTheTip(t *testing.T) {
 func TestTheGiantVinesComeOutInAnyOrderNotRoundTheRing(t *testing.T) {
 	cfg := DefaultConfig()
 	gv := &cfg.Chikorita.GiantVines
-	gv.Count, gv.Interval = 10, 0.5
+	gv.Count, gv.Interval, gv.SpreadTime = 10, 0.5, 0.4
 	orders := map[string]bool{}
 	for seed := uint64(1); seed <= 8; seed++ {
 		g := gvGame(cfg, 100)
@@ -234,8 +234,13 @@ func TestTheGiantVinesComeOutInAnyOrderNotRoundTheRing(t *testing.T) {
 			t.Fatalf("%d vines", len(delays))
 		}
 		orders[fmt.Sprint(delays)] = true
-		if seen[0] == false || !seen[4.5] {
-			t.Fatalf("the turns are not 0, 0.5, ... 4.5: %v", delays)
+		if !seen[0.4] || !seen[0.4+4.5] {
+			t.Fatalf("the waits are not 0.4, 0.9, ... 4.9: %v", delays)
+		}
+		for _, b := range g.Balls {
+			if b.K == ballGiantVine && b.Life != b.Delay {
+				t.Fatalf("a vine waits %v and says %v", b.Delay, b.Life) // the page spreads it out over Life
+			}
 		}
 	}
 	if len(orders) < 4 {

@@ -94,13 +94,14 @@ func (g *Game) stepGiantHead(b *Ball, dt float64) (alive bool, born []Ball, even
 	turn := g.rng.Perm(gv.Count)              // the n-th place on the ring comes out turn[n]-th
 	for n := 0; n < gv.Count && n < maxGiantVines; n++ {
 		a := start + 2*math.Pi*float64(n)/float64(gv.Count)
+		wait := gv.SpreadTime + float64(turn[n])*gv.Interval // the first has the spread time to get to its place, each later one a little longer
 		born = append(born, Ball{
-			K: ballGiantVine, Owner: b.Owner, Side: b.Side, Idx: n, Phase: vineWait, Delay: float64(turn[n]) * gv.Interval,
+			K: ballGiantVine, Owner: b.Owner, Side: b.Side, Idx: n, Phase: vineWait, Delay: wait, Life: wait, // Life is the whole wait, for the page to spread it out at the right speed
 			X: math.Min(math.Max(cx+math.Cos(a)*gv.RingRadius, 0), g.court.Length),
 			Y: math.Min(math.Max(cy+math.Sin(a)*gv.RingRadius, 0), g.court.Width),
 		})
 	}
-	return false, born, []Event{{T: "gvplant", X: cx, Y: cy, R: gv.RingRadius}}
+	return false, born, []Event{{T: "gvplant", X: cx, Y: cy, R: gv.RingRadius, K: b.Side}}
 }
 
 // stepGiantVine runs one giant vine through its turns: it comes up and locks on the nearest foe as it is then, stands up with its shape on show,

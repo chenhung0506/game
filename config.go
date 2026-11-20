@@ -341,8 +341,11 @@ type Config struct {
 			TerminalTime   float64 `json:"terminal_time"`
 			HeadRadius     float64 `json:"head_radius"`
 			HeadWidth      float64 `json:"head_width"`
-			Count          int     `json:"count"` // 1..maxGiantVines
+			WormOut        float64 `json:"worm_out_length"` // looks only: the head runs under the ground like a worm: it is out of the ground for this far...
+			WormIn         float64 `json:"worm_in_length"`  // ...then under it for this far, and so on (a stretch that came out stays until the skill is over)
+			Count          int     `json:"count"`           // 1..maxGiantVines
 			RingRadius     float64 `json:"ring_radius"`
+			SpreadTime     float64 `json:"spread_time"` // seconds the first vine takes to be spread out from where the head surfaced to its place on the ring (each later one takes `interval` longer, so they spread out slower and slower: it is also when each comes out)
 			Interval       float64 `json:"interval"`
 			ChargeDuration float64 `json:"charge_duration"`
 			SwingDuration  float64 `json:"swing_duration"`
@@ -915,8 +918,8 @@ func DefaultConfig() Config {
 	c.Chikorita.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
 	gv := &c.Chikorita.GiantVines
 	gv.Reach = groundReach
-	gv.FollowSpeed, gv.TerminalTime, gv.HeadRadius, gv.HeadWidth = 260, 4, 40, 50
-	gv.Count, gv.RingRadius, gv.Interval, gv.ChargeDuration, gv.SwingDuration = 10, 200, 0.25, 0.5, 0.2
+	gv.FollowSpeed, gv.TerminalTime, gv.HeadRadius, gv.HeadWidth, gv.WormOut, gv.WormIn = 260, 4, 40, 50, 100, 100
+	gv.Count, gv.RingRadius, gv.SpreadTime, gv.Interval, gv.ChargeDuration, gv.SwingDuration = 10, 200, 0.4, 0.25, 0.5, 0.2
 	gv.TrunkLength, gv.TrunkWidth, gv.TipWidth, gv.TrunkScale, gv.Damage, gv.SlowDuration, gv.Slow, gv.Linger = 320, 80, 20, 1, 8, 3, 0.5, 0.7
 	c.Vulpix.MaxHP = 100
 	c.Vulpix.WalkSpeed = 160
@@ -1206,6 +1209,8 @@ func (c Config) validate() error {
 		{"chikorita.giant_vines.follow_speed", c.Chikorita.GiantVines.FollowSpeed, 0},
 		{"chikorita.giant_vines.terminal_time", c.Chikorita.GiantVines.TerminalTime, 0},
 		{"chikorita.giant_vines.head_radius", c.Chikorita.GiantVines.HeadRadius, 0},
+		{"chikorita.giant_vines.worm_out_length", c.Chikorita.GiantVines.WormOut, 0},
+		{"chikorita.giant_vines.worm_in_length", c.Chikorita.GiantVines.WormIn, 0},
 		{"chikorita.giant_vines.ring_radius", c.Chikorita.GiantVines.RingRadius, 0},
 		{"chikorita.giant_vines.trunk_length", c.Chikorita.GiantVines.TrunkLength, 0},
 		{"chikorita.giant_vines.trunk_width", c.Chikorita.GiantVines.TrunkWidth, 0},
@@ -1533,6 +1538,7 @@ func (c Config) validate() error {
 		{"chikorita.ultimate.gain_dealt", c.Chikorita.Ultimate.GainDealt},
 		{"chikorita.ultimate.gain_per_second", c.Chikorita.Ultimate.GainPerSecond},
 		{"chikorita.giant_vines.head_width", c.Chikorita.GiantVines.HeadWidth},
+		{"chikorita.giant_vines.spread_time", c.Chikorita.GiantVines.SpreadTime},
 		{"chikorita.giant_vines.interval", c.Chikorita.GiantVines.Interval},
 		{"chikorita.giant_vines.charge_duration", c.Chikorita.GiantVines.ChargeDuration},
 		{"chikorita.giant_vines.swing_duration", c.Chikorita.GiantVines.SwingDuration},
