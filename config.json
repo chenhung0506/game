@@ -185,7 +185,7 @@
     },
     "giant_vines": {
       "min_height": 0,
-      "max_height": 60,
+      "max_height": 100,
       "follow_speed": 300,
       "terminal_time": 4,
       "head_radius": 40,
@@ -212,13 +212,13 @@
     },
     "leaf_slash": {
       "min_height": 0,
-      "max_height": 20,
+      "max_height": 60,
       "jump_distance": 350,
       "jump_duration": 0.35,
       "jump_height": 40,
-      "slashes": 6,
+      "slashes": 8,
       "slash_interval": 0.25,
-      "slash_step": 80,
+      "slash_step": 70,
       "slash_radius": 140,
       "leaf_scale": 3,
       "damage": 7,
@@ -226,7 +226,7 @@
     },
     "razor_leaf": {
       "min_height": 0,
-      "max_height": 60,
+      "max_height": 40,
       "count": 45,
       "scatter_radius": 150,
       "min_delay": 0.3,
@@ -241,7 +241,7 @@
     },
     "vine_whip": {
       "min_height": 0,
-      "max_height": 12,
+      "max_height": 40,
       "charge_duration": 0.25,
       "recharge_duration": 0.1,
       "length": 260,
