@@ -379,9 +379,9 @@ func TestAPersonsKeysMeanTheirOwnCharactersSkills(t *testing.T) {
 	if !in.Kick || in.Skill || in.Mega {
 		t.Fatalf("Ash, only the main button: %+v", in)
 	}
-	// the others are left as they were (and the computer's Kick, Tree and Night Shade are not a person's)
+	// Machamp: Skill is the Uppercut and K (sent as Rock) the High Jump Kick; the others are left as they were (and the computer's Kick, Tree and Night Shade are not a person's)
 	in = personsInput(machamp, Input{Skill: true, Tree: true, Kick: true, Mega: true, Rock: true, Shade: true, DX: 7})
-	if !in.Skill || in.Kick || in.Tree || !in.Mega || !in.Rock || in.Shade || in.DX != 1 {
+	if !in.Skill || !in.Kick || in.Tree || !in.Mega || in.Rock || in.Shade || in.DX != 1 { // the K button (Rock) is its kick, and the Rock Tomb has no key
 		t.Fatalf("Machamp: %+v", in)
 	}
 }

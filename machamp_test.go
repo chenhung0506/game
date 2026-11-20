@@ -644,7 +644,7 @@ func TestEachBrawlerPlaysByItsOwnNumbers(t *testing.T) {
 		g := duel(cfg, kind, snorlax)
 		g.P[0].HP, g.P[1].HP = g.maxHP(0), g.maxHP(1)
 		hp := g.P[1].HP
-		g.P[0].In = Input{Skill: true, DX: 1}
+		g.P[0].In = Input{Skill: kind == ash, Kick: kind == machamp, DX: 1}
 		for n := 0; n < 200 && g.P[1].HP == hp; n++ {
 			g.Step(dt)
 			g.P[0].In = Input{}

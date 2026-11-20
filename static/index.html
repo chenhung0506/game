@@ -113,7 +113,7 @@ const HELP = [
   '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝空氣斬（朝按住的方向衝出一道半月形弧線，彎向敵人那一側，沿途朝最近的敵人射出一道道白色的空氣斬擊，打得到貼地的敵人）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）　Z＝神鳥猛攻（絕招，蓄能滿才能放：先定身集氣，飛上高空、身上的鳥形光芒愈來愈大，然後朝敵人俯衝，撞擊地面爆炸，把敵人打上天、在空中動彈不得）',
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
   '你是真新鎮小智　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人）　Z＝百萬噸拳擊（絕招，蓄能滿了才能放；天色會變暗。朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），蓄力後半段畫面會閃爍，朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
-  '你是怪力　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝子彈拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
+  '你是怪力　移動 WASD　空白鍵＝上鉤拳（朝按住的方向滑一步，接著朝敵人衝過去給他一記上鉤拳，打中的敵人受傷、不會被推開，而是被打飛到空中動彈不得）　J＝子彈拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝飛膝踢（直接朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）',
   '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才發射；輕點就朝敵人；定身蓄力一下後，球筆直飛出去，碰到敵人、牆或被打爆就爆炸，會把範圍內的敵人往中心吸過去一陣子，並向外炸出一圈不會回頭的紫色火焰；球有血量，敵人的招式和飛行物可以提早打爆它）',
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
@@ -123,6 +123,8 @@ const perSlot = (make) => Array.from({ length: SLOTS }, make);
 const beamLook = perSlot(() => ({ ang: null, tail: null })); // per slot: the smoothed beam angle, and the fading afterimage when a sweep ends
 const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, ctime: 0.8, pull: 1, orb: 30, orbhp: 30, nscale: 1, nslam: 110, nflight: 0.9, nlob: 150, sfire: 20 }; // Gengar's, from 'hi'
+let kickText = { ash: { slide: '閃身步', kick: '浪子踢球' }, machamp: { slide: '閃身步', kick: '飛膝踢' } }; // the names shown for the two parts of the High Jump Kick, from 'hi'
+let upText = { slide: '閃身步', punch: '上鉤拳' }, upWarn = 0; // the names shown for the two parts of Machamp's Uppercut, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
 let gvCfg = { hw: 50, wo: 100, wi: 100, hr: 40, len: 320, w: 80, tw: 20, rs: 0.8, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
 let megaCfg = { fevery: 0, charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
@@ -203,7 +205,7 @@ const beamSlots = () => (snap ? [...snap.p.keys()].filter((i) => hasBeam(snap.p[
 const slotsOf = (k) => (snap ? [...snap.p.keys()].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; kickText = m.kicktext; upText = m.uptext; upWarn = m.upwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (PLAY === 'dummy' && !!m.full !== fullWant) send({ fullcharge: fullWant }); // the practice room starts without it: say what the box says
     if (m.on || (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1])) return; // a match is on: a refused pick changes nothing
@@ -248,6 +250,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'mega') shake = 14;
       if (ev.t === 'megahit') shake = 30;
       if (ev.t === 'kickhit') shake = 24;
+      if (ev.t === 'uphit') shake = 20;
       if (ev.t === 'evolve') shake = 14;
       if (ev.t === 'leaf') shake = 6;
       if (ev.t === 'airhit') shake = Math.max(shake, 3);
@@ -570,7 +573,7 @@ const PAD = [
   { main: ['空氣斬', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']], ult: ['神鳥猛攻', 'ult'] }, // Rowlet
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
   { main: ['飛膝踢', 'skill'], small: [['拔樹', 'tree'], ['百裂拳', 'comet']], ult: ['百萬噸', 'ult'] }, // Ash: the kick is the main skill (sent as Skill, personsInput on the server sorts out what it is), the tree and the Comet Punch the small ones, the Megaton Punch the ultimate
-  { main: ['飛膝踢', 'skill'], small: [['子彈拳', 'comet'], ['岩石陣', 'rock']] }, // Machamp: the kick in place of the tree
+  { main: ['上鉤拳', 'skill'], small: [['子彈拳', 'comet'], ['飛膝踢', 'rock']] }, // Machamp: the Uppercut is the main skill, the High Jump Kick (the page sends K as `rock`, the server turns it into the kick) a small one; the Rock Tomb is not used
   { main: ['暗影潛行', 'skill'], small: [['鬼火', 'gfire'], ['影子球', 'sball', true]] }, // Gengar
   { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
 ];
@@ -598,7 +601,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['kkcd', 'akick'], tree: ['trcd', 'tree'], comet: ['cpcd', 'comet'] }, { skill: ['kkcd', 'kick'], comet: ['cpcd', 'mcomet'], rock: ['rkcd', 'mrock'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['kkcd', 'akick'], tree: ['trcd', 'tree'], comet: ['cpcd', 'comet'] }, { skill: ['ucd', 'upper'], comet: ['cpcd', 'mcomet'], rock: ['kkcd', 'mkick'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
   const hold = (b, label, name, aimed) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -999,29 +1002,56 @@ function artRowlet(c, x, y, t, pose) {
 
 // Machamp: a grey-blue, four-armed brawler with a black belt, seen from the front (its back when it walks up; the side view
 // is the front one turned a little). Its two lower arms hang at its sides, the upper two are raised and swing as it runs.
-function artMachamp(c, x, y, t, pose) {
+// gmax: the Gigantamax Machamp (the ultimate of the future): the same four-armed build, bigger and blacker, with orange cracked-lava gauntlets, eyes aglow and a flaming red sash.
+function artMachamp(c, x, y, t, pose, gmax = false) {
   const { dir, mv, ph } = pose, sw = Math.sin(ph) * mv, bob = -Math.abs(Math.sin(ph)) * 2 * mv + Math.sin(t * 3) * 0.6;
-  const B = '#8a9bb5', BD = '#5d6e8a', BELLY = '#c9d3e2', BLK = '#2b2f3a', EYE = '#e8362f';
+  const B = gmax ? '#4b4060' : '#8a9bb5', BD = gmax ? '#2e2540' : '#5d6e8a', BELLY = gmax ? '#7a6a92' : '#c9d3e2', BLK = '#2b2f3a', EYE = gmax ? '#ffe066' : '#e8362f';
+  const LAVA = '#ff9a1f', CRACK = '#8a2d08'; // the gauntlets
   const back = dir === 1;
   c.save(); c.translate(x, y + bob);
   if (dir === 2) c.scale(-1, 1);
-  ov(c, -9, 29 - Math.max(0, sw) * 4, 8, 5, BD); ov(c, 9, 29 - Math.max(0, -sw) * 4, 8, 5, BD); // feet
-  ov(c, -8, 21, 7.5, 10, B); ov(c, 8, 21, 7.5, 10, B); // legs
-  ov(c, 0, 12.5, 9, 7, B); ov(c, 0, -1, 19, 13, B); // torso: a broad chest over a narrower waist, pinched in where they meet
-  if (!back) { ov(c, 0, 1, 12.5, 8, BELLY, 0, null); ov(c, 0, 11, 8, 9, BELLY, 0, null); for (const [yy, hw] of [[3, 9], [9, 7], [15, 5]]) { c.strokeStyle = BD; c.lineWidth = 0.9; c.beginPath(); c.moveTo(-hw, yy); c.lineTo(hw, yy); c.stroke(); } } // the pale chest: wide at the top, narrow below
+  if (gmax) c.scale(1.3, 1.3);
+  const LD = gmax ? 6 : 0, LL = gmax ? 8 : 0; // how much longer the Gigantamax waist is, and then its legs on top of that, so it stands taller and long-legged
+  const FX = gmax ? 12 : 9; // the feet are further apart on the Gigantamax one, under its slanting calves
+  ov(c, -FX, 29 + LD + LL - Math.max(0, sw) * 4, 8, 5, BD); ov(c, FX, 29 + LD + LL - Math.max(0, -sw) * 4, 8, 5, BD); // feet
+  if (!gmax) { ov(c, -8, 21, 7.5, 10, B); ov(c, 8, 21, 7.5, 10, B); } // legs
+  else for (const m of [-1, 1]) { // the Gigantamax legs are in two pieces: a thick thigh, a knee and a slimmer calf with the muscle swelling at the top
+    const hip = 11, ankle = 31 + LD + LL, knee = hip + (ankle - hip) * 0.55, kick = Math.max(0, m > 0 ? -sw : sw) * 1.5; // the knee comes up a little as that leg steps
+    ov(c, m * 6.2, (hip + knee) / 2 + 1, 7.4, (knee - hip) / 2 + 2, B, -m * 0.36); // the thigh: its top is in towards the middle, by the hips, and it slants out to the knee
+    ov(c, m * 10.6, (knee + ankle) / 2 - kick * 0.3, 5.6, (ankle - knee) / 2 + 1, B, -m * 0.19); // the calf: it slants out from the knee, so its foot end is further out
+    ov(c, m * 9.4, knee + 4.2, 6.6, 4.8, B, 0, null); // the swell of the calf muscle, under the knee
+    ov(c, m * 9.4, knee - kick, 5.4, 4.2, '#3b3150'); // the knee
+    c.strokeStyle = 'rgba(255,255,255,.14)'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(m * 5.6, hip + 4); c.lineTo(m * 6.2, knee - 5); c.stroke(); // the line of the thigh muscle
+  }
+  ov(c, 0, 12.5 + LD * 0.4, 9, 7 + LD * 0.5, B); ov(c, 0, -1, gmax ? 22 : 19, gmax ? 15 : 13, B); // torso: a broad chest over a narrower waist, pinched in where they meet
+  if (!back) { ov(c, 0, 1, 12.5, 8, BELLY, 0, null); ov(c, 0, 11 + LD * 0.3, 8, 9 + LD * 0.4, BELLY, 0, null); for (const [yy, hw] of [[3, 9], [9, 7], [15 + LD * 0.4, 5]]) { c.strokeStyle = BD; c.lineWidth = 0.9; c.beginPath(); c.moveTo(-hw, yy); c.lineTo(hw, yy); c.stroke(); } } // the pale chest: wide at the top, narrow below
   c.lineJoin = 'round'; // the black pants: a rounded triangle, wide at the waist and pointing down (an outline pass, then the fill)
 //for (const [col, w] of [[OUTLINE, 5.8], [BLK, 5]]) { c.fillStyle = col; c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(-6.5, 15); c.lineTo(6.5, 15); c.lineTo(0, 21.5); c.closePath(); c.fill(); c.stroke(); }
-  for (const [col, w] of [[OUTLINE, 5.8], [BLK, 5]]) { c.fillStyle = col; c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(-6.5, 15); c.lineTo(6.5, 15); c.lineTo(0, 21); c.closePath(); c.fill(); c.stroke(); }
+  for (const [col, w] of [[OUTLINE, 5.8], [BLK, 5]]) { c.fillStyle = col; c.strokeStyle = col; c.lineWidth = w; const pw = gmax ? 4.2 : 6.5, pt = gmax ? 21 + LD * 0.4 : 21; c.beginPath(); c.moveTo(-pw, 15 + LD * 0.6); c.lineTo(pw, 15 + LD * 0.6); c.lineTo(0, pt); c.closePath(); c.fill(); c.stroke(); } // (the Gigantamax one is a small triangle: a big one would be a black patch on a body that size)
   for (const m of [-1, 1]) { // the lower arms hang, the upper ones are raised with fists up
     const swing = sw * m * 3;
-    ov(c, m * 20.2, 5.1 + swing, 5.5, 11, B, m * 0.6 + Math.PI / 2); ov(c, m * 26.4, 14.4 + swing, 6, 5.5, BD); // the lower arms start at the shoulders and reach out and down
-    ov(c, m * 21.6, -12.8 - swing, 5.8, 11, B, -m * 0.9 + Math.PI / 2); ov(c, m * 30, -19.6 - swing, 6.5, 6, BD); // the upper ones too, flung wide and up from the same place
+    if (!gmax) {
+      ov(c, m * 20.2, 5.1 + swing, 5.5, 11, B, m * 0.6 + Math.PI / 2); ov(c, m * 21.6, -12.8 - swing, 5.8, 11, B, -m * 0.9 + Math.PI / 2);
+      ov(c, m * 26.4, 14.4 + swing, 6, 5.5, BD); ov(c, m * 30, -19.6 - swing, 6.5, 6, BD);
+      continue;
+    }
+    // The Gigantamax arms are thicker, each ending in a huge gauntlet of cracked lava rock for a fist; the lower pair is held out away from the chest.
+    ov(c, m * 22.5, 6 + swing, 7.4, 14.8, B, m * 0.75 + Math.PI / 2); ov(c, m * 22.6, -17 - swing, 7.8, 14.8, B, -m * 0.9 + Math.PI / 2);
+    for (const [hx, hy, r] of [[m * 30.5, 16.5 + swing, 9.5], [m * 32, -26 - swing, 10.5]]) {
+      ov(c, hx, hy, r, r * 0.9, LAVA); c.strokeStyle = CRACK; c.lineWidth = 1.1; c.beginPath();
+      c.moveTo(hx - r * 0.6, hy - r * 0.2); c.lineTo(hx - r * 0.1, hy + r * 0.1); c.lineTo(hx + r * 0.2, hy - r * 0.5); c.moveTo(hx - r * 0.1, hy + r * 0.1); c.lineTo(hx + r * 0.1, hy + r * 0.7); c.moveTo(hx + r * 0.2, hy - r * 0.5); c.lineTo(hx + r * 0.65, hy - r * 0.35); c.stroke();
+      ov(c, hx + (m > 0 ? 1 : -1) * r * 0.2, hy + r * 0.7, r * 0.8, r * 0.28, '#d9731a', 0, null); // the knuckles
+    }
   }
-  for (const m of [-1, 0, 1]) poly(c, [[m * 6 - 3, -14], [m * 6, -27 - (m === 0 ? 4 : 0)], [m * 6 + 3, -14]], BD); // the head ridges
+  if (gmax && !back) { // the flaming red sash round the waist, and the gold belt
+    for (let q = -3; q <= 3; q++) ov(c, q * 4.2, 13.5 + LD * 0.6 + Math.sin(t * 7 + q) * 1.2, 3.4, 3.8 + Math.abs(Math.sin(t * 5 + q * 2)) * 1.4, '#ee3a6e', 0, null);
+    ov(c, 0, 14 + LD * 0.6, 4.6, 3.6, '#d9a41f'); ov(c, 0, 14 + LD * 0.6, 2, 1.6, '#8a5a0a', 0, null);
+  }
+  for (const m of [-1, 0, 1]) poly(c, [[m * 6 - 3, -14], [m * 6, -27 - (m === 0 ? (gmax ? 9 : 4) : 0)], [m * 6 + 3, -14]], BD); // the head ridges
   ov(c, 0, -13, 11.5, 10, B); // head
   if (!back) {
     ov(c, 0, -16, 9, 3, BD, 0, null);
-    for (const m of [-1, 1]) { ov(c, m * 4.5, -13, 2.4, 2.4, '#fff', 0, null); ov(c, m * 4.5, -13, 1.2, 1.6, EYE, 0, null); }
+    for (const m of [-1, 1]) { if (gmax) { c.globalAlpha = 0.35; ov(c, m * 4.5, -13, 4.2, 3.6, '#ffd23a', 0, null); c.globalAlpha = 1; } ov(c, m * 4.5, -13, 2.4, 2.4, gmax ? '#fff6c0' : '#fff', 0, null); ov(c, m * 4.5, -13, 1.2, 1.6, EYE, 0, null); }
     c.strokeStyle = '#222'; c.lineWidth = 1; c.beginPath(); c.arc(0, -8, 3, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
   }
   c.restore();
@@ -2532,8 +2562,9 @@ function drawKickLeg(p, d, bs) {
   const [ax, ay] = rv(p.kkx, p.kky), fly = p.kkp === 2, wait = p.kkp === 3, top = -d.z;
   if (p.k === 7 ? kickWarn.ash : kickWarn.machamp) upright(d.x, d.y, () => { // the name of the move over its head
     ctx.save(); ctx.font = '900 26px system-ui'; ctx.textAlign = 'center'; ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,.85)';
-    const txt = fly || wait ? '浪子踢球' : '閃身步', y = top - 60 * bs;
-    ctx.strokeText(txt, 0, y); ctx.fillStyle = fly || wait ? '#ffd23a' : '#9fe8ff'; ctx.fillText(txt, 0, y); ctx.restore();
+    const kick = fly || wait, txt = (p.k === 7 ? kickText.ash : kickText.machamp)[kick ? 'kick' : 'slide'], y = top - 60 * bs; // the names are the config's
+    if (!txt) { ctx.restore(); return; }
+    ctx.strokeText(txt, 0, y); ctx.fillStyle = kick ? '#ffd23a' : '#9fe8ff'; ctx.fillText(txt, 0, y); ctx.restore();
   });
   upright(d.x, d.y, () => {
     ctx.lineCap = 'round';
@@ -2550,6 +2581,45 @@ function drawKickLeg(p, d, bs) {
     ctx.fillStyle = '#2b2f3a'; ctx.beginPath(); ctx.ellipse(bx + ax * 6 * bs, by + ay * 6 * bs, 10 * bs, 8 * bs, Math.atan2(ay, ax), 0, 7); ctx.fill();
     ctx.strokeStyle = 'rgba(255,240,150,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(bx + ax * 8 * bs, by + ay * 8 * bs, 15 * bs, 0, 7); ctx.stroke();
   });
+}
+// The Uppercut. In the slide speed lines trail behind Machamp; in the rush (and the wait before it) a fist is cocked low ahead of it, and in the rush it streaks forward with a
+// dust of speed lines, ready to swing up.
+function drawUppercut(p, d, bs) {
+  const [ax, ay] = rv(p.upx, p.upy), rush = p.upp === 3, wait = p.upp === 2, top = -d.z;
+  if (upWarn) upright(d.x, d.y, () => { // the name of the move over its head
+    const txt = rush || wait ? upText.punch : upText.slide, y = top - 60 * bs;
+    if (!txt) return;
+    ctx.save(); ctx.font = '900 26px system-ui'; ctx.textAlign = 'center'; ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,.85)';
+    ctx.strokeText(txt, 0, y); ctx.fillStyle = rush || wait ? '#ffd23a' : '#9fe8ff'; ctx.fillText(txt, 0, y); ctx.restore();
+  });
+  upright(d.x, d.y, () => {
+    ctx.lineCap = 'round';
+    if (!wait) for (let n = 0; n < (rush ? 7 : 4); n++) { // streaks behind it
+      const off = (n - 3) * 5 * bs, L = (rush ? 100 : 55) * bs * (0.6 + 0.4 * Math.abs(Math.sin(n * 2.3 + performance.now() / 60)));
+      const sx = -ay * off, sy = ax * off;
+      ctx.strokeStyle = `rgba(255,255,255,${rush ? 0.7 : 0.45})`; ctx.lineWidth = 2.5 * bs;
+      ctx.beginPath(); ctx.moveTo(sx - ax * 14 * bs, top + sy - ay * 14 * bs); ctx.lineTo(sx - ax * (14 * bs + L), top + sy - ay * (14 * bs + L)); ctx.stroke();
+    }
+    if (!rush && !wait) return;
+    const bx = ax * 26 * bs, by = top + 12 * bs + ay * 26 * bs; // the fist, low and ahead, cocked to swing up
+    ctx.fillStyle = '#2b2f3a'; ctx.beginPath(); ctx.ellipse(bx, by, 11 * bs, 9 * bs, Math.atan2(ay, ax), 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,240,150,.85)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(bx, by, 16 * bs, 0, 7); ctx.stroke();
+  });
+}
+// Where the uppercut lands: a white flash at the foe's feet and streaks of light shooting straight up (the way the foe is thrown), with a ring on the ground.
+function drawUpperHit(f) {
+  const k = f.age / 0.6, a = 1 - k, H = (f.r || 200) * 0.9;
+  ctx.save(); ctx.lineCap = 'round';
+  ctx.fillStyle = `rgba(255,255,255,${0.8 * a})`; ctx.beginPath(); ctx.arc(f.x, f.y, 50 * (0.4 + 0.6 * Math.min(1, k * 4)), 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,200,60,${a})`; ctx.lineWidth = 5 * a + 1; ctx.beginPath(); ctx.ellipse(f.x, f.y, 20 + 110 * k, (20 + 110 * k) * 0.45, 0, 0, 7); ctx.stroke();
+  upright(f.x, f.y, () => { // straight up on the screen, whatever way the court is turned
+    for (let i = 0; i < 9; i++) {
+      const x = (i - 4) * 14 + Math.sin(i * 5.1) * 6, r0 = 10 + 30 * k, r1 = r0 + (50 + H * 0.5 * Math.min(1, k * 2.5)) * (0.55 + 0.45 * Math.abs(Math.sin(i * 3.1)));
+      ctx.strokeStyle = i % 2 ? `rgba(255,232,90,${a})` : `rgba(255,255,255,${a})`; ctx.lineWidth = 4 * a + 1;
+      ctx.beginPath(); ctx.moveTo(x, -r0); ctx.lineTo(x, -r1); ctx.stroke();
+    }
+  });
+  ctx.restore();
 }
 // Where the kick lands: a white flash, a ring and lines thrown along the kick.
 function drawKickImpact(f) {
@@ -3331,6 +3401,7 @@ function drawPlayer(i, p) {
   drawBody(p.k, d.x, d.y, 1, d.z, p.k === 2 && (p.ft > 0 || p.gp > 0) ? 1 : 0, pose, spin, tumble); // the body floats d.z above the ground; Charizard beats its wings hard in flight
   drawFrozen(p, i, d);
   if (p.kkp > 0) drawKickLeg(p, d, bs);
+  if (p.upp > 0) drawUppercut(p, d, bs);
   if (p.bd > 0) drawBound(d, p);
   if (p.pz > 0) drawParalyzed(d, p);
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.
@@ -3643,7 +3714,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' ? 0.5 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -3658,6 +3729,7 @@ function frame() {
       else if (f.t === 'mega') drawMegaFist(f);
       else if (f.t === 'megahit') drawMegaImpact(f);
       else if (f.t === 'kickhit') drawKickImpact(f);
+      else if (f.t === 'uphit') drawUpperHit(f);
       else if (f.t === 'gslam') drawGhostSlam(f);
       else if (f.t === 'gwell') drawPullWell(f);
       else if (f.t === 'evolve') drawEvolve(f);

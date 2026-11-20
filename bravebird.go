@@ -63,8 +63,8 @@ func (g *Game) diveBird(i int, dt float64) ([]Event, bool) {
 			continue
 		}
 		g.hit(f, bb.Damage)
-		if !f.Held && bb.LaunchHeight > 0 && bb.LaunchDuration > 0 {
-			f.Held, f.Juggle, f.JuggleT, f.VZ = true, true, bb.LaunchDuration, 0
+		if !f.Held {
+			g.launch(f, bb.LaunchHeight, bb.LaunchDuration)
 		}
 	}
 	if tn := bb.Tornado; tn.Duration > 0 { // a tornado is left where it landed: it does not chase, but takes whoever comes near
@@ -74,20 +74,28 @@ func (g *Game) diveBird(i int, dt float64) ([]Event, bool) {
 	return []Event{{T: "bbboom", X: p.X, Y: p.Y, R: bb.ExplosionRadius, K: p.Kind}}, true
 }
 
-// stepJuggle keeps the bodies Brave Bird threw up in the air: up to launch_height as fast as a tornado's fall is, there for
-// `launch_duration` seconds, then down. They are Held all the while, so they cannot move or act.
+// launch throws f up to `height` and holds it helpless there for `duration` seconds (Brave Bird's, the Uppercut's): nothing happens to a body
+// something else holds already, or when either number is 0.
+func (g *Game) launch(f *Player, height, duration float64) {
+	if f.Held || height <= 0 || duration <= 0 {
+		return
+	}
+	f.Held, f.Juggle, f.JuggleT, f.JuggleH, f.VZ = true, true, duration, height, 0
+}
+
+// stepJuggle keeps the bodies that were thrown up in the air: up to the height they were thrown to as fast as a tornado's fall is, there for
+// their `launch_duration` seconds, then down. They are Held all the while, so they cannot move or act.
 func (g *Game) stepJuggle(dt float64) {
-	bb := g.cfg.Rowlet.BraveBird
-	rate := bb.LaunchHeight / twirlFallTime
 	for i := range g.P {
 		p := &g.P[i]
 		if !p.Juggle {
 			continue
 		}
+		rate := p.JuggleH / twirlFallTime
 		p.Held = true
 		if p.JuggleT > 0 {
-			p.Z = math.Min(p.Z+rate*dt, bb.LaunchHeight)
-			if p.Z >= bb.LaunchHeight {
+			p.Z = math.Min(p.Z+rate*dt, p.JuggleH)
+			if p.Z >= p.JuggleH {
 				p.JuggleT = math.Max(p.JuggleT-dt, 0) // the time counts once it is up there
 			}
 			if p.JuggleT == 0 {

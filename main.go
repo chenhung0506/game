@@ -763,6 +763,8 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 		"evolve":   cfg.Magikarp.EvolveHops,
 		"tree":     []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
 		"fist":     []map[string]float64{aFist, mFist},
+		"kicktext": map[string]map[string]string{"ash": {"slide": cfg.Ash.HighJumpKick.SlideText, "kick": cfg.Ash.HighJumpKick.KickText}, "machamp": {"slide": cfg.Machamp.HighJumpKick.SlideText, "kick": cfg.Machamp.HighJumpKick.KickText}},
+		"uptext":   map[string]string{"slide": cfg.Machamp.Uppercut.SlideText, "punch": cfg.Machamp.Uppercut.PunchText}, "upwarn": b2f(cfg.Machamp.Uppercut.ShowWarning),
 		"kickwarn": map[string]float64{"ash": b2f(cfg.Ash.HighJumpKick.ShowWarning), "machamp": b2f(cfg.Machamp.HighJumpKick.ShowWarning)},
 		"bbird":    map[string]float64{"ring": cfg.Rowlet.BraveBird.RingDuration, "charge": cfg.Rowlet.BraveBird.ChargeDuration, "rs": cfg.Rowlet.BraveBird.RingScale, "ls": cfg.Rowlet.BraveBird.LightScale, "lf": cfg.Rowlet.BraveBird.LeafScale, "dark": cfg.Rowlet.BraveBird.SkyDark, "fevery": cfg.Rowlet.BraveBird.FlashEvery, "falpha": cfg.Rowlet.BraveBird.FlashAlpha},
 		"gvine": map[string]float64{"hw": cfg.Chikorita.GiantVines.HeadWidth, "wo": cfg.Chikorita.GiantVines.WormOut, "wi": cfg.Chikorita.GiantVines.WormIn, "hr": cfg.Chikorita.GiantVines.HeadRadius, "len": cfg.Chikorita.GiantVines.TrunkLength, "w": cfg.Chikorita.GiantVines.TrunkWidth, "rs": cfg.Chikorita.GiantVines.RingScale, "tw": cfg.Chikorita.GiantVines.TipWidth,
@@ -804,7 +806,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,
 			"frost": cfg.Vulpix.FrostField.Cooldown, "storm": cfg.Vulpix.IceStorm.Cooldown, "fbeam": cfg.Vulpix.FreezeBeam.Cooldown,
 			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown,
-			"mega": cfg.Ash.MegatonPunch.Cooldown, "tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "kick": cfg.Machamp.HighJumpKick.Cooldown, "akick": cfg.Ash.HighJumpKick.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
+			"mega": cfg.Ash.MegatonPunch.Cooldown, "tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "kick": cfg.Machamp.HighJumpKick.Cooldown, "akick": cfg.Ash.HighJumpKick.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "upper": cfg.Machamp.Uppercut.Cooldown, "mkick": cfg.Machamp.HighJumpKick.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
 	})
 	return hi
 }
@@ -913,6 +915,9 @@ func personsInput(kind int, in Input) Input {
 	in.Kick = false
 	if kind == ash {
 		in.Kick, in.Skill, in.Mega, in.Rock = in.Skill, in.Tree, in.Ult, false
+	}
+	if kind == machamp { // the main button is the Uppercut (Skill); the High Jump Kick is on the K button, which the page sends as Rock; the Rock Tomb is not used
+		in.Kick, in.Rock = in.Rock, false
 	}
 	in.Tree = false
 	return in

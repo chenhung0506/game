@@ -744,8 +744,31 @@ type BrawlerCfg struct {
 		StunDuration  float64 `json:"stun_duration"`
 		Knockback     float64 `json:"knockback"`
 		Cooldown      float64 `json:"cooldown"`
-		ShowWarning   bool    `json:"show_warning"` // true: the name of the move is shown over whoever is doing it ("閃身步" for the slide, "浪子踢球" for the kick)
+		ShowWarning   bool    `json:"show_warning"` // true: the name of the move is shown over whoever is doing it
+		SlideText     string  `json:"slide_text"`   // what is shown during the slide ("" = nothing)
+		KickText      string  `json:"kick_text"`    // what is shown from the wait before the leap to the end of it ("" = nothing)
 	} `json:"high_jump_kick"`
+	// Uppercut (Machamp's main skill; the computer's Ash does not have it): like the High Jump Kick it is in two parts. First it slides `slide_distance` along the stick
+	// (the way it faces without one) in `slide_duration` seconds, stands still `rush_delay` seconds, then rushes at where the opponent stands, `rush_speed` per second for at
+	// most `rush_distance`, and stops at the first body it meets (`radius` more than the bodies) to throw an uppercut: that foe, at a height inside min_height..max_height, takes
+	// `damage` and is not knocked back: it is thrown up to `launch_height` and held helpless in the air for `launch_duration` seconds (as Brave Bird does). `show_warning`
+	// shows `slide_text` over it during the slide and `punch_text` from the wait to the end of the rush ("" = nothing).
+	Uppercut struct {
+		Reach
+		SlideDistance  float64 `json:"slide_distance"`
+		SlideDuration  float64 `json:"slide_duration"`
+		RushDelay      float64 `json:"rush_delay"`
+		RushDistance   float64 `json:"rush_distance"`
+		RushSpeed      float64 `json:"rush_speed"`
+		Radius         float64 `json:"radius"`
+		Damage         int     `json:"damage"`
+		LaunchHeight   float64 `json:"launch_height"`
+		LaunchDuration float64 `json:"launch_duration"`
+		Cooldown       float64 `json:"cooldown"` // counted from the start of the slide
+		ShowWarning    bool    `json:"show_warning"`
+		SlideText      string  `json:"slide_text"`
+		PunchText      string  `json:"punch_text"`
+	} `json:"uppercut"`
 	// Comet Punch (J): for `duration` seconds Machamp runs at the opponent (`distance` in all, stopping at its body)
 	// throwing `quantity` fists, evenly spaced in time. Each fist appears ahead of it, `scatter_min_distance` to
 	// `scatter_max_distance` beyond its body and up to `random_offset_angle` degrees either side of its heading, hangs
@@ -818,6 +841,7 @@ type BrawlerCfg struct {
 	// projectile; it crumbles after `stone_duration` seconds.
 	RockTomb struct {
 		Reach
+		Enabled            bool    `json:"enabled"` // false: nobody uses it (a person has no key for it and the computer never starts it)
 		RingRadius         float64 `json:"ring_radius"`
 		Height             float64 `json:"height"`
 		Duration           float64 `json:"duration"`
@@ -1101,6 +1125,7 @@ func DefaultConfig() Config {
 	cp.Duration, cp.Quantity, cp.RandomOffsetAngle, cp.Distance = 1.5, 24, 40, 300
 	cp.ScatterMinDistance, cp.ScatterMaxDistance, cp.FistDuration = 20, 90, 0.2
 	rt := &c.Ash.RockTomb
+	rt.Enabled = true
 	rt.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	rt.RingRadius, rt.Height, rt.Duration, rt.Cooldown = 500, 80, 0.8, 12
 	rt.AirSpeedFirstHalf, rt.AirSpeedSecondHalf = 150, 100
@@ -1130,9 +1155,17 @@ func DefaultConfig() Config {
 	hk.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	hk.SlideDistance, hk.SlideDuration, hk.KickDistance, hk.KickSpeed, hk.KickHeight = 180, 0.25, 450, 1000, 40
 	hk.Radius, hk.Damage, hk.StunDuration, hk.Knockback, hk.Cooldown = 10, 35, 1.2, 300, 9
+	hk.SlideText, hk.KickText = "閃身步", "浪子踢球"
 	c.Ash.HighJumpKick = *hk // the computer's Ash kicks as well, a notch harder
 	c.Ash.HighJumpKick.ShowWarning = true
+	c.Machamp.HighJumpKick.KickText = "飛膝踢" // Machamp's is the Flying Knee Kick
 	c.Ash.HighJumpKick.SlideDistance, c.Ash.HighJumpKick.KickDistance, c.Ash.HighJumpKick.Damage, c.Ash.HighJumpKick.Cooldown = 200, 500, 40, 8
+	uc := &c.Machamp.Uppercut
+	uc.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	uc.SlideDistance, uc.SlideDuration, uc.RushDistance, uc.RushSpeed, uc.Radius = 120, 0.2, 380, 900, 14
+	uc.Damage, uc.LaunchHeight, uc.LaunchDuration, uc.Cooldown = 25, 200, 1.2, 7
+	uc.SlideText, uc.PunchText = "閃身步", "上鉤拳"
+	c.Ash.Uppercut = *uc // not used by Ash: filled so the file's check is the same
 	c.Machamp.CometPunch.Quantity, c.Machamp.CometPunch.HP, c.Machamp.CometPunch.Cooldown, c.Machamp.CometPunch.BallKnockback = 20, 16, 9, 100
 	c.Machamp.CometPunch.Knockback = 8
 	c.Machamp.RockTomb.RingRadius, c.Machamp.RockTomb.Count, c.Machamp.RockTomb.StoneHP, c.Machamp.RockTomb.StoneDuration, c.Machamp.RockTomb.Cooldown = 450, 20, 80, 7, 14
@@ -1366,6 +1399,8 @@ func (c Config) validate() error {
 		{"machamp.rock_tomb.stone_duration", c.Machamp.RockTomb.StoneDuration, 0},
 		{"ash.rock_tomb.stone_duration", c.Ash.RockTomb.StoneDuration, 0},
 		{"rowlet.fly_high", c.Rowlet.FlyHigh, 0},
+		{"machamp.uppercut.rush_distance", c.Machamp.Uppercut.RushDistance, 0},
+		{"machamp.uppercut.rush_speed", c.Machamp.Uppercut.RushSpeed, 0},
 		{"rowlet.brave_bird.dive_speed", c.Rowlet.BraveBird.DiveSpeed, 0},
 		{"rowlet.brave_bird.explosion_radius", c.Rowlet.BraveBird.ExplosionRadius, 0},
 		{"rowlet.brave_bird.sky_height", c.Rowlet.BraveBird.SkyHeight, 0},
@@ -1558,6 +1593,14 @@ func (c Config) validate() error {
 		{"ash.megaton_punch.stun_duration", c.Ash.MegatonPunch.StunDuration},
 		{"ash.megaton_punch.knockback", c.Ash.MegatonPunch.Knockback},
 		{"ash.megaton_punch.lunge_distance", c.Ash.MegatonPunch.LungeDistance},
+		{"machamp.uppercut.slide_distance", c.Machamp.Uppercut.SlideDistance},
+		{"machamp.uppercut.slide_duration", c.Machamp.Uppercut.SlideDuration},
+		{"machamp.uppercut.rush_delay", c.Machamp.Uppercut.RushDelay},
+		{"machamp.uppercut.radius", c.Machamp.Uppercut.Radius},
+		{"machamp.uppercut.damage", float64(c.Machamp.Uppercut.Damage)},
+		{"machamp.uppercut.launch_height", c.Machamp.Uppercut.LaunchHeight},
+		{"machamp.uppercut.launch_duration", c.Machamp.Uppercut.LaunchDuration},
+		{"machamp.uppercut.cooldown", c.Machamp.Uppercut.Cooldown},
 		{"machamp.high_jump_kick.slide_distance", c.Machamp.HighJumpKick.SlideDistance},
 		{"machamp.high_jump_kick.slide_duration", c.Machamp.HighJumpKick.SlideDuration},
 		{"machamp.high_jump_kick.kick_delay", c.Machamp.HighJumpKick.KickDelay},
@@ -1738,6 +1781,7 @@ func (c Config) validate() error {
 		"ash.comet_punch":           c.Ash.CometPunch.Reach,
 		"ash.megaton_punch":         c.Ash.MegatonPunch.Reach,
 		"machamp.rock_tomb":         c.Machamp.RockTomb.Reach,
+		"machamp.uppercut":          c.Machamp.Uppercut.Reach,
 		"gengar.shadow_sneak":       c.Gengar.ShadowSneak.Reach,
 		"gengar.ghost_fire":         c.Gengar.GhostFire.Reach,
 		"gengar.shadow_ball":        c.Gengar.ShadowBall.Reach,

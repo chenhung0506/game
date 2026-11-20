@@ -18,6 +18,14 @@ const (
 	kickWait  // standing still between the slide and the leap (kick_delay); the leap is aimed when it ends
 )
 
+// Uppercut phases.
+const (
+	upNone  = iota
+	upSlide // sliding along the stick
+	upWait  // standing still between the slide and the rush (rush_delay)
+	upRush  // rushing at the opponent
+)
+
 // pinned is whether a vine or a paralysis holds the player on the spot: a skill it is in the middle of goes on (its timers
 // run, its fist or kick still comes), but it does not move.
 func (p *Player) pinned() bool { return p.BoundT > 0 || p.ParalyzeT > 0 }
@@ -42,6 +50,7 @@ func (g *Game) dropMachamp(i int) {
 	p.TreePhase, p.TreeT, p.CometT, p.CometN, p.RockT, p.MegaT = treeNone, 0, 0, 0, 0, 0
 	p.MegaJT = 0
 	p.KickPhase, p.KickT = kickNone, 0
+	p.UpPhase, p.UpT = upNone, 0
 }
 
 // machampAirSpeed is how fast Machamp is steered in the Rock Tomb jump: the first speed until the middle, the second after.
@@ -61,15 +70,15 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	oi := g.nearestFoe(i) // what it runs at, aims at and closes in on is the nearest foe
 	p, other := &g.P[i], &g.P[oi]
 	ts, cp, rt := g.brawler(i).TreeSlam, g.brawler(i).CometPunch, g.brawler(i).RockTomb
-	mp, hk := g.brawler(i).MegatonPunch, g.brawler(i).HighJumpKick
-	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD, &p.KickCD} {
+	mp, hk, uc := g.brawler(i).MegatonPunch, g.brawler(i).HighJumpKick, g.brawler(i).Uppercut
+	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD, &p.KickCD, &p.UpCD} {
 		if *cd > 0 {
 			if *cd -= dt; *cd < 1e-9 {
 				*cd = 0
 			}
 		}
 	}
-	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.KickPhase == kickNone && p.Z == 0
+	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.KickPhase == kickNone && p.UpPhase == upNone && p.Z == 0
 
 	// ---- Tree slam: jump, then pull up a tree and smash it down ----
 	if in.Skill && idle && p.TreeCD == 0 && p.Kind != machamp { // Machamp kicks instead
@@ -105,8 +114,8 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	}
 	rooted := p.TreePhase != treeNone || len(events) > 0 // through the tick of the smash, free from the next
 
-	// ---- High Jump Kick (Machamp's Skill; Ash's Kick, for the computer): slide along the stick, then leap at the opponent ----
-	if ((in.Skill && p.Kind == machamp) || (in.Kick && p.Kind == ash)) && idle && p.KickCD == 0 {
+	// ---- High Jump Kick (Machamp's and Ash's Kick): slide along the stick, then leap at the opponent ----
+	if in.Kick && idle && p.KickCD == 0 { // Machamp's person sends it as Rock (personsInput), the computers as Kick
 		dx, dy := float64(in.DX), float64(in.DY)
 		if dx == 0 && dy == 0 {
 			dx, dy = float64(p.FX), float64(p.FY)
@@ -152,6 +161,47 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		rooted = true
 	}
 
+	// ---- Uppercut (Machamp's Skill): slide along the stick, then rush at the opponent and throw it up ----
+	if in.Skill && p.Kind == machamp && idle && p.UpCD == 0 {
+		dx, dy := float64(in.DX), float64(in.DY)
+		if dx == 0 && dy == 0 {
+			dx, dy = float64(p.FX), float64(p.FY)
+		}
+		p.UpX, p.UpY = unit(dx, dy)
+		p.UpPhase, p.UpT, p.UpCD = upSlide, uc.SlideDuration, uc.Cooldown
+		if uc.SlideDuration == 0 || uc.SlideDistance == 0 {
+			p.UpT = 0
+		}
+		idle = false
+	}
+	rushing := p.UpPhase == upRush // the rush leaves on the tick after the slide (or the wait) ends
+	if p.UpPhase == upWait {
+		if p.UpT -= dt; p.UpT < 1e-9 {
+			g.startRush(i, other)
+		}
+	}
+	if p.UpPhase == upSlide {
+		step := math.Min(dt, p.UpT) // the last step is clipped so the distance is exact
+		if p.UpT > 0 && !p.pinned() {
+			v := uc.SlideDistance / uc.SlideDuration
+			p.X = math.Min(math.Max(p.X+p.UpX*v*step, 0), g.court.Length)
+			p.Y = math.Min(math.Max(p.Y+p.UpY*v*step, 0), g.court.Width)
+		}
+		if p.UpT -= step; p.UpT < 1e-9 {
+			if uc.RushDelay > 0 {
+				p.UpT, p.UpPhase = uc.RushDelay, upWait
+			} else {
+				g.startRush(i, other)
+			}
+		}
+	}
+	if rushing {
+		events = append(events, g.uppercutStep(i, dt)...)
+	}
+	if p.UpPhase != upNone {
+		rooted = true
+	}
+
 	// ---- Comet Punch: run at the opponent, throwing fists ahead ----
 	if in.Comet && idle && p.CometCD == 0 {
 		p.CometT, p.CometN, p.CometCD = cp.Duration, 0, cp.Cooldown
@@ -190,7 +240,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	}
 
 	// ---- Rock Tomb: a jump (steered like a walk), and the landing raises a ring of stones ----
-	if in.Rock && idle && p.RockCD == 0 {
+	if in.Rock && rt.Enabled && idle && p.RockCD == 0 {
 		p.RockT, p.RockCD = rt.Duration, rt.Cooldown
 	}
 	if p.RockT > 0 {
@@ -258,6 +308,53 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		}
 	}
 	return events, rooted
+}
+
+// startRush points the rush at where `other` stands now.
+func (g *Game) startRush(i int, other *Player) {
+	p := &g.P[i]
+	p.UpT, p.UpPhase, p.UpD = 0, upRush, 0
+	if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
+		p.UpX, p.UpY = ux, uy
+	}
+}
+
+// uppercutStep runs the rush on one tick along the direction it was aimed: it stops at the first foe's body it meets, which it hurts and throws
+// up into the air (not away), or at the end of its distance.
+func (g *Game) uppercutStep(i int, dt float64) []Event {
+	p, uc := &g.P[i], g.brawler(i).Uppercut
+	s := math.Min(uc.RushSpeed*dt, uc.RushDistance-p.UpD)
+	if p.pinned() { // held on the spot: the rush runs its course but gets nowhere, and so touches nobody
+		if p.UpD += s; p.UpD >= uc.RushDistance-1e-9 {
+			p.UpPhase = upNone
+		}
+		return nil
+	}
+	var other *Player
+	for _, j := range g.foes(i) {
+		foe := &g.P[j]
+		R := g.radius(i) + g.radius(j) + uc.Radius
+		rx, ry := foe.X-p.X, foe.Y-p.Y
+		along, side := rx*p.UpX+ry*p.UpY, math.Abs(rx*p.UpY-ry*p.UpX)
+		if uc.Reach.hits(foe) && along > 0 && side <= R {
+			if c := along - math.Sqrt(R*R-side*side); c <= s {
+				s, other = math.Max(c, 0), foe
+			}
+		}
+	}
+	p.X = math.Min(math.Max(p.X+p.UpX*s, 0), g.court.Length)
+	p.Y = math.Min(math.Max(p.Y+p.UpY*s, 0), g.court.Width)
+	p.UpD += s
+	if other == nil {
+		if p.UpD >= uc.RushDistance-1e-9 {
+			p.UpPhase = upNone
+		}
+		return nil
+	}
+	p.UpPhase = upNone
+	g.hit(other, uc.Damage)
+	g.launch(other, uc.LaunchHeight, uc.LaunchDuration)
+	return []Event{{T: "uphit", X: other.X, Y: other.Y, DX: p.UpX, DY: p.UpY, R: uc.LaunchHeight}}
 }
 
 // kickStep flies the kick on one tick along the direction it was aimed: it stops at the first foe's body it meets, which it

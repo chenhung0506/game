@@ -534,7 +534,9 @@
       "stun_duration": 0.5,
       "knockback": 300,
       "cooldown": 7,
-      "show_warning": true
+      "show_warning": true,
+      "slide_text": "閃身步",
+      "kick_text": "浪子踢球"
     },
     "tree_slam": {
       "min_height": 0,
@@ -606,6 +608,7 @@
       "fist_duration": 0.2
     },
     "rock_tomb": {
+      "enabled": false,
       "min_height": 0,
       "max_height": 120,
       "ring_radius": 130,
@@ -626,10 +629,10 @@
     "radius": 30,
     "high_jump_kick": {
       "min_height": 0,
-      "max_height": 60,
-      "slide_distance": 180,
-      "slide_duration": 0.3,
-      "kick_delay": 0.4,
+      "max_height": 80,
+      "slide_distance": 0,
+      "slide_duration": 0,
+      "kick_delay": 0,
       "kick_distance": 300,
       "kick_speed": 550,
       "kick_height": 40,
@@ -638,7 +641,26 @@
       "stun_duration": 1.2,
       "knockback": 200,
       "cooldown": 6,
-      "show_warning": true
+      "show_warning": true,
+      "slide_text": "飛膝踢",
+      "kick_text": "飛膝踢"
+    },
+    "uppercut": {
+      "min_height": 0,
+      "max_height": 60,
+      "slide_distance": 320,
+      "slide_duration": 0.2,
+      "rush_delay": 0,
+      "rush_distance": 480,
+      "rush_speed": 900,
+      "radius": 14,
+      "damage": 25,
+      "launch_height": 80,
+      "launch_duration": 1.2,
+      "cooldown": 7,
+      "show_warning": true,
+      "slide_text": "閃身步",
+      "punch_text": "上鉤拳"
     },
     "tree_slam": {
       "min_height": 0,
@@ -660,23 +682,24 @@
     },
     "comet_punch": {
       "min_height": 0,
-      "max_height": 60,
+      "max_height": 80,
       "radius": 22,
       "hp": 16,
       "damage": 2,
       "cooldown": 6,
       "mass": 100,
       "ball_knockback": 100,
-      "knockback": 12,
+      "knockback": 4,
       "duration": 3,
-      "quantity": 120,
-      "random_offset_angle": 70,
+      "quantity": 140,
+      "random_offset_angle": 60,
       "distance": 350,
       "scatter_min_distance": 0,
       "scatter_max_distance": 100,
       "fist_duration": 0.2
     },
     "rock_tomb": {
+      "enabled": false,
       "min_height": 0,
       "max_height": 120,
       "ring_radius": 200,

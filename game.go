@@ -104,6 +104,7 @@ type Player struct {
 	Tw               spinParams `json:"-"` // what the tornado that holds it does (set when it is caught), and the height it was caught at
 	TwZ0             float64    `json:"-"`
 	JuggleT          float64    `json:"-"`
+	JuggleH          float64    `json:"-"` // the height it was thrown to (Brave Bird's launch_height, the Uppercut's)
 
 	FX           int     `json:"fx"` // last non-zero direction held; a dash with no keys goes this way, and so does the ball
 	FY           int     `json:"fy"`
@@ -292,6 +293,14 @@ type Player struct {
 	KickY     float64 `json:"kky"`
 	KickD     float64 `json:"-"`
 	KickCD    float64 `json:"kkcd"`
+	// Uppercut (Machamp): its phase (upNone, upSlide, upWait, upRush), the seconds of the slide or the wait left, the unit direction it is going along, how far
+	// the rush has gone and the cooldown.
+	UpPhase int     `json:"upp"`
+	UpT     float64 `json:"-"`
+	UpX     float64 `json:"upx"`
+	UpY     float64 `json:"upy"`
+	UpD     float64 `json:"-"`
+	UpCD    float64 `json:"ucd"`
 	// Gengar: seconds left under the ground (the shadow shows), the three cooldowns, and how much longer it cannot start a skill
 	// (an opponent's shadow is on it).
 	SneakT           float64 `json:"gnt"`
@@ -1289,7 +1298,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}
 			b.Life -= dt
 			if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
-				return (!f.Held || (b.Still && f.Juggle && f.Z >= g.cfg.Rowlet.BraveBird.LaunchHeight-1e-6)) && f.Twirl == twirlNone && sp.Reach.hits(f) && math.Hypot(f.X-b.X, f.Y-b.Y) <= g.tornadoRadius(&b)+rad
+				return (!f.Held || (b.Still && f.Juggle && f.Z >= f.JuggleH-1e-6)) && f.Twirl == twirlNone && sp.Reach.hits(f) && math.Hypot(f.X-b.X, f.Y-b.Y) <= g.tornadoRadius(&b)+rad
 			}); ok {
 				b.Caught, b.Life, b.Prey = true, sp.SpinDuration, g.slotOf(foe)+1
 				foe.Twirl, foe.Held, foe.VZ, foe.TwirlIn = twirlSpin, true, 0, sp.SpinInterval

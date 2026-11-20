@@ -21,7 +21,7 @@ func TestHighJumpKickSlidesAlongTheStickTheConfiguredDistanceInTheConfiguredTime
 	hk := cfg.Machamp.HighJumpKick
 	g := kickDuel(cfg, 700)
 	g.P[1].Y = 900 // far off the line: this is about the slide
-	press(g, 0, Input{Skill: true, DY: 1})
+	press(g, 0, Input{Kick: true, DY: 1})
 	n := 1
 	for g.P[0].KickPhase == kickSlide {
 		if g.P[0].X != 300 || g.P[0].Z != 0 {
@@ -51,7 +51,7 @@ func TestHighJumpKickWithNoStickSlidesTheWayItFaces(t *testing.T) {
 	cfg := DefaultConfig()
 	g := kickDuel(cfg, 1500)
 	g.P[1].Y = 900
-	press(g, 0, Input{Skill: true})
+	press(g, 0, Input{Kick: true})
 	steps(g, int(math.Ceil(cfg.Machamp.HighJumpKick.SlideDuration/dt))-1)
 	if g.P[0].X <= 300 || g.P[0].Y != 250 {
 		t.Fatalf("at %v,%v: it should have slid the way it faces (+x)", g.P[0].X, g.P[0].Y)
@@ -62,7 +62,7 @@ func TestHighJumpKickHurtsStunsAndKicksAwayWhatItReachesAndStopsAtItsBody(t *tes
 	cfg := DefaultConfig()
 	hk := cfg.Machamp.HighJumpKick
 	g := kickDuel(cfg, 600)
-	press(g, 0, Input{Skill: true, DX: 1})
+	press(g, 0, Input{Kick: true, DX: 1})
 	peak := 0.0
 	for n := 0; n < 200 && g.P[1].HP == g.maxHP(1); n++ {
 		peak = math.Max(peak, g.P[0].Z)
@@ -102,7 +102,7 @@ func TestHighJumpKickThatFindsNobodyEndsAtItsDistanceAndSteppingOutOfTheLineDodg
 	cfg := DefaultConfig()
 	hk := cfg.Machamp.HighJumpKick
 	g := kickDuel(cfg, hk.SlideDistance+hk.KickDistance+g0radii(cfg)+hk.Radius+80) // out of reach
-	press(g, 0, Input{Skill: true, DX: 1})
+	press(g, 0, Input{Kick: true, DX: 1})
 	steps(g, 100)
 	if g.P[1].HP != g.maxHP(1) || g.P[1].StunT > 0 {
 		t.Fatal("hit a body beyond its reach")
@@ -115,7 +115,7 @@ func TestHighJumpKickThatFindsNobodyEndsAtItsDistanceAndSteppingOutOfTheLineDodg
 	}
 	// a body that leaves the line while the kick flies is missed: the way is fixed as the slide ends
 	g = kickDuel(cfg, 600)
-	press(g, 0, Input{Skill: true, DX: 1})
+	press(g, 0, Input{Kick: true, DX: 1})
 	for g.P[0].KickPhase != kickFly {
 		g.Step(dt)
 	}
@@ -133,7 +133,7 @@ func TestHighJumpKickHasItsHeightBandAndCooldownAndMachampHasNoTree(t *testing.T
 	hk := cfg.Machamp.HighJumpKick
 	g := kickDuel(cfg, 600)
 	g.P[1].Z = hk.MaxHeight + 30 // above its band (held there: the Snorlax is on the ground, so Z is reset each tick; set it each time)
-	press(g, 0, Input{Skill: true, DX: 1})
+	press(g, 0, Input{Kick: true, DX: 1})
 	for range 60 {
 		g.P[1].Z = hk.MaxHeight + 30
 		g.Step(dt)
@@ -144,12 +144,12 @@ func TestHighJumpKickHasItsHeightBandAndCooldownAndMachampHasNoTree(t *testing.T
 	if g.P[0].TreePhase != treeNone || g.P[0].TreeCD != 0 {
 		t.Fatal("Machamp started the tree")
 	}
-	press(g, 0, Input{Skill: true})
+	press(g, 0, Input{Kick: true})
 	if g.P[0].KickPhase != kickNone {
 		t.Fatal("a second kick started during the cooldown")
 	}
 	g.P[0].KickCD = 0
-	press(g, 0, Input{Skill: true})
+	press(g, 0, Input{Kick: true})
 	if g.P[0].KickPhase == kickNone {
 		t.Fatal("it would not start once the cooldown was over")
 	}
@@ -164,7 +164,7 @@ func TestBeingStunnedOrFrozenInTheMiddleOfTheKickBringsMachampDown(t *testing.T)
 	for _, cut := range []string{"stun", "freeze"} {
 		g := kickDuel(DefaultConfig(), 1500)
 		g.P[1].Y = 900
-		press(g, 0, Input{Skill: true, DX: 1})
+		press(g, 0, Input{Kick: true, DX: 1})
 		for g.P[0].KickPhase != kickFly {
 			g.Step(dt)
 		}
@@ -212,7 +212,7 @@ func TestTheBotKeepsOutOfTheLineOfAHighJumpKickFarBetterThanOneThatStandsStill(t
 					g := duel(cfg, kind, machamp)
 					g.P[1].X, g.P[1].Y = 1300, 450
 					g.P[0].X, g.P[0].Y = 1300-d, 450 // in the line
-					press(g, 1, Input{Skill: true})
+					press(g, 1, Input{Kick: true})
 					b := newBot(kind, seed)
 					hp := g.P[0].HP
 					for range 8 {
@@ -259,11 +259,16 @@ func TestTheComputersAshKicksWithItsOwnNumbersAndAPersonsKeyForItIsDropped(t *te
 	if g.P[1].HP != g.maxHP(1)-hk.Damage {
 		t.Fatalf("HP %d, want Ash's own damage %d", g.maxHP(1)-g.P[1].HP, hk.Damage)
 	}
-	// Machamp's key is Skill, and the kick key does nothing for it
+	// Machamp kicks with the same key, and its Skill is the Uppercut, not a kick
 	m := duel(cfg, machamp, snorlax)
-	press(m, 0, Input{Kick: true})
-	if m.P[0].KickPhase != kickNone {
-		t.Fatal("Machamp kicked with the computer's key")
+	press(m, 0, Input{Skill: true})
+	if m.P[0].KickPhase != kickNone || m.P[0].UpPhase == upNone {
+		t.Fatalf("Machamp's Skill: kick phase %d, uppercut phase %d", m.P[0].KickPhase, m.P[0].UpPhase)
+	}
+	k := duel(cfg, machamp, snorlax)
+	press(k, 0, Input{Kick: true})
+	if k.P[0].KickPhase == kickNone {
+		t.Fatal("Machamp would not kick with the Kick key")
 	}
 
 	srv := httptest.NewServer(newMux(cfg))
@@ -291,10 +296,10 @@ func TestTheMachampBotKicksAtAFarOpponentAndNeverReachesForTheTreeOrAKeyItDoesNo
 		b := newBot(machamp, seed)
 		for i := 0; i < 90; i++ {
 			in := b.Decide(g, 0)
-			if in.Mega || in.Kick || in.Thunder || in.Beam {
+			if in.Mega || in.Thunder || in.Beam || in.Rock || in.Tree {
 				t.Fatalf("Machamp's bot pressed a key that is not its: %+v", in)
 			}
-			if in.Skill {
+			if in.Skill || in.Kick {
 				kicked++
 				break
 			}
@@ -360,7 +365,7 @@ func TestHighJumpKickWaitsKickDelayAfterTheSlideAndAimsWhenTheWaitEnds(t *testin
 	cfg.Machamp.HighJumpKick.KickDelay = 0.5
 	hk := cfg.Machamp.HighJumpKick
 	g := kickDuel(cfg, 700)
-	press(g, 0, Input{Skill: true, DY: 1})
+	press(g, 0, Input{Kick: true, DY: 1})
 	for g.P[0].KickPhase == kickSlide {
 		g.Step(dt)
 	}
@@ -392,7 +397,7 @@ func TestHighJumpKickHeldByAVineOrParalysisStaysOnTheSpotAndTouchesNobody(t *tes
 	} {
 		for _, phase := range []int{kickSlide, kickFly} {
 			g := kickDuel(DefaultConfig(), 300) // the opponent is right in the line of the kick
-			press(g, 0, Input{Skill: true, DY: 1})
+			press(g, 0, Input{Kick: true, DY: 1})
 			for g.P[0].KickPhase != phase {
 				g.Step(dt)
 			}
@@ -410,5 +415,43 @@ func TestHighJumpKickHeldByAVineOrParalysisStaysOnTheSpotAndTouchesNobody(t *tes
 				t.Fatalf("%s/%d: the kick did not run its course (phase %d z=%v)", name, phase, g.P[0].KickPhase, g.P[0].Z)
 			}
 		}
+	}
+}
+
+func TestAHighJumpKickWithNoSlideLeavesAtOnceAtWhereTheOpponentStands(t *testing.T) {
+	cfg := DefaultConfig()
+	hk := &cfg.Machamp.HighJumpKick
+	hk.SlideDistance, hk.SlideDuration, hk.KickDelay = 0, 0, 0
+	g := kickDuel(cfg, 700)
+	g.P[1].Y = 450
+	press(g, 0, Input{Kick: true, DY: 1}) // the stick is held, but there is nothing to slide with
+	if g.P[0].X != 300 || g.P[0].Y != 250 {
+		t.Fatalf("moved to %v,%v before the kick", g.P[0].X, g.P[0].Y)
+	}
+	if g.P[0].KickPhase != kickFly {
+		t.Fatalf("phase %d, want the kick right away", g.P[0].KickPhase)
+	}
+	wx, wy := unit(g.P[1].X-300, g.P[1].Y-250)
+	if math.Abs(g.P[0].KickX-wx) > 1e-9 || math.Abs(g.P[0].KickY-wy) > 1e-9 {
+		t.Fatalf("kick aimed %v,%v, want it at the opponent %v,%v", g.P[0].KickX, g.P[0].KickY, wx, wy)
+	}
+}
+
+func TestTheNamesShownForTheTwoPartsOfTheKickAreTheConfigsAndAreSentToThePage(t *testing.T) {
+	cfg := DefaultConfig()
+	if k := cfg.Machamp.HighJumpKick; k.SlideText == "" || k.KickText != "飛膝踢" {
+		t.Fatalf("Machamp's defaults: %q and %q", k.SlideText, k.KickText)
+	}
+	if k := cfg.Ash.HighJumpKick; k.SlideText != "閃身步" || k.KickText != "浪子踢球" {
+		t.Fatalf("Ash's defaults: %q and %q", k.SlideText, k.KickText)
+	}
+	cfg.Machamp.HighJumpKick.SlideText, cfg.Machamp.HighJumpKick.KickText = "起", "踢"
+	cfg.Ash.HighJumpKick.SlideText = ""
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	kt := next(t, dialPlay(t, srv, "dummy"), "hi")["kicktext"].(map[string]any)
+	m, a := kt["machamp"].(map[string]any), kt["ash"].(map[string]any)
+	if m["slide"] != "起" || m["kick"] != "踢" || a["slide"] != "" || a["kick"] != "浪子踢球" {
+		t.Fatalf("kicktext = %v", kt)
 	}
 }
