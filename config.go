@@ -20,8 +20,8 @@ type CourtSize struct {
 // CourtConfig is one view's court: the walls (`max_*`: what the fighters can walk on and where the spawns are; past them is out of
 // bounds) and the window the camera shows. The island and the sea around it are drawn beyond the walls and the camera may look
 // `sea_margin` units past them on every side. The camera shows `min_*` while the farthest two characters are close and widens to
-// `max_*` plus the sea margin on both sides as they part: it zooms out while that distance is above `zoom_out_distance`, in while it
-// is below `zoom_in_distance` (in between it holds), by `zoom_speed` of the whole range per second. The window keeps the shape of `min_*`.
+// `max_*` plus the sea margin on both sides as they part: the zoom is all the way in at `zoom_in_distance` or less, all the way out at `zoom_out_distance`
+// or more, and in between it is the distance's share of that span; it moves there by `zoom_speed` of the whole range per second. The window keeps the shape of `min_*`.
 type CourtConfig struct {
 	MinWidth        float64 `json:"min_width"`
 	MinLength       float64 `json:"min_length"`

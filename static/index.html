@@ -290,8 +290,8 @@ function setView() {
   camState.t = 0; camState.cx = camState.cy = null;
   updateCamera(0);
 }
-// The zoom follows the distance between the farthest two characters (so it works for more than two): above zout it widens, below zin
-// it closes in, and in between it holds, zspeed of the whole range per second. The window centres on all of them.
+// The zoom follows the distance between the farthest two characters (so it works for more than two): at zin or less it is all the way in, at zout
+// or more all the way out, and in between it is that far along (the distance's share of zin..zout); it gets there at zspeed of the whole range per second. The window centres on all of them.
 function updateCamera(dt) {
   let pts = snap ? snap.p.map((p, i) => (disp[i] && disp[i].x !== null ? { x: disp[i].x, y: disp[i].y } : { x: p.x, y: p.y })) : [];
   if (snap && snap.p.length > 2 && snap.p.some((p) => p.hp > 0)) pts = pts.filter((_, i) => snap.p[i].hp > 0); // the camera follows whoever still fights
@@ -301,7 +301,10 @@ function updateCamera(dt) {
     for (let j = i + 1; j < pts.length; j++) far = Math.max(far, Math.hypot(a.x - pts[j].x, a.y - pts[j].y));
   });
   const S = camState;
-  if (pts.length > 1) { if (far > cam.zout) S.t += cam.zspeed * dt; else if (far < cam.zin) S.t -= cam.zspeed * dt; }
+  if (pts.length > 1) { // the wanted zoom grows with the distance: all the way in at zin, all the way out at zout; it moves there at zspeed
+    const want = cam.zout > cam.zin ? Math.min(1, Math.max(0, (far - cam.zin) / (cam.zout - cam.zin))) : (far > cam.zout ? 1 : 0);
+    S.t += Math.min(Math.abs(want - S.t), cam.zspeed * dt) * Math.sign(want - S.t);
+  }
   S.t = Math.min(1, Math.max(0, S.t));
   const CL = cam.minw, CW = cam.minh;
   const m = cam.margin; // the camera may look this far past the walls; fully zoomed out it shows the whole field and the sea around it
