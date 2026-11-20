@@ -16,6 +16,8 @@ func (g *Game) gatheringBall(p *Player) bool {
 		return p.UltT > 0 && p.UltT <= g.cfg.Pikachu.ThousandVolt.BallDuration
 	case ash:
 		return p.MegaT > 0 && p.MegaT <= g.cfg.Ash.MegatonPunch.BallDuration
+	case rowlet:
+		return p.BirdDive || (p.UltT > 0 && p.UltT <= g.cfg.Rowlet.BraveBird.ChargeDuration)
 	}
 	return false
 }
@@ -50,6 +52,8 @@ func (c Config) ultimateOf(kind int) (Ultimate, bool) {
 		return c.Ash.Ultimate, true
 	case chikorita:
 		return c.Chikorita.Ultimate, true
+	case rowlet:
+		return c.Rowlet.Ultimate, true
 	}
 	return Ultimate{}, false
 }
@@ -83,6 +87,9 @@ func (g *Game) stepUltimate(i int, in Input, dt float64) ([]Event, bool) {
 	u, ok := g.cfg.ultimateOf(p.Kind)
 	if ok && p.Kind == chikorita {
 		return g.stepGiantCast(i, in, u)
+	}
+	if ok && p.Kind == rowlet {
+		return g.stepBraveBird(i, in, u, dt)
 	}
 	if !ok || p.Kind != pikachu { // Ash's is the Megaton Punch, started by stepMachamp
 		return nil, false

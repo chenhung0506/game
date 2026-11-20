@@ -61,6 +61,8 @@
   .card b { display: block; margin-top: 6px; font-size: 16px; }
   .card small { display: block; margin-top: 4px; opacity: .75; line-height: 1.5; text-align: left; font-size: 12px; }
   .card.mine { border-color: #6fd36f; background: #243026; }
+  #fullbox { margin: 0 0 12px; text-align: center; display: none; }
+  #fullbox label { cursor: pointer; }
   #easebox { margin: 0 0 12px; text-align: center; line-height: 1.6; display: none; }
   #easebox input { width: 220px; vertical-align: middle; }
   #easemsg { font-size: 12px; opacity: .75; }
@@ -84,7 +86,7 @@
 <div id="bar"></div>
 <button id="reconnect">連線中斷　重新連線</button>
 <div id="rooms"><h2>選擇房間</h2><div id="roomlist"></div><button id="newroom">開新房間</button><div class="hint">灰色表示對方可能已斷線；沒有人等待時會自動開房</div></div>
-<div id="pick"><h2>選擇你的寶可夢</h2><div id="playmodes"><button data-play="computer">打電腦</button><button data-play="player">打玩家</button><button data-play="dummy">打木樁</button><button data-play="squad">2v2</button><button data-play="vs2">1v2</button></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="tools"><button id="botMain">單機對戰</button><button id="botOff">改和真人對戰</button><button id="easeBtn">放水 0%</button></div><div id="botpick"></div><div id="easebox"><label><span id="easelabel">放水</span> <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
+<div id="pick"><h2>選擇你的寶可夢</h2><div id="playmodes"><button data-play="computer">打電腦</button><button data-play="player">打玩家</button><button data-play="dummy">打木樁</button><button data-play="squad">2v2</button><button data-play="vs2">1v2</button></div><div id="fullbox"><label><input type="checkbox" id="fullcharge"> 絕招一進場就充滿（不用累積能量）</label></div><div id="modes"><button id="mSingle">單場對戰</button><button id="mTeam">死鬥（依序上場）</button><button id="sz3">3 隻</button><button id="szAll">全部</button></div><div id="tools"><button id="botMain">單機對戰</button><button id="botOff">改和真人對戰</button><button id="easeBtn">放水 0%</button></div><div id="botpick"></div><div id="easebox"><label><span id="easelabel">放水</span> <b id="easeval">0%</b>　<input id="ease" type="range" min="0" max="90" step="10" value="0"></label><div id="easemsg"></div></div><div id="cards"></div><div id="teambar"><button id="tClear">清除順序</button><button id="tOk">確認出場順序</button></div><div id="pickmsg"></div></div>
 <button id="repick">重選角色</button><button id="exitdummy">退出木樁</button>
 <canvas id="c" width="2000" height="1000"></canvas>
 <div id="bar2" style="padding:8px 16px;opacity:.7"></div>
@@ -108,7 +110,7 @@ const HELP = [
   '你是噴火龍　移動 WASD　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　J＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　K＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）',
   '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　J＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　K＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）　Z＝大藤蔓（絕招，蓄能滿了才能放；一根粗藤蔓從地底追著敵人跑，碰到敵人或時間到就在那裡冒出來，周圍一圈大藤蔓依序衝出地面，各自鎖定敵人朝下拍打，打中的人受傷、變慢，被藤蔓打中好幾次還會被打暈；整個過程無法移動）',
   '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
-  '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝空氣斬（朝按住的方向衝出一道半月形弧線，彎向敵人那一側，沿途朝最近的敵人射出一道道白色的空氣斬擊，打得到貼地的敵人）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）',
+  '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝空氣斬（朝按住的方向衝出一道半月形弧線，彎向敵人那一側，沿途朝最近的敵人射出一道道白色的空氣斬擊，打得到貼地的敵人）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）　Z＝神鳥猛攻（絕招，蓄能滿才能放：先定身集氣，飛上高空、身上的鳥形光芒愈來愈大，然後朝敵人俯衝，撞擊地面爆炸，把敵人打上天、在空中動彈不得）',
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
   '你是真新鎮小智　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人）　Z＝百萬噸拳擊（絕招，蓄能滿了才能放；天色會變暗。朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），蓄力後半段畫面會閃爍，朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
   '你是怪力　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝子彈拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝岩石陣（朝按住的方向跳起重重踩地，在周圍很遠的地方升起一圈岩石擋住敵人，岩石可以被打壞）',
@@ -201,8 +203,9 @@ const beamSlots = () => (snap ? [...snap.p.keys()].filter((i) => hasBeam(snap.p[
 const slotsOf = (k) => (snap ? [...snap.p.keys()].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; gengarCfg = m.gengar; fistCfgs = m.fist; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
+    if (PLAY === 'dummy' && !!m.full !== fullWant) send({ fullcharge: fullWant }); // the practice room starts without it: say what the box says
     if (m.on || (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1])) return; // a match is on: a refused pick changes nothing
     if (teamSize !== (m.size || TEAM_BIG)) { teamSize = m.size || TEAM_BIG; myOrder = []; sentOrder = ''; } // another team size: choose again
     if (teamMode !== !!m.team) { teamMode = !!m.team; myOrder = []; sentOrder = ''; } // another match type: choose again
@@ -236,6 +239,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'thunder') { shake = 10; flashT = 4 * tvoltCfg.fevery; } // a strike lands: one white and black flash
       if (ev.t === 'explode') shake = 14;
       if (ev.t === 'ult') shake = 10;
+      if (ev.t === 'bbboom') { shake = 18; bbLeaves(ev); }
       if (ev.t === 'gvcast' || ev.t === 'gvplant' || ev.t === 'gvrise' || ev.t === 'gvslam') gvBurst(ev);
       if (ev.t === 'voltburst') { shake = Math.max(shake, 5); flashT = 4 * tvoltCfg.fevery; } // an explosion: one white and black flash (the bolts of a cast go off together, still one flash)
       if (ev.t === 'iceburst') shake = 12;
@@ -366,6 +370,7 @@ function showPick() {
   document.getElementById('easebox').style.display = easeOpen ? 'block' : 'none';
   document.getElementById('easemsg').textContent = (soloMode ? `你的血量增加 ${amt}%（最高 300%）` : `你的血量和移動速度減少 ${amt}%`) + (!soloMode && ease[1 - me] ? `　對手放水 ${ease[1 - me]}%` : '') + '（開打前設定）';
   for (const b of document.querySelectorAll('#playmodes button')) b.classList.toggle('on', b.dataset.play === PLAY);
+  document.getElementById('fullbox').style.display = PLAY === 'dummy' ? 'block' : 'none';
   document.getElementById('tools').style.display = squadMode && !soloMode ? 'none' : ''; // a 2v2 has no computer to pick and no handicap; a 1v2 has the extra-HP slider
   document.getElementById('modes').style.display = PLAY === 'player' && !squadMode ? '' : 'none'; // single or team match is for people; the computer and the dummy are single bouts // no team match against a dummy
   document.getElementById('mSingle').classList.toggle('on', !teamMode);
@@ -418,6 +423,15 @@ function showPick() {
   document.getElementById('pickmsg').innerHTML = lines.join('<br>');
 }
 let botOpen = false, easeOpen = false; // the opponent list and the handicap slider are folded away until their button is pressed
+let fullWant = new URLSearchParams(location.search).get('full') === '1'; // the practice option: ultimates always full (kept in the address so a reload remembers it)
+const fullEl = document.getElementById('fullcharge');
+fullEl.checked = fullWant;
+fullEl.onchange = () => {
+  fullWant = fullEl.checked;
+  const q = new URLSearchParams(location.search); if (fullWant) q.set('full', '1'); else q.delete('full');
+  history.replaceState(null, '', '?' + q.toString());
+  send({ fullcharge: fullWant });
+};
 const send = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const easeEl = document.getElementById('ease');
 easeEl.oninput = () => { document.getElementById('easeval').textContent = easeEl.value + '%'; };
@@ -553,7 +567,7 @@ const PAD = [
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']] }, // Charizard
   { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine', true]], ult: ['大藤蔓', 'ult'] }, // Chikorita
   { main: ['冰山', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
-  { main: ['空氣斬', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']] }, // Rowlet
+  { main: ['空氣斬', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']], ult: ['神鳥猛攻', 'ult'] }, // Rowlet
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
   { main: ['飛膝踢', 'skill'], small: [['拔樹', 'tree'], ['百裂拳', 'comet']], ult: ['百萬噸', 'ult'] }, // Ash: the kick is the main skill (sent as Skill, personsInput on the server sorts out what it is), the tree and the Comet Punch the small ones, the Megaton Punch the ultimate
   { main: ['飛膝踢', 'skill'], small: [['子彈拳', 'comet'], ['岩石陣', 'rock']] }, // Machamp: the kick in place of the tree
@@ -1278,6 +1292,7 @@ function drawTelegraph() {
   for (const si of [...slotsOf(7), ...slotsOf(8)]) drawTreeWarning(snap.p[si], disp[si]);
   for (const si of slotsOf(7)) drawMegaCharge(snap.p[si], disp[si]);
   for (const si of slotsOf(0)) drawVoltCharge(si);
+  for (const si of slotsOf(5)) drawBirdCharge(si);
   if (aiming && AIMED[snap.p[you].k] === aiming.name) drawAimFan(snap.p[you], disp[you]);
 }
 // The fan of an aimed skill the player is choosing, drawn for them only (the opponent's page never gets it; it is not sent) until the cast, when the
@@ -1945,6 +1960,98 @@ function drawTreeSlam(f) {
 // Bits of dirt, stone, leaf and white shards thrown up by the vines. (x, y) is on the ground, z above it; they are drawn upright so "up" is up on the
 // screen whichever way the arena is turned.
 let gvBits = [];
+// Rowlet's Brave Bird. First the rings of the Megaton Punch close in on it; then, as it climbs, a bird made of light grows out of its middle (bigger
+// as the charge goes on) with its head turned to the foe; in the dive that bird is at full size, its head along the way it dives, with a streak of light behind it.
+// The bird flashes between green and black, and the sky flickers between overcast and bright for as long as it lasts (drawBirdSky).
+let bbCfg = { ring: 0.5, charge: 1.5, rs: 1, ls: 1, dark: 0.5, fevery: 6, falpha: 0.3 }; // from 'hi'
+const BIRD_PAL = [
+  { main: '#6ff35a', edge: '#e4ffa8', glow: '90,255,110', ray: 'rgba(110,255,100,.55)', deep: '#1c8a2b' }, // grass green with a pale edge
+  { main: '#14171a', edge: '#6ff35a', glow: '20,70,35', ray: 'rgba(16,48,24,.6)', deep: '#6ff35a' }, // black with a green edge
+];
+function birdLight(R, fl, pal) { // a bird of light, head up (-y), R from its middle to its beak; fl is how far the wings are lifted (-0.12..0.12 rad)
+  const t = performance.now() / 1000;
+  const gl = ctx.createRadialGradient(0, 0, R * 0.1, 0, 0, R * 2.1);
+  gl.addColorStop(0, `rgba(${pal.glow},.85)`); gl.addColorStop(0.5, `rgba(${pal.glow},.4)`); gl.addColorStop(1, `rgba(${pal.glow},0)`);
+  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0, 0, R * 2.1, 0, 7); ctx.fill();
+  ctx.save(); ctx.rotate(t * 1.6); ctx.fillStyle = pal.ray; // rays turning behind it
+  for (let k = 0; k < 14; k++) { ctx.rotate(Math.PI / 7); ctx.beginPath(); ctx.moveTo(R * 1.75, -R * 0.05); ctx.lineTo(R * (2.15 + 0.25 * Math.sin(t * 9 + k * 2)), 0); ctx.lineTo(R * 1.75, R * 0.05); ctx.fill(); }
+  ctx.restore();
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1.5, R * 0.035); ctx.strokeStyle = pal.edge;
+  const feather = (x, y, a, len, w) => { // from (x, y) along the direction a (radians from straight up), len long, w wide
+    const dx = Math.sin(a), dy = -Math.cos(a), nx = -dy, ny = dx;
+    ctx.beginPath(); ctx.moveTo(x + nx * w, y + ny * w);
+    ctx.quadraticCurveTo(x + dx * len * 0.6 + nx * w * 1.2, y + dy * len * 0.6 + ny * w * 1.2, x + dx * len, y + dy * len);
+    ctx.quadraticCurveTo(x + dx * len * 0.55 - nx * w * 0.5, y + dy * len * 0.55 - ny * w * 0.5, x - nx * w, y - ny * w);
+    ctx.closePath(); ctx.fillStyle = pal.main; ctx.fill(); ctx.stroke();
+  };
+  // The wings: a broad arm out to the tip and a trailing edge of pointed feathers, lines between the feathers and a lighter patch of coverts on the arm.
+  const scallop = [[1.8, -0.5], [1.62, -0.12], [1.3, 0.08], [0.98, 0.16], [0.68, 0.2], [0.36, 0.14], [0.14, -0.02]]; // where the feather tips are, right wing, in R from the middle
+  for (const sg of [-1, 1]) {
+    ctx.save(); ctx.scale(sg, 1); ctx.translate(R * 0.12, -R * 0.4); ctx.rotate(-fl * 1.6); // hinged at the shoulder, lifted by fl
+    const q = (x, y) => [(x - 0.12) * R, (y + 0.4) * R];
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(...q(0.5, -1.05), ...q(1.25, -1.15), ...q(1.8, -0.5)); // the leading edge, up and out to the tip
+    for (let k = 1; k < scallop.length; k++) { // the trailing edge: one pointed feather tip per feather
+      const [x0, y0] = scallop[k - 1], [x1, y1] = scallop[k];
+      ctx.lineTo(...q((x0 + x1) / 2 + 0.06, (y0 + y1) / 2 + 0.3)); ctx.lineTo(...q(x1, y1)); // a point
+    }
+    ctx.closePath(); ctx.fillStyle = pal.main; ctx.fill(); ctx.stroke();
+    ctx.save(); ctx.globalAlpha = 0.45; ctx.lineWidth = Math.max(1, R * 0.022);
+    for (const [x, y] of scallop.slice(0, -1)) { ctx.beginPath(); ctx.moveTo(...q(x, y)); ctx.lineTo(...q(0.3 + x * 0.1, -0.55 + y * 0.35)); ctx.stroke(); } // between the feathers
+    ctx.restore();
+    ctx.beginPath(); ctx.ellipse(...q(0.62, -0.5), R * 0.5, R * 0.14, -0.3, 0, 7); ctx.fillStyle = pal.deep; ctx.globalAlpha = 0.35; ctx.fill(); ctx.globalAlpha = 1; // the coverts
+    ctx.restore();
+  }
+  const train = [[-0.5, 1.15], [-0.34, 1.5], [-0.17, 1.8], [0, 2], [0.17, 1.8], [0.34, 1.5], [0.5, 1.15]]; // the tail: a long fan of feathers like a phoenix's or a peacock's, the middle ones longest
+  for (const [a, len] of train) feather(0, R * 0.3, Math.PI + a, R * len, R * 0.09);
+  ctx.beginPath(); ctx.ellipse(0, -R * 0.08, R * 0.2, R * 0.5, 0, 0, 7); ctx.fillStyle = pal.main; ctx.fill(); ctx.stroke(); // the body
+  ctx.beginPath(); ctx.ellipse(0, -R * 0.05, R * 0.07, R * 0.34, 0, 0, 7); ctx.fillStyle = pal.deep; ctx.globalAlpha = 0.35; ctx.fill(); ctx.globalAlpha = 1; // a stripe of colour down its breast
+  ctx.beginPath(); ctx.arc(0, -R * 0.68, R * 0.18, 0, 7); ctx.fillStyle = pal.main; ctx.fill(); ctx.stroke(); // the head
+  for (const sg of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sg * R * 0.06, -R * 0.82); ctx.lineTo(sg * R * 0.24, -R * 0.96); ctx.lineTo(sg * R * 0.14, -R * 0.74); ctx.closePath(); ctx.fillStyle = pal.main; ctx.fill(); ctx.stroke(); } // the crest
+  ctx.beginPath(); ctx.moveTo(-R * 0.075, -R * 0.82); ctx.lineTo(0, -R * 1.1); ctx.lineTo(R * 0.075, -R * 0.82); ctx.closePath(); ctx.fillStyle = pal.edge; ctx.fill(); // the beak
+}
+// The way (as an angle for ctx.rotate: 0 = head up) a bird at (hx, hy) turns its head: along its dive, before that to the foe it will dive at.
+function birdAngle(i, p, hx, hy) {
+  let tx, ty;
+  if (p.bbd) { tx = p.btx; ty = p.bty; } else { const o = disp[foeOf(i)]; tx = o.x; ty = o.y; }
+  const v = rv(tx - hx, ty - hy);
+  return Math.atan2(v[1], v[0]) + Math.PI / 2;
+}
+function drawBirdCharge(i) {
+  const p = snap.p[i], d = disp[i];
+  if (!(p.uct > 0) && !p.bbd) return;
+  const lu = toWorld(0, -d.z), hx = d.x + lu.x, hy = d.y + lu.y; // it gathers up in the air
+  const pal = BIRD_PAL[Math.floor(performance.now() / 90) & 1], fl = 0.3 * Math.sin(performance.now() / 120), full = (14 + 130) * bbCfg.ls;
+  if (p.bbd) {
+    upright(hx, hy, () => {
+      ctx.rotate(birdAngle(i, p, hx, hy));
+      const tail = ctx.createLinearGradient(0, 0, 0, full * 3.2); // behind it, +y while the head is -y
+      tail.addColorStop(0, `rgba(${pal.glow},.75)`); tail.addColorStop(1, `rgba(${pal.glow},0)`);
+      ctx.fillStyle = tail; ctx.beginPath(); ctx.moveTo(-full * 0.55, 0); ctx.lineTo(full * 0.55, 0); ctx.lineTo(0, full * 3.2); ctx.closePath(); ctx.fill();
+      birdLight(full, 0.4 * Math.sin(performance.now() / 65), pal); // in the dive it beats its wings harder and faster
+    });
+    return;
+  }
+  const e = bbCfg.ring + bbCfg.charge - p.uct;
+  if (e < bbCfg.ring) { chargeRings(hx, hy, bbCfg.ring > 0 ? e / bbCfg.ring : 1, bbCfg.rs, RING_GREEN); return; }
+  const v = Math.min((e - bbCfg.ring) / Math.max(bbCfg.charge, 1e-6), 1);
+  upright(hx, hy, () => { ctx.rotate(birdAngle(i, p, hx, hy)); birdLight((14 + 130 * v) * bbCfg.ls, fl, pal); });
+}
+// The sky for Brave Bird: while a bird of light is being gathered or dives, it flickers between overcast and bright every `fevery` frames.
+let birdSkyK = 0;
+function drawBirdSky(dt) {
+  const on = snap.p.some((p) => p.k === 5 && ((p.uct > 0 && p.uct <= bbCfg.charge) || p.bbd));
+  birdSkyK = Math.min(1, Math.max(0, birdSkyK + (on ? 1 : -1) * dt / 0.25));
+  if (birdSkyK <= 0) return;
+  const bright = !calm.matches && bbCfg.fevery > 0 && (Math.floor(performance.now() / (bbCfg.fevery * 16.7)) & 1) === 1;
+  ctx.fillStyle = bright ? `rgba(255,252,228,${bbCfg.falpha * birdSkyK})` : `rgba(8,12,34,${bbCfg.dark * birdSkyK})`;
+  ctx.fillRect(0, 0, cv.width, cv.height);
+}
+function bbLeaves(ev) { // the landing of Brave Bird: leaves and earth burst out from where it came down
+  const at = { x: ev.x, y: ev.y };
+  gvAdd(70, () => { const a = gvRand(0, 6.28), v = ev.r * gvRand(0.4, 1.3); return { ...at, z: 6, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: gvRand(200, 520), age: 0, life: gvRand(0.9, 1.6), kind: 'leaf', sz: gvRand(5, 10), rot: gvRand(0, 6.28), spin: gvRand(-14, 14) }; });
+  gvAdd(24, () => { const a = gvRand(0, 6.28), v = ev.r * gvRand(0.2, 0.9); return { ...at, z: 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: gvRand(120, 320), age: 0, life: gvRand(0.6, 1), kind: 'dirt', sz: gvRand(3, 7) }; });
+}
 const gvPlant = {}; // per owner (its slot + 1): where the head last surfaced, and when
 const GV_MAX_BITS = 400;
 function gvAdd(n, make) { for (let i = 0; i < n && gvBits.length < GV_MAX_BITS; i++) gvBits.push(make(i)); }
@@ -2228,14 +2335,15 @@ function drawMegaCharge(p, d) {
 // The gathering of a punch or of Thousand Volt: the bolts from the sky onto the hand, then the rings closing in on it, then the black and white ball
 // swelling. c is the look from the config (megaCfg, or tvoltCfg, which has the same keys), left the seconds of the gathering to go, base the way the hand points.
 // The rings of a gathering: three, one after another, each closing in on (hx, hy) (`u` is how far the gathering has got, 0..1; `rs` the size).
-function chargeRings(hx, hy, u, rs) {
+const RING_AMBER = ['190,100,10', '255,185,30', '150,80,10'], RING_GREEN = ['20,120,50', '120,255,110', '20,100,40']; // the underlay, the ring, the middle: Rowlet's gathering is green
+function chargeRings(hx, hy, u, rs, col = RING_AMBER) {
   ctx.save(); ctx.lineWidth = 3;
   for (let j = 0; j < 3; j++) {
     const v = Math.min(Math.max(u * 1.5 - j * 0.25, 0), 1), r = (150 * (1 - v) + 10) * rs;
-    ctx.lineWidth = 6; ctx.strokeStyle = `rgba(190,100,10,${0.3 + 0.45 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r + 2, 0, 7); ctx.stroke(); // a deep amber underlay, not black
-    ctx.lineWidth = 3.5; ctx.strokeStyle = `rgba(255,185,30,${0.6 + 0.4 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r, 0, 7); ctx.stroke(); // an orange-yellow ring on top
+    ctx.lineWidth = 6; ctx.strokeStyle = `rgba(${col[0]},${0.3 + 0.45 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r + 2, 0, 7); ctx.stroke(); // a deep underlay, not black
+    ctx.lineWidth = 3.5; ctx.strokeStyle = `rgba(${col[1]},${0.6 + 0.4 * v})`; ctx.beginPath(); ctx.arc(hx, hy, r, 0, 7); ctx.stroke(); // the bright ring on top
   }
-  ctx.fillStyle = `rgba(150,80,10,${0.15 + 0.35 * u})`; ctx.beginPath(); ctx.arc(hx, hy, 18 * rs, 0, 7); ctx.fill();
+  ctx.fillStyle = `rgba(${col[2]},${0.15 + 0.35 * u})`; ctx.beginPath(); ctx.arc(hx, hy, 18 * rs, 0, 7); ctx.fill();
   ctx.restore();
 }
 function megaChargeFx(d, c, left, base, yellow = false) {
@@ -2946,7 +3054,7 @@ function drawTornadoWarnings() {
 // round and up in it. The dashed circle on the ground is what it catches within. Leaves behind the funnel are drawn
 // first and the ones in front over it. It leans a little as it travels; a bar shows its HP.
 function drawTornado(b, grow = 1) { // grow < 1: the small one that shows where a tornado is about to appear
-  const hit = tornadoCfg.radius, R = hit * (tornadoCfg.scale || 1) * grow, H = R * 2.8, t = performance.now() / 1000, held = !!b.cg, w = (u) => R * (0.16 + 0.84 * u), lean = (u) => Math.sin(t * 2.6 + u * 3.2) * R * 0.12 * u;
+  const hit = b.r || tornadoCfg.radius, R = hit * (b.sc || tornadoCfg.scale || 1) * grow, H = R * 2.8, t = performance.now() / 1000, held = !!b.cg, w = (u) => R * (0.16 + 0.84 * u), lean = (u) => Math.sin(t * 2.6 + u * 3.2) * R * 0.12 * u;
   ctx.save();
   ctx.strokeStyle = held ? 'rgba(150,235,120,.6)' : 'rgba(150,230,120,.4)'; ctx.lineWidth = 2; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -t * 40;
   ctx.beginPath(); ctx.arc(b.x, b.y, hit, 0, 7); ctx.stroke(); // the real reach, whatever size it is drawn at
@@ -3478,11 +3586,11 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' ? 0.5 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' ? 0.5 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
-      else if (f.t === 'explode' || f.t === 'voltburst') drawExplosion(f);
+      else if (f.t === 'explode' || f.t === 'voltburst' || f.t === 'bbboom') drawExplosion(f);
       else if (f.t === 'ult') drawUltRing(f);
       else if (f.t === 'airhit') drawAirHit(f);
       else if (f.t === 'freeze') drawFreezeBurst(f);
@@ -3507,6 +3615,7 @@ function frame() {
     }
     ctx.restore();
     drawStormSky(dt);
+    drawBirdSky(dt);
     drawTeamHud();
     drawResult();
   }

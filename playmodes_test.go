@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -172,5 +173,34 @@ func TestAComputerOpponentIsDrawnAgainWhenCharactersAreChosenAgainUnlessThePerso
 	r.drawBots()
 	if r.bot[1].kind != dummy {
 		t.Fatal("the dummy was drawn again")
+	}
+}
+
+func TestThePracticeRoomCanKeepEveryUltimateFull(t *testing.T) {
+	cfg := DefaultConfig()
+	r := newHub(cfg).open(modeWeb)
+	if r.setFull(true) || r.full {
+		t.Fatal("a room that is not the practice room took the option")
+	}
+	r.dummy = true
+	if !r.setFull(true) {
+		t.Fatal("the practice room refused it")
+	}
+	r.g.SetKinds(pikachu, dummy)
+	r.g.P[0].Charge = 0
+	r.step(time.Now())
+	if r.g.P[0].Charge != cfg.Pikachu.Ultimate.Max {
+		t.Fatalf("charge %v, want it full at %v at once", r.g.P[0].Charge, cfg.Pikachu.Ultimate.Max)
+	}
+	r.g.P[0].Charge = 3 // a cast empties it: it is full again by the next tick
+	r.step(time.Now())
+	if r.g.P[0].Charge != cfg.Pikachu.Ultimate.Max {
+		t.Fatal("not full again after a cast")
+	}
+	r.setFull(false)
+	r.g.P[0].Charge = 3
+	r.step(time.Now())
+	if r.g.P[0].Charge > 10 {
+		t.Fatalf("charge %v: switched off, it should build up as usual", r.g.P[0].Charge)
 	}
 }

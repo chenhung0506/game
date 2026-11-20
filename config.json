@@ -358,6 +358,37 @@
       "cooldown": 12,
       "mass": 100,
       "scale": 1.4
+    },
+    "ultimate": { "max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_per_second": 1 },
+    "brave_bird": {
+      "min_height": 0,
+      "max_height": 1000,
+      "ring_duration": 0.5,
+      "charge_duration": 1.5,
+      "sky_height": 200,
+      "dive_speed": 1200,
+      "explosion_radius": 160,
+      "damage": 30,
+      "launch_height": 200,
+      "launch_duration": 1,
+      "ring_scale": 1,
+      "light_scale": 1,
+      "tornado": {
+        "min_height": 0,
+        "max_height": 1000,
+        "hp": 60,
+        "radius": 180,
+        "scale": 2,
+        "duration": 4,
+        "spin_interval": 0.5,
+        "spin_damage": 5,
+        "landing_damage": 15,
+        "lift_height": 500,
+        "spin_duration": 3
+      },
+      "sky_dark": 0.45,
+      "flash_every": 6,
+      "flash_alpha": 0.3
     }
   },
   "magikarp": {

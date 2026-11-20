@@ -67,7 +67,7 @@ func (b *Bot) rowlet(c *bctx) Input {
 	g, p, f := c.g, c.p, c.f
 	rw := g.cfg.Rowlet
 	dr, ar, tn := rw.Tailwind, rw.Arrows, rw.Tornado
-	if p.FrozenT > 0 || p.Held || p.StunT > 0 || p.DriftT > 0 || p.TwistT > 0 || p.TwistRecT > 0 {
+	if p.FrozenT > 0 || p.Held || p.StunT > 0 || p.DriftT > 0 || p.TwistT > 0 || p.TwistRecT > 0 || p.UltT > 0 || p.BirdDive {
 		return c.stay() // rooted, or the run moves it itself
 	}
 	face := c.pr + c.fr + 12 // close enough for the whole volley to land
@@ -81,6 +81,13 @@ func (b *Bot) rowlet(c *bctx) Input {
 	// What threatens it is walked out of, except while the arrows are being drawn: they leave all the same, and the plan needs the walk.
 	if th := c.th; th.kind != thNone && th.eta <= botHorizon && (p.ArrowT == 0 || th.eta <= 0.25) {
 		return c.move(th.ax, th.ay)
+	}
+
+	// The ultimate: Brave Bird, whenever it is charged and nothing is being set up (it dives at wherever the opponent stands when the climb ends).
+	if p.Charge >= rw.Ultimate.Max && p.ArrowT == 0 && f.Twirl == twirlNone && rw.BraveBird.Reach.hits(f) {
+		in := c.stay()
+		in.Ult = true
+		return in
 	}
 
 	// 3. The opponent is in the tornado (or still coming down out of it).

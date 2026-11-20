@@ -43,7 +43,7 @@ func (g *Game) stepRowlet(i int, in Input, dt float64) ([]Event, bool) {
 			}
 		}
 	}
-	if !p.Held { // a tornado or a toss has it while Held
+	if !p.Held && p.UltT == 0 && !p.BirdDive { // a tornado or a toss has it while Held; Brave Bird sets its height itself
 		p.Z = math.Min(p.Z+rw.FlyHigh/flyRiseTime*dt, rw.FlyHigh)
 	}
 	twisting := p.TwistT > 0 || p.TwistRecT > 0
@@ -182,21 +182,25 @@ func (g *Game) stepTwirl(dt float64) []Event {
 	tn := g.cfg.Rowlet.Tornado
 	for v := range g.P {
 		p := &g.P[v]
+		sp := p.Tw // the numbers of the tornado that caught it
+		if sp.SpinDuration == 0 {
+			sp = g.spinOf(nil)
+		}
 		if p.Twirl == twirlSpin {
 			if b := g.holding(v); b != nil {
 				p.X, p.Y = b.X, b.Y
-				p.Z = tn.LiftHeight * math.Min(1, (tn.SpinDuration-b.Life)/(tn.SpinDuration/2))
-				for p.TwirlIn -= dt; p.TwirlIn < 1e-9; p.TwirlIn += tn.SpinInterval { // a loop so a tiny interval cannot lose ticks
-					g.hit(p, tn.SpinDamage)
+				p.Z = p.TwZ0 + (math.Max(sp.LiftHeight, p.TwZ0)-p.TwZ0)*math.Min(1, (sp.SpinDuration-b.Life)/(sp.SpinDuration/2))
+				for p.TwirlIn -= dt; p.TwirlIn < 1e-9; p.TwirlIn += sp.SpinInterval { // a loop so a tiny interval cannot lose ticks
+					g.hit(p, sp.SpinDamage)
 				}
 				continue
 			}
 			p.Twirl = twirlFall
 		}
 		if p.Twirl == twirlFall {
-			if p.Z -= tn.LiftHeight / twirlFallTime * dt; p.Z <= 1e-9 {
-				p.Z, p.Twirl, p.Held = 0, twirlNone, false
-				g.hit(p, tn.LandingDamage)
+			if p.Z -= math.Max(sp.LiftHeight, p.TwZ0) / twirlFallTime * dt; p.Z <= 1e-9 {
+				p.Z, p.Twirl, p.Held, p.Tw, p.TwZ0 = 0, twirlNone, false, spinParams{}, 0
+				g.hit(p, sp.LandingDamage)
 				events = append(events, Event{T: "slam", X: p.X, Y: p.Y, R: tn.Radius})
 			}
 		}
@@ -226,7 +230,7 @@ func (g *Game) grindPillars(dt float64) {
 			if p.Carried {
 				tx, ty = t.X0, t.Y0 // it moves with the tornado, so it is judged against where the tornado was
 			}
-			if math.Hypot(p.X-tx, p.Y-ty) <= tn.Radius+g.ballRadius(p) {
+			if math.Hypot(p.X-tx, p.Y-ty) <= g.tornadoRadius(t)+g.ballRadius(p) {
 				held = t
 				break
 			}
@@ -244,4 +248,21 @@ func (g *Game) grindPillars(dt float64) {
 			p.GrindCD = tn.SpinInterval
 		}
 	}
+}
+
+// spinOf is what the tornado b does to whoever it holds (nil: rowlet.tornado's numbers).
+func (g *Game) spinOf(b *Ball) spinParams {
+	if b != nil && b.Spin != nil {
+		return *b.Spin
+	}
+	tn := g.cfg.Rowlet.Tornado
+	return spinParams{tn.Reach, tn.LiftHeight, tn.SpinDuration, tn.SpinInterval, tn.SpinDamage, tn.LandingDamage}
+}
+
+// tornadoRadius is how far a tornado reaches: rowlet.tornado.radius, or its own where Brave Bird made it.
+func (g *Game) tornadoRadius(b *Ball) float64 {
+	if b.Rad > 0 {
+		return b.Rad
+	}
+	return g.cfg.Rowlet.Tornado.Radius
 }

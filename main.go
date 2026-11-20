@@ -44,6 +44,7 @@ type room struct {
 	id      string // the server's own number for it (never shown to players)
 	n       int    // counts the rooms opened, so the longest-waiting one is the lowest
 	mode    string // the view it was opened from
+	full    bool   // the practice room's option: every ultimate is always fully charged (setFull)
 	dummy   bool   // opened for practice: the computer is a dummy that stays; nobody else is let in, and a person may play Ash here
 	mu      sync.Mutex
 	g       *Game
@@ -512,6 +513,15 @@ func (r *room) setTeam(team bool) bool {
 	return true
 }
 
+// setFull turns the practice room's "ultimates always fully charged" on or off. Only a dummy room has it. Must be called with r.mu held.
+func (r *room) setFull(on bool) bool {
+	if !r.dummy {
+		return false
+	}
+	r.full = on
+	return true
+}
+
 // setEase records slot idx's handicap, which counts from the next match. It is refused unless it is a multiple of
 // easeStep up to easeMax, and while a match is on. Must be called with r.mu held.
 func (r *room) setEase(idx, pct int) bool {
@@ -642,7 +652,7 @@ func (r *room) broadcastLobby() {
 			bots[i] = b.kind
 		}
 	}
-	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.present(0), r.present(1)}, "bot": bots, "team": r.team, "size": r.teamN(), "ease": r.ease})
+	msg, _ := json.Marshal(map[string]any{"t": "lobby", "picks": r.pick, "here": [2]bool{r.present(0), r.present(1)}, "bot": bots, "team": r.team, "size": r.teamN(), "ease": r.ease, "full": r.full})
 	r.broadcast(msg)
 }
 
@@ -683,6 +693,13 @@ func (r *room) step(now time.Time) []byte {
 		for i, b := range r.bot {
 			if b != nil {
 				r.g.P[i].In = b.Decide(r.g, i)
+			}
+		}
+		if r.full { // practice: the ultimates start full and are full again at once
+			for i := range r.g.P {
+				if u, ok := r.g.cfg.ultimateOf(r.g.P[i].Kind); ok {
+					r.g.P[i].Charge = u.Max
+				}
 			}
 		}
 		events = r.g.Step(1.0 / tickRate)
@@ -747,6 +764,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 		"tree":     []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
 		"fist":     []map[string]float64{aFist, mFist},
 		"kickwarn": map[string]float64{"ash": b2f(cfg.Ash.HighJumpKick.ShowWarning), "machamp": b2f(cfg.Machamp.HighJumpKick.ShowWarning)},
+		"bbird":    map[string]float64{"ring": cfg.Rowlet.BraveBird.RingDuration, "charge": cfg.Rowlet.BraveBird.ChargeDuration, "rs": cfg.Rowlet.BraveBird.RingScale, "ls": cfg.Rowlet.BraveBird.LightScale, "dark": cfg.Rowlet.BraveBird.SkyDark, "fevery": cfg.Rowlet.BraveBird.FlashEvery, "falpha": cfg.Rowlet.BraveBird.FlashAlpha},
 		"gvine": map[string]float64{"hw": cfg.Chikorita.GiantVines.HeadWidth, "wo": cfg.Chikorita.GiantVines.WormOut, "wi": cfg.Chikorita.GiantVines.WormIn, "hr": cfg.Chikorita.GiantVines.HeadRadius, "len": cfg.Chikorita.GiantVines.TrunkLength, "w": cfg.Chikorita.GiantVines.TrunkWidth, "rs": cfg.Chikorita.GiantVines.RingScale, "tw": cfg.Chikorita.GiantVines.TipWidth,
 			"scale": cfg.Chikorita.GiantVines.TrunkScale, "charge": cfg.Chikorita.GiantVines.ChargeDuration, "swing": cfg.Chikorita.GiantVines.SwingDuration, "linger": cfg.Chikorita.GiantVines.Linger, "ring": cfg.Chikorita.GiantVines.RingRadius},
 		"mega":  map[string]any{"charge": cfg.Ash.MegatonPunch.RingDuration + cfg.Ash.MegatonPunch.BallDuration, "ring": cfg.Ash.MegatonPunch.RingDuration, "bstart": cfg.Ash.MegatonPunch.BoltStart, "bcount": cfg.Ash.MegatonPunch.BoltCount, "bint": cfg.Ash.MegatonPunch.BoltInterval, "boffs": cfg.Ash.MegatonPunch.BoltOffsets, "dist": cfg.Ash.MegatonPunch.Distance, "radius": cfg.Ash.MegatonPunch.Radius, "fwscale": cfg.Ash.MegatonPunch.BallFollowScale, "fwdur": cfg.Ash.MegatonPunch.BallFollowDuration, "htscale": cfg.Ash.MegatonPunch.BallHitScale, "htdur": cfg.Ash.MegatonPunch.BallHitDuration, "fevery": float64(cfg.Ash.MegatonPunch.FlashEvery), "rscale": cfg.Ash.MegatonPunch.RingScale, "bscale": cfg.Ash.MegatonPunch.BallScale, "fscale": cfg.Ash.MegatonPunch.FistScale, "iscale": cfg.Ash.MegatonPunch.ImpactScale, "warn": b2f(cfg.Ash.MegatonPunch.ShowWarning), "text": b2f(cfg.Ash.MegatonPunch.ShowText), "fstart": cfg.Ash.MegatonPunch.FistStart, "fend": cfg.Ash.MegatonPunch.FistEnd},
@@ -850,6 +868,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			Order  []int `json:"order"`
 			Repick bool  `json:"repick"`
 			Ease   *int  `json:"ease"`
+			Full   *bool `json:"fullcharge"`
 			Bot    *int  `json:"bot"`
 			Input
 		}
@@ -857,7 +876,7 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 			continue
 		}
 		r.mu.Lock()
-		if m.Pick != nil || m.Team != nil || m.Size != nil || m.Order != nil || m.Repick || m.Ease != nil || m.Bot != nil {
+		if m.Pick != nil || m.Team != nil || m.Size != nil || m.Order != nil || m.Repick || m.Ease != nil || m.Bot != nil || m.Full != nil {
 			switch {
 			case m.Pick != nil:
 				r.choose(idx, *m.Pick)
@@ -871,6 +890,8 @@ func (h *hub) serveWS(w http.ResponseWriter, req *http.Request) {
 				r.setEase(idx, *m.Ease)
 			case m.Bot != nil:
 				r.setBot(idx, *m.Bot)
+			case m.Full != nil:
+				r.setFull(*m.Full)
 			default:
 				r.repick()
 			}

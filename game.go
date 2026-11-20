@@ -93,6 +93,17 @@ type Player struct {
 	Charge float64 `json:"uc"`
 	Lifted bool    `json:"-"`   // Thousand Volt has Pikachu off the ground (so nothing else's Z is touched)
 	UltT   float64 `json:"uct"` // Thousand Volt: seconds of its gathering left (Pikachu is rooted meanwhile)
+	// Brave Bird (Rowlet's ultimate): it is diving (rooted, out of the player's hands) from BirdZ0 high, BirdLeft of BirdT0 seconds left, at (BirdTX, BirdTY);
+	// Juggle is a body it threw up: Held in the air for JuggleT more seconds (-1 once they are over and it is coming down).
+	BirdDive         bool       `json:"bbd"`
+	BirdTX           float64    `json:"btx"` // where the dive is going (for the page: which way the bird of light faces)
+	BirdTY           float64    `json:"bty"`
+	BirdZ0           float64    `json:"-"`
+	BirdT0, BirdLeft float64    `json:"-"`
+	Juggle           bool       `json:"-"`
+	Tw               spinParams `json:"-"` // what the tornado that holds it does (set when it is caught), and the height it was caught at
+	TwZ0             float64    `json:"-"`
+	JuggleT          float64    `json:"-"`
 
 	FX           int     `json:"fx"` // last non-zero direction held; a dash with no keys goes this way, and so does the ball
 	FY           int     `json:"fy"`
@@ -359,9 +370,13 @@ type Ball struct {
 	Idx       int             `json:"ix,omitempty"` // thousand volt: which bolt of the cast it is (the client colours it by this)
 	AnchorX   float64         `json:"ax,omitempty"` // thousand volt: where it finished flying out, which the line to its Pikachu runs through
 	AnchorY   float64         `json:"ay,omitempty"`
-	Hits      int             `json:"-"` // thousand volt: how many times it has touched a foe
-	Burst     *[maxSlots]bool `json:"-"` // thousand volt: the foes the explosions of its cast have hurt already (shared by the bolts of one cast)
-	Prey      int             `json:"-"` // tornado: the slot it holds plus one (0: not recorded, whichever foe it is holding)
+	Hits      int             `json:"-"`            // thousand volt: how many times it has touched a foe
+	Burst     *[maxSlots]bool `json:"-"`            // thousand volt: the foes the explosions of its cast have hurt already (shared by the bolts of one cast)
+	Prey      int             `json:"-"`            // tornado: the slot it holds plus one (0: not recorded, whichever foe it is holding)
+	Still     bool            `json:"-"`            // tornado: it stands where it is (Brave Bird's), it does not chase
+	Spin      *spinParams     `json:"-"`            // tornado: what it does to whoever it holds, where that is not rowlet.tornado (Brave Bird's)
+	Rad       float64         `json:"r,omitempty"`  // tornado: its own reach where it is not rowlet.tornado.radius (Brave Bird's)
+	Scale     float64         `json:"sc,omitempty"` // tornado: how many times bigger than its reach it is drawn (with Rad)
 }
 
 // Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
@@ -604,7 +619,7 @@ func (g *Game) ballRadius(b *Ball) float64 {
 	case ballSlash:
 		return g.cfg.Rowlet.Tailwind.Slash.Radius
 	case ballTornado:
-		return g.cfg.Rowlet.Tornado.Radius
+		return g.tornadoRadius(b)
 	}
 	return g.cfg.Pikachu.ElectroBall.Radius
 }
@@ -732,11 +747,11 @@ func (g *Game) Step(dt float64) []Event {
 				}
 			}
 			in = Input{}
-			p.DashT, p.BallT, p.BreathT, p.UltT = 0, 0, 0, 0 // a dash, a charge, a breath or a gathering ultimate in progress is cut short
-			g.dropToss(i)                                    // a Charizard caught mid-toss lets go
-			g.dropLeaf(i)                                    // a Chikorita mid-hop or mid-slash is stopped
-			g.dropMachamp(i)                                 // so is a Machamp mid-jump, mid-smash or mid-flurry
-			g.dropGengar(i)                                  // and a Gengar comes up out of the ground
+			p.DashT, p.BallT, p.BreathT, p.UltT, p.BirdDive = 0, 0, 0, 0, false // a dash, a charge, a breath or a gathering ultimate in progress is cut short
+			g.dropToss(i)                                                       // a Charizard caught mid-toss lets go
+			g.dropLeaf(i)                                                       // a Chikorita mid-hop or mid-slash is stopped
+			g.dropMachamp(i)                                                    // so is a Machamp mid-jump, mid-smash or mid-flurry
+			g.dropGengar(i)                                                     // and a Gengar comes up out of the ground
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
 			p.FrostT, p.FBeamT = 0, 0                              // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
 			p.DriftT, p.TwistT, p.TwistRecT, p.ArrowT = 0, 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
@@ -749,7 +764,7 @@ func (g *Game) Step(dt float64) []Event {
 		if p.SilentT > 0 { // under a Gengar's shadow: it can walk, but no skill starts
 			in = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY, CastX: in.CastX, CastY: in.CastY}
 		}
-		if p.UltT > 0 { // gathering the ultimate: no other skill starts
+		if p.UltT > 0 || p.BirdDive { // gathering the ultimate (or diving): no other skill starts
 			in = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY, CastX: in.CastX, CastY: in.CastY}
 		} else if p.Kind == pikachu && g.cfg.Pikachu.ThousandVolt.RootedWhileBolts && g.voltBoltsOut(i) {
 			in.Skill = false // its bolts are out and it stays where it is: no Volt Tackle either
@@ -1109,6 +1124,7 @@ func (g *Game) Step(dt float64) []Event {
 	g.stepWaves(dt)
 	events = append(events, g.stepBalls(dt)...)
 	events = append(events, g.stepTwirl(dt)...)
+	g.stepJuggle(dt)
 	g.gainCharge(hp0, dt)
 	return events
 }
@@ -1262,8 +1278,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 				}
 				continue
 			}
-			// It chases the nearest foe without overshooting, for `distance` of travel or `duration` seconds.
-			if dx, dy := g.foeNearTo(b.Owner, b.X, b.Y).X-b.X, g.foeNearTo(b.Owner, b.X, b.Y).Y-b.Y; math.Hypot(dx, dy) > 1e-9 {
+			sp := g.spinOf(&b)
+			// It chases the nearest foe without overshooting, for `distance` of travel or `duration` seconds (a still one only waits).
+			if dx, dy := g.foeNearTo(b.Owner, b.X, b.Y).X-b.X, g.foeNearTo(b.Owner, b.X, b.Y).Y-b.Y; math.Hypot(dx, dy) > 1e-9 && !b.Still {
 				d := math.Hypot(dx, dy)
 				step := math.Min(math.Min(tn.Speed*dt, b.Left), d)
 				b.X += dx / d * step
@@ -1272,15 +1289,19 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}
 			b.Life -= dt
 			if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
-				return !f.Held && f.Twirl == twirlNone && tn.Reach.hits(f) && math.Hypot(f.X-b.X, f.Y-b.Y) <= tn.Radius+rad
+				return (!f.Held || (b.Still && f.Juggle && f.Z >= g.cfg.Rowlet.BraveBird.LaunchHeight-1e-6)) && f.Twirl == twirlNone && sp.Reach.hits(f) && math.Hypot(f.X-b.X, f.Y-b.Y) <= g.tornadoRadius(&b)+rad
 			}); ok {
-				b.Caught, b.Life, b.Prey = true, tn.SpinDuration, g.slotOf(foe)+1
-				foe.Twirl, foe.Held, foe.VZ, foe.TwirlIn = twirlSpin, true, 0, tn.SpinInterval
+				b.Caught, b.Life, b.Prey = true, sp.SpinDuration, g.slotOf(foe)+1
+				foe.Twirl, foe.Held, foe.VZ, foe.TwirlIn = twirlSpin, true, 0, sp.SpinInterval
+				foe.Tw, foe.TwZ0, foe.Juggle = sp, 0, false
+				if b.Still { // Brave Bird's tornado takes a body where it hangs, even high in the air, and lifts it from there
+					foe.TwZ0 = foe.Z
+				}
 				events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})
 				kept = append(kept, b)
 				continue
 			}
-			if b.Left > 1e-9 && b.Life > 1e-9 {
+			if (b.Left > 1e-9 || b.Still) && b.Life > 1e-9 {
 				kept = append(kept, b)
 			}
 			continue

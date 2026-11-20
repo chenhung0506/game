@@ -69,6 +69,35 @@ type HyperBeamCfg struct {
 	Width            float64 `json:"width"`
 }
 
+// StillTornado is the tornado Rowlet's Brave Bird leaves where it lands. It does not chase; it stands for `duration` seconds and takes whoever
+// is within `radius` (at a height inside min_height..max_height) and spins them, like rowlet.tornado: carried up to `lift_height` by the middle of
+// the spin, `spin_damage` every `spin_interval`, then dropped to take `landing_damage`. Unlike that one it also takes a body Brave Bird threw up
+// in the air (it is lifted from where it hangs, up to lift_height if that is higher), so min_height..max_height must reach as high as launch_height.
+// `scale` only changes how big it is drawn.
+type StillTornado struct {
+	Reach
+	HP            int     `json:"hp"`
+	Radius        float64 `json:"radius"`
+	Scale         float64 `json:"scale"`
+	Duration      float64 `json:"duration"` // 0 = none is left
+	SpinInterval  float64 `json:"spin_interval"`
+	SpinDamage    int     `json:"spin_damage"`
+	LandingDamage int     `json:"landing_damage"`
+	LiftHeight    float64 `json:"lift_height"`
+	SpinDuration  float64 `json:"spin_duration"`
+}
+
+// spinParams is what a tornado does to whoever it holds: the numbers of rowlet.tornado, or of Brave Bird's still one.
+type spinParams struct {
+	Reach
+	LiftHeight, SpinDuration, SpinInterval float64
+	SpinDamage, LandingDamage              int
+}
+
+func (t StillTornado) spin() spinParams {
+	return spinParams{t.Reach, t.LiftHeight, t.SpinDuration, t.SpinInterval, t.SpinDamage, t.LandingDamage}
+}
+
 // Ultimate is the charge a character's third skill (Z) needs. It starts the round empty and the skill only works once the charge
 // reaches `max`; casting empties it. It fills in three independent ways, each in charge points: `gain_taken` for every HP of
 // damage the character takes, `gain_dealt` for every HP of damage its foes take (in a 2v2 whoever hurt them, every foe of the
@@ -501,6 +530,29 @@ type Config struct {
 			Mass             float64 `json:"mass"`     // see hyper_beam.mass: a heavier beam or punch pushes the tornado (and whoever it holds) by the difference
 			Scale            float64 `json:"scale"`    // how many times bigger the funnel is drawn than `radius` (what it hits within); looks only
 		} `json:"tornado"`
+		// Ultimate (Z) and Brave Bird, its skill: Rowlet is rooted for `ring_duration` (the rings of the Megaton Punch close in on it), then
+		// for `charge_duration` it climbs to `sky_height` while a light in the shape of a bird grows out of its middle; then it dives at
+		// where the opponent stands at that moment, `dive_speed` along the way down, and bursts on landing: foes within
+		// `explosion_radius` (and `min_height`..`max_height`) take `damage` and are not pushed but thrown up to `launch_height` and kept
+		// helpless in the air for `launch_duration` seconds. Stuns and freezes cannot stop it from the charge to the landing.
+		Ultimate  Ultimate `json:"ultimate"`
+		BraveBird struct {
+			Reach
+			RingDuration    float64      `json:"ring_duration"`
+			ChargeDuration  float64      `json:"charge_duration"`
+			SkyHeight       float64      `json:"sky_height"`
+			DiveSpeed       float64      `json:"dive_speed"`
+			ExplosionRadius float64      `json:"explosion_radius"`
+			Damage          int          `json:"damage"`
+			LaunchHeight    float64      `json:"launch_height"`
+			LaunchDuration  float64      `json:"launch_duration"`
+			RingScale       float64      `json:"ring_scale"`  // looks only: the size of the rings that close in
+			LightScale      float64      `json:"light_scale"` // looks only: how big the bird of light grows
+			Tornado         StillTornado `json:"tornado"`     // the tornado left where it lands (see StillTornado)
+			SkyDark         float64      `json:"sky_dark"`    // looks only: how dark the overcast half of the flicker is (0..1) while the bird is gathered and dives
+			FlashEvery      float64      `json:"flash_every"` // looks only: how many frames the sky stays overcast, then bright (0 = no flicker, just overcast)
+			FlashAlpha      float64      `json:"flash_alpha"` // looks only: how bright the bright half is (0..1)
+		} `json:"brave_bird"`
 	} `json:"rowlet"`
 	// Magikarp evolves into Gyarados (the red one): each hop it lands from counts, and the `evolve_hops`-th landing
 	// evolves it, keeping the share of its HP it has left. The two have their own HP, speed and size.
@@ -1003,6 +1055,14 @@ func DefaultConfig() Config {
 	c.Rowlet.Tornado.Cooldown = 12
 	c.Rowlet.Tornado.Mass = 100
 	c.Rowlet.Tornado.Scale = 1
+	c.Rowlet.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
+	bb := &c.Rowlet.BraveBird
+	bb.Reach = Reach{MinHeight: 0, MaxHeight: 1000}
+	bb.RingDuration, bb.ChargeDuration, bb.SkyHeight, bb.DiveSpeed = 0.5, 1.5, 400, 1200
+	bb.ExplosionRadius, bb.Damage, bb.LaunchHeight, bb.LaunchDuration = 160, 30, 200, 1.5
+	bb.RingScale, bb.LightScale = 1, 1
+	bb.SkyDark, bb.FlashEvery, bb.FlashAlpha = 0.45, 6, 0.3
+	bb.Tornado = StillTornado{Reach: Reach{MinHeight: 0, MaxHeight: 1000}, HP: 40, Radius: 90, Scale: 1, Duration: 4, SpinInterval: 0.5, SpinDamage: 4, LandingDamage: 20, LiftHeight: 300, SpinDuration: 3}
 
 	c.Magikarp.MaxHP, c.Magikarp.WalkSpeed, c.Magikarp.Radius, c.Magikarp.EvolveHops = 70, 150, 10, 5
 	c.Magikarp.Jump.Height, c.Magikarp.Jump.Duration, c.Magikarp.Jump.HighestPointDuration, c.Magikarp.Jump.Cooldown = 200, 2, 1, 3
@@ -1210,6 +1270,7 @@ func (c Config) validate() error {
 		{"pikachu.ultimate.max", c.Pikachu.Ultimate.Max, 0},
 		{"ash.ultimate.max", c.Ash.Ultimate.Max, 0},
 		{"chikorita.ultimate.max", c.Chikorita.Ultimate.Max, 0},
+		{"rowlet.ultimate.max", c.Rowlet.Ultimate.Max, 0},
 		{"chikorita.giant_vines.follow_speed", c.Chikorita.GiantVines.FollowSpeed, 0},
 		{"chikorita.giant_vines.terminal_time", c.Chikorita.GiantVines.TerminalTime, 0},
 		{"chikorita.giant_vines.head_radius", c.Chikorita.GiantVines.HeadRadius, 0},
@@ -1304,6 +1365,17 @@ func (c Config) validate() error {
 		{"machamp.rock_tomb.stone_duration", c.Machamp.RockTomb.StoneDuration, 0},
 		{"ash.rock_tomb.stone_duration", c.Ash.RockTomb.StoneDuration, 0},
 		{"rowlet.fly_high", c.Rowlet.FlyHigh, 0},
+		{"rowlet.brave_bird.dive_speed", c.Rowlet.BraveBird.DiveSpeed, 0},
+		{"rowlet.brave_bird.explosion_radius", c.Rowlet.BraveBird.ExplosionRadius, 0},
+		{"rowlet.brave_bird.sky_height", c.Rowlet.BraveBird.SkyHeight, 0},
+		{"rowlet.brave_bird.ring_scale", c.Rowlet.BraveBird.RingScale, 0},
+		{"rowlet.brave_bird.light_scale", c.Rowlet.BraveBird.LightScale, 0},
+		{"rowlet.brave_bird.tornado.hp", float64(c.Rowlet.BraveBird.Tornado.HP), 0},
+		{"rowlet.brave_bird.tornado.radius", c.Rowlet.BraveBird.Tornado.Radius, 0},
+		{"rowlet.brave_bird.tornado.scale", c.Rowlet.BraveBird.Tornado.Scale, 0},
+		{"rowlet.brave_bird.tornado.spin_interval", c.Rowlet.BraveBird.Tornado.SpinInterval, 0},
+		{"rowlet.brave_bird.tornado.lift_height", c.Rowlet.BraveBird.Tornado.LiftHeight, 0},
+		{"rowlet.brave_bird.tornado.spin_duration", c.Rowlet.BraveBird.Tornado.SpinDuration, 0},
 		{"rowlet.tailwind.radius", c.Rowlet.Tailwind.Radius, 0},
 		{"rowlet.tailwind.speed", c.Rowlet.Tailwind.Speed, 0},
 		{"rowlet.tailwind.duration", c.Rowlet.Tailwind.Duration, 0},
@@ -1545,6 +1617,20 @@ func (c Config) validate() error {
 		{"chikorita.giant_vines.spread_time", c.Chikorita.GiantVines.SpreadTime},
 		{"chikorita.giant_vines.interval", c.Chikorita.GiantVines.Interval},
 		{"chikorita.giant_vines.charge_duration", c.Chikorita.GiantVines.ChargeDuration},
+		{"rowlet.ultimate.gain_taken", c.Rowlet.Ultimate.GainTaken},
+		{"rowlet.ultimate.gain_dealt", c.Rowlet.Ultimate.GainDealt},
+		{"rowlet.ultimate.gain_per_second", c.Rowlet.Ultimate.GainPerSecond},
+		{"rowlet.brave_bird.ring_duration", c.Rowlet.BraveBird.RingDuration},
+		{"rowlet.brave_bird.charge_duration", c.Rowlet.BraveBird.ChargeDuration},
+		{"rowlet.brave_bird.damage", float64(c.Rowlet.BraveBird.Damage)},
+		{"rowlet.brave_bird.launch_height", c.Rowlet.BraveBird.LaunchHeight},
+		{"rowlet.brave_bird.launch_duration", c.Rowlet.BraveBird.LaunchDuration},
+		{"rowlet.brave_bird.tornado.duration", c.Rowlet.BraveBird.Tornado.Duration},
+		{"rowlet.brave_bird.tornado.spin_damage", float64(c.Rowlet.BraveBird.Tornado.SpinDamage)},
+		{"rowlet.brave_bird.tornado.landing_damage", float64(c.Rowlet.BraveBird.Tornado.LandingDamage)},
+		{"rowlet.brave_bird.sky_dark", c.Rowlet.BraveBird.SkyDark},
+		{"rowlet.brave_bird.flash_every", c.Rowlet.BraveBird.FlashEvery},
+		{"rowlet.brave_bird.flash_alpha", c.Rowlet.BraveBird.FlashAlpha},
 		{"chikorita.giant_vines.swing_duration", c.Chikorita.GiantVines.SwingDuration},
 		{"chikorita.giant_vines.damage", float64(c.Chikorita.GiantVines.Damage)},
 		{"chikorita.giant_vines.slow_duration", c.Chikorita.GiantVines.SlowDuration},
@@ -1618,41 +1704,43 @@ func (c Config) validate() error {
 		return fmt.Errorf("ash.megaton_punch.bolt_count must be 0..20, got %d", n)
 	}
 	for name, r := range map[string]Reach{
-		"machamp.high_jump_kick": c.Machamp.HighJumpKick.Reach,
-		"ash.high_jump_kick":     c.Ash.HighJumpKick.Reach,
-		"pikachu.volt_tackle":    c.Pikachu.VoltTackle.Reach,
-		"pikachu.thunder":        c.Pikachu.Thunder.Reach,
-		"pikachu.electro_ball":   c.Pikachu.ElectroBall.Reach,
-		"pikachu.thousand_volt":  c.Pikachu.ThousandVolt.Reach,
-		"snorlax.jump":           c.Snorlax.Jump.Reach,
-		"snorlax.ice_punch":      c.Snorlax.IcePunch.Reach,
-		"snorlax.hyper_beam":     c.Snorlax.HyperBeam.Reach,
-		"gyarados.hyper_beam":    c.Gyarados.HyperBeam.Reach,
-		"charizard.fire_breath":  c.Charizard.FireBreath.Reach,
-		"charizard.seismic_toss": c.Charizard.SeismicToss.Reach,
-		"chikorita.leaf_slash":   c.Chikorita.LeafSlash.Reach,
-		"chikorita.razor_leaf":   c.Chikorita.RazorLeaf.Reach,
-		"chikorita.vine_whip":    c.Chikorita.VineWhip.Reach,
-		"chikorita.giant_vines":  c.Chikorita.GiantVines.Reach,
-		"vulpix.frost_field":     c.Vulpix.FrostField.Reach,
-		"vulpix.ice_storm":       c.Vulpix.IceStorm.Reach,
-		"vulpix.freeze_beam":     c.Vulpix.FreezeBeam.Reach,
-		"rowlet.tailwind.slash":  c.Rowlet.Tailwind.Slash.Reach,
-		"rowlet.arrows":          c.Rowlet.Arrows.Reach,
-		"rowlet.tornado":         c.Rowlet.Tornado.Reach,
-		"gyarados.wave":          c.Gyarados.Wave.Reach,
-		"gyarados.tail_whip":     c.Gyarados.TailWhip.Reach,
-		"machamp.tree_slam":      c.Machamp.TreeSlam.Reach,
-		"ash.tree_slam":          c.Ash.TreeSlam.Reach,
-		"machamp.comet_punch":    c.Machamp.CometPunch.Reach,
-		"ash.comet_punch":        c.Ash.CometPunch.Reach,
-		"ash.megaton_punch":      c.Ash.MegatonPunch.Reach,
-		"machamp.rock_tomb":      c.Machamp.RockTomb.Reach,
-		"gengar.shadow_sneak":    c.Gengar.ShadowSneak.Reach,
-		"gengar.ghost_fire":      c.Gengar.GhostFire.Reach,
-		"gengar.shadow_ball":     c.Gengar.ShadowBall.Reach,
-		"gengar.night_shade":     c.Gengar.NightShade.Reach,
-		"ash.rock_tomb":          c.Ash.RockTomb.Reach,
+		"machamp.high_jump_kick":    c.Machamp.HighJumpKick.Reach,
+		"ash.high_jump_kick":        c.Ash.HighJumpKick.Reach,
+		"pikachu.volt_tackle":       c.Pikachu.VoltTackle.Reach,
+		"pikachu.thunder":           c.Pikachu.Thunder.Reach,
+		"pikachu.electro_ball":      c.Pikachu.ElectroBall.Reach,
+		"pikachu.thousand_volt":     c.Pikachu.ThousandVolt.Reach,
+		"snorlax.jump":              c.Snorlax.Jump.Reach,
+		"snorlax.ice_punch":         c.Snorlax.IcePunch.Reach,
+		"snorlax.hyper_beam":        c.Snorlax.HyperBeam.Reach,
+		"gyarados.hyper_beam":       c.Gyarados.HyperBeam.Reach,
+		"charizard.fire_breath":     c.Charizard.FireBreath.Reach,
+		"charizard.seismic_toss":    c.Charizard.SeismicToss.Reach,
+		"chikorita.leaf_slash":      c.Chikorita.LeafSlash.Reach,
+		"chikorita.razor_leaf":      c.Chikorita.RazorLeaf.Reach,
+		"chikorita.vine_whip":       c.Chikorita.VineWhip.Reach,
+		"chikorita.giant_vines":     c.Chikorita.GiantVines.Reach,
+		"rowlet.brave_bird":         c.Rowlet.BraveBird.Reach,
+		"vulpix.frost_field":        c.Vulpix.FrostField.Reach,
+		"vulpix.ice_storm":          c.Vulpix.IceStorm.Reach,
+		"vulpix.freeze_beam":        c.Vulpix.FreezeBeam.Reach,
+		"rowlet.tailwind.slash":     c.Rowlet.Tailwind.Slash.Reach,
+		"rowlet.arrows":             c.Rowlet.Arrows.Reach,
+		"rowlet.tornado":            c.Rowlet.Tornado.Reach,
+		"rowlet.brave_bird.tornado": c.Rowlet.BraveBird.Tornado.Reach,
+		"gyarados.wave":             c.Gyarados.Wave.Reach,
+		"gyarados.tail_whip":        c.Gyarados.TailWhip.Reach,
+		"machamp.tree_slam":         c.Machamp.TreeSlam.Reach,
+		"ash.tree_slam":             c.Ash.TreeSlam.Reach,
+		"machamp.comet_punch":       c.Machamp.CometPunch.Reach,
+		"ash.comet_punch":           c.Ash.CometPunch.Reach,
+		"ash.megaton_punch":         c.Ash.MegatonPunch.Reach,
+		"machamp.rock_tomb":         c.Machamp.RockTomb.Reach,
+		"gengar.shadow_sneak":       c.Gengar.ShadowSneak.Reach,
+		"gengar.ghost_fire":         c.Gengar.GhostFire.Reach,
+		"gengar.shadow_ball":        c.Gengar.ShadowBall.Reach,
+		"gengar.night_shade":        c.Gengar.NightShade.Reach,
+		"ash.rock_tomb":             c.Ash.RockTomb.Reach,
 	} {
 		if !(r.MinHeight >= -minHeightFloor && r.MaxHeight >= r.MinHeight) { // also rejects NaN
 			return fmt.Errorf("%s: need %v <= min_height <= max_height, got %v and %v", name, -minHeightFloor, r.MinHeight, r.MaxHeight)
