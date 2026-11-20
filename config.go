@@ -548,6 +548,7 @@ type Config struct {
 			LaunchDuration  float64      `json:"launch_duration"`
 			RingScale       float64      `json:"ring_scale"`  // looks only: the size of the rings that close in
 			LightScale      float64      `json:"light_scale"` // looks only: how big the bird of light grows
+			LeafScale       float64      `json:"leaf_scale"`  // looks only: how many times bigger the leaves that burst out where it lands are drawn
 			Tornado         StillTornado `json:"tornado"`     // the tornado left where it lands (see StillTornado)
 			SkyDark         float64      `json:"sky_dark"`    // looks only: how dark the overcast half of the flicker is (0..1) while the bird is gathered and dives
 			FlashEvery      float64      `json:"flash_every"` // looks only: how many frames the sky stays overcast, then bright (0 = no flicker, just overcast)
@@ -1060,7 +1061,7 @@ func DefaultConfig() Config {
 	bb.Reach = Reach{MinHeight: 0, MaxHeight: 1000}
 	bb.RingDuration, bb.ChargeDuration, bb.SkyHeight, bb.DiveSpeed = 0.5, 1.5, 400, 1200
 	bb.ExplosionRadius, bb.Damage, bb.LaunchHeight, bb.LaunchDuration = 160, 30, 200, 1.5
-	bb.RingScale, bb.LightScale = 1, 1
+	bb.RingScale, bb.LightScale, bb.LeafScale = 1, 1, 1
 	bb.SkyDark, bb.FlashEvery, bb.FlashAlpha = 0.45, 6, 0.3
 	bb.Tornado = StillTornado{Reach: Reach{MinHeight: 0, MaxHeight: 1000}, HP: 40, Radius: 90, Scale: 1, Duration: 4, SpinInterval: 0.5, SpinDamage: 4, LandingDamage: 20, LiftHeight: 300, SpinDuration: 3}
 
@@ -1370,6 +1371,7 @@ func (c Config) validate() error {
 		{"rowlet.brave_bird.sky_height", c.Rowlet.BraveBird.SkyHeight, 0},
 		{"rowlet.brave_bird.ring_scale", c.Rowlet.BraveBird.RingScale, 0},
 		{"rowlet.brave_bird.light_scale", c.Rowlet.BraveBird.LightScale, 0},
+		{"rowlet.brave_bird.leaf_scale", c.Rowlet.BraveBird.LeafScale, 0},
 		{"rowlet.brave_bird.tornado.hp", float64(c.Rowlet.BraveBird.Tornado.HP), 0},
 		{"rowlet.brave_bird.tornado.radius", c.Rowlet.BraveBird.Tornado.Radius, 0},
 		{"rowlet.brave_bird.tornado.scale", c.Rowlet.BraveBird.Tornado.Scale, 0},

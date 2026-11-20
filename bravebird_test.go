@@ -194,3 +194,22 @@ func TestBraveBirdsTornadoTakesAFoeHangingInTheAirAndLiftsItHigherButOnlyWithinI
 		}
 	}
 }
+
+func TestBraveBirdPutsTheTornadoSkillIntoItsCooldownWhenItLands(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Rowlet.BraveBird.RingDuration, cfg.Rowlet.BraveBird.ChargeDuration = 0.1, 0.1
+	g := bbGame(cfg, 300)
+	gpress(g, Input{Ult: true})
+	for n := 0; n < 300 && !g.P[0].BirdDive; n++ {
+		g.Step(dt)
+		if g.P[0].TwistCD != 0 {
+			t.Fatalf("the tornado went into its cooldown (%v) before the bird landed", g.P[0].TwistCD)
+		}
+	}
+	for n := 0; n < 90 && g.P[0].BirdDive; n++ {
+		g.Step(dt)
+	}
+	if want := cfg.Rowlet.Tornado.Cooldown; g.P[0].TwistCD < want-2*dt {
+		t.Fatalf("tornado cooldown %v after the landing, want about %v", g.P[0].TwistCD, want)
+	}
+}

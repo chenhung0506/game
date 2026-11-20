@@ -5,7 +5,7 @@ import "math"
 // Rowlet's ultimate, Brave Bird (Z): rooted at first for `ring_duration` (rings close in on it) and then for `charge_duration` while it
 // climbs to `sky_height` and a bird of light grows out of its middle (both are counted down in Player.UltT, like Thousand Volt's
 // gathering); then it dives, `dive_speed` along the straight way, at where the nearest foe stood as the dive began, and bursts where it
-// lands. Foes in the burst take `damage` and are not pushed: they are thrown up (stepJuggle) and held helpless in the air. A still tornado
+// lands, and Rowlet's Tornado skill (K) is put into its cooldown. Foes in the burst take `damage` and are not pushed: they are thrown up (stepJuggle) and held helpless in the air. A still tornado
 // (`tornado_*`) is left where it landed.
 
 // stepBraveBird runs Z for Rowlet. It says whether Rowlet is rooted by the skill this tick.
@@ -56,6 +56,7 @@ func (g *Game) diveBird(i int, dt float64) ([]Event, bool) {
 		return nil, true
 	}
 	p.BirdDive, p.Z = false, 0
+	p.TwistCD = math.Max(p.TwistCD, g.cfg.Rowlet.Tornado.Cooldown) // the Tornado skill (K) goes into its cooldown too
 	for _, j := range g.foes(i) {
 		f := &g.P[j]
 		if !bb.Reach.hits(f) || math.Hypot(f.X-p.X, f.Y-p.Y) > bb.ExplosionRadius+g.radius(j) {
