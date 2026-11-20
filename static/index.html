@@ -2270,6 +2270,58 @@ function drawGiantVineArt(x, y, base, pitch, alpha, ext = 1) { // ext: how much 
   ctx.strokeStyle = 'rgba(255,215,160,.2)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(len * 0.04, -W * 0.28); ctx.lineTo(len * 0.9, -T * 0.25); ctx.stroke(); // the light along the top
   ctx.restore();
 }
+// The swing of a giant vine, drawn as a whip rather than a plank: the vine is a chain of bits, the foot comes down first and the tip lags behind (still up in
+// the air, and swung out to the side) and then cracks down after it, faster than the rest. `t` is how far the swing has got (0..1); at 1 it lies straight on
+// the ground, as drawGiantVineArt draws it at pitch 0. The way it moved is shown by a streak along the tip's path and a few fading copies behind it, and the
+// crack at the end by a flash at the tip.
+function drawWhipVine(x, y, base, t, ix) {
+  const ts = gvCfg.scale, len = gvCfg.len * ts, W = gvCfg.w * ts, T = gvCfg.tw * ts, th = ROT + base, N = 20, side = (ix || 0) % 2 ? 1 : -1;
+  const wAt = (u) => (W + (T - W) * u) / 2;
+  const chain = (tt) => { // the screen points of the centre line, and of its two edges
+    const c = [], L = [], R = [];
+    let a = 0, z = 0;
+    const clamp01 = (q) => Math.min(1, Math.max(0, q));
+    for (let k = 0; k <= N; k++) {
+      const u = k / N;
+      if (k > 0) { const um = (k - 0.5) / N, pr = clamp01((tt - 0.5 * um) / (1 - 0.5 * um)), pitch = TREE_RAISED * (1 - pr * pr); a += len / N * Math.cos(pitch); z += len / N * Math.sin(pitch); }
+      const v = side * len * 0.3 * u * u * Math.sin(Math.PI * clamp01(tt)); // swung out to the side while it comes round, straight when it has landed
+      c.push([a * Math.cos(th) - v * Math.sin(th), a * Math.sin(th) + v * Math.cos(th) - TREE_UP * z]);
+    }
+    for (let k = 0; k <= N; k++) {
+      const p0 = c[Math.max(0, k - 1)], p1 = c[Math.min(N, k + 1)], dx = p1[0] - p0[0], dy = p1[1] - p0[1], n = Math.hypot(dx, dy) || 1, hw = wAt(k / N) * (k === 0 ? 1.12 : k === N ? 0.25 : 1);
+      L.push([c[k][0] - dy / n * hw, c[k][1] + dx / n * hw]); R.push([c[k][0] + dy / n * hw, c[k][1] - dx / n * hw]);
+    }
+    return { c, L, R };
+  };
+  const path = (ch) => { ctx.beginPath(); ch.L.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py))); for (let i = N; i >= 0; i--) ctx.lineTo(ch.R[i][0], ch.R[i][1]); ctx.closePath(); };
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-ROT);
+  for (let g = 3; g >= 1; g--) { // the vine a moment ago: it is moving fast
+    const tg = t - g * 0.07; if (tg <= 0) continue;
+    path(chain(tg)); ctx.fillStyle = `rgba(150,215,90,${0.16 - g * 0.035})`; ctx.fill();
+  }
+  const ch = chain(t), tip = ch.c[N];
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; // the streak along the path the tip has just taken
+  let prev = chain(Math.max(0, t - 0.3)).c[N];
+  for (let q = 1; q <= 8; q++) { const cur = chain(Math.max(0, t - 0.3 + 0.3 * q / 8)).c[N]; ctx.strokeStyle = `rgba(235,255,210,${0.75 * q / 8})`; ctx.lineWidth = 1.5 + 5 * q / 8; ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(cur[0], cur[1]); ctx.stroke(); prev = cur; }
+  ctx.restore();
+  path(ch); // the body: the colours of the trunk, with the light along the top and the dark underneath
+  ctx.fillStyle = '#7a4e26'; ctx.fill(); ctx.strokeStyle = '#2f1b09'; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.lineCap = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(178,122,66,.75)'; ctx.beginPath(); ch.L.forEach(([px, py], i) => { if (i && i < N - 1) ctx[i === 1 ? 'moveTo' : 'lineTo']((px + ch.c[i][0]) / 2, (py + ch.c[i][1]) / 2); }); ctx.stroke();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(35,18,6,.55)'; // the rings of bark across it
+  for (let k = 2; k < N - 1; k += 2) { ctx.beginPath(); ctx.moveTo(ch.L[k][0], ch.L[k][1]); ctx.lineTo(ch.R[k][0], ch.R[k][1]); ctx.stroke(); }
+  { // the lash: a thin cord flicking on from the tip, along the way the tip is going and curling to the side as it whips
+    const q = ch.c[N - 1], dx = tip[0] - q[0], dy = tip[1] - q[1], n = Math.hypot(dx, dy) || 1, ux = dx / n, uy = dy / n, cl = len * 0.14 * (0.4 + 0.6 * Math.sin(Math.PI * Math.min(1, t))), curl = side * cl * 0.5 * Math.sin(t * 9);
+    ctx.strokeStyle = '#3d2a12'; ctx.lineWidth = 3.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(tip[0], tip[1]);
+    ctx.quadraticCurveTo(tip[0] + ux * cl * 0.6 - uy * curl * 0.4, tip[1] + uy * cl * 0.6 + ux * curl * 0.4, tip[0] + ux * cl - uy * curl, tip[1] + uy * cl + ux * curl); ctx.stroke();
+  }
+  if (t > 0.8) { // the crack of the whip: a flash and short lines flying off the tip
+    const k = Math.min(1, (t - 0.8) / 0.2), a = Math.sin(Math.PI * k);
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,255,220,${0.9 * a})`; ctx.beginPath(); ctx.arc(tip[0], tip[1], 10 + 26 * k, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(255,255,230,${0.9 * a})`; ctx.lineWidth = 2.5;
+    for (let q = 0; q < 10; q++) { const ang = q * 0.628 + 0.3, r0 = 14 + 16 * k, r1 = r0 + 22 + 30 * k; ctx.beginPath(); ctx.moveTo(tip[0] + Math.cos(ang) * r0, tip[1] + Math.sin(ang) * r0); ctx.lineTo(tip[0] + Math.cos(ang) * r1, tip[1] + Math.sin(ang) * r1); ctx.stroke(); }
+  }
+  ctx.restore();
+}
 function drawGiantVine(b) {
   if (!(b.ph > 0)) { drawGvSpread(b); return; } // still underground: the earth it pushes up as it makes its way out to its place
   const base = Math.atan2(b.dy, b.dx), left = b.lf || 0, w = gvCfg.w;
@@ -2296,7 +2348,7 @@ function drawGiantVine(b) {
   } else if (b.ph === 2) { // coming down, faster and faster
     const t = 1 - left / Math.max(gvCfg.swing, 1e-6);
     warn(1);
-    drawGiantVineArt(b.x, b.y, base, Math.max(0, TREE_RAISED * (1 - t * t)), 0.95);
+    drawWhipVine(b.x, b.y, base, t, b.ix);
   } else { // lying where it landed, until it is gone
     drawGiantVineArt(b.x, b.y, base, 0, Math.min(1, left / Math.max(gvCfg.linger * 0.5, 1e-6)));
   }
