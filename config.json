@@ -1,7 +1,7 @@
 {
   "court": {
-    "mobile": { "min_width": 600, "min_length": 1000, "max_width": 800, "max_length": 1200, "zoom_in_distance": 400, "zoom_out_distance": 400, "zoom_speed": 0.5, "sea_margin": 120 },
-    "web": { "min_width": 900, "min_length": 1600, "max_width": 1200, "max_length": 2000, "zoom_in_distance": 700, "zoom_out_distance": 1100, "zoom_speed": 0.5, "sea_margin": 300 }
+    "mobile": { "min_width": 600, "min_length": 1000, "max_width": 800, "max_length": 1200, "zoom_in_distance": 400, "zoom_out_distance": 400, "zoom_speed": 0.5, "sea_margin": 120, "gigantamax_zoom_out": true },
+    "web": { "min_width": 900, "min_length": 1600, "max_width": 1200, "max_length": 2000, "zoom_in_distance": 700, "zoom_out_distance": 1100, "zoom_speed": 0.5, "sea_margin": 300, "gigantamax_zoom_out": true }
   },
   "pikachu": {
     "max_hp": 130,
@@ -650,7 +650,7 @@
       "max_height": 60,
       "slide_distance": 320,
       "slide_duration": 0.2,
-      "rush_delay": 0,
+      "rush_delay": 0.2,
       "rush_distance": 480,
       "rush_speed": 900,
       "radius": 14,
@@ -712,6 +712,71 @@
       "stone_radius": 35,
       "stone_hp": 10,
       "stone_duration": 6
+    },
+    "ultimate": {
+      "max": 100,
+      "gain_taken": 1,
+      "gain_dealt": 1,
+      "gain_per_second": 1
+    },
+    "gigantamax": {
+      "max_hp": 170,
+      "walk_speed": 140,
+      "radius": 300,
+      "duration": 15,
+      "uppercut": {
+        "min_height": 0,
+        "max_height": 60,
+        "slide_distance": 320,
+        "slide_duration": 0.2,
+        "rush_delay": 0,
+        "rush_distance": 480,
+        "rush_speed": 900,
+        "radius": 14,
+        "damage": 37,
+        "launch_height": 80,
+        "launch_duration": 1.2,
+        "cooldown": 7,
+        "show_warning": true,
+        "slide_text": "閃身步",
+        "punch_text": "上鉤拳"
+      },
+      "high_jump_kick": {
+        "min_height": 0,
+        "max_height": 80,
+        "slide_distance": 0,
+        "slide_duration": 0,
+        "kick_delay": 0,
+        "kick_distance": 300,
+        "kick_speed": 550,
+        "kick_height": 40,
+        "radius": 10,
+        "damage": 45,
+        "stun_duration": 1.2,
+        "knockback": 200,
+        "cooldown": 6,
+        "show_warning": true,
+        "slide_text": "飛膝踢",
+        "kick_text": "飛膝踢"
+      },
+      "comet_punch": {
+        "min_height": 0,
+        "max_height": 80,
+        "radius": 22,
+        "hp": 16,
+        "damage": 3,
+        "cooldown": 6,
+        "mass": 100,
+        "ball_knockback": 100,
+        "knockback": 4,
+        "duration": 3,
+        "quantity": 140,
+        "random_offset_angle": 60,
+        "distance": 350,
+        "scatter_min_distance": 0,
+        "scatter_max_distance": 100,
+        "fist_duration": 0.2
+      }
     }
   }
 }

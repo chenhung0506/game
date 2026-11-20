@@ -31,6 +31,9 @@ type CourtConfig struct {
 	ZoomOutDistance float64 `json:"zoom_out_distance"`
 	ZoomSpeed       float64 `json:"zoom_speed"`
 	SeaMargin       float64 `json:"sea_margin"`
+	// GigantamaxZoomOut: while any character on the field is Gigantamax the camera goes all the way out (at `zoom_speed`), whatever the distance between them is, since
+	// such a body fills the screen; it goes back to following the distance when none is.
+	GigantamaxZoomOut bool `json:"gigantamax_zoom_out"`
 }
 
 // size is the field itself.
@@ -96,6 +99,75 @@ type spinParams struct {
 
 func (t StillTornado) spin() spinParams {
 	return spinParams{t.Reach, t.LiftHeight, t.SpinDuration, t.SpinInterval, t.SpinDamage, t.LandingDamage}
+}
+
+// High Jump Kick (Machamp's and Ash's Kick): see BrawlerCfg.
+type HighJumpKickCfg struct {
+	Reach
+	SlideDistance float64 `json:"slide_distance"`
+	SlideDuration float64 `json:"slide_duration"`
+	KickDelay     float64 `json:"kick_delay"` // seconds it stands still between the slide and the leap (the leap is aimed when it ends)
+	KickDistance  float64 `json:"kick_distance"`
+	KickSpeed     float64 `json:"kick_speed"`
+	KickHeight    float64 `json:"kick_height"`
+	Radius        float64 `json:"radius"`
+	Damage        int     `json:"damage"`
+	StunDuration  float64 `json:"stun_duration"`
+	Knockback     float64 `json:"knockback"`
+	Cooldown      float64 `json:"cooldown"`
+	ShowWarning   bool    `json:"show_warning"` // true: the name of the move is shown over whoever is doing it
+	SlideText     string  `json:"slide_text"`   // what is shown during the slide ("" = nothing)
+	KickText      string  `json:"kick_text"`    // what is shown from the wait before the leap to the end of it ("" = nothing)
+}
+
+// Uppercut: see BrawlerCfg.
+type UppercutCfg struct {
+	Reach
+	SlideDistance  float64 `json:"slide_distance"`
+	SlideDuration  float64 `json:"slide_duration"`
+	RushDelay      float64 `json:"rush_delay"`
+	RushDistance   float64 `json:"rush_distance"`
+	RushSpeed      float64 `json:"rush_speed"`
+	Radius         float64 `json:"radius"`
+	Damage         int     `json:"damage"`
+	LaunchHeight   float64 `json:"launch_height"`
+	LaunchDuration float64 `json:"launch_duration"`
+	Cooldown       float64 `json:"cooldown"` // counted from the start of the slide
+	ShowWarning    bool    `json:"show_warning"`
+	SlideText      string  `json:"slide_text"`
+	PunchText      string  `json:"punch_text"`
+}
+
+// Comet Punch: see BrawlerCfg.
+type CometPunchCfg struct {
+	Reach
+	Radius             float64 `json:"radius"`
+	HP                 int     `json:"hp"`
+	Damage             int     `json:"damage"`
+	Cooldown           float64 `json:"cooldown"` // counted from the start
+	Mass               float64 `json:"mass"`
+	Knockback          float64 `json:"knockback"`      // how far each fist that lands pushes the opponent, away from the fist
+	BallKnockback      float64 `json:"ball_knockback"` // how far a fist shoves an opponent's projectile it meets: this much, times the share of the fist's mass the projectile lacks
+	Duration           float64 `json:"duration"`
+	Quantity           int     `json:"quantity"`
+	RandomOffsetAngle  float64 `json:"random_offset_angle"`
+	Distance           float64 `json:"distance"`
+	ScatterMinDistance float64 `json:"scatter_min_distance"`
+	ScatterMaxDistance float64 `json:"scatter_max_distance"`
+	FistDuration       float64 `json:"fist_duration"`
+}
+
+// GigantamaxCfg is Machamp's ultimate (Z, once the charge is full): for `duration` seconds it is the Gigantamax Machamp, with its own `max_hp` (the HP it has is
+// scaled to it, and back when it is over), `walk_speed` and body `radius`, and its own numbers for the three skills it keeps: the Uppercut, the High Jump Kick and the
+// Comet Punch (read exactly like machamp.uppercut, machamp.high_jump_kick and machamp.comet_punch, which it uses the rest of the time).
+type GigantamaxCfg struct {
+	MaxHP        int             `json:"max_hp"`
+	WalkSpeed    float64         `json:"walk_speed"`
+	Radius       float64         `json:"radius"`
+	Duration     float64         `json:"duration"`
+	Uppercut     UppercutCfg     `json:"uppercut"`
+	HighJumpKick HighJumpKickCfg `json:"high_jump_kick"`
+	CometPunch   CometPunchCfg   `json:"comet_punch"`
 }
 
 // Ultimate is the charge a character's third skill (Z) needs. It starts the round empty and the skill only works once the charge
@@ -731,44 +803,13 @@ type BrawlerCfg struct {
 	// for up to `kick_distance` and rising `kick_height` at the top of the leap. The opponent (at a height inside min_height..max_height)
 	// whose body comes within `radius` of its path takes `damage`, is stunned `stun_duration` seconds and is kicked `knockback` away;
 	// the kick stops where it lands. A kick that finds nobody ends at `kick_distance`.
-	HighJumpKick struct {
-		Reach
-		SlideDistance float64 `json:"slide_distance"`
-		SlideDuration float64 `json:"slide_duration"`
-		KickDelay     float64 `json:"kick_delay"` // seconds it stands still between the slide and the leap (the leap is aimed when it ends)
-		KickDistance  float64 `json:"kick_distance"`
-		KickSpeed     float64 `json:"kick_speed"`
-		KickHeight    float64 `json:"kick_height"`
-		Radius        float64 `json:"radius"`
-		Damage        int     `json:"damage"`
-		StunDuration  float64 `json:"stun_duration"`
-		Knockback     float64 `json:"knockback"`
-		Cooldown      float64 `json:"cooldown"`
-		ShowWarning   bool    `json:"show_warning"` // true: the name of the move is shown over whoever is doing it
-		SlideText     string  `json:"slide_text"`   // what is shown during the slide ("" = nothing)
-		KickText      string  `json:"kick_text"`    // what is shown from the wait before the leap to the end of it ("" = nothing)
-	} `json:"high_jump_kick"`
+	HighJumpKick HighJumpKickCfg `json:"high_jump_kick"`
 	// Uppercut (Machamp's main skill; the computer's Ash does not have it): like the High Jump Kick it is in two parts. First it slides `slide_distance` along the stick
 	// (the way it faces without one) in `slide_duration` seconds, stands still `rush_delay` seconds, then rushes at where the opponent stands, `rush_speed` per second for at
 	// most `rush_distance`, and stops at the first body it meets (`radius` more than the bodies) to throw an uppercut: that foe, at a height inside min_height..max_height, takes
 	// `damage` and is not knocked back: it is thrown up to `launch_height` and held helpless in the air for `launch_duration` seconds (as Brave Bird does). `show_warning`
 	// shows `slide_text` over it during the slide and `punch_text` from the wait to the end of the rush ("" = nothing).
-	Uppercut struct {
-		Reach
-		SlideDistance  float64 `json:"slide_distance"`
-		SlideDuration  float64 `json:"slide_duration"`
-		RushDelay      float64 `json:"rush_delay"`
-		RushDistance   float64 `json:"rush_distance"`
-		RushSpeed      float64 `json:"rush_speed"`
-		Radius         float64 `json:"radius"`
-		Damage         int     `json:"damage"`
-		LaunchHeight   float64 `json:"launch_height"`
-		LaunchDuration float64 `json:"launch_duration"`
-		Cooldown       float64 `json:"cooldown"` // counted from the start of the slide
-		ShowWarning    bool    `json:"show_warning"`
-		SlideText      string  `json:"slide_text"`
-		PunchText      string  `json:"punch_text"`
-	} `json:"uppercut"`
+	Uppercut UppercutCfg `json:"uppercut"`
 	// Comet Punch (J): for `duration` seconds Machamp runs at the opponent (`distance` in all, stopping at its body)
 	// throwing `quantity` fists, evenly spaced in time. Each fist appears ahead of it, `scatter_min_distance` to
 	// `scatter_max_distance` beyond its body and up to `random_offset_angle` degrees either side of its heading, hangs
@@ -776,23 +817,9 @@ type BrawlerCfg struct {
 	// down like a fire ball (`mass`: see hyper_beam.mass). A fist also shoves the opponent's projectiles (electro balls, leaves, fire balls,
 	// arrows) back, away from itself, by `ball_knockback` x (mass - the projectile's mass) / mass: none for one as heavy as the fist, nearly the whole
 	// of `ball_knockback` for a light one.
-	CometPunch struct {
-		Reach
-		Radius             float64 `json:"radius"`
-		HP                 int     `json:"hp"`
-		Damage             int     `json:"damage"`
-		Cooldown           float64 `json:"cooldown"` // counted from the start
-		Mass               float64 `json:"mass"`
-		Knockback          float64 `json:"knockback"`      // how far each fist that lands pushes the opponent, away from the fist
-		BallKnockback      float64 `json:"ball_knockback"` // how far a fist shoves an opponent's projectile it meets: this much, times the share of the fist's mass the projectile lacks
-		Duration           float64 `json:"duration"`
-		Quantity           int     `json:"quantity"`
-		RandomOffsetAngle  float64 `json:"random_offset_angle"`
-		Distance           float64 `json:"distance"`
-		ScatterMinDistance float64 `json:"scatter_min_distance"`
-		ScatterMaxDistance float64 `json:"scatter_max_distance"`
-		FistDuration       float64 `json:"fist_duration"`
-	} `json:"comet_punch"`
+	CometPunch CometPunchCfg `json:"comet_punch"`
+	// Gigantamax (Machamp's ultimate; Ash has none): see GigantamaxCfg. Its charge is `ultimate`, like the other ultimates.
+	Gigantamax GigantamaxCfg `json:"gigantamax"`
 	// Megaton Punch (Ash only: Machamp never throws it): Ash stands rooted for `ring_duration` + `ball_duration` seconds, the direction locked
 	// on the opponent as it begins, with a warning on the ground (the line the fist will fly along) and circles closing in on
 	// its hand; then it throws a fist `distance` ahead, `radius` either side of the line. The opponent it touches (at a height
@@ -1169,6 +1196,12 @@ func DefaultConfig() Config {
 	c.Machamp.CometPunch.Quantity, c.Machamp.CometPunch.HP, c.Machamp.CometPunch.Cooldown, c.Machamp.CometPunch.BallKnockback = 20, 16, 9, 100
 	c.Machamp.CometPunch.Knockback = 8
 	c.Machamp.RockTomb.RingRadius, c.Machamp.RockTomb.Count, c.Machamp.RockTomb.StoneHP, c.Machamp.RockTomb.StoneDuration, c.Machamp.RockTomb.Cooldown = 450, 20, 80, 7, 14
+	gm := &c.Machamp.Gigantamax // the ultimate: bigger, tougher and harder-hitting than Machamp
+	gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration = 190, 125, 40, 15
+	gm.Uppercut, gm.HighJumpKick, gm.CometPunch = c.Machamp.Uppercut, c.Machamp.HighJumpKick, c.Machamp.CometPunch
+	gm.Uppercut.Damage, gm.Uppercut.LaunchHeight = 35, 260
+	gm.HighJumpKick.Damage, gm.HighJumpKick.Radius = 50, 18
+	gm.CometPunch.Damage, gm.CometPunch.Quantity, gm.CometPunch.Radius = 3, 28, 26
 	return c
 }
 
@@ -1195,7 +1228,24 @@ func LoadConfig(path string) (Config, error) {
 	return c, nil
 }
 
+// validate checks the whole config: the numbers of every character, and then the Gigantamax Machamp's own (its three skills are checked just like Machamp's).
 func (c Config) validate() error {
+	if err := c.validateSkills(); err != nil {
+		return err
+	}
+	gm := c.Machamp.Gigantamax
+	if gm.MaxHP <= 0 || !(gm.WalkSpeed > 0) || !(gm.Radius > 0) || !(gm.Duration > 0) {
+		return fmt.Errorf("machamp.gigantamax: max_hp (%d), walk_speed (%v), radius (%v) and duration (%v) must be above 0", gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration)
+	}
+	tmp := c
+	tmp.Machamp.Uppercut, tmp.Machamp.HighJumpKick, tmp.Machamp.CometPunch = gm.Uppercut, gm.HighJumpKick, gm.CometPunch
+	if err := tmp.validateSkills(); err != nil {
+		return fmt.Errorf("machamp.gigantamax's skills are checked like Machamp's, and: %w", err)
+	}
+	return nil
+}
+
+func (c Config) validateSkills() error {
 	for _, f := range []struct {
 		name string
 		v    float64

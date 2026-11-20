@@ -34,8 +34,23 @@ func (p *Player) pinned() bool { return p.BoundT > 0 || p.ParalyzeT > 0 }
 func isBrawler(kind int) bool { return kind == ash || kind == machamp }
 
 // brawler is the numbers slot i plays by: Machamp's own, else Ash's (a stone or a fist is looked up by its owner).
-func (g *Game) brawler(i int) *BrawlerCfg {
-	if g.P[i].Kind == machamp {
+func (g *Game) brawler(i int) *BrawlerCfg { return g.brawlerP(&g.P[i]) }
+
+// gigantamax is whether p is the Gigantamax Machamp now.
+func (p *Player) gigantamax() bool { return p.Kind == machamp && p.GmaxT > 0 }
+
+// brawlerP is the numbers p plays by. The Gigantamax Machamp has Machamp's, with its own Uppercut, High Jump Kick and Comet Punch.
+func (g *Game) brawlerP(p *Player) *BrawlerCfg {
+	if p.gigantamax() {
+		if g.gmaxCfg == nil {
+			b := g.cfg.Machamp
+			gm := b.Gigantamax
+			b.Uppercut, b.HighJumpKick, b.CometPunch = gm.Uppercut, gm.HighJumpKick, gm.CometPunch
+			g.gmaxCfg = &b
+		}
+		return g.gmaxCfg
+	}
+	if p.Kind == machamp {
 		return &g.cfg.Machamp
 	}
 	return &g.cfg.Ash

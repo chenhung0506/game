@@ -301,6 +301,8 @@ type Player struct {
 	UpY     float64 `json:"upy"`
 	UpD     float64 `json:"-"`
 	UpCD    float64 `json:"ucd"`
+	// Gigantamax (Machamp's ultimate): the seconds it has left as the Gigantamax Machamp (0: it is not).
+	GmaxT float64 `json:"gmt"`
 	// Gengar: seconds left under the ground (the shadow shows), the three cooldowns, and how much longer it cannot start a skill
 	// (an opponent's shadow is on it).
 	SneakT           float64 `json:"gnt"`
@@ -430,6 +432,7 @@ const (
 const maxSlots = 4
 
 type Game struct {
+	gmaxCfg *BrawlerCfg // Machamp's numbers as the Gigantamax Machamp, built when first needed (brawlerP)
 	cfg     Config
 	court   CourtSize
 	P       []Player // slots 0 and 1 are the duel; in a 2v2 slots 2 and 3 join them, so a slot's side is its number mod 2
@@ -460,7 +463,11 @@ func validEase(pct int) bool { return pct >= 0 && pct <= easeMax && pct%easeStep
 
 // maxHP is slot i's full HP, handicap included (at least 1).
 func (g *Game) maxHP(i int) int {
-	return max(1, g.cfg.maxHPOf(g.P[i].Kind)*(100-g.ease(i)+g.Boost[i])/100)
+	base := g.cfg.maxHPOf(g.P[i].Kind)
+	if g.P[i].gigantamax() {
+		base = g.cfg.Machamp.Gigantamax.MaxHP
+	}
+	return max(1, base*(100-g.ease(i)+g.Boost[i])/100)
 }
 
 // ease is slot i's handicap in percent.
@@ -602,7 +609,22 @@ func (g *Game) Winner() int {
 }
 
 // radius is how big a character's body is: a skill hits when its area touches the body.
-func (g *Game) radius(i int) float64 { return g.cfg.radiusOf(g.P[i].Kind) }
+func (g *Game) radius(i int) float64 { return g.bodyRadius(&g.P[i]) }
+
+// bodyRadius is how big p's body is (the Gigantamax Machamp's own while it lasts), walkSpeedOf how fast it walks.
+func (g *Game) bodyRadius(p *Player) float64 {
+	if p.gigantamax() {
+		return g.cfg.Machamp.Gigantamax.Radius
+	}
+	return g.cfg.radiusOf(p.Kind)
+}
+
+func (g *Game) walkSpeedOf(p *Player) float64 {
+	if p.gigantamax() {
+		return g.cfg.Machamp.Gigantamax.WalkSpeed
+	}
+	return g.cfg.walkSpeedOf(p.Kind)
+}
 
 // ballRadius and ballMass are the size and weight of a projectile, which depend on whose it is.
 func (g *Game) ballRadius(b *Ball) float64 {
@@ -1063,7 +1085,7 @@ func (g *Game) Step(dt float64) []Event {
 		} else if n := math.Hypot(float64(in.DX), float64(in.DY)); !busy && !casting && n > 0 {
 			// Normalise diagonals so they are not faster. Snorlax steers at its own speeds in
 			// the air: rising is the first half of the jump, falling the second.
-			v := g.cfg.walkSpeedOf(p.Kind)
+			v := g.walkSpeedOf(p)
 			if p.Kind == charizard && p.FlyT > 0 {
 				v = g.cfg.Charizard.Fly.Speed
 			}

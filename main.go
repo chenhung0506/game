@@ -752,18 +752,23 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 	}
 	aTree, aFist, aStone := brawl(cfg.Ash)
 	mTree, mFist, mStone := brawl(cfg.Machamp)
+	gm := cfg.Machamp // as the Gigantamax Machamp: its Comet Punch is its own
+	gm.CometPunch = cfg.Machamp.Gigantamax.CometPunch
+	_, gFist, _ := brawl(gm)
 	tree, comet, rock := cfg.Ash.TreeSlam, cfg.Ash.CometPunch, cfg.Ash.RockTomb
 	cc := cfg.courtConfigFor(mode)
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": court.Length, "h": court.Width}, // the x and y extents
-		"cam": map[string]float64{"minw": cc.MinLength, "minh": cc.MinWidth, "maxw": cc.MaxLength, "maxh": cc.MaxWidth, "zin": cc.ZoomInDistance, "zout": cc.ZoomOutDistance, "zspeed": cc.ZoomSpeed, "margin": cc.SeaMargin}, // the camera window and its zoom
+		"cam": map[string]float64{"minw": cc.MinLength, "minh": cc.MinWidth, "maxw": cc.MaxLength, "maxh": cc.MaxWidth, "zin": cc.ZoomInDistance, "zout": cc.ZoomOutDistance, "zspeed": cc.ZoomSpeed, "margin": cc.SeaMargin, "gz": b2f(cc.GigantamaxZoomOut)}, // the camera window and its zoom
 		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp, gengar and the gyarados magikarp becomes
 		"radius":   []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Gyarados.Radius, cfg.Dummy.Radius},
 		"maxhp":    []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gengar.MaxHP, cfg.Gyarados.MaxHP, cfg.Dummy.MaxHP},
 		"evolve":   cfg.Magikarp.EvolveHops,
 		"tree":     []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
 		"fist":     []map[string]float64{aFist, mFist},
+		"gfist":    gFist, // the fists of the Gigantamax Machamp
 		"kicktext": map[string]map[string]string{"ash": {"slide": cfg.Ash.HighJumpKick.SlideText, "kick": cfg.Ash.HighJumpKick.KickText}, "machamp": {"slide": cfg.Machamp.HighJumpKick.SlideText, "kick": cfg.Machamp.HighJumpKick.KickText}},
+		"gmax":     map[string]float64{"hp": float64(cfg.Machamp.Gigantamax.MaxHP), "radius": cfg.Machamp.Gigantamax.Radius, "dur": cfg.Machamp.Gigantamax.Duration},
 		"uptext":   map[string]string{"slide": cfg.Machamp.Uppercut.SlideText, "punch": cfg.Machamp.Uppercut.PunchText}, "upwarn": b2f(cfg.Machamp.Uppercut.ShowWarning),
 		"kickwarn": map[string]float64{"ash": b2f(cfg.Ash.HighJumpKick.ShowWarning), "machamp": b2f(cfg.Machamp.HighJumpKick.ShowWarning)},
 		"bbird":    map[string]float64{"ring": cfg.Rowlet.BraveBird.RingDuration, "charge": cfg.Rowlet.BraveBird.ChargeDuration, "rs": cfg.Rowlet.BraveBird.RingScale, "ls": cfg.Rowlet.BraveBird.LightScale, "lf": cfg.Rowlet.BraveBird.LeafScale, "dark": cfg.Rowlet.BraveBird.SkyDark, "fevery": cfg.Rowlet.BraveBird.FlashEvery, "falpha": cfg.Rowlet.BraveBird.FlashAlpha},

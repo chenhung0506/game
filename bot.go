@@ -172,7 +172,7 @@ func (b *Bot) look(g *Game, me int) *bctx {
 		}
 	}
 	c := &bctx{g: g, b: b, me: me, fs: fs, p: &g.P[me], f: &old.all[fs], balls: old.balls}
-	c.pr, c.fr = g.cfg.radiusOf(c.p.Kind), g.cfg.radiusOf(c.f.Kind)
+	c.pr, c.fr = g.bodyRadius(c.p), g.bodyRadius(c.f)
 	dx, dy := c.f.X-c.p.X, c.f.Y-c.p.Y
 	c.dist = math.Hypot(dx, dy)
 	if c.dist > 1e-9 {
@@ -190,7 +190,7 @@ func (b *Bot) look(g *Game, me int) *bctx {
 			continue
 		}
 		cc := *c
-		cc.f, cc.fr = &old.all[j], g.cfg.radiusOf(old.all[j].Kind)
+		cc.f, cc.fr = &old.all[j], g.bodyRadius(&old.all[j])
 		if t := cc.findThreat(); t.eta < c.th.eta {
 			c.th = t
 		}
@@ -322,7 +322,7 @@ func (c *bctx) findThreat() threat {
 
 	if (f.Kind == ash || f.Kind == machamp) && (f.TreePhase == treeSmash || f.TreePhase == treeSwing) {
 		// The whole shape is on the ground for everyone to see: the trunk and the canopy. Leave all of it, by the way out that is soonest.
-		ts := cfg.brawlerOf(f.Kind).TreeSlam
+		ts := c.g.brawlerP(f).TreeSlam
 		eta := f.TreeT
 		if f.TreePhase == treeSmash {
 			eta += ts.SwingDuration
@@ -366,7 +366,7 @@ func (c *bctx) findThreat() threat {
 	}
 
 	if isBrawler(f.Kind) && f.KickPhase != kickNone { // a High Jump Kick: the line it flies along is fixed once the slide ends, at where the bot stands now
-		hk := cfg.brawlerOf(f.Kind).HighJumpKick
+		hk := c.g.brawlerP(f).HighJumpKick
 		sx, sy, kx, ky, left, eta := f.X, f.Y, f.KickX, f.KickY, hk.KickDistance-f.KickD, 0.0
 		if f.KickPhase == kickSlide || f.KickPhase == kickWait { // not yet aimed: it will kick from where the slide ends, straight at the bot
 			if f.KickPhase == kickSlide && hk.SlideDuration > 0 {
@@ -386,7 +386,7 @@ func (c *bctx) findThreat() threat {
 	}
 
 	if f.Kind == machamp && f.UpPhase != upNone { // an Uppercut: the line it rushes along is fixed once the slide ends, at where the bot stands now
-		uc := cfg.Machamp.Uppercut
+		uc := c.g.brawlerP(f).Uppercut
 		sx, sy, kx, ky, left, eta := f.X, f.Y, f.UpX, f.UpY, uc.RushDistance-f.UpD, 0.0
 		if f.UpPhase == upSlide || f.UpPhase == upWait { // not yet aimed
 			if f.UpPhase == upSlide && uc.SlideDuration > 0 {
@@ -497,7 +497,7 @@ func (c *bctx) walksIntoFlames(in Input) bool {
 	}
 	gf := c.g.cfg.Gengar.GhostFire
 	ux, uy := unit(float64(in.DX), float64(in.DY))
-	speed := c.g.cfg.walkSpeedOf(c.p.Kind)
+	speed := c.g.walkSpeedOf(c.p)
 	lag := botReact * dtBot
 	for t := 0.0; t <= 0.5+1e-9; t += 0.05 {
 		x := math.Min(math.Max(c.p.X+ux*speed*t, 0), c.g.court.Length)
@@ -515,7 +515,7 @@ func (c *bctx) walksIntoFlames(in Input) bool {
 // its own speed; none of them does it in time then it is the one that gets nearest to being out (the last it tries).
 func (c *bctx) wayOutOf(inside func(x, y float64) bool) (float64, float64) {
 	const step = 0.05
-	speed := c.g.cfg.walkSpeedOf(c.p.Kind)
+	speed := c.g.walkSpeedOf(c.p)
 	bestT, bx, by := math.Inf(1), 0.0, 0.0
 	for k := 0; k < 8; k++ {
 		ux, uy := unit(float64(stickX[k]), float64(stickY[k]))
@@ -585,8 +585,8 @@ func (c *bctx) hazards() []hazard {
 // "step aside" from the nearest arrow does not.
 func (c *bctx) safeDir(hz []hazard) (float64, float64) {
 	const step = 0.1
-	p, cfg := c.p, &c.g.cfg
-	speed := cfg.walkSpeedOf(p.Kind)
+	p := c.p
+	speed := c.g.walkSpeedOf(p)
 	lag := botReact * dtBot
 	bestScore, bx, by := math.Inf(-1), 0.0, 0.0
 	pos := make([][2]float64, len(hz))
@@ -962,6 +962,11 @@ func (b *Bot) ash(c *bctx) Input {
 		return c.move(th.ax, th.ay)
 	}
 	danger := f.Kind == rowlet && f.ArrowT > 0
+	if p.Kind == machamp && p.GmaxT == 0 && p.Charge >= g.cfg.Machamp.Ultimate.Max && !danger && c.dist <= 600 { // the ultimate, as soon as it is charged and the opponent is in reach
+		in := c.stay()
+		in.Ult = true
+		return in
+	}
 
 	// Is the opponent shut in? The ring is the stones that are still standing: it is inside when it is nearer their middle than they are.
 	var n int
