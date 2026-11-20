@@ -1704,12 +1704,11 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 
 // stepChikorita runs Chikorita's Leaf Slash: a hop the way it walks (nothing happens when it lands), then
 // `slashes` swings of the leaf, alternating upper-left to lower-right and upper-right to lower-left. During a
-// swing it moves slash_step towards the opponent (stopping where the bodies touch), and at the middle of the swing
-// the blade hits anyone in reach within slash_radius.
+// swing it moves slash_step the way the player holds the stick (it stays where it is with no stick: it does not
+// go for the opponent by itself), and at the middle of the swing the blade hits anyone in reach within slash_radius.
 func (g *Game) stepChikorita(i int, in Input, dt float64) []Event {
 	var events []Event
-	oi := g.nearestFoe(i) // it closes in on the nearest foe
-	p, other := &g.P[i], &g.P[oi]
+	p := &g.P[i]
 	ls := g.cfg.Chikorita.LeafSlash
 	if p.LeafCD > 0 {
 		if p.LeafCD -= dt; p.LeafCD < 1e-9 {
@@ -1738,16 +1737,17 @@ func (g *Game) stepChikorita(i int, in Input, dt float64) []Event {
 		u := 1 - p.LeafT/ls.JumpDuration
 		p.LeafK, p.Z = u, 4*ls.JumpHeight*u*(1-u) // a parabola peaking at jump_height
 	case leafSlash:
-		if d := dist(p, other); d > 1e-9 {
+		if dx, dy := float64(in.DX), float64(in.DY); dx != 0 || dy != 0 { // the way the player pushes the stick, as far as a swing carries it
 			// A swing's time carries over into the next tick, so only the very last tick is clipped: the swings add
 			// up to exactly slashes x slash_step.
 			used := dt
 			if p.LeafN == ls.Slashes-1 {
 				used = math.Min(dt, p.LeafT)
 			}
-			adv := math.Min(ls.SlashStep*used/ls.SlashInterval, math.Max(0, d-g.radius(i)-g.radius(oi)))
-			p.X = math.Min(math.Max(p.X+(other.X-p.X)/d*adv, 0), g.court.Length)
-			p.Y = math.Min(math.Max(p.Y+(other.Y-p.Y)/d*adv, 0), g.court.Width)
+			adv := ls.SlashStep * used / ls.SlashInterval
+			n := math.Hypot(dx, dy)
+			p.X = math.Min(math.Max(p.X+dx/n*adv, 0), g.court.Length)
+			p.Y = math.Min(math.Max(p.Y+dy/n*adv, 0), g.court.Width)
 		}
 		p.LeafT -= dt
 		p.LeafK = math.Min(math.Max(1-p.LeafT/ls.SlashInterval, 0), 1)

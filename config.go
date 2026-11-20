@@ -276,7 +276,7 @@ type Config struct {
 		// Leaf Slash (the main button): Chikorita hops `jump_distance` the way it is walking, `jump_duration` seconds
 		// in the air at the top `jump_height` (no damage on landing), then whips the leaf on its head `slashes` times,
 		// `slash_interval` seconds each: the first from the upper left to the lower right, the second from the upper
-		// right to the lower left, and so on. Each swing carries it `slash_step` towards the opponent and hits once,
+		// right to the lower left, and so on. Each swing carries it `slash_step` the way the stick is held (not at the opponent by itself) and hits once,
 		// at the middle of the swing, anyone within `slash_radius` (plus their body).
 		LeafSlash struct {
 			Reach

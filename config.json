@@ -70,7 +70,7 @@
       "terminal_time": 4,
       "hits_to_explode": 3,
       "link_width": 14,
-      "jump_height": 80,
+      "jump_height": 40,
       "sky_dark": 0.4,
       "flash_every": 15,
       "flash_alpha": 0.25,

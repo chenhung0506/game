@@ -878,8 +878,11 @@ func (b *Bot) snorlax(c *bctx) Input {
 func (b *Bot) chikorita(c *bctx) Input {
 	g, p, f := c.g, c.p, c.f
 	ls, rl, vw := g.cfg.Chikorita.LeafSlash, g.cfg.Chikorita.RazorLeaf, g.cfg.Chikorita.VineWhip
+	if p.LeafPhase == leafSlash && p.FrozenT == 0 && !p.Held {
+		return c.move(c.ux, c.uy) // each swing carries it the way the stick is held: at the opponent
+	}
 	if p.FrozenT > 0 || p.Held || p.vineBusy() || p.LeafPhase != leafNone || g.giantOut(c.me) {
-		return c.stay() // rooted (the Giant Vines root it too), or the leaf slash is moving it
+		return c.stay() // rooted (the Giant Vines root it too), or the leaf hop is moving it
 	}
 	th := c.th
 	if th.kind != thNone && th.eta <= botHorizon {

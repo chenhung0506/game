@@ -117,38 +117,39 @@ func TestSlashSwingsAlternateAndHitInTheMiddleOfEachSwing(t *testing.T) {
 	}
 }
 
-func TestEachSwingCarriesChikoritaTowardsTheOpponent(t *testing.T) {
+func TestEachSwingCarriesChikoritaTheWayTheStickIsHeld(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Chikorita.LeafSlash.Slashes, cfg.Chikorita.LeafSlash.SlashStep = 3, 50
 	cfg.Chikorita.LeafSlash.SlashRadius = 1
 	g := chGame(cfg)
-	g.P[1].X, g.P[1].Y = 1500, 900 // up and to the right
+	g.P[1].X, g.P[1].Y = 1500, 900 // down and to the right: not where the stick will point
 	hopRight(g)
 	stepsUntil(g, leafSlash)
 	x0, y0 := g.P[0].X, g.P[0].Y
-	dx, dy := g.P[1].X-x0, g.P[1].Y-y0
-	n := math.Hypot(dx, dy)
 	for g.P[0].LeafPhase == leafSlash {
+		g.P[0].In = Input{DX: 0, DY: -1} // up
 		g.Step(dt)
 	}
-	moved := math.Hypot(g.P[0].X-x0, g.P[0].Y-y0)
-	if math.Abs(moved-150) > 3 {
-		t.Fatalf("moved %.1f over three swings, want 3 x 50", moved)
-	}
-	if cos := ((g.P[0].X-x0)*dx + (g.P[0].Y-y0)*dy) / (moved * n); cos < 0.99 {
-		t.Fatalf("it did not go towards the opponent (cos %.3f)", cos)
+	// 3 x 50, and the tick the last swing ends in also walks (the skill is over by the time the walk is worked out): one tick of walking more
+	up := y0 - g.P[0].Y
+	if want := 150 + cfg.Chikorita.WalkSpeed*dt; math.Abs(up-want) > 1 || math.Abs(g.P[0].X-x0) > 1e-6 {
+		t.Fatalf("moved (%.1f, %.1f) over three swings with the stick held up, want %.1f straight up", g.P[0].X-x0, g.P[0].Y-y0, want)
 	}
 }
 
-func TestSlashAdvanceStopsWhereTheBodiesTouch(t *testing.T) {
+func TestChikoritaDoesNotWalkAtTheOpponentByItselfDuringTheSlashes(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Chikorita.LeafSlash.SlashStep, cfg.Chikorita.LeafSlash.Slashes = 500, 4
+	cfg.Chikorita.LeafSlash.SlashStep = 500
 	g := chGame(cfg)
-	g.P[1].X = 300 + cfg.Chikorita.LeafSlash.JumpDistance + 100
+	g.P[1].X = 300 + cfg.Chikorita.LeafSlash.JumpDistance + 300
 	hopRight(g)
-	steps(g, 100)
-	if gap := g.P[1].X - g.P[0].X; gap < cfg.Chikorita.Radius+cfg.Snorlax.Radius-1e-6 {
-		t.Fatalf("gap %.2f, it walked into the opponent", gap)
+	stepsUntil(g, leafSlash)
+	x0, y0 := g.P[0].X, g.P[0].Y
+	for g.P[0].LeafPhase == leafSlash {
+		g.Step(dt)
+	}
+	if g.P[0].X != x0 || g.P[0].Y != y0 {
+		t.Fatalf("moved from (%v, %v) to (%v, %v) with no stick held", x0, y0, g.P[0].X, g.P[0].Y)
 	}
 }
 
@@ -258,7 +259,7 @@ func TestChikoritaSnapshotCarriesTheLeafState(t *testing.T) {
 
 func TestChikoritaMirrorMatchSlashesOnlyTheOpponent(t *testing.T) {
 	g := duel(DefaultConfig(), chikorita, chikorita)
-	g.P[1].X = 520
+	g.P[1].X = 640 // they hop past each other and end up a body apart
 	g.P[0].In = Input{Skill: true, DX: 1}
 	g.P[1].In = Input{Skill: true, DX: -1}
 	g.Step(dt)
