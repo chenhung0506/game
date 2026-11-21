@@ -75,11 +75,13 @@ func (g *Game) gainCharge(hp0 [maxSlots]int, dt float64) {
 		}
 		for _, j := range g.foes(i) {
 			if lost := hp0[j] - g.P[j].HP; lost > 0 {
-				gain += u.GainDealt * float64(lost)
+				ult := min(g.ultLost[j], lost) // the part of it an ultimate did
+				gain += u.GainDealt*float64(lost-ult) + u.GainUltDealt*float64(ult)
 			}
 		}
 		p.Charge = math.Min(p.Charge+gain, u.Max)
 	}
+	g.ultLost = [maxSlots]int{}
 }
 
 // stepUltimate runs Z for a character that has an ultimate: with a full charge the press empties the charge and starts the
@@ -169,6 +171,7 @@ func (g *Game) voltBoltsOut(i int) bool {
 // stepVoltBolt moves one Thousand Volt bolt, hurts the foe it touches and blows it up when its time is up. It says whether the bolt
 // is still there.
 func (g *Game) stepVoltBolt(b *Ball, dt float64) (bool, []Event) {
+	defer g.ultimateDamage()()
 	if b.HP <= 0 {
 		return false, nil
 	}

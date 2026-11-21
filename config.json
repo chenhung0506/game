@@ -4,7 +4,7 @@
     "web": { "min_width": 900, "min_length": 1600, "max_width": 1200, "max_length": 2000, "zoom_in_distance": 700, "zoom_out_distance": 1100, "zoom_speed": 0.5, "sea_margin": 300, "gigantamax_zoom_out": true }
   },
   "pikachu": {
-    "max_hp": 130,
+    "max_hp": 140,
     "walk_speed": 170,
     "radius": 8,
     "volt_tackle": {
@@ -84,11 +84,12 @@
       "max": 100,
       "gain_taken": 1,
       "gain_dealt": 1,
+      "gain_ultimate_dealt": 1,
       "gain_per_second": 1
     }
   },
   "snorlax": {
-    "max_hp": 210,
+    "max_hp": 230,
     "walk_speed": 120,
     "radius": 30,
     "ice_punch": {
@@ -131,7 +132,7 @@
     }
   },
   "charizard": {
-    "max_hp": 180,
+    "max_hp": 200,
     "walk_speed": 140,
     "radius": 20,
     "fly": {
@@ -174,13 +175,14 @@
     }
   },
   "chikorita": {
-    "max_hp": 170,
+    "max_hp": 180,
     "walk_speed": 150,
     "radius": 10,
     "ultimate": {
       "max": 100,
       "gain_taken": 1,
       "gain_dealt": 1,
+      "gain_ultimate_dealt": 1,
       "gain_per_second": 1
     },
     "giant_vines": {
@@ -254,7 +256,7 @@
     }
   },
   "vulpix": {
-    "max_hp": 150,
+    "max_hp": 180,
     "walk_speed": 140,
     "radius": 14,
     "frost_field": {
@@ -303,7 +305,7 @@
     }
   },
   "rowlet": {
-    "max_hp": 130,
+    "max_hp": 140,
     "walk_speed": 160,
     "radius": 13,
     "fly_high": 30,
@@ -359,7 +361,7 @@
       "mass": 100,
       "scale": 1.4
     },
-    "ultimate": { "max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_per_second": 1 },
+    "ultimate": { "max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_ultimate_dealt": 1, "gain_per_second": 1 },
     "brave_bird": {
       "min_height": 0,
       "max_height": 1000,
@@ -408,7 +410,7 @@
     }
   },
   "gengar": {
-    "max_hp": 150,
+    "max_hp": 170,
     "walk_speed": 155,
     "radius": 18,
     "shadow_sneak": {
@@ -512,13 +514,14 @@
     "radius": 28
   },
   "ash": {
-    "max_hp": 170,
+    "max_hp": 190,
     "walk_speed": 150,
     "radius": 30,
     "ultimate": {
       "max": 100,
       "gain_taken": 1,
       "gain_dealt": 1,
+      "gain_ultimate_dealt": 1,
       "gain_per_second": 1
     },
     "high_jump_kick": {
@@ -566,7 +569,7 @@
       "bolt_count": 6,
       "bolt_interval": 0.2,
       "bolt_offsets": [60,-60,-120,120,60,-60],
-      "distance": 380,
+      "distance": 580,
       "radius": 45,
       "damage": 50,
       "stun_duration": 1.5,
@@ -633,9 +636,9 @@
       "max_height": 60,
       "slide_distance": 320,
       "slide_duration": 0.3,
-      "rush_delay": 0.2,
+      "rush_delay": 0.3,
       "rush_distance": 480,
-      "rush_speed": 900,
+      "rush_speed": 700,
       "radius": 14,
       "damage": 15,
       "launch_height": 80,
@@ -652,7 +655,7 @@
       "slide_duration": 0,
       "kick_delay": 0,
       "kick_distance": 300,
-      "kick_speed": 550,
+      "kick_speed": 400,
       "kick_height": 40,
       "radius": 10,
       "damage": 20,
@@ -718,12 +721,13 @@
       "max": 100,
       "gain_taken": 1,
       "gain_dealt": 1,
+      "gain_ultimate_dealt": 0.5,
       "gain_per_second": 1
     },
     "gigantamax": {
-      "max_hp": 340,
+      "max_hp":  510,
       "walk_speed": 280,
-      "radius": 200,
+      "radius": 180,
       "duration": 15,
       "uppercut": {
         "min_height": 0,
@@ -748,7 +752,7 @@
         "charge_duration": 1.2,
         "distance": 700,
         "radius": 120,
-        "damage": 40,
+        "damage": 25,
         "stun_duration": 1,
         "knockback": 200,
         "lightning_radius": 250,
@@ -763,7 +767,7 @@
         "max_height": 80,
         "radius": 22,
         "hp": 16,
-        "damage": 3,
+        "damage": 2,
         "cooldown": 6,
         "mass": 100,
         "ball_knockback": 100,
@@ -773,7 +777,7 @@
         "random_offset_angle": 60,
         "distance": 350,
         "scatter_min_distance": 0,
-        "scatter_max_distance": 100,
+        "scatter_max_distance": 400,
         "fist_duration": 0.2
       }
     }

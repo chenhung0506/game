@@ -101,6 +101,7 @@ type Player struct {
 	Juggle   bool       `json:"-"`
 	Tw       spinParams `json:"-"` // what the tornado that holds it does (set when it is caught), and the height it was caught at
 	TwZ0     float64    `json:"-"`
+	TwUlt    bool       `json:"-"` // the tornado that holds it is an ultimate's (its damage is counted as one)
 	JuggleT  float64    `json:"-"`
 	JuggleH  float64    `json:"-"` // the height it was thrown to (Brave Bird's launch_height, the Uppercut's)
 
@@ -435,7 +436,9 @@ const (
 const maxSlots = 4
 
 type Game struct {
-	gmaxCfg *BrawlerCfg // Machamp's numbers as the Gigantamax Machamp, built when first needed (brawlerP)
+	ultNow  bool          // the damage being dealt is an ultimate's (ultimateDamage)
+	ultLost [maxSlots]int // per slot, the HP it lost this tick to ultimates
+	gmaxCfg *BrawlerCfg   // Machamp's numbers as the Gigantamax Machamp, built when first needed (brawlerP)
 	cfg     Config
 	court   CourtSize
 	P       []Player // slots 0 and 1 are the duel; in a 2v2 slots 2 and 3 join them, so a slot's side is its number mod 2
@@ -740,10 +743,22 @@ func sweepHits(src, target *Player, fx, fy, a0, a1, length, width float64) bool 
 }
 
 func (g *Game) hit(victim *Player, dmg int) {
+	before := victim.HP
 	victim.HP -= dmg
 	if victim.HP < 0 {
 		victim.HP = 0
 	}
+	if g.ultNow { // the damage of an ultimate is counted apart, for the charge it gives (gainCharge)
+		if j := g.slotOf(victim); j >= 0 {
+			g.ultLost[j] += before - victim.HP
+		}
+	}
+}
+
+// ultimateDamage says that the damage dealt from now until the returned function is called is an ultimate's: `defer g.ultimateDamage()()`.
+func (g *Game) ultimateDamage() func() {
+	g.ultNow = true
+	return func() { g.ultNow = false }
 }
 
 // groundReach is the default band of a ground-level skill (0 up to groundZ); anyHeight is for skills that
@@ -1251,7 +1266,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 				if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
 					return cp.Reach.hits(f) && math.Hypot(f.X-b.X, f.Y-b.Y) <= cp.Radius+rad
 				}); ok {
+					g.ultNow = g.P[b.Owner].gigantamax() // a Gigantamax Machamp's fists are its ultimate's
 					g.hit(foe, cp.Damage)
+					g.ultNow = false
 					if !foe.Held { // a body pinned by a tornado stays where it is held
 						g.knockBack(b.X, b.Y, foe, cp.Knockback, b.DX, b.DY)
 					}
@@ -1327,8 +1344,8 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}); ok {
 				b.Caught, b.Life, b.Prey = true, sp.SpinDuration, g.slotOf(foe)+1
 				foe.Twirl, foe.Held, foe.VZ, foe.TwirlIn = twirlSpin, true, 0, sp.SpinInterval
-				foe.Tw, foe.TwZ0, foe.Juggle = sp, 0, false
-				if b.Still { // Brave Bird's tornado takes a body where it hangs, even high in the air, and lifts it from there
+				foe.Tw, foe.TwZ0, foe.Juggle, foe.TwUlt = sp, 0, false, b.Still // Brave Bird's tornado is part of its ultimate
+				if b.Still {                                                    // Brave Bird's tornado takes a body where it hangs, even high in the air, and lifts it from there
 					foe.TwZ0 = foe.Z
 				}
 				events = append(events, Event{T: "leaf", X: foe.X, Y: foe.Y})

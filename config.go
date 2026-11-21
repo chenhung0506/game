@@ -193,12 +193,14 @@ type GigantamaxCfg struct {
 
 // Ultimate is the charge a character's third skill (Z) needs. It starts the round empty and the skill only works once the charge
 // reaches `max`; casting empties it. It fills in three independent ways, each in charge points: `gain_taken` for every HP of
-// damage the character takes, `gain_dealt` for every HP of damage its foes take (in a 2v2 whoever hurt them, every foe of the
-// victim's counts), and `gain_per_second` just for time passing.
+// damage the character takes, `gain_dealt` for every HP of damage its foes take from the skills that are not an ultimate (in a 2v2 whoever hurt them, every foe of the
+// victim's counts), `gain_ultimate_dealt` for every HP they take from an ultimate (Thousand Volt's bolts, the Giant Vines, Brave Bird and its tornado, the Megaton Punch,
+// and everything the Gigantamax Machamp does while it lasts), and `gain_per_second` just for time passing.
 type Ultimate struct {
 	Max           float64 `json:"max"`
 	GainTaken     float64 `json:"gain_taken"`
 	GainDealt     float64 `json:"gain_dealt"`
+	GainUltDealt  float64 `json:"gain_ultimate_dealt"` // like gain_dealt, but for the damage an ultimate does (so an ultimate that hits hard does not pay for itself)
 	GainPerSecond float64 `json:"gain_per_second"`
 }
 
@@ -953,8 +955,8 @@ func DefaultConfig() Config {
 	tv.BoltOffsets, tv.RingScale, tv.BallScale = []float64{60, -60, -120, 120, 60, -60}, 2.2, 2
 	tv.RingRadius, tv.SpreadSpeed, tv.FollowSpeed, tv.ContactDamage, tv.Count, tv.Radius = 220, 400, 260, 4, 10, 16
 	tv.RehitInterval, tv.HP, tv.Mass, tv.Knockback, tv.TerminalTime, tv.ExplosionDamage, tv.ExplosionRadius = 0.5, 10, 20, 40, 5, 20, 110
-	c.Pikachu.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
-	c.Ash.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
+	c.Pikachu.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
+	c.Ash.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
 	c.Snorlax.MaxHP = maxHP
 	c.Snorlax.WalkSpeed = speed
 	c.Snorlax.Radius = snorlaxRadius
@@ -1044,7 +1046,7 @@ func DefaultConfig() Config {
 	c.Chikorita.VineWhip.Damage = 10
 	c.Chikorita.VineWhip.BindDuration = 2
 	c.Chikorita.VineWhip.Cooldown = 5
-	c.Chikorita.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
+	c.Chikorita.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
 	gv := &c.Chikorita.GiantVines
 	gv.Reach = groundReach
 	gv.FollowSpeed, gv.TerminalTime, gv.HeadRadius, gv.HeadWidth, gv.WormOut, gv.WormIn = 260, 4, 40, 50, 100, 100
@@ -1129,7 +1131,7 @@ func DefaultConfig() Config {
 	c.Rowlet.Tornado.Cooldown = 12
 	c.Rowlet.Tornado.Mass = 100
 	c.Rowlet.Tornado.Scale = 1
-	c.Rowlet.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
+	c.Rowlet.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
 	bb := &c.Rowlet.BraveBird
 	bb.Reach = Reach{MinHeight: 0, MaxHeight: 1000}
 	bb.RingDuration, bb.ChargeDuration, bb.SkyHeight, bb.DiveSpeed, bb.LockDistance = 0.5, 1.5, 400, 1200, 400
@@ -1377,6 +1379,7 @@ func (c Config) validateSkills() error {
 		{"ash.ultimate.max", c.Ash.Ultimate.Max, 0},
 		{"chikorita.ultimate.max", c.Chikorita.Ultimate.Max, 0},
 		{"rowlet.ultimate.max", c.Rowlet.Ultimate.Max, 0},
+		{"machamp.ultimate.max", c.Machamp.Ultimate.Max, 0},
 		{"chikorita.giant_vines.follow_speed", c.Chikorita.GiantVines.FollowSpeed, 0},
 		{"chikorita.giant_vines.terminal_time", c.Chikorita.GiantVines.TerminalTime, 0},
 		{"chikorita.giant_vines.head_radius", c.Chikorita.GiantVines.HeadRadius, 0},
@@ -1747,6 +1750,14 @@ func (c Config) validateSkills() error {
 		{"chikorita.giant_vines.charge_duration", c.Chikorita.GiantVines.ChargeDuration},
 		{"rowlet.ultimate.gain_taken", c.Rowlet.Ultimate.GainTaken},
 		{"rowlet.ultimate.gain_dealt", c.Rowlet.Ultimate.GainDealt},
+		{"pikachu.ultimate.gain_ultimate_dealt", c.Pikachu.Ultimate.GainUltDealt},
+		{"ash.ultimate.gain_ultimate_dealt", c.Ash.Ultimate.GainUltDealt},
+		{"chikorita.ultimate.gain_ultimate_dealt", c.Chikorita.Ultimate.GainUltDealt},
+		{"rowlet.ultimate.gain_ultimate_dealt", c.Rowlet.Ultimate.GainUltDealt},
+		{"machamp.ultimate.gain_taken", c.Machamp.Ultimate.GainTaken},
+		{"machamp.ultimate.gain_dealt", c.Machamp.Ultimate.GainDealt},
+		{"machamp.ultimate.gain_ultimate_dealt", c.Machamp.Ultimate.GainUltDealt},
+		{"machamp.ultimate.gain_per_second", c.Machamp.Ultimate.GainPerSecond},
 		{"rowlet.ultimate.gain_per_second", c.Rowlet.Ultimate.GainPerSecond},
 		{"rowlet.brave_bird.ring_duration", c.Rowlet.BraveBird.RingDuration},
 		{"rowlet.brave_bird.charge_duration", c.Rowlet.BraveBird.ChargeDuration},

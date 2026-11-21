@@ -85,6 +85,9 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
 	oi := g.nearestFoe(i) // what it runs at, aims at and closes in on is the nearest foe
 	p, other := &g.P[i], &g.P[oi]
+	if p.gigantamax() { // everything it does while it is Gigantamax is its ultimate's
+		defer g.ultimateDamage()()
+	}
 	ts, cp, rt := g.brawler(i).TreeSlam, g.brawler(i).CometPunch, g.brawler(i).RockTomb
 	mp, hk, uc := g.brawler(i).MegatonPunch, g.brawler(i).HighJumpKick, g.brawler(i).Uppercut
 	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD, &p.KickCD, &p.UpCD, &p.LpCD} {
@@ -492,6 +495,7 @@ func (g *Game) megatonGather(i int) []Event {
 // megatonPunch throws the fist along the direction locked when the charge began: it hurts, stuns and knocks back the
 // opponent it touches, once.
 func (g *Game) megatonPunch(i int) []Event {
+	defer g.ultimateDamage()()
 	p, mp := &g.P[i], g.brawler(i).MegatonPunch
 	ev := Event{T: "mega", S: i, X: p.X, Y: p.Y, R: mp.Distance, DX: p.MegaX, DY: p.MegaY}
 	var hits []int // every foe the fist touches

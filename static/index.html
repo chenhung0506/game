@@ -614,7 +614,7 @@ function buildPad() {
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
     if (name === 'ult') { // no cooldown: the dark pie is the charge still missing, and the button lights up when it is full
       const pct = document.createElement('div'); pct.className = 'pct'; b.append(pct); b.classList.add('ult'); ultBtn = { b, span, pct };
-    } else cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1] });
+    } else cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1], b, label, gmLabel: padKind === 8 && name === 'rock' ? '閃電拳' : null }); // gmLabel: what the button says while Machamp is Gigantamax
     if (padKind === 0 && name === 'skill') { usesBadge = document.createElement('div'); usesBadge.className = 'uses'; b.append(usesBadge); }
     if (aimed) { // the button turns into a stick while it is held: the way it is dragged is the way the skill goes
       const ring = document.createElement('div'), dot = document.createElement('div'); ring.className = 'aimring'; dot.className = 'aimdot'; b.append(ring, dot);
@@ -3558,6 +3558,7 @@ function drawCooldowns() {
   if (!snap) return;
   const gm = snap.p[you].k === 8 && snap.p[you].gmt > 0; // the Gigantamax Machamp's K is the Lightning Punch, with a cooldown of its own
   for (const c of cdBtns) {
+    if (c.gmLabel && c.b.firstChild && c.b.firstChild.nodeType === 3) { const want = gm ? c.gmLabel : c.label; if (c.b.firstChild.nodeValue !== want) c.b.firstChild.nodeValue = want; }
     const total = cdCfg[gm && c.total === 'mkick' ? 'glp' : c.total], left = snap.p[you][gm && c.field === 'kkcd' ? 'lpcd' : c.field];
     c.span.style.setProperty('--cd', (total > 0 ? Math.min(Math.max(left / total, 0), 1) * 360 : 0) + 'deg');
   }

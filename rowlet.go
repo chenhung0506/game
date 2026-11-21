@@ -191,7 +191,9 @@ func (g *Game) stepTwirl(dt float64) []Event {
 				p.X, p.Y = b.X, b.Y
 				p.Z = p.TwZ0 + (math.Max(sp.LiftHeight, p.TwZ0)-p.TwZ0)*math.Min(1, (sp.SpinDuration-b.Life)/(sp.SpinDuration/2))
 				for p.TwirlIn -= dt; p.TwirlIn < 1e-9; p.TwirlIn += sp.SpinInterval { // a loop so a tiny interval cannot lose ticks
+					g.ultNow = p.TwUlt
 					g.hit(p, sp.SpinDamage)
+					g.ultNow = false
 				}
 				continue
 			}
@@ -200,7 +202,9 @@ func (g *Game) stepTwirl(dt float64) []Event {
 		if p.Twirl == twirlFall {
 			if p.Z -= math.Max(sp.LiftHeight, p.TwZ0) / twirlFallTime * dt; p.Z <= 1e-9 {
 				p.Z, p.Twirl, p.Held, p.Tw, p.TwZ0 = 0, twirlNone, false, spinParams{}, 0
+				g.ultNow = p.TwUlt
 				g.hit(p, sp.LandingDamage)
+				g.ultNow, p.TwUlt = false, false
 				events = append(events, Event{T: "slam", X: p.X, Y: p.Y, R: tn.Radius})
 			}
 		}

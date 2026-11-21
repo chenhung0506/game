@@ -45,6 +45,7 @@ func (g *Game) startDive(i int) bool {
 // diveBird moves Rowlet one step along its dive and bursts when it is down. It aims at the nearest foe's place as it is now until it is `lock_distance` (along the way) from it;
 // from then on the way is fixed, so a foe that steps aside in the last stretch is missed.
 func (g *Game) diveBird(i int, dt float64) ([]Event, bool) {
+	defer g.ultimateDamage()()
 	p, bb := &g.P[i], g.cfg.Rowlet.BraveBird
 	total := math.Hypot(math.Hypot(p.BirdTX-p.X, p.BirdTY-p.Y), p.Z)
 	if total > bb.LockDistance {

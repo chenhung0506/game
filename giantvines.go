@@ -108,6 +108,7 @@ func (g *Game) stepGiantHead(b *Ball, dt float64) (alive bool, born []Ball, even
 // stepGiantVine runs one giant vine through its turns: it comes up and locks on the nearest foe as it is then, stands up with its shape on show,
 // comes down, hits whoever is in the shape when it lands, lies there and goes. A turn of no length is passed in the same tick.
 func (g *Game) stepGiantVine(b *Ball, dt float64) (alive bool, events []Event) {
+	defer g.ultimateDamage()()
 	gv := g.cfg.Chikorita.GiantVines
 	left := dt
 	for {
