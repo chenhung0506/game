@@ -63,6 +63,9 @@ func (c Config) ultimateOf(kind int) (Ultimate, bool) {
 // gainCharge fills every ultimate by what happened over this tick: time passing, the HP each character lost (hp0 is everyone's
 // HP when the tick began, so every source of damage counts and none needs to say who dealt it) and the HP its foes lost.
 func (g *Game) gainCharge(hp0 [maxSlots]int, dt float64) {
+	for i := range hp0 {
+		hp0[i] += g.hpAdj[i] // a change of form moved the HP without anyone being hurt
+	}
 	for i := range g.P {
 		p := &g.P[i]
 		u, ok := g.cfg.ultimateOf(p.Kind)
@@ -81,7 +84,7 @@ func (g *Game) gainCharge(hp0 [maxSlots]int, dt float64) {
 		}
 		p.Charge = math.Min(p.Charge+gain, u.Max)
 	}
-	g.ultLost = [maxSlots]int{}
+	g.ultLost, g.hpAdj = [maxSlots]int{}, [maxSlots]int{}
 }
 
 // stepUltimate runs Z for a character that has an ultimate: with a full charge the press empties the charge and starts the

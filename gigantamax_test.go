@@ -258,3 +258,45 @@ func TestTheLightningPunchIsCancelledWhenStunnedAndTheNumbersAreChecked(t *testi
 		}
 	}
 }
+
+// A tick that takes the last of its time off can leave GmaxT a hair below zero; the HP must be scaled back from the Gigantamax maximum all the same, for whatever the duration is.
+func TestTheHPComesBackScaledWhateverTheDurationIsAndNeverAboveTheMaximum(t *testing.T) {
+	for _, dur := range []float64{0.3, 0.7, 1.1, 2.3, 7.7, 15, 33.3, 150} {
+		cfg := DefaultConfig()
+		cfg.Machamp.MaxHP = 170
+		cfg.Machamp.Gigantamax.MaxHP, cfg.Machamp.Gigantamax.Duration = 510, dur
+		g := gmGame(cfg, 800)
+		gpress(g, Input{Ult: true})
+		g.P[0].HP = 90 // 90 of 510
+		for n := 0; n < int(dur/dt)+100 && g.P[0].GmaxT > 0; n++ {
+			g.Step(dt)
+		}
+		if g.P[0].GmaxT != 0 {
+			t.Fatalf("duration %v: it never ended", dur)
+		}
+		if g.P[0].HP != 30 || g.P[0].HP > g.maxHP(0) {
+			t.Fatalf("duration %v: HP %d after it ended (max %d), want 30", dur, g.P[0].HP, g.maxHP(0))
+		}
+	}
+}
+
+func TestChangingBackScalesTheHPWithoutHurtingAnyoneForTheOthersCharge(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Machamp.MaxHP = 170
+	cfg.Machamp.Gigantamax.MaxHP, cfg.Machamp.Gigantamax.Duration = 510, 0.3
+	cfg.Pikachu.Ultimate.GainPerSecond, cfg.Pikachu.Ultimate.GainDealt, cfg.Pikachu.Ultimate.GainUltDealt = 0, 1, 1
+	cfg.Machamp.Ultimate.GainTaken, cfg.Machamp.Ultimate.GainPerSecond = 1, 0
+	g := duel(cfg, machamp, pikachu)
+	g.P[0].Charge = cfg.Machamp.Ultimate.Max
+	g.P[1].X, g.P[1].Y = 2000, 900
+	gpress(g, Input{Ult: true})
+	g.P[0].HP = 300
+	c0, p1 := g.P[0].Charge, g.P[1].Charge
+	steps(g, 30)
+	if g.P[0].GmaxT != 0 || g.P[0].HP != 100 {
+		t.Fatalf("GmaxT %v HP %d, want it back with 300/510 of 170 = 100", g.P[0].GmaxT, g.P[0].HP)
+	}
+	if g.P[1].Charge != p1 || g.P[0].Charge != c0 {
+		t.Fatalf("charges moved (%v -> %v, %v -> %v): nobody was hurt", p1, g.P[1].Charge, c0, g.P[0].Charge)
+	}
+}

@@ -438,6 +438,7 @@ const maxSlots = 4
 type Game struct {
 	ultNow  bool          // the damage being dealt is an ultimate's (ultimateDamage)
 	ultLost [maxSlots]int // per slot, the HP it lost this tick to ultimates
+	hpAdj   [maxSlots]int // per slot, the HP this tick's change of form added or took away (rescaleHP)
 	gmaxCfg *BrawlerCfg   // Machamp's numbers as the Gigantamax Machamp, built when first needed (brawlerP)
 	cfg     Config
 	court   CourtSize
