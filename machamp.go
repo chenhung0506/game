@@ -39,13 +39,13 @@ func (g *Game) brawler(i int) *BrawlerCfg { return g.brawlerP(&g.P[i]) }
 // gigantamax is whether p is the Gigantamax Machamp now.
 func (p *Player) gigantamax() bool { return p.Kind == machamp && p.GmaxT > 0 }
 
-// brawlerP is the numbers p plays by. The Gigantamax Machamp has Machamp's, with its own Uppercut, High Jump Kick and Comet Punch.
+// brawlerP is the numbers p plays by. The Gigantamax Machamp has Machamp's, with its own Uppercut and Comet Punch (its Lightning Punch is read from the config directly).
 func (g *Game) brawlerP(p *Player) *BrawlerCfg {
 	if p.gigantamax() {
 		if g.gmaxCfg == nil {
 			b := g.cfg.Machamp
 			gm := b.Gigantamax
-			b.Uppercut, b.HighJumpKick, b.CometPunch = gm.Uppercut, gm.HighJumpKick, gm.CometPunch
+			b.Uppercut, b.CometPunch = gm.Uppercut, gm.CometPunch
 			g.gmaxCfg = &b
 		}
 		return g.gmaxCfg
@@ -66,6 +66,7 @@ func (g *Game) dropMachamp(i int) {
 	p.MegaJT = 0
 	p.KickPhase, p.KickT = kickNone, 0
 	p.UpPhase, p.UpT = upNone, 0
+	p.LpT = 0
 }
 
 // machampAirSpeed is how fast Machamp is steered in the Rock Tomb jump: the first speed until the middle, the second after.
@@ -86,14 +87,14 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	p, other := &g.P[i], &g.P[oi]
 	ts, cp, rt := g.brawler(i).TreeSlam, g.brawler(i).CometPunch, g.brawler(i).RockTomb
 	mp, hk, uc := g.brawler(i).MegatonPunch, g.brawler(i).HighJumpKick, g.brawler(i).Uppercut
-	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD, &p.KickCD, &p.UpCD} {
+	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD, &p.KickCD, &p.UpCD, &p.LpCD} {
 		if *cd > 0 {
 			if *cd -= dt; *cd < 1e-9 {
 				*cd = 0
 			}
 		}
 	}
-	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.KickPhase == kickNone && p.UpPhase == upNone && p.Z == 0
+	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.KickPhase == kickNone && p.UpPhase == upNone && p.LpT == 0 && p.Z == 0
 
 	// ---- Tree slam: jump, then pull up a tree and smash it down ----
 	if in.Skill && idle && p.TreeCD == 0 && p.Kind != machamp { // Machamp kicks instead
@@ -130,7 +131,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	rooted := p.TreePhase != treeNone || len(events) > 0 // through the tick of the smash, free from the next
 
 	// ---- High Jump Kick (Machamp's and Ash's Kick): slide along the stick, then leap at the opponent ----
-	if in.Kick && idle && p.KickCD == 0 { // Machamp's person sends it as Rock (personsInput), the computers as Kick
+	if in.Kick && idle && p.KickCD == 0 && !p.gigantamax() { // Machamp's person sends it as Rock (personsInput), the computers as Kick
 		dx, dy := float64(in.DX), float64(in.DY)
 		if dx == 0 && dy == 0 {
 			dx, dy = float64(p.FX), float64(p.FY)
@@ -174,6 +175,32 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	}
 	if p.KickPhase != kickNone {
 		rooted = true
+	}
+
+	// ---- Lightning Punch (the Gigantamax Machamp's Kick): gather, rooted, with the fist aimed at the foe all the while, then one huge punch and a bolt from the sky ----
+	if in.Kick && p.gigantamax() && idle && p.LpCD == 0 {
+		lp := g.cfg.Machamp.Gigantamax.LightningPunch
+		p.LpX, p.LpY, p.LpCD, p.LpT = 0, 0, lp.Cooldown, lp.ChargeDuration
+		if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
+			p.LpX, p.LpY = ux, uy
+		} else {
+			p.LpX, p.LpY = unit(float64(p.FX), float64(p.FY))
+		}
+		idle = false
+		if p.LpT == 0 {
+			events = append(events, g.lightningPunch(i)...)
+			rooted = true
+		}
+	}
+	if p.LpT > 0 {
+		rooted = true
+		if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
+			p.LpX, p.LpY = ux, uy // the fist follows the foe while it gathers
+		}
+		if p.LpT -= dt; p.LpT < 1e-9 {
+			p.LpT = 0
+			events = append(events, g.lightningPunch(i)...)
+		}
 	}
 
 	// ---- Uppercut (Machamp's Skill): slide along the stick, then rush at the opponent and throw it up ----
@@ -325,6 +352,35 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	return events, rooted
 }
 
+// lightningPunch throws the Gigantamax Machamp's fist along the direction it was aimed: every foe it touches is hurt, stunned and knocked back, and a bolt of lightning
+// comes down on each place it landed, hurting everyone within its radius once.
+func (g *Game) lightningPunch(i int) []Event {
+	p, lp := &g.P[i], g.cfg.Machamp.Gigantamax.LightningPunch
+	events := []Event{{T: "lpunch", S: i, X: p.X, Y: p.Y, R: lp.Distance, DX: p.LpX, DY: p.LpY}}
+	var hits []int
+	for _, j := range g.foes(i) {
+		if foe := &g.P[j]; lp.Reach.hits(foe) && segDist(foe.X, foe.Y, p.X, p.Y, p.X+p.LpX*lp.Distance, p.Y+p.LpY*lp.Distance) <= lp.Radius+g.radius(j) {
+			hits = append(hits, j)
+		}
+	}
+	var struck [maxSlots]bool // the foes the bolts have hurt: each is hurt once
+	for _, j := range hits {
+		foe := &g.P[j]
+		x, y := foe.X, foe.Y // the bolt comes down where the fist found it
+		g.hit(foe, lp.Damage)
+		g.stun(foe, lp.StunDuration)
+		g.knockBack(p.X, p.Y, foe, lp.Knockback, p.LpX, p.LpY)
+		events = append(events, Event{T: "lpbolt", S: i, X: x, Y: y, R: lp.LightningRadius, DX: p.LpX, DY: p.LpY})
+		for _, k := range g.foes(i) {
+			if f2 := &g.P[k]; !struck[k] && lp.Reach.hits(f2) && math.Hypot(f2.X-x, f2.Y-y) <= lp.LightningRadius+g.radius(k) {
+				struck[k] = true
+				g.hit(f2, lp.LightningDamage)
+			}
+		}
+	}
+	return events
+}
+
 // startRush points the rush at where `other` stands now.
 func (g *Game) startRush(i int, other *Player) {
 	p := &g.P[i]
@@ -369,7 +425,7 @@ func (g *Game) uppercutStep(i int, dt float64) []Event {
 	p.UpPhase = upNone
 	g.hit(other, uc.Damage)
 	g.launch(other, uc.LaunchHeight, uc.LaunchDuration)
-	return []Event{{T: "uphit", X: other.X, Y: other.Y, DX: p.UpX, DY: p.UpY, R: uc.LaunchHeight}}
+	return []Event{{T: "uphit", S: i, X: other.X, Y: other.Y, DX: p.UpX, DY: p.UpY, R: uc.LaunchHeight}}
 }
 
 // kickStep flies the kick on one tick along the direction it was aimed: it stops at the first foe's body it meets, which it

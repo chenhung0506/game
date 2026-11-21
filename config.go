@@ -157,17 +157,38 @@ type CometPunchCfg struct {
 	FistDuration       float64 `json:"fist_duration"`
 }
 
+// LightningPunchCfg is the Gigantamax Machamp's Lightning Punch (the K button in place of the High Jump Kick): it stands rooted for `charge_duration` seconds gathering
+// the punch, aimed at the nearest foe all the while, and then throws a huge fist `distance` ahead, `radius` either side of the line. A foe it touches (at a height inside
+// min_height..max_height) takes `damage`, is stunned `stun_duration` seconds and is knocked `knockback` away along the punch, and at the same moment a huge bolt of lightning
+// comes down on it: every foe within `lightning_radius` of where it stood takes `lightning_damage`, once. `show_warning` draws the line of the punch on the ground while
+// it gathers; `fist_scale` and `lightning_scale` only change how big the fist and the bolt are drawn (on top of the size of the body).
+type LightningPunchCfg struct {
+	Reach
+	ChargeDuration  float64 `json:"charge_duration"`
+	Distance        float64 `json:"distance"`
+	Radius          float64 `json:"radius"`
+	Damage          int     `json:"damage"`
+	StunDuration    float64 `json:"stun_duration"`
+	Knockback       float64 `json:"knockback"`
+	LightningRadius float64 `json:"lightning_radius"`
+	LightningDamage int     `json:"lightning_damage"`
+	Cooldown        float64 `json:"cooldown"` // counted from the start of the gathering
+	ShowWarning     bool    `json:"show_warning"`
+	FistScale       float64 `json:"fist_scale"`
+	LightningScale  float64 `json:"lightning_scale"`
+}
+
 // GigantamaxCfg is Machamp's ultimate (Z, once the charge is full): for `duration` seconds it is the Gigantamax Machamp, with its own `max_hp` (the HP it has is
-// scaled to it, and back when it is over), `walk_speed` and body `radius`, and its own numbers for the three skills it keeps: the Uppercut, the High Jump Kick and the
-// Comet Punch (read exactly like machamp.uppercut, machamp.high_jump_kick and machamp.comet_punch, which it uses the rest of the time).
+// scaled to it, and back when it is over), `walk_speed` and body `radius`, and its own numbers for the skills it has: the Uppercut and the Comet Punch (read exactly like
+// machamp.uppercut and machamp.comet_punch, which it uses the rest of the time) and the Lightning Punch, which takes the place of the High Jump Kick.
 type GigantamaxCfg struct {
-	MaxHP        int             `json:"max_hp"`
-	WalkSpeed    float64         `json:"walk_speed"`
-	Radius       float64         `json:"radius"`
-	Duration     float64         `json:"duration"`
-	Uppercut     UppercutCfg     `json:"uppercut"`
-	HighJumpKick HighJumpKickCfg `json:"high_jump_kick"`
-	CometPunch   CometPunchCfg   `json:"comet_punch"`
+	MaxHP          int               `json:"max_hp"`
+	WalkSpeed      float64           `json:"walk_speed"`
+	Radius         float64           `json:"radius"`
+	Duration       float64           `json:"duration"`
+	Uppercut       UppercutCfg       `json:"uppercut"`
+	CometPunch     CometPunchCfg     `json:"comet_punch"`
+	LightningPunch LightningPunchCfg `json:"lightning_punch"`
 }
 
 // Ultimate is the charge a character's third skill (Z) needs. It starts the round empty and the skill only works once the charge
@@ -614,6 +635,7 @@ type Config struct {
 			ChargeDuration  float64      `json:"charge_duration"`
 			SkyHeight       float64      `json:"sky_height"`
 			DiveSpeed       float64      `json:"dive_speed"`
+			LockDistance    float64      `json:"lock_distance"` // the dive follows the foe until it is this far (along the way) from it, then the way is fixed; 0 = it follows it all the way down
 			ExplosionRadius float64      `json:"explosion_radius"`
 			Damage          int          `json:"damage"`
 			LaunchHeight    float64      `json:"launch_height"`
@@ -1110,7 +1132,7 @@ func DefaultConfig() Config {
 	c.Rowlet.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainPerSecond: 1}
 	bb := &c.Rowlet.BraveBird
 	bb.Reach = Reach{MinHeight: 0, MaxHeight: 1000}
-	bb.RingDuration, bb.ChargeDuration, bb.SkyHeight, bb.DiveSpeed = 0.5, 1.5, 400, 1200
+	bb.RingDuration, bb.ChargeDuration, bb.SkyHeight, bb.DiveSpeed, bb.LockDistance = 0.5, 1.5, 400, 1200, 400
 	bb.ExplosionRadius, bb.Damage, bb.LaunchHeight, bb.LaunchDuration = 160, 30, 200, 1.5
 	bb.RingScale, bb.LightScale, bb.LeafScale = 1, 1, 1
 	bb.SkyDark, bb.FlashEvery, bb.FlashAlpha = 0.45, 6, 0.3
@@ -1198,9 +1220,9 @@ func DefaultConfig() Config {
 	c.Machamp.RockTomb.RingRadius, c.Machamp.RockTomb.Count, c.Machamp.RockTomb.StoneHP, c.Machamp.RockTomb.StoneDuration, c.Machamp.RockTomb.Cooldown = 450, 20, 80, 7, 14
 	gm := &c.Machamp.Gigantamax // the ultimate: bigger, tougher and harder-hitting than Machamp
 	gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration = 190, 125, 40, 15
-	gm.Uppercut, gm.HighJumpKick, gm.CometPunch = c.Machamp.Uppercut, c.Machamp.HighJumpKick, c.Machamp.CometPunch
+	gm.Uppercut, gm.CometPunch = c.Machamp.Uppercut, c.Machamp.CometPunch
 	gm.Uppercut.Damage, gm.Uppercut.LaunchHeight = 35, 260
-	gm.HighJumpKick.Damage, gm.HighJumpKick.Radius = 50, 18
+	gm.LightningPunch = LightningPunchCfg{Reach: Reach{MinHeight: 0, MaxHeight: 80}, ChargeDuration: 1.2, Distance: 500, Radius: 70, Damage: 40, StunDuration: 1, Knockback: 200, LightningRadius: 160, LightningDamage: 30, Cooldown: 9, FistScale: 1, LightningScale: 1}
 	gm.CometPunch.Damage, gm.CometPunch.Quantity, gm.CometPunch.Radius = 3, 28, 26
 	return c
 }
@@ -1238,7 +1260,7 @@ func (c Config) validate() error {
 		return fmt.Errorf("machamp.gigantamax: max_hp (%d), walk_speed (%v), radius (%v) and duration (%v) must be above 0", gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration)
 	}
 	tmp := c
-	tmp.Machamp.Uppercut, tmp.Machamp.HighJumpKick, tmp.Machamp.CometPunch = gm.Uppercut, gm.HighJumpKick, gm.CometPunch
+	tmp.Machamp.Uppercut, tmp.Machamp.CometPunch = gm.Uppercut, gm.CometPunch
 	if err := tmp.validateSkills(); err != nil {
 		return fmt.Errorf("machamp.gigantamax's skills are checked like Machamp's, and: %w", err)
 	}
@@ -1450,6 +1472,11 @@ func (c Config) validateSkills() error {
 		{"ash.rock_tomb.stone_duration", c.Ash.RockTomb.StoneDuration, 0},
 		{"rowlet.fly_high", c.Rowlet.FlyHigh, 0},
 		{"machamp.uppercut.rush_distance", c.Machamp.Uppercut.RushDistance, 0},
+		{"machamp.gigantamax.lightning_punch.distance", c.Machamp.Gigantamax.LightningPunch.Distance, 0},
+		{"machamp.gigantamax.lightning_punch.radius", c.Machamp.Gigantamax.LightningPunch.Radius, 0},
+		{"machamp.gigantamax.lightning_punch.lightning_radius", c.Machamp.Gigantamax.LightningPunch.LightningRadius, 0},
+		{"machamp.gigantamax.lightning_punch.fist_scale", c.Machamp.Gigantamax.LightningPunch.FistScale, 0},
+		{"machamp.gigantamax.lightning_punch.lightning_scale", c.Machamp.Gigantamax.LightningPunch.LightningScale, 0},
 		{"machamp.uppercut.rush_speed", c.Machamp.Uppercut.RushSpeed, 0},
 		{"rowlet.brave_bird.dive_speed", c.Rowlet.BraveBird.DiveSpeed, 0},
 		{"rowlet.brave_bird.explosion_radius", c.Rowlet.BraveBird.ExplosionRadius, 0},
@@ -1644,6 +1671,12 @@ func (c Config) validateSkills() error {
 		{"ash.megaton_punch.knockback", c.Ash.MegatonPunch.Knockback},
 		{"ash.megaton_punch.lunge_distance", c.Ash.MegatonPunch.LungeDistance},
 		{"machamp.uppercut.slide_distance", c.Machamp.Uppercut.SlideDistance},
+		{"machamp.gigantamax.lightning_punch.charge_duration", c.Machamp.Gigantamax.LightningPunch.ChargeDuration},
+		{"machamp.gigantamax.lightning_punch.damage", float64(c.Machamp.Gigantamax.LightningPunch.Damage)},
+		{"machamp.gigantamax.lightning_punch.stun_duration", c.Machamp.Gigantamax.LightningPunch.StunDuration},
+		{"machamp.gigantamax.lightning_punch.knockback", c.Machamp.Gigantamax.LightningPunch.Knockback},
+		{"machamp.gigantamax.lightning_punch.lightning_damage", float64(c.Machamp.Gigantamax.LightningPunch.LightningDamage)},
+		{"machamp.gigantamax.lightning_punch.cooldown", c.Machamp.Gigantamax.LightningPunch.Cooldown},
 		{"machamp.uppercut.slide_duration", c.Machamp.Uppercut.SlideDuration},
 		{"machamp.uppercut.rush_delay", c.Machamp.Uppercut.RushDelay},
 		{"machamp.uppercut.radius", c.Machamp.Uppercut.Radius},
@@ -1719,6 +1752,7 @@ func (c Config) validateSkills() error {
 		{"rowlet.brave_bird.charge_duration", c.Rowlet.BraveBird.ChargeDuration},
 		{"rowlet.brave_bird.damage", float64(c.Rowlet.BraveBird.Damage)},
 		{"rowlet.brave_bird.launch_height", c.Rowlet.BraveBird.LaunchHeight},
+		{"rowlet.brave_bird.lock_distance", c.Rowlet.BraveBird.LockDistance},
 		{"rowlet.brave_bird.launch_duration", c.Rowlet.BraveBird.LaunchDuration},
 		{"rowlet.brave_bird.tornado.duration", c.Rowlet.BraveBird.Tornado.Duration},
 		{"rowlet.brave_bird.tornado.spin_damage", float64(c.Rowlet.BraveBird.Tornado.SpinDamage)},
@@ -1799,44 +1833,45 @@ func (c Config) validateSkills() error {
 		return fmt.Errorf("ash.megaton_punch.bolt_count must be 0..20, got %d", n)
 	}
 	for name, r := range map[string]Reach{
-		"machamp.high_jump_kick":    c.Machamp.HighJumpKick.Reach,
-		"ash.high_jump_kick":        c.Ash.HighJumpKick.Reach,
-		"pikachu.volt_tackle":       c.Pikachu.VoltTackle.Reach,
-		"pikachu.thunder":           c.Pikachu.Thunder.Reach,
-		"pikachu.electro_ball":      c.Pikachu.ElectroBall.Reach,
-		"pikachu.thousand_volt":     c.Pikachu.ThousandVolt.Reach,
-		"snorlax.jump":              c.Snorlax.Jump.Reach,
-		"snorlax.ice_punch":         c.Snorlax.IcePunch.Reach,
-		"snorlax.hyper_beam":        c.Snorlax.HyperBeam.Reach,
-		"gyarados.hyper_beam":       c.Gyarados.HyperBeam.Reach,
-		"charizard.fire_breath":     c.Charizard.FireBreath.Reach,
-		"charizard.seismic_toss":    c.Charizard.SeismicToss.Reach,
-		"chikorita.leaf_slash":      c.Chikorita.LeafSlash.Reach,
-		"chikorita.razor_leaf":      c.Chikorita.RazorLeaf.Reach,
-		"chikorita.vine_whip":       c.Chikorita.VineWhip.Reach,
-		"chikorita.giant_vines":     c.Chikorita.GiantVines.Reach,
-		"rowlet.brave_bird":         c.Rowlet.BraveBird.Reach,
-		"vulpix.frost_field":        c.Vulpix.FrostField.Reach,
-		"vulpix.ice_storm":          c.Vulpix.IceStorm.Reach,
-		"vulpix.freeze_beam":        c.Vulpix.FreezeBeam.Reach,
-		"rowlet.tailwind.slash":     c.Rowlet.Tailwind.Slash.Reach,
-		"rowlet.arrows":             c.Rowlet.Arrows.Reach,
-		"rowlet.tornado":            c.Rowlet.Tornado.Reach,
-		"rowlet.brave_bird.tornado": c.Rowlet.BraveBird.Tornado.Reach,
-		"gyarados.wave":             c.Gyarados.Wave.Reach,
-		"gyarados.tail_whip":        c.Gyarados.TailWhip.Reach,
-		"machamp.tree_slam":         c.Machamp.TreeSlam.Reach,
-		"ash.tree_slam":             c.Ash.TreeSlam.Reach,
-		"machamp.comet_punch":       c.Machamp.CometPunch.Reach,
-		"ash.comet_punch":           c.Ash.CometPunch.Reach,
-		"ash.megaton_punch":         c.Ash.MegatonPunch.Reach,
-		"machamp.rock_tomb":         c.Machamp.RockTomb.Reach,
-		"machamp.uppercut":          c.Machamp.Uppercut.Reach,
-		"gengar.shadow_sneak":       c.Gengar.ShadowSneak.Reach,
-		"gengar.ghost_fire":         c.Gengar.GhostFire.Reach,
-		"gengar.shadow_ball":        c.Gengar.ShadowBall.Reach,
-		"gengar.night_shade":        c.Gengar.NightShade.Reach,
-		"ash.rock_tomb":             c.Ash.RockTomb.Reach,
+		"machamp.high_jump_kick":             c.Machamp.HighJumpKick.Reach,
+		"ash.high_jump_kick":                 c.Ash.HighJumpKick.Reach,
+		"pikachu.volt_tackle":                c.Pikachu.VoltTackle.Reach,
+		"pikachu.thunder":                    c.Pikachu.Thunder.Reach,
+		"pikachu.electro_ball":               c.Pikachu.ElectroBall.Reach,
+		"pikachu.thousand_volt":              c.Pikachu.ThousandVolt.Reach,
+		"snorlax.jump":                       c.Snorlax.Jump.Reach,
+		"snorlax.ice_punch":                  c.Snorlax.IcePunch.Reach,
+		"snorlax.hyper_beam":                 c.Snorlax.HyperBeam.Reach,
+		"gyarados.hyper_beam":                c.Gyarados.HyperBeam.Reach,
+		"charizard.fire_breath":              c.Charizard.FireBreath.Reach,
+		"charizard.seismic_toss":             c.Charizard.SeismicToss.Reach,
+		"chikorita.leaf_slash":               c.Chikorita.LeafSlash.Reach,
+		"chikorita.razor_leaf":               c.Chikorita.RazorLeaf.Reach,
+		"chikorita.vine_whip":                c.Chikorita.VineWhip.Reach,
+		"chikorita.giant_vines":              c.Chikorita.GiantVines.Reach,
+		"rowlet.brave_bird":                  c.Rowlet.BraveBird.Reach,
+		"vulpix.frost_field":                 c.Vulpix.FrostField.Reach,
+		"vulpix.ice_storm":                   c.Vulpix.IceStorm.Reach,
+		"vulpix.freeze_beam":                 c.Vulpix.FreezeBeam.Reach,
+		"rowlet.tailwind.slash":              c.Rowlet.Tailwind.Slash.Reach,
+		"rowlet.arrows":                      c.Rowlet.Arrows.Reach,
+		"rowlet.tornado":                     c.Rowlet.Tornado.Reach,
+		"rowlet.brave_bird.tornado":          c.Rowlet.BraveBird.Tornado.Reach,
+		"gyarados.wave":                      c.Gyarados.Wave.Reach,
+		"gyarados.tail_whip":                 c.Gyarados.TailWhip.Reach,
+		"machamp.tree_slam":                  c.Machamp.TreeSlam.Reach,
+		"ash.tree_slam":                      c.Ash.TreeSlam.Reach,
+		"machamp.comet_punch":                c.Machamp.CometPunch.Reach,
+		"ash.comet_punch":                    c.Ash.CometPunch.Reach,
+		"ash.megaton_punch":                  c.Ash.MegatonPunch.Reach,
+		"machamp.rock_tomb":                  c.Machamp.RockTomb.Reach,
+		"machamp.uppercut":                   c.Machamp.Uppercut.Reach,
+		"machamp.gigantamax.lightning_punch": c.Machamp.Gigantamax.LightningPunch.Reach,
+		"gengar.shadow_sneak":                c.Gengar.ShadowSneak.Reach,
+		"gengar.ghost_fire":                  c.Gengar.GhostFire.Reach,
+		"gengar.shadow_ball":                 c.Gengar.ShadowBall.Reach,
+		"gengar.night_shade":                 c.Gengar.NightShade.Reach,
+		"ash.rock_tomb":                      c.Ash.RockTomb.Reach,
 	} {
 		if !(r.MinHeight >= -minHeightFloor && r.MaxHeight >= r.MinHeight) { // also rejects NaN
 			return fmt.Errorf("%s: need %v <= min_height <= max_height, got %v and %v", name, -minHeightFloor, r.MinHeight, r.MaxHeight)

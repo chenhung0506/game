@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 // bbGame is Rowlet (slot 0, at 300,250) against a Snorlax `d` ahead of it, Rowlet with a full charge.
 func bbGame(cfg Config, d float64) *Game {
@@ -136,7 +139,8 @@ func TestBraveBirdLeavesAStillTornadoOfItsOwnSizeThatCatchesWhoeverComesNear(t *
 	bb := &cfg.Rowlet.BraveBird
 	bb.RingDuration, bb.ChargeDuration = 0.1, 0.1
 	bb.Tornado.Radius, bb.Tornado.Scale, bb.Tornado.Duration = 70, 2, 4
-	bb.LaunchHeight = 0 // the foe is not thrown, so only the tornado can hold it
+	bb.LockDistance = 1e6 // the way is fixed from the start: the foe steps aside once it is aimed
+	bb.LaunchHeight = 0   // the foe is not thrown, so only the tornado can hold it
 	g := bbGame(cfg, 400)
 	gpress(g, Input{Ult: true})
 	for n := 0; n < 300 && !g.P[0].BirdDive; n++ {
@@ -211,5 +215,42 @@ func TestBraveBirdPutsTheTornadoSkillIntoItsCooldownWhenItLands(t *testing.T) {
 	}
 	if want := cfg.Rowlet.Tornado.Cooldown; g.P[0].TwistCD < want-2*dt {
 		t.Fatalf("tornado cooldown %v after the landing, want about %v", g.P[0].TwistCD, want)
+	}
+}
+
+func TestTheDiveFollowsTheFoeUntilItIsLockDistanceAwayAndNotAfter(t *testing.T) {
+	for name, tc := range map[string]struct {
+		lock    float64
+		moveAt  float64 // the foe steps aside when the bird is this far (along the way) from it
+		wantHit bool
+	}{
+		"steps aside early, the dive follows":         {lock: 400, moveAt: 1200, wantHit: true},
+		"steps aside late, the way is fixed":          {lock: 400, moveAt: 300, wantHit: false},
+		"fixed from the start, however early it goes": {lock: 5000, moveAt: 1200, wantHit: false},
+	} {
+		cfg := DefaultConfig()
+		bb := &cfg.Rowlet.BraveBird
+		bb.RingDuration, bb.ChargeDuration, bb.SkyHeight, bb.DiveSpeed, bb.LockDistance = 0.1, 0.1, 300, 800, tc.lock
+		bb.ExplosionRadius, bb.LaunchHeight = 120, 0
+		bb.Tornado.Duration = 0
+		g := bbGame(cfg, 1400)
+		gpress(g, Input{Ult: true})
+		for n := 0; n < 300 && !g.P[0].BirdDive; n++ {
+			g.Step(dt)
+		}
+		hp0, moved := g.P[1].HP, false
+		for n := 0; n < 200 && g.P[0].BirdDive; n++ {
+			if left := math.Hypot(math.Hypot(g.P[1].X-g.P[0].X, g.P[1].Y-g.P[0].Y), g.P[0].Z); !moved && left <= tc.moveAt {
+				g.P[1].Y += 500 // out of the explosion's reach from where it was
+				moved = true
+			}
+			g.Step(dt)
+		}
+		if !moved {
+			t.Fatalf("%s: the foe never stepped aside", name)
+		}
+		if hit := g.P[1].HP < hp0; hit != tc.wantHit {
+			t.Fatalf("%s: hit %v, want %v", name, hit, tc.wantHit)
+		}
 	}
 }

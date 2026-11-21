@@ -38,23 +38,28 @@ func (g *Game) startDive(i int) bool {
 	p, bb := &g.P[i], g.cfg.Rowlet.BraveBird
 	foe := &g.P[g.nearestFoe(i)]
 	p.Z = math.Max(p.Z, bb.SkyHeight)
-	p.BirdDive, p.BirdTX, p.BirdTY, p.BirdZ0 = true, foe.X, foe.Y, p.Z
-	p.BirdT0 = math.Max(math.Hypot(math.Hypot(foe.X-p.X, foe.Y-p.Y), p.Z)/bb.DiveSpeed, 1e-3)
-	p.BirdLeft = p.BirdT0
+	p.BirdDive, p.BirdTX, p.BirdTY = true, foe.X, foe.Y
 	return true
 }
 
-// diveBird moves Rowlet one step along its dive and bursts when it is down.
+// diveBird moves Rowlet one step along its dive and bursts when it is down. It aims at the nearest foe's place as it is now until it is `lock_distance` (along the way) from it;
+// from then on the way is fixed, so a foe that steps aside in the last stretch is missed.
 func (g *Game) diveBird(i int, dt float64) ([]Event, bool) {
 	p, bb := &g.P[i], g.cfg.Rowlet.BraveBird
-	step := math.Min(dt, p.BirdLeft)
-	p.X += (p.BirdTX - p.X) * step / p.BirdLeft
-	p.Y += (p.BirdTY - p.Y) * step / p.BirdLeft
-	p.BirdLeft -= step
-	p.Z = p.BirdZ0 * p.BirdLeft / p.BirdT0
-	if p.BirdLeft > 1e-9 {
+	total := math.Hypot(math.Hypot(p.BirdTX-p.X, p.BirdTY-p.Y), p.Z)
+	if total > bb.LockDistance {
+		foe := &g.P[g.nearestFoe(i)]
+		p.BirdTX, p.BirdTY = foe.X, foe.Y
+		total = math.Hypot(math.Hypot(p.BirdTX-p.X, p.BirdTY-p.Y), p.Z)
+	}
+	if step := bb.DiveSpeed * dt; step < total-1e-9 {
+		f := step / total
+		p.X += (p.BirdTX - p.X) * f
+		p.Y += (p.BirdTY - p.Y) * f
+		p.Z -= p.Z * f
 		return nil, true
 	}
+	p.X, p.Y = p.BirdTX, p.BirdTY
 	p.BirdDive, p.Z = false, 0
 	p.TwistCD = math.Max(p.TwistCD, g.cfg.Rowlet.Tornado.Cooldown) // the Tornado skill (K) goes into its cooldown too
 	for _, j := range g.foes(i) {

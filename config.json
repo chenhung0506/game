@@ -367,6 +367,7 @@
       "charge_duration": 1.5,
       "sky_height": 200,
       "dive_speed": 1200,
+      "lock_distance": 400,
       "explosion_radius": 160,
       "damage": 30,
       "launch_height": 200,
@@ -741,23 +742,21 @@
         "slide_text": "閃身步",
         "punch_text": "上鉤拳"
       },
-      "high_jump_kick": {
+      "lightning_punch": {
         "min_height": 0,
         "max_height": 80,
-        "slide_distance": 0,
-        "slide_duration": 0,
-        "kick_delay": 0,
-        "kick_distance": 300,
-        "kick_speed": 550,
-        "kick_height": 40,
-        "radius": 10,
-        "damage": 45,
-        "stun_duration": 1.2,
+        "charge_duration": 1.2,
+        "distance": 700,
+        "radius": 120,
+        "damage": 40,
+        "stun_duration": 1,
         "knockback": 200,
-        "cooldown": 6,
+        "lightning_radius": 250,
+        "lightning_damage": 30,
+        "cooldown": 9,
         "show_warning": true,
-        "slide_text": "飛膝踢",
-        "kick_text": "飛膝踢"
+        "fist_scale": 1,
+        "lightning_scale": 1
       },
       "comet_punch": {
         "min_height": 0,

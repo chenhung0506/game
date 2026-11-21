@@ -63,19 +63,18 @@ func TestTheHPIsScaledToTheGigantamaxMaximumAndBack(t *testing.T) {
 	}
 }
 
-func TestTheGigantamaxMachampUsesItsOwnNumbersForTheThreeSkills(t *testing.T) {
+func TestTheGigantamaxMachampUsesItsOwnNumbersForItsSkills(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Machamp.Gigantamax.Uppercut.Damage = 77
-	cfg.Machamp.Gigantamax.HighJumpKick.Damage = 66
 	cfg.Machamp.Gigantamax.CometPunch.Quantity = 5
-	cfg.Machamp.Uppercut.Damage, cfg.Machamp.HighJumpKick.Damage = 11, 12
+	cfg.Machamp.Uppercut.Damage = 11
 	g := gmGame(cfg, 800)
 	if g.brawler(0).Uppercut.Damage != 11 {
 		t.Fatal("Machamp's own uppercut is not in force before it changes")
 	}
 	gpress(g, Input{Ult: true})
-	if b := g.brawler(0); b.Uppercut.Damage != 77 || b.HighJumpKick.Damage != 66 || b.CometPunch.Quantity != 5 {
-		t.Fatalf("uppercut %d kick %d fists %d", b.Uppercut.Damage, b.HighJumpKick.Damage, b.CometPunch.Quantity)
+	if b := g.brawler(0); b.Uppercut.Damage != 77 || b.CometPunch.Quantity != 5 {
+		t.Fatalf("uppercut %d fists %d", b.Uppercut.Damage, b.CometPunch.Quantity)
 	}
 	if b := g.brawler(1); b == &cfg.Machamp {
 		t.Fatal("the foe's numbers are Machamp's")
@@ -158,5 +157,104 @@ func TestTheCameraSettingForGigantamaxIsSentToThePage(t *testing.T) {
 	hi := next(t, dialPlay(t, srv, "dummy"), "hi")
 	if cam := hi["cam"].(map[string]any); cam["gz"] != float64(1) {
 		t.Fatalf("cam = %v", cam)
+	}
+}
+
+// lpGame is a Gigantamax Machamp (slot 0, at 300,250) against a Snorlax `d` ahead on the same line.
+func lpGame(cfg Config, d float64) *Game {
+	g := gmGame(cfg, d)
+	g.P[0].GmaxT = 100
+	g.P[1].HP = 100000
+	return g
+}
+
+func TestTheGigantamaxKickIsTheLightningPunchAndTheNormalKickIsNotAvailable(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Machamp.Gigantamax.LightningPunch.ChargeDuration = 0.5
+	g := lpGame(cfg, 600)
+	press(g, 0, Input{Kick: true})
+	if g.P[0].LpT <= 0 || g.P[0].KickPhase != kickNone || g.P[0].LpCD <= 0 {
+		t.Fatalf("LpT %v kick phase %d cooldown %v: the Kick key should gather the Lightning Punch", g.P[0].LpT, g.P[0].KickPhase, g.P[0].LpCD)
+	}
+	n := DefaultConfig()
+	k := kickDuel(n, 600)
+	press(k, 0, Input{Kick: true})
+	if k.P[0].KickPhase == kickNone || k.P[0].LpT != 0 {
+		t.Fatal("a normal Machamp's Kick is the High Jump Kick")
+	}
+}
+
+func TestTheLightningPunchGathersRootedAimedAtTheFoeThenHitsAndABoltComesDownOnIt(t *testing.T) {
+	cfg := DefaultConfig()
+	lp := &cfg.Machamp.Gigantamax.LightningPunch
+	lp.ChargeDuration, lp.Distance, lp.Radius, lp.Damage, lp.Knockback, lp.StunDuration = 0.4, 600, 60, 40, 100, 1
+	lp.LightningRadius, lp.LightningDamage = 150, 30
+	g := lpGame(cfg, 400)
+	hp0 := g.P[1].HP
+	press(g, 0, Input{Kick: true, DY: 1}) // the stick is held, but it gathers on the spot
+	x0, y0 := g.P[0].X, g.P[0].Y
+	g.P[1].Y = 450 // the foe moves while it gathers: the fist follows
+	var punch, bolt, stunned bool
+	for n := 0; n < 60; n++ {
+		g.P[0].In = Input{DX: 1}
+		for _, e := range g.Step(dt) {
+			punch, bolt = punch || e.T == "lpunch", bolt || e.T == "lpbolt"
+		}
+		stunned = stunned || g.P[1].StunT > 0
+		if g.P[0].LpT > 0 && (g.P[0].X != x0 || g.P[0].Y != y0) {
+			t.Fatal("it walked while it gathered")
+		}
+	}
+	if !punch {
+		t.Fatal("the fist was never thrown")
+	}
+	if !bolt {
+		// the foe at (700,450) is 200 off the line of the first aim, but the fist followed it: it must have been hit
+		t.Fatalf("no bolt: foe HP %d of %d, LpX %v LpY %v", g.P[1].HP, hp0, g.P[0].LpX, g.P[0].LpY)
+	}
+	if got := hp0 - g.P[1].HP; got != lp.Damage+lp.LightningDamage {
+		t.Fatalf("the foe lost %d, want the punch %d plus the bolt %d", got, lp.Damage, lp.LightningDamage)
+	}
+	if !stunned {
+		t.Fatal("the foe was not stunned")
+	}
+}
+
+func TestTheLightningPunchMissesAFoeOutOfReach(t *testing.T) {
+	cfg := DefaultConfig()
+	lp := &cfg.Machamp.Gigantamax.LightningPunch
+	lp.ChargeDuration, lp.Distance = 0, 300
+	g := lpGame(cfg, 900) // beyond the reach of the fist
+	press(g, 0, Input{Kick: true})
+	steps(g, 5)
+	if g.P[1].HP != 100000 {
+		t.Fatal("hit a foe out of reach")
+	}
+	if g.P[0].LpCD <= 0 {
+		t.Fatal("a miss has its cooldown as well")
+	}
+}
+
+func TestTheLightningPunchIsCancelledWhenStunnedAndTheNumbersAreChecked(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Machamp.Gigantamax.LightningPunch.ChargeDuration = 1
+	g := lpGame(cfg, 400)
+	press(g, 0, Input{Kick: true})
+	g.P[0].StunT = 0.5
+	steps(g, 3)
+	if g.P[0].LpT != 0 {
+		t.Fatalf("LpT %v: it should have been broken off", g.P[0].LpT)
+	}
+	for name, edit := range map[string]func(*Config){
+		"distance":  func(c *Config) { c.Machamp.Gigantamax.LightningPunch.Distance = 0 },
+		"radius":    func(c *Config) { c.Machamp.Gigantamax.LightningPunch.Radius = 0 },
+		"damage":    func(c *Config) { c.Machamp.Gigantamax.LightningPunch.Damage = -1 },
+		"the reach": func(c *Config) { c.Machamp.Gigantamax.LightningPunch.MinHeight = 100 },
+	} {
+		c := DefaultConfig()
+		edit(&c)
+		if c.validate() == nil {
+			t.Fatalf("%s: a nonsense number was accepted", name)
+		}
 	}
 }

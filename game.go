@@ -93,18 +93,16 @@ type Player struct {
 	Charge float64 `json:"uc"`
 	Lifted bool    `json:"-"`   // Thousand Volt has Pikachu off the ground (so nothing else's Z is touched)
 	UltT   float64 `json:"uct"` // Thousand Volt: seconds of its gathering left (Pikachu is rooted meanwhile)
-	// Brave Bird (Rowlet's ultimate): it is diving (rooted, out of the player's hands) from BirdZ0 high, BirdLeft of BirdT0 seconds left, at (BirdTX, BirdTY);
+	// Brave Bird (Rowlet's ultimate): it is diving (rooted, out of the player's hands) at (BirdTX, BirdTY);
 	// Juggle is a body it threw up: Held in the air for JuggleT more seconds (-1 once they are over and it is coming down).
-	BirdDive         bool       `json:"bbd"`
-	BirdTX           float64    `json:"btx"` // where the dive is going (for the page: which way the bird of light faces)
-	BirdTY           float64    `json:"bty"`
-	BirdZ0           float64    `json:"-"`
-	BirdT0, BirdLeft float64    `json:"-"`
-	Juggle           bool       `json:"-"`
-	Tw               spinParams `json:"-"` // what the tornado that holds it does (set when it is caught), and the height it was caught at
-	TwZ0             float64    `json:"-"`
-	JuggleT          float64    `json:"-"`
-	JuggleH          float64    `json:"-"` // the height it was thrown to (Brave Bird's launch_height, the Uppercut's)
+	BirdDive bool       `json:"bbd"`
+	BirdTX   float64    `json:"btx"` // where the dive is going (for the page: which way the bird of light faces)
+	BirdTY   float64    `json:"bty"`
+	Juggle   bool       `json:"-"`
+	Tw       spinParams `json:"-"` // what the tornado that holds it does (set when it is caught), and the height it was caught at
+	TwZ0     float64    `json:"-"`
+	JuggleT  float64    `json:"-"`
+	JuggleH  float64    `json:"-"` // the height it was thrown to (Brave Bird's launch_height, the Uppercut's)
 
 	FX           int     `json:"fx"` // last non-zero direction held; a dash with no keys goes this way, and so does the ball
 	FY           int     `json:"fy"`
@@ -303,6 +301,11 @@ type Player struct {
 	UpCD    float64 `json:"ucd"`
 	// Gigantamax (Machamp's ultimate): the seconds it has left as the Gigantamax Machamp (0: it is not).
 	GmaxT float64 `json:"gmt"`
+	// Lightning Punch (the Gigantamax Machamp's Kick): the seconds of the gathering left, the unit direction the fist is aimed along (it follows the foe) and the cooldown.
+	LpT  float64 `json:"lpt"`
+	LpX  float64 `json:"lpx"`
+	LpY  float64 `json:"lpy"`
+	LpCD float64 `json:"lpcd"`
 	// Gengar: seconds left under the ground (the shadow shows), the three cooldowns, and how much longer it cannot start a skill
 	// (an opponent's shadow is on it).
 	SneakT           float64 `json:"gnt"`

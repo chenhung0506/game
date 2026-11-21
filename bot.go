@@ -405,6 +405,14 @@ func (c *bctx) findThreat() threat {
 		}
 	}
 
+	if f.gigantamax() && f.LpT > 0 { // a Lightning Punch gathering: the line of the fist is on the ground and follows its target, so only getting out of its reach helps
+		lp := cfg.Machamp.Gigantamax.LightningPunch
+		if segDist(p.X, p.Y, f.X, f.Y, f.X+f.LpX*lp.Distance, f.Y+f.LpY*lp.Distance) < lp.Radius+c.pr+15 {
+			ax, ay := unit(p.X-f.X, p.Y-f.Y)
+			consider(threat{thPunch, f.LpT, ax, ay})
+		}
+	}
+
 	if f.Kind == ash && f.MegaT > 0 { // a Megaton Punch gathering: the line it will fly along is on the ground and follows the target (or the stick of a person), so it is read afresh every tick
 		mp := cfg.Ash.MegatonPunch
 		if segDist(p.X, p.Y, f.X, f.Y, f.X+f.MegaX*mp.Distance, f.Y+f.MegaY*mp.Distance) < mp.Radius+c.pr+15 {
@@ -951,7 +959,7 @@ func (b *Bot) ash(c *bctx) Input {
 	g, p, f := c.g, c.p, c.f
 	bc := g.brawler(c.me)
 	ts, cp, rt := bc.TreeSlam, bc.CometPunch, bc.RockTomb
-	if p.FrozenT > 0 || p.Held || p.StunT > 0 || p.TreePhase != treeNone || p.CometT > 0 || p.MegaT > 0 || p.MegaJT > 0 || p.KickPhase != kickNone || p.UpPhase != upNone {
+	if p.FrozenT > 0 || p.Held || p.StunT > 0 || p.TreePhase != treeNone || p.CometT > 0 || p.MegaT > 0 || p.MegaJT > 0 || p.KickPhase != kickNone || p.UpPhase != upNone || p.LpT > 0 {
 		return c.stay() // rooted, or it moves itself
 	}
 	if p.RockT > 0 {
@@ -962,6 +970,11 @@ func (b *Bot) ash(c *bctx) Input {
 		return c.move(th.ax, th.ay)
 	}
 	danger := f.Kind == rowlet && f.ArrowT > 0
+	if lp := g.cfg.Machamp.Gigantamax.LightningPunch; p.gigantamax() && p.LpCD == 0 && p.Z == 0 && lp.Reach.hits(f) && c.dist <= lp.Distance*0.85 && !danger { // the Lightning Punch: it gathers on the spot with the fist on the foe
+		in := c.stay()
+		in.Kick = true
+		return in
+	}
 	if p.Kind == machamp && p.GmaxT == 0 && p.Charge >= g.cfg.Machamp.Ultimate.Max && !danger && c.dist <= 600 { // the ultimate, as soon as it is charged and the opponent is in reach
 		in := c.stay()
 		in.Ult = true
@@ -993,7 +1006,7 @@ func (b *Bot) ash(c *bctx) Input {
 	punch := p.CometCD == 0 && cp.Reach.hits(f) && c.dist <= cp.Distance+cp.ScatterMaxDistance+c.fr
 	smash := p.Kind == ash && p.TreeCD == 0 && p.Z == 0 && ts.Reach.hits(f) && c.dist <= ts.JumpDistance+ts.TrunkLength*0.8 // Machamp has no tree
 	hk := bc.HighJumpKick
-	kick := p.KickCD == 0 && p.Z == 0 && hk.Reach.hits(f) && c.dist <= hk.SlideDistance+hk.KickDistance*0.8
+	kick := p.KickCD == 0 && p.Z == 0 && hk.Reach.hits(f) && c.dist <= hk.SlideDistance+hk.KickDistance*0.8 && !p.gigantamax()
 	kickIn := func() Input { // slides at the opponent, then kicks it
 		in := c.move(c.ux, c.uy)
 		in.Kick = true

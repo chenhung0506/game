@@ -24,7 +24,7 @@ func (g *Game) stepGigantamax(i int, in Input, u Ultimate, dt float64) ([]Event,
 		}
 		return nil, false
 	}
-	busy := p.TreePhase != treeNone || p.CometT > 0 || p.RockT > 0 || p.MegaT > 0 || p.MegaJT > 0 || p.KickPhase != kickNone || p.UpPhase != upNone ||
+	busy := p.TreePhase != treeNone || p.CometT > 0 || p.RockT > 0 || p.MegaT > 0 || p.MegaJT > 0 || p.KickPhase != kickNone || p.UpPhase != upNone || p.LpT > 0 ||
 		p.Z != 0 || p.Held || p.FrozenT > 0 || p.StunT > 0
 	if !in.Ult || p.Charge < u.Max || busy {
 		return nil, false
