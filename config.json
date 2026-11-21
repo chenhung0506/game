@@ -369,7 +369,7 @@
       "charge_duration": 1.5,
       "sky_height": 200,
       "dive_speed": 1000,
-      "lock_distance": 200,
+      "lock_distance": 1000,
       "explosion_radius": 160,
       "damage": 30,
       "launch_height": 200,
