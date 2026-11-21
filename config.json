@@ -84,7 +84,7 @@
       "max": 100,
       "gain_taken": 1,
       "gain_dealt": 1,
-      "gain_ultimate_dealt": 1,
+      "gain_ultimate_dealt": 0.4,
       "gain_per_second": 1
     }
   },
@@ -182,7 +182,7 @@
       "max": 100,
       "gain_taken": 1,
       "gain_dealt": 1,
-      "gain_ultimate_dealt": 1,
+      "gain_ultimate_dealt": 0.4,
       "gain_per_second": 1
     },
     "giant_vines": {
@@ -361,7 +361,7 @@
       "mass": 100,
       "scale": 1.4
     },
-    "ultimate": { "max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_ultimate_dealt": 1, "gain_per_second": 1 },
+    "ultimate": { "max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_ultimate_dealt": 0.4, "gain_per_second": 1 },
     "brave_bird": {
       "min_height": 0,
       "max_height": 1000,
@@ -721,7 +721,7 @@
       "max": 100,
       "gain_taken": 1,
       "gain_dealt": 1,
-      "gain_ultimate_dealt": 0.5,
+      "gain_ultimate_dealt": 0.2,
       "gain_per_second": 1
     },
     "gigantamax": {
