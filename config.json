@@ -727,7 +727,7 @@
     "gigantamax": {
       "max_hp":  510,
       "walk_speed": 280,
-      "radius": 140,
+      "radius": 100,
       "duration": 8,
       "uppercut": {
         "min_height": 0,
@@ -775,9 +775,9 @@
         "duration": 3,
         "quantity": 140,
         "random_offset_angle": 60,
-        "distance": 350,
+        "distance": 250,
         "scatter_min_distance": 0,
-        "scatter_max_distance": 600,
+        "scatter_max_distance": 300,
         "fist_duration": 0.2
       }
     }
