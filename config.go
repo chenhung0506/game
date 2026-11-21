@@ -204,6 +204,75 @@ type Ultimate struct {
 	GainPerSecond float64 `json:"gain_per_second"`
 }
 
+// FlyCfg is Charizard's Fly (the main button): it lifts Charizard for `duration` seconds. It only moves faster. Whether a skill still hits it is up to that skill's
+// min_height / max_height against `height`.
+type FlyCfg struct {
+	Duration float64 `json:"duration"`
+	Cooldown float64 `json:"cooldown"` // starts when it has landed
+	Speed    float64 `json:"speed"`    // walking speed while flying
+	Height   float64 `json:"height"`
+	// When the flight ends (Charizard is back on the ground) it breathes a ring of `ring_count` fire balls
+	// that spread out from it, `ring_length` far; each is a fire ball of fire_breath (speed, size, HP, damage).
+	// 0 balls = no ring.
+	RingCount  int     `json:"ring_count"`
+	RingLength float64 `json:"ring_length"`
+}
+
+// FireBreathCfg is Charizard's Fire Breath: for `duration` seconds Charizard spits `quantity` fire balls, evenly spaced, each at the
+// opponent's position when it leaves the mouth, turned by a random angle within +-random_offset_angle.
+// It can walk or fly while breathing. A fire ball hurts the first thing it touches and is gone; the
+// opponent's skills wear its HP down, and it ends at `length` or at a wall.
+type FireBreathCfg struct {
+	Reach
+	Speed             float64 `json:"speed"`
+	Radius            float64 `json:"radius"`
+	HP                int     `json:"hp"`
+	Damage            int     `json:"damage"`              // per fire ball that lands
+	Cooldown          float64 `json:"cooldown"`            // counted from the start of the breath
+	Mass              float64 `json:"mass"`                // see hyper_beam.mass: a heavier beam or punch pushes it back by the difference
+	Duration          float64 `json:"duration"`            // seconds the breath lasts
+	Quantity          int     `json:"quantity"`            // fire balls in one breath
+	RandomOffsetAngle float64 `json:"random_offset_angle"` // degrees: each ball is turned by a random angle in [-this, +this]
+	Length            float64 `json:"length"`              // how far a fire ball flies
+}
+
+// SeismicTossCfg is Charizard's Seismic Toss: Charizard, on fire, runs `length` along the aim at `speed`. The body it touches (within
+// `radius`) is caught and cannot move or act: Charizard flies up `high` with it, then slams it down for
+// `damage`, with the same shock as Snorlax's landing (drawn `radius` wide). The rise and the fall go at `speed`.
+type SeismicTossCfg struct {
+	Reach            // who the run can catch, by height
+	Speed    float64 `json:"speed"`
+	Radius   float64 `json:"radius"`
+	Damage   int     `json:"damage"`
+	Cooldown float64 `json:"cooldown"` // counted from the start of the run
+	Length   float64 `json:"length"`
+	High     float64 `json:"high"`
+	Mass     float64 `json:"mass"` // against another skill running at the same time, see pikachu.volt_tackle.mass
+	// The slam sets the ground on fire where the opponent landed: a disc of `fire_radius` (plus the body of
+	// whoever stands in it) that burns for `fire_duration` seconds. An opponent standing in it, no higher off
+	// the ground than `fire_max_height`, takes `fire_damage` at once and again every `fire_interval` seconds.
+	// A radius or duration of 0 = no fire.
+	FireRadius    float64 `json:"fire_radius"`
+	FireDuration  float64 `json:"fire_duration"`
+	FireDamage    int     `json:"fire_damage"`
+	FireInterval  float64 `json:"fire_interval"`
+	FireMaxHeight float64 `json:"fire_max_height"`
+}
+
+// CharizardGmaxCfg is Charizard's ultimate (Z, once the charge is full): for `duration` seconds it is the Gigantamax Charizard, with its own `max_hp` (the HP it has is
+// scaled to it, and back when it is over), `walk_speed` and body `radius`, and its own numbers for its three skills (Fly on the main button, Fire Breath, Seismic Toss),
+// each read exactly like charizard.fly, charizard.fire_breath and charizard.seismic_toss, which it uses the rest of the time. The fire balls and the burning ground it
+// makes keep these numbers after it has changed back.
+type CharizardGmaxCfg struct {
+	MaxHP       int            `json:"max_hp"`
+	WalkSpeed   float64        `json:"walk_speed"`
+	Radius      float64        `json:"radius"`
+	Duration    float64        `json:"duration"`
+	Fly         FlyCfg         `json:"fly"`
+	FireBreath  FireBreathCfg  `json:"fire_breath"`
+	SeismicToss SeismicTossCfg `json:"seismic_toss"`
+}
+
 // Config holds the tuning values. Distances are in game units and times are in seconds.
 type Config struct {
 	// Length runs between the two players (left-right on the web page, up-down on a phone), width
@@ -337,61 +406,15 @@ type Config struct {
 		HyperBeam HyperBeamCfg `json:"hyper_beam"`
 	} `json:"snorlax"`
 	Charizard struct {
-		MaxHP     int     `json:"max_hp"`
-		WalkSpeed float64 `json:"walk_speed"`
-		Radius    float64 `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
-		// Fly: the main button lifts Charizard for `duration` seconds. It only moves faster. Whether a skill still
-		// hits it is up to that skill's min_height / max_height against `height`.
-		Fly struct {
-			Duration float64 `json:"duration"`
-			Cooldown float64 `json:"cooldown"` // starts when it has landed
-			Speed    float64 `json:"speed"`    // walking speed while flying
-			Height   float64 `json:"height"`
-			// When the flight ends (Charizard is back on the ground) it breathes a ring of `ring_count` fire balls
-			// that spread out from it, `ring_length` far; each is a fire ball of fire_breath (speed, size, HP, damage).
-			// 0 balls = no ring.
-			RingCount  int     `json:"ring_count"`
-			RingLength float64 `json:"ring_length"`
-		} `json:"fly"`
-		// Fire Breath: for `duration` seconds Charizard spits `quantity` fire balls, evenly spaced, each at the
-		// opponent's position when it leaves the mouth, turned by a random angle within +-random_offset_angle.
-		// It can walk or fly while breathing. A fire ball hurts the first thing it touches and is gone; the
-		// opponent's skills wear its HP down, and it ends at `length` or at a wall.
-		FireBreath struct {
-			Reach
-			Speed             float64 `json:"speed"`
-			Radius            float64 `json:"radius"`
-			HP                int     `json:"hp"`
-			Damage            int     `json:"damage"`              // per fire ball that lands
-			Cooldown          float64 `json:"cooldown"`            // counted from the start of the breath
-			Mass              float64 `json:"mass"`                // see hyper_beam.mass: a heavier beam or punch pushes it back by the difference
-			Duration          float64 `json:"duration"`            // seconds the breath lasts
-			Quantity          int     `json:"quantity"`            // fire balls in one breath
-			RandomOffsetAngle float64 `json:"random_offset_angle"` // degrees: each ball is turned by a random angle in [-this, +this]
-			Length            float64 `json:"length"`              // how far a fire ball flies
-		} `json:"fire_breath"`
-		// Seismic Toss: Charizard, on fire, runs `length` along the aim at `speed`. The body it touches (within
-		// `radius`) is caught and cannot move or act: Charizard flies up `high` with it, then slams it down for
-		// `damage`, with the same shock as Snorlax's landing (drawn `radius` wide). The rise and the fall go at `speed`.
-		SeismicToss struct {
-			Reach            // who the run can catch, by height
-			Speed    float64 `json:"speed"`
-			Radius   float64 `json:"radius"`
-			Damage   int     `json:"damage"`
-			Cooldown float64 `json:"cooldown"` // counted from the start of the run
-			Length   float64 `json:"length"`
-			High     float64 `json:"high"`
-			Mass     float64 `json:"mass"` // against another skill running at the same time, see pikachu.volt_tackle.mass
-			// The slam sets the ground on fire where the opponent landed: a disc of `fire_radius` (plus the body of
-			// whoever stands in it) that burns for `fire_duration` seconds. An opponent standing in it, no higher off
-			// the ground than `fire_max_height`, takes `fire_damage` at once and again every `fire_interval` seconds.
-			// A radius or duration of 0 = no fire.
-			FireRadius    float64 `json:"fire_radius"`
-			FireDuration  float64 `json:"fire_duration"`
-			FireDamage    int     `json:"fire_damage"`
-			FireInterval  float64 `json:"fire_interval"`
-			FireMaxHeight float64 `json:"fire_max_height"`
-		} `json:"seismic_toss"`
+		MaxHP       int            `json:"max_hp"`
+		WalkSpeed   float64        `json:"walk_speed"`
+		Radius      float64        `json:"radius"` // body size: drawn at this size, and it widens what skills can hit
+		Fly         FlyCfg         `json:"fly"`
+		FireBreath  FireBreathCfg  `json:"fire_breath"`
+		SeismicToss SeismicTossCfg `json:"seismic_toss"`
+		// Ultimate (Z) is the charge for the Gigantamax Charizard below; Gigantamax is what it turns into (see CharizardGmaxCfg).
+		Ultimate   Ultimate         `json:"ultimate"`
+		Gigantamax CharizardGmaxCfg `json:"gigantamax"`
 	} `json:"charizard"`
 	Chikorita struct {
 		MaxHP     int     `json:"max_hp"`
@@ -1226,6 +1249,13 @@ func DefaultConfig() Config {
 	gm.Uppercut.Damage, gm.Uppercut.LaunchHeight = 35, 260
 	gm.LightningPunch = LightningPunchCfg{Reach: Reach{MinHeight: 0, MaxHeight: 80}, ChargeDuration: 1.2, Distance: 500, Radius: 70, Damage: 40, StunDuration: 1, Knockback: 200, LightningRadius: 160, LightningDamage: 30, Cooldown: 9, FistScale: 1, LightningScale: 1}
 	gm.CometPunch.Damage, gm.CometPunch.Quantity, gm.CometPunch.Radius = 3, 28, 26
+	c.Charizard.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
+	cg := &c.Charizard.Gigantamax // the ultimate: bigger and tougher than Charizard, with bigger fire balls and a bigger toss
+	cg.MaxHP, cg.WalkSpeed, cg.Radius, cg.Duration = 600, 200, 60, 8
+	cg.Fly, cg.FireBreath, cg.SeismicToss = c.Charizard.Fly, c.Charizard.FireBreath, c.Charizard.SeismicToss
+	cg.Fly.Height, cg.Fly.Speed = 130, 340
+	cg.FireBreath.Radius, cg.FireBreath.Damage, cg.FireBreath.HP, cg.FireBreath.Quantity = 28, 6, 12, 30
+	cg.SeismicToss.Radius, cg.SeismicToss.Damage, cg.SeismicToss.FireRadius = 160, 60, 320
 	return c
 }
 
@@ -1265,6 +1295,15 @@ func (c Config) validate() error {
 	tmp.Machamp.Uppercut, tmp.Machamp.CometPunch = gm.Uppercut, gm.CometPunch
 	if err := tmp.validateSkills(); err != nil {
 		return fmt.Errorf("machamp.gigantamax's skills are checked like Machamp's, and: %w", err)
+	}
+	cg := c.Charizard.Gigantamax
+	if cg.MaxHP <= 0 || !(cg.WalkSpeed > 0) || !(cg.Radius > 0) || !(cg.Duration > 0) {
+		return fmt.Errorf("charizard.gigantamax: max_hp (%d), walk_speed (%v), radius (%v) and duration (%v) must be above 0", cg.MaxHP, cg.WalkSpeed, cg.Radius, cg.Duration)
+	}
+	tmp = c
+	tmp.Charizard.Fly, tmp.Charizard.FireBreath, tmp.Charizard.SeismicToss = cg.Fly, cg.FireBreath, cg.SeismicToss
+	if err := tmp.validateSkills(); err != nil {
+		return fmt.Errorf("charizard.gigantamax's skills are checked like Charizard's, and: %w", err)
 	}
 	return nil
 }
@@ -1380,6 +1419,7 @@ func (c Config) validateSkills() error {
 		{"chikorita.ultimate.max", c.Chikorita.Ultimate.Max, 0},
 		{"rowlet.ultimate.max", c.Rowlet.Ultimate.Max, 0},
 		{"machamp.ultimate.max", c.Machamp.Ultimate.Max, 0},
+		{"charizard.ultimate.max", c.Charizard.Ultimate.Max, 0},
 		{"chikorita.giant_vines.follow_speed", c.Chikorita.GiantVines.FollowSpeed, 0},
 		{"chikorita.giant_vines.terminal_time", c.Chikorita.GiantVines.TerminalTime, 0},
 		{"chikorita.giant_vines.head_radius", c.Chikorita.GiantVines.HeadRadius, 0},
@@ -1758,6 +1798,10 @@ func (c Config) validateSkills() error {
 		{"machamp.ultimate.gain_dealt", c.Machamp.Ultimate.GainDealt},
 		{"machamp.ultimate.gain_ultimate_dealt", c.Machamp.Ultimate.GainUltDealt},
 		{"machamp.ultimate.gain_per_second", c.Machamp.Ultimate.GainPerSecond},
+		{"charizard.ultimate.gain_taken", c.Charizard.Ultimate.GainTaken},
+		{"charizard.ultimate.gain_dealt", c.Charizard.Ultimate.GainDealt},
+		{"charizard.ultimate.gain_ultimate_dealt", c.Charizard.Ultimate.GainUltDealt},
+		{"charizard.ultimate.gain_per_second", c.Charizard.Ultimate.GainPerSecond},
 		{"rowlet.ultimate.gain_per_second", c.Rowlet.Ultimate.GainPerSecond},
 		{"rowlet.brave_bird.ring_duration", c.Rowlet.BraveBird.RingDuration},
 		{"rowlet.brave_bird.charge_duration", c.Rowlet.BraveBird.ChargeDuration},

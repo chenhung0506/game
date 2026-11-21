@@ -10,14 +10,14 @@
     "volt_tackle": {
       "min_height": 0,
       "max_height": 60,
-      "radius": 30,
+      "radius": 40,
       "distance": 150,
       "duration": 0.2,
       "max_uses": 3,
       "use_window": 3,
       "cooldown": 5,
-      "paralyze_duration": 1.5,
-      "damage": 5,
+      "paralyze_duration": 2,
+      "damage": 15,
       "mass": 60,
       "scale": 1.5
     },
@@ -172,6 +172,51 @@
       "fire_damage": 3,
       "fire_interval": 0.5,
       "fire_max_height": 12
+    },
+    "ultimate": { "max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_ultimate_dealt": 0.3, "gain_per_second": 1 },
+    "gigantamax": {
+      "max_hp": 600,
+      "walk_speed": 200,
+      "radius": 60,
+      "duration": 8,
+      "fly": {
+        "duration": 8,
+        "cooldown": 6,
+        "speed": 340,
+        "height": 100,
+        "ring_count": 24,
+        "ring_length": 500
+      },
+      "fire_breath": {
+        "min_height": 0,
+        "max_height": 80,
+        "speed": 255,
+        "radius": 28,
+        "hp": 12,
+        "damage": 8,
+        "cooldown": 7,
+        "mass": 60,
+        "duration": 4.5,
+        "quantity": 30,
+        "random_offset_angle": 9,
+        "length": 650
+      },
+      "seismic_toss": {
+        "min_height": 0,
+        "max_height": 60,
+        "speed": 600,
+        "radius": 160,
+        "damage": 60,
+        "cooldown": 7,
+        "length": 450,
+        "high": 400,
+        "mass": 100,
+        "fire_radius": 380,
+        "fire_duration": 8,
+        "fire_damage": 6,
+        "fire_interval": 0.5,
+        "fire_max_height": 30
+      }
     }
   },
   "chikorita": {
@@ -221,9 +266,9 @@
       "slashes": 8,
       "slash_interval": 0.25,
       "slash_step": 80,
-      "slash_radius": 140,
-      "leaf_scale": 3,
-      "damage": 7,
+      "slash_radius": 200,
+      "leaf_scale": 3.5,
+      "damage": 8,
       "cooldown": 5
     },
     "razor_leaf": {

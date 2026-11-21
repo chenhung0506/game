@@ -56,6 +56,8 @@ func (c Config) ultimateOf(kind int) (Ultimate, bool) {
 		return c.Rowlet.Ultimate, true
 	case machamp:
 		return c.Machamp.Ultimate, true
+	case charizard:
+		return c.Charizard.Ultimate, true
 	}
 	return Ultimate{}, false
 }
@@ -98,7 +100,7 @@ func (g *Game) stepUltimate(i int, in Input, dt float64) ([]Event, bool) {
 	if ok && p.Kind == rowlet {
 		return g.stepBraveBird(i, in, u, dt)
 	}
-	if ok && p.Kind == machamp {
+	if ok && (p.Kind == machamp || p.Kind == charizard) {
 		return g.stepGigantamax(i, in, u, dt)
 	}
 	if !ok || p.Kind != pikachu { // Ash's is the Megaton Punch, started by stepMachamp

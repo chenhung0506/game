@@ -392,6 +392,7 @@ type Ball struct {
 	Spin      *spinParams     `json:"-"`            // tornado: what it does to whoever it holds, where that is not rowlet.tornado (Brave Bird's)
 	Rad       float64         `json:"r,omitempty"`  // tornado: its own reach where it is not rowlet.tornado.radius (Brave Bird's)
 	Scale     float64         `json:"sc,omitempty"` // tornado: how many times bigger than its reach it is drawn (with Rad)
+	Ult       bool            `json:"ug,omitempty"` // fire ball: a Gigantamax Charizard breathed it, so it keeps charizard.gigantamax.fire_breath's numbers and its damage is the ultimate's even after the change back
 }
 
 // Frost is a patch of Vulpix's frost on the ground: whoever stands on it walks faster (the owner) or slower.
@@ -401,8 +402,9 @@ type FireZone struct {
 	X     float64 `json:"x"`
 	Y     float64 `json:"y"`
 	R     float64 `json:"r"`
-	Left  float64 `json:"l"` // seconds before it burns out
-	HitCD float64 `json:"-"` // until it may burn the opponent again
+	Left  float64 `json:"l"`            // seconds before it burns out
+	HitCD float64 `json:"-"`            // until it may burn the opponent again
+	Ult   bool    `json:"ug,omitempty"` // a Gigantamax Charizard lit it: it burns by charizard.gigantamax.seismic_toss's numbers and its damage is the ultimate's
 }
 
 type Frost struct {
@@ -471,8 +473,8 @@ func validEase(pct int) bool { return pct >= 0 && pct <= easeMax && pct%easeStep
 // maxHP is slot i's full HP, handicap included (at least 1).
 func (g *Game) maxHP(i int) int {
 	base := g.cfg.maxHPOf(g.P[i].Kind)
-	if g.P[i].gigantamax() {
-		base = g.cfg.Machamp.Gigantamax.MaxHP
+	if gm, ok := g.cfg.gigantamaxOf(g.P[i].Kind); ok && g.P[i].gigantamax() {
+		base = gm.MaxHP
 	}
 	return max(1, base*(100-g.ease(i)+g.Boost[i])/100)
 }
@@ -618,17 +620,17 @@ func (g *Game) Winner() int {
 // radius is how big a character's body is: a skill hits when its area touches the body.
 func (g *Game) radius(i int) float64 { return g.bodyRadius(&g.P[i]) }
 
-// bodyRadius is how big p's body is (the Gigantamax Machamp's own while it lasts), walkSpeedOf how fast it walks.
+// bodyRadius is how big p's body is (the Gigantamax Machamp's or Charizard's own while it lasts), walkSpeedOf how fast it walks.
 func (g *Game) bodyRadius(p *Player) float64 {
-	if p.gigantamax() {
-		return g.cfg.Machamp.Gigantamax.Radius
+	if gm, ok := g.cfg.gigantamaxOf(p.Kind); ok && p.gigantamax() {
+		return gm.Radius
 	}
 	return g.cfg.radiusOf(p.Kind)
 }
 
 func (g *Game) walkSpeedOf(p *Player) float64 {
-	if p.gigantamax() {
-		return g.cfg.Machamp.Gigantamax.WalkSpeed
+	if gm, ok := g.cfg.gigantamaxOf(p.Kind); ok && p.gigantamax() {
+		return gm.WalkSpeed
 	}
 	return g.cfg.walkSpeedOf(p.Kind)
 }
@@ -637,7 +639,7 @@ func (g *Game) walkSpeedOf(p *Player) float64 {
 func (g *Game) ballRadius(b *Ball) float64 {
 	switch b.K {
 	case ballFire:
-		return g.cfg.Charizard.FireBreath.Radius
+		return g.fireBreathOf(b.Ult).Radius
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Radius
 	case ballPillar:
@@ -665,7 +667,7 @@ func (g *Game) ballRadius(b *Ball) float64 {
 func (g *Game) ballMass(b *Ball) float64 {
 	switch b.K {
 	case ballFire:
-		return g.cfg.Charizard.FireBreath.Mass
+		return g.fireBreathOf(b.Ult).Mass
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Mass
 	case ballPillar, ballStone:
@@ -1106,7 +1108,7 @@ func (g *Game) Step(dt float64) []Event {
 			// the air: rising is the first half of the jump, falling the second.
 			v := g.walkSpeedOf(p)
 			if p.Kind == charizard && p.FlyT > 0 {
-				v = g.cfg.Charizard.Fly.Speed
+				v = g.charizardP(p).Fly.Speed
 			}
 			if p.Kind == magikarp && p.HopLeft > 0 {
 				v = g.magikarpAirSpeed(p)
@@ -1241,7 +1243,7 @@ func (g *Game) stepIcePunch(i int, in Input, dt float64) []Event {
 // opponent (hurting it), reaches a wall, runs out of range or runs out of HP.
 func (g *Game) stepBalls(dt float64) []Event {
 	var events []Event
-	bc, fb, rl := g.cfg.Pikachu.ElectroBall, g.cfg.Charizard.FireBreath, g.cfg.Chikorita.RazorLeaf
+	bc, rl := g.cfg.Pikachu.ElectroBall, g.cfg.Chikorita.RazorLeaf
 	ar, tn := g.cfg.Rowlet.Arrows, g.cfg.Rowlet.Tornado
 	type blast struct{ x, y float64 }
 	var blasts []blast
@@ -1440,6 +1442,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 		}
 		if b.K == ballFire {
 			if b.HP > 0 {
+				fb := g.fireBreathOf(b.Ult)
 				x0, y0 := b.X, b.Y
 				step := math.Min(fb.Speed*dt, b.Left)
 				b.X += b.DX * step
@@ -1449,7 +1452,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 				if foe, ok := g.touchedFoe(b.Owner, func(f *Player, rad float64) bool {
 					return fb.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, b.X, b.Y) <= fb.Radius+rad
 				}); ok {
+					g.ultNow = b.Ult // a Gigantamax Charizard's fire balls are its ultimate's
 					g.hit(foe, fb.Damage)
+					g.ultNow = false
 					continue
 				}
 				inside := b.X > 0 && b.X < g.court.Length && b.Y > 0 && b.Y < g.court.Width
@@ -1542,7 +1547,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 func (g *Game) ballDamage(b *Ball) int {
 	switch b.K {
 	case ballFire:
-		return g.cfg.Charizard.FireBreath.Damage
+		return g.fireBreathOf(b.Ult).Damage
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Damage
 	case ballPillar, ballStone:
@@ -1656,7 +1661,10 @@ func (g *Game) fistShove(fist, ball *Ball) float64 {
 func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 	var events []Event
 	p, other := &g.P[i], &g.P[g.nearestFoe(i)]
-	cz := g.cfg.Charizard
+	cz := g.charizardP(p) // the Gigantamax Charizard has its own numbers
+	if p.gigantamax() {
+		defer g.ultimateDamage()() // everything it does while it is Gigantamax is its ultimate's
+	}
 	stunned := p.FrozenT > 0 || p.Held // in is already empty then; this only stops new skills
 	tick := func(v *float64) {
 		if *v > 0 {
@@ -1712,7 +1720,7 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 			ux, uy := dx/n, dy/n
 			ux, uy = ux*math.Cos(a)-uy*math.Sin(a), ux*math.Sin(a)+uy*math.Cos(a)
 			off := g.radius(i) + fb.Radius + 1 // starts just clear of Charizard's body
-			g.Balls = append(g.Balls, Ball{K: ballFire, Owner: i, Left: fb.Length, X: p.X + ux*off, Y: p.Y + uy*off, DX: ux, DY: uy, HP: fb.HP})
+			g.Balls = append(g.Balls, Ball{K: ballFire, Owner: i, Left: fb.Length, X: p.X + ux*off, Y: p.Y + uy*off, DX: ux, DY: uy, HP: fb.HP, Ult: p.gigantamax()})
 		}
 	}
 
@@ -1759,7 +1767,7 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 			caught.Held, caught.Z = false, 0
 			events = append(events, Event{T: "slam", X: caught.X, Y: caught.Y, R: ts.Radius}) // the same shock as Snorlax's landing
 			if ts.FireRadius > 0 && ts.FireDuration > 0 {
-				g.Fires = append(g.Fires, FireZone{Owner: i, X: caught.X, Y: caught.Y, R: ts.FireRadius, Left: ts.FireDuration})
+				g.Fires = append(g.Fires, FireZone{Owner: i, X: caught.X, Y: caught.Y, R: ts.FireRadius, Left: ts.FireDuration, Ult: p.gigantamax()})
 				if over := len(g.Fires) - maxFires; over > 0 {
 					g.Fires = g.Fires[over:]
 				}
@@ -1954,7 +1962,7 @@ func (g *Game) dropToss(i int) {
 	if p.TossPhase != tossDash {
 		p.Z = 0
 		if p.TossAir {
-			p.FlyCD = g.cfg.Charizard.Fly.Cooldown
+			p.FlyCD = g.charizardP(p).Fly.Cooldown
 		}
 	}
 	p.TossPhase = tossNone
@@ -1970,7 +1978,7 @@ func (g *Game) runningMass(j int) (float64, bool) {
 	case p.Kind == snorlax && p.PunchLeft > 0:
 		return g.cfg.Snorlax.IcePunch.Mass, true
 	case p.Kind == charizard && p.TossPhase == tossDash:
-		return g.cfg.Charizard.SeismicToss.Mass, true
+		return g.charizardP(p).SeismicToss.Mass, true
 	}
 	return 0, false
 }
@@ -2055,20 +2063,25 @@ const maxFires = 20
 
 // flyRing is the ring of fire balls Charizard breathes out when it lands from a flight.
 func (g *Game) flyRing(i int) {
-	p, fly, fb := &g.P[i], g.cfg.Charizard.Fly, g.cfg.Charizard.FireBreath
+	p := &g.P[i]
+	cz := g.charizardP(p)
+	fly, fb := cz.Fly, cz.FireBreath
 	off := g.radius(i) + fb.Radius + 1 // starts just clear of the body
 	for n := 0; n < fly.RingCount; n++ {
 		a := 2 * math.Pi * float64(n) / float64(fly.RingCount)
 		ux, uy := math.Cos(a), math.Sin(a)
-		g.Balls = append(g.Balls, Ball{K: ballFire, Owner: i, Left: fly.RingLength, X: p.X + ux*off, Y: p.Y + uy*off, DX: ux, DY: uy, HP: fb.HP})
+		g.Balls = append(g.Balls, Ball{K: ballFire, Owner: i, Left: fly.RingLength, X: p.X + ux*off, Y: p.Y + uy*off, DX: ux, DY: uy, HP: fb.HP, Ult: p.gigantamax()})
 	}
 }
 
 // tickFires burns the opponent standing in a fire zone and lets the zones burn out.
 func (g *Game) tickFires(dt float64) {
-	ts := g.cfg.Charizard.SeismicToss
 	kept := g.Fires[:0]
 	for _, z := range g.Fires {
+		ts := g.cfg.Charizard.SeismicToss
+		if z.Ult {
+			ts = g.cfg.Charizard.Gigantamax.SeismicToss
+		}
 		if z.HitCD > 0 {
 			z.HitCD -= dt
 		}
@@ -2076,7 +2089,9 @@ func (g *Game) tickFires(dt float64) {
 			burnt := false
 			for _, j := range g.foes(z.Owner) {
 				if foe := &g.P[j]; foe.Z >= 0 && foe.Z <= ts.FireMaxHeight && math.Hypot(foe.X-z.X, foe.Y-z.Y) <= z.R+g.radius(j) {
+					g.ultNow = z.Ult // a Gigantamax Charizard's burning ground is its ultimate's
 					g.hit(foe, ts.FireDamage)
+					g.ultNow = false
 					burnt = true
 				}
 			}

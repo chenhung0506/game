@@ -94,6 +94,7 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 | 暴鯉龍 | J / 小按鈕「死光」 | 破壞死光：機制和卡比獸一樣（同一段程式，`Step` 裡那一塊是 `snorlax || gyarados`，用 `cfg.beamOf(kind)` 取數值；跳躍與冰拳只有卡比獸有），但**數值是自己的 `gyarados.hyper_beam`**（欄位同 `snorlax.hyper_beam`，預設與卡比獸相同，改一邊不影響另一邊）；`hi` 的 `gbeam` 與 `cooldown.gbeam` 是它的警示扇形與冷卻 |
 | 暴鯉龍 | K / 小按鈕「擺尾」 | 擺尾（`Input.Tail`）：先蓄力 `charge_duration` 秒（`Player.TailT`，**定身**；0＝按下就打）再掃出扇形，蓄力時地上畫出**警示扇形**（`tlx`/`tly` 是按下那一刻鎖定的方向、`tail.length`/`angle` 是範圍，前端 `drawTailWarning`：顏色隨蓄力填滿、一圈環跑到邊緣就是打下去的瞬間），所以蓄力時轉搖桿不會轉扇形、對手走出扇形就不會被打到；被冰凍／擊暈／抓住會中斷蓄力；蓄力中不能跳海浪或放死光；冷卻從按下算、`tail` 事件在打下去那一刻才發（畫面上的尾巴在這時甩出去）。**瞄準操作（兩種模式，之後別的技能也會照這個做）**：按住「擺尾」鍵（K，或手機的小按鈕）時畫面只給自己看一個**預覽扇形**（虛線，`drawTailAim`，不送給伺服器、對手看不到）、這顆按鈕變成方向桿（手機拖曳按鈕；鍵盤按住 K 時 WASD 改成瞄準、不走路），**放開才施放**；放開時沒選方向（輕點，或拖曳不到死區 20px）就**朝對手**。施放時頁面送 `tail:true` 加上 `tx`/`ty`（`Input.CastX/CastY`，世界座標，任意長度，(0,0)＝朝對手；`Game.castDir`），維持約 120ms（`CAST_PULSE`）讓伺服器一定收得到，之後才是上面的蓄力＋給對手看的警示扇形。所以方向不再來自搖桿 `ax/ay` 或最後走的方向。頁面的 `AIMED`（角色→技能名）決定哪個角色的 K 技能是這種瞄準方式，目前是皮卡丘的電球、菊草葉的藤鞭、梗鬼的影子球和暴鯉龍的擺尾，要加別的技能就在 `AIMED` 和 `PAD` 的按鈕定義各加一筆、伺服器端那個技能改用 `castDir`。扇形：總角度 `angle`、距離 `length`（加對手半徑），對手中心在扇形內、高度在帶內就被往瞄準方向擊退 `knockback` 並擊暈 `stun_duration` 秒（`Player.StunT`：和冰凍一樣不能走也不能出招，進行中的衝刺與蓄力會中斷，但不會被畫成冰），發 `tail` 事件（`dx`/`dy` 是方向，為 0 時被省略，前端要 `|| 0`）；不能在跳躍或死光進行中用；冷卻 `cooldown` 從出招算 |
 | 噴火龍 | K / 小按鈕「上投」 | 地球上投：朝瞄準方向衝 `length`，碰到（地面上的）敵人就抓住（`Held`，不能動不能用技能）、飛到 `high` 再摔下，落地受 `damage` 並播落地震波特效；噴火龍中途被冰凍會鬆手；摔下去的地方會**著火**（`Game.Fires`，`tickFires`）：半徑 `fire_radius`（加上對手身體）的圓盤燒 `fire_duration` 秒，對手站在裡面、高度不超過 `fire_max_height`（預設 12，飛在天上不會燒）就受 `fire_damage`，之後每 `fire_interval` 秒再一次；只燒對手，不燒噴火龍自己；半徑或時間為 0＝不著火；場上最多 20 塊（`maxFires`），快照 `fz` |
+| 噴火龍 | L（鍵盤，招式名稱仍叫 Z）/ 小按鈕「極巨化」（絕招） | 極巨化噴火龍：細節見下面「極巨化噴火龍（已完成）」。變身 `charizard.gigantamax.duration` 秒，血量、速度、體型依 `charizard.gigantamax` 變大，飛行、噴火、地球上投各換成自己的一組數值（火球更大顆、摔下去的火更大片），極巨化期間做的傷害都算絕招的（`gain_ultimate_dealt`） |
 
 技能判定都是「技能範圍 + 對方身體半徑 `radius`」，另外每個攻擊技能都有自己的**高度範圍**
 `min_height`～`max_height`（含頭尾，寫在該技能的設定區塊裡；`Reach.hits`）：目標當下的高度 `Z` 在範圍內才打得到，
@@ -255,3 +256,23 @@ PORT=8099 go run .                      # 本機啟動，開 http://localhost:80
 - 測試：`twovtwo_test.go`（引擎、電腦）、`squad_test.go`（房間）。**已知限制**：Hyper Beam 一次掃過只算一次命中（`SweptHit`）、冰風暴的凍結是兩個敵人合併計算命中數。
 
 - **沙地上的顏色**：場地是淺色沙地，所以特效不能只靠發亮的光暈（`lighter` 疊加在淺底上看不見）：箭與預警線是深綠加深色底線、電球與電球蓄力是實心橘邊、百萬噸拳的圈是橘色加深色底線。新增特效時要在沙地上看過。
+
+## 極巨化噴火龍（已完成）
+
+噴火龍的絕招（電腦版 L 鍵，名稱叫 Z 招式）：蓄能滿且沒在放招（不在飛行／噴火／地球上投、沒被暈凍抓）時按 L，變成極巨化噴火龍 `charizard.gigantamax.duration` 秒（`Player.GmaxT` 快照 `gmt`，事件 `gmax`／`gmaxend`，和怪力共用 `stepGigantamax`）。設定在 `charizard.ultimate`（蓄能規則）與 `charizard.gigantamax`（`CharizardGmaxCfg`）：`max_hp`、`walk_speed`、`radius`、`duration`，加上三組**獨立的技能數值** `fly`、`fire_breath`、`seismic_toss`（具名型別 `FlyCfg`、`FireBreathCfg`、`SeismicTossCfg`，欄位和一般版同名同意義；三個技能的按鍵與名稱不變，所以按鈕不換字，只有冷卻圈的總秒數換成極巨化的 `hi.cgmax.cd`）。
+
+- **通用化**：`Player.gigantamax()` 現在是「怪力或噴火龍且 `GmaxT > 0`」；身體數值走 `cfg.gigantamaxOf(kind)`（`maxHP`／`bodyRadius`／`walkSpeedOf` 用它）；怪力專用的 `brawlerP` 先檢查 `Kind == machamp`。噴火龍的技能數值一律走 `g.charizardP(p)`（回傳 `CharizardSkills`），不要直接讀 `cfg.Charizard.Fly` 等。
+- **火球與火區要記住是不是極巨化發射的**：`Ball.Ult`（快照 `ug`）、`FireZone.Ult`。極巨化結束後火球／火區還在場上，所以半徑、質量、傷害、`Speed` 都看 `g.fireBreathOf(b.Ult)`／`z.Ult` 的那一組，傷害也用它設 `g.ultNow`（算絕招傷害，`gain_ultimate_dealt`）；`stepCharizard` 本身在極巨化時 `defer g.ultimateDamage()()`（摔下去的傷害）。電腦的 `findThreat` 躲火球／火區也讀這兩個旗標。
+- **高度**：極巨化的 `fly.height` 預設 100（一般 60）、`fire_breath.max_height` 80、`seismic_toss.max_height` 60，大體型飛起來比較高，打不打得到仍看各招的 `min_height`／`max_height`。
+- **畫面**：`artCharizardGmaxFront`／`Back`／`Side`（`static/index.html`，`artCharizard` 在 `pose.gmax` 時改畫它們；側面朝右，往左用鏡射）。身體寬約 28 單位，大小用 `hi.cgmax.radius`（`bodyR`、`gmaxOf(k)`、`isGmax(p)`；`drawBody` 的 `bs = radius / REF[2]`）；火焰是 `tonguePath` 一束束火舌，隨時間晃動；翅膀火焰靠身體窄、外側寬，尾巴與嘴裡的火是暗紅色以和翅膀區別。大火球畫大小看 `b.ug` 與 `cgmax.fire`／`firehp`，地球上投的光暈看 `cgmax.toss`。腳比一般版低，影子在 `p.k === 2 && p.gmt > 0` 時下移。
+- 電腦：`bot.go` 的 `charizard()` 在蓄能滿、對手在 600 內、沒在放招時變身，並讀 `g.charizardP(p)` 的數值。
+- 測試：`gigantamax_charizard_test.go`。
+- 美術細節（還沒調的）：背面的尾巴會蓋住左腳、手被翅膀火焰蓋住；正面嘴前的暗紅火蓋到肚子。
+
+
+**這個 repo／這位使用者的做事方式：**
+- **先給使用者看美術再接機制。** 把一般版和極巨化版並排畫在頁面上截圖（用 JS 在頁面裡插一個 canvas 呼叫 `art(...)`）。使用者會一項一項調（手臂位置、腿長、顏色…），每次只做他說的那一項，改完再截圖給他看。顏色用他說的描述，不要自己亂換。
+- **瀏覽器截圖有約 1 秒延遲**，特效只有 0.3～0.8 秒會看不到：用暫時設定把蓄力／持續時間拉長，或把 `drawBalls` 換成固定時間點畫特效的版本再截圖。測試用設定放 scratchpad，用 `PORT=8099 CONFIG=… ` 啟動；用完要 kill 伺服器、刪暫存檔和 repo 根目錄的 `game` 執行檔、關掉自己開的分頁。
+- `go test` 一律加 `-timeout 100s`（改按鍵對應時，舊測試的 `for` 迴圈會卡住整個測試）。改技能的按鍵或對應時，先去改 `kick_test.go` 這類測試。
+- 用 python 批次改程式時，`gofmt` 會重排 struct 欄位的對齊，用整行當 anchor 會失敗：先 `sed -n` 看實際文字，用短一點的字串或 regex。
+- 回報用繁體中文，先講結果和要注意的事。使用者說「commit & deploy」才 commit：逐檔 `git add`（不要 `-A`）、commit 前用 json 比對 `config.json` 與 HEAD，把使用者自己改過的數值列在回報裡；commit 訊息結尾加 Co-Authored-By；之後跑 `./deploy.sh` 並回報 hash 與 `/health`。使用者常在我們講話時自己改 `config.json`，所以每次 commit 前都要重新比對。

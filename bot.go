@@ -436,7 +436,11 @@ func (c *bctx) findThreat() threat {
 	}
 
 	for _, z := range g.Fires { // burning ground: it burns whoever stands in it every half second, so get out of it
-		if g.side(z.Owner) != g.side(c.me) && p.Z <= cfg.Charizard.SeismicToss.FireMaxHeight && math.Hypot(p.X-z.X, p.Y-z.Y) <= z.R+c.pr+10 {
+		fmh := cfg.Charizard.SeismicToss.FireMaxHeight
+		if z.Ult { // ground a Gigantamax Charizard lit burns by its own numbers
+			fmh = cfg.Charizard.Gigantamax.SeismicToss.FireMaxHeight
+		}
+		if g.side(z.Owner) != g.side(c.me) && p.Z <= fmh && math.Hypot(p.X-z.X, p.Y-z.Y) <= z.R+c.pr+10 {
 			zz := z
 			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-zz.X, y-zz.Y) <= zz.R+c.pr+10 })
 			consider(threat{thFire, 0.2, ax, ay})
@@ -578,6 +582,9 @@ func (c *bctx) hazards() []hazard {
 			}
 		default:
 			sp := cfg.ballSpeed(bl.K)
+			if bl.K == ballFire {
+				sp = c.g.fireBreathOf(bl.Ult).Speed // a Gigantamax Charizard's fire balls may fly at their own speed
+			}
 			hz = append(hz, hazard{thBall, bl.X, bl.Y, bl.DX * sp, bl.DY * sp, c.g.ballRadius(bl)})
 		}
 	}
@@ -1072,12 +1079,18 @@ func (b *Bot) ash(c *bctx) Input {
 // to cross the court, and ends in a ring of fire balls, so it is taken now and then, not only to run.
 func (b *Bot) charizard(c *bctx) Input {
 	g, p, f := c.g, c.p, c.f
-	ts, fb, fly := g.cfg.Charizard.SeismicToss, g.cfg.Charizard.FireBreath, g.cfg.Charizard.Fly
+	cz := g.charizardP(p) // the Gigantamax Charizard plays by its own numbers
+	ts, fb, fly := cz.SeismicToss, cz.FireBreath, cz.Fly
 	if p.FrozenT > 0 || p.Held || p.TossPhase != tossNone {
 		return c.stay() // rooted, or the run (and the lift) moves it
 	}
 	th := c.th
 	danger := f.Kind == rowlet && f.ArrowT > 0
+	if p.GmaxT == 0 && p.Charge >= g.cfg.Charizard.Ultimate.Max && !danger && p.FlyT == 0 && p.BreathT == 0 && p.Z == 0 && c.dist <= 600 { // the ultimate, as soon as it is charged and the opponent is in reach
+		in := c.stay()
+		in.Ult = true
+		return in
+	}
 	var in Input
 	if th.kind != thNone && th.eta <= botHorizon {
 		in = c.move(th.ax, th.ay)
