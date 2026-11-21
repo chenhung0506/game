@@ -728,7 +728,7 @@
       "max_hp":  510,
       "walk_speed": 280,
       "radius": 180,
-      "duration": 15,
+      "duration": 10,
       "uppercut": {
         "min_height": 0,
         "max_height": 60,
