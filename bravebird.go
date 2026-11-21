@@ -62,7 +62,8 @@ func (g *Game) diveBird(i int, dt float64) ([]Event, bool) {
 	}
 	p.X, p.Y = p.BirdTX, p.BirdTY
 	p.BirdDive, p.Z = false, 0
-	p.TwistCD = math.Max(p.TwistCD, g.cfg.Rowlet.Tornado.Cooldown) // the Tornado skill (K) goes into its cooldown too
+	p.TwistCD = math.Max(p.TwistCD, g.cfg.Rowlet.Tornado.Cooldown) // the Tornado skill (K) goes into its cooldown too,
+	p.ArrowCD = math.Max(p.ArrowCD, g.cfg.Rowlet.Arrows.Cooldown)  // and so do the Arrows (J)
 	for _, j := range g.foes(i) {
 		f := &g.P[j]
 		if !bb.Reach.hits(f) || math.Hypot(f.X-p.X, f.Y-p.Y) > bb.ExplosionRadius+g.radius(j) {
