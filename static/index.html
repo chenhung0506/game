@@ -1202,10 +1202,30 @@ function artCharizardFront(c, x, y, t, flap) {
   c.restore();
 }
 
+// A claw with some body to it, by shading and not by its shape: a straight cone whose lit side is white and whose far side is in shadow (a soft edge between them where it turns away
+// from the light), darker toward the root where the paw shades it, a thin dark outline, and the shadow it casts on the paw. pts is [one corner of the base, the
+// other corner, the tip].
+function gclaw(c, pts, hook = 0) { // hook: how far the claw curls down at its tip (0: straight)
+  const [a, b, t0] = pts, mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, tp = [mx + (t0[0] - mx) * 0.68, my + (t0[1] - my) * 0.68]; // the tip is drawn at 0.68 of the way: short claws
+  c.save();
+  c.fillStyle = 'rgba(70,40,15,.35)'; c.beginPath(); c.ellipse(mx, my, Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.7 + 0.5, 1.4, 0, 0, 7); c.fill(); // the shadow at its root
+  const L = Math.hypot(tp[0] - mx, tp[1] - my) || 1, tx = tp[0] + L * 0.1 * hook, ty = tp[1] + L * 0.35 * hook; // a hooked claw's tip is let down
+  c.beginPath(); c.moveTo(a[0], a[1]);
+  if (hook) { c.quadraticCurveTo(a[0] + (tp[0] - a[0]) * 0.6 + L * 0.3 * hook, a[1] + (tp[1] - a[1]) * 0.55 - L * 0.05 * hook, tx, ty); c.quadraticCurveTo(b[0] + (tp[0] - b[0]) * 0.6 + L * 0.12 * hook, b[1] + (tp[1] - b[1]) * 0.5 - L * 0.2 * hook, b[0], b[1]); } else { c.lineTo(tp[0], tp[1]); c.lineTo(b[0], b[1]); }
+  c.closePath();
+  const gr = c.createLinearGradient(a[0], a[1], b[0], b[1]); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.38, '#f1f2f7'); gr.addColorStop(0.55, '#b9bdcb'); gr.addColorStop(1, '#6f7589');
+  c.fillStyle = gr; c.fill();
+  const ao = c.createLinearGradient(mx, my, tp[0], tp[1]); ao.addColorStop(0, 'rgba(60,50,80,.45)'); ao.addColorStop(0.55, 'rgba(60,50,80,0)'); // darker where it meets the paw
+  c.fillStyle = ao; c.fill();
+  c.strokeStyle = 'rgba(70,75,95,.85)'; c.lineWidth = 0.6; c.stroke();
+  c.restore();
+}
+
 // The Gigantamax Charizard: a round egg of a body on thick legs, a short straight neck, the arms raised and the wings are fire, thin at the shoulder and wide out at
 // the far end (the Gigantamax form of the games, which has no real wings), a dark-red fire at the tail's tip and in its mouth so they are not mistaken for the wings'. Each
 // view is drawn in the units of the others: the body is about 28 wide each side, which is `charizard.gigantamax.radius`. The side view faces right (a left run mirrors it).
-function artCharizardGmaxSide(c, x, y, t) {
+function artCharizardGmaxSide(c, x, y, t, pose = { mv: 0, ph: 0 }) {
+  const sw = Math.sin(pose.ph) * pose.mv; // the walk: the leg that steps lifts and swings, the other goes back
   const O = '#e8821f', OD = '#b85a14', OL = '#f6a73c', LINE = '#7a3a10', BELLY = '#fbe9ee', DIA = '#e3cf3a', CLAW = '#f6f6f8', CLAWD = '#8a90a0';
   c.save(); c.translate(x, y); c.lineJoin = 'round'; c.lineCap = 'round';
   // ---- fire: a tongue is four nested layers (red, orange, yellow, pale) with wavy licking edges that sway; a mass is many tongues, each layer drawn across all of them first so they melt together
@@ -1241,11 +1261,14 @@ function artCharizardGmaxSide(c, x, y, t) {
     c.fillStyle = '#ff7ab0'; c.beginPath(); c.arc(bx + ox - r * 0.3, by + oy - r * 0.3, r * 0.5, 0, 7); c.fill();
   }
   // ---- far leg and foot (behind the body)
+  c.save(); c.translate(-sw * 7, -Math.max(0, -sw) * 5);
   ov(c, 19, 34, 8.5, 13, OD); ov(c, 23, 47, 11, 5, OD);
-  for (const k of [0, 1, 2]) poly(c, [[17 + k * 6, 48], [22 + k * 6, 48], [23.5 + k * 6, 56]], CLAW, CLAWD);
+  for (const k of [0, 1, 2]) gclaw(c, [[17 + k * 6, 48], [22 + k * 6, 48], [23.5 + k * 6, 56]], 1);
+  c.restore();
+  { const a = 2.9, ex0 = 21 + Math.sin(a) * 15, ey0 = -6 + Math.cos(a) * 15, jx = ex0 + 3, jy = ey0 + 3.3; ov(c, jx + 2.4, jy, 8.5, 4.3, OD, -a); ov(c, 21 + Math.sin(a) * 16 / 2, -6 + Math.cos(a) * 16 / 2, 5.3, 16 / 2 + 1, OD, -a); } /* the far arm's 手軸 (longer to the right) and then the arm over it, both under the body */
   // ---- body, neck and head are ONE piece: all the outlines first, then all the fills on top, so there is no line at the joins
   const egg = () => { c.beginPath(); c.moveTo(3, -32); c.bezierCurveTo(9, -32, 18, -12, 25, 4); c.bezierCurveTo(31, 22, 22, 38, 2, 38); c.bezierCurveTo(-20, 38, -31, 24, -26, 6); c.bezierCurveTo(-22, -10, -4, -32, 3, -32); c.closePath(); };
-  const np = [4, -20, 6, -31, 12, -42, 16, -52];
+  const np = [4, -20, 10, -33, 24, -42, 30, -44];
   const head = (outline) => { // the head in its own frame: hinge at the origin, facing +x
     const up = () => { c.beginPath(); c.moveTo(-10, 2); c.bezierCurveTo(-12, -8, -4, -13, 5, -11); c.bezierCurveTo(12, -10, 19, -8, 25, -5); c.quadraticCurveTo(27, -3, 25, -1); c.lineTo(14, -0.6); c.lineTo(2, 1.4); c.closePath(); };
     const lo = () => { c.beginPath(); c.moveTo(-2, 1); c.lineTo(20, 0.5); c.quadraticCurveTo(23, 2, 21, 5); c.lineTo(8, 7.5); c.quadraticCurveTo(-1, 8, -4, 5); c.closePath(); };
@@ -1253,7 +1276,7 @@ function artCharizardGmaxSide(c, x, y, t) {
     if (outline) { c.strokeStyle = LINE; c.lineWidth = 2.6; c.fillStyle = LINE; up(); c.stroke(); c.fill(); c.save(); c.translate(1, 2); c.rotate(0.42); c.translate(-1, -2); lo(); c.stroke(); c.fill(); c.restore(); }
     c.restore();
   };
-  const place = (fn) => { c.save(); c.translate(17, -52); c.rotate(-0.4); c.scale(1.25, 1.25); c.translate(4, 0); c.scale(0.8, 1); c.translate(-4, 0); fn(); c.restore(); };
+  const place = (fn) => { c.save(); c.translate(30, -44); c.rotate(0.3); c.scale(1.25, 1.25); c.translate(4, 0); c.scale(0.8, 1); c.translate(-4, 0); fn(); c.restore(); };
   const neck = (w0, w1, col) => { const q = (u) => { const m = 1 - u; return [m*m*m*np[0] + 3*m*m*u*np[2] + 3*m*u*u*np[4] + u*u*u*np[6], m*m*m*np[1] + 3*m*m*u*np[3] + 3*m*u*u*np[5] + u*u*u*np[7]]; }; c.fillStyle = col; for (let k = 0; k <= 60; k++) { const u = k / 60, p = q(u), w = w1 + (w0 - w1) * Math.pow(1 - u, 2.4); c.beginPath(); c.arc(p[0], p[1], w / 2, 0, 7); c.fill(); } };
   // outlines
   c.fillStyle = LINE; egg(); c.lineWidth = 3; c.strokeStyle = LINE; c.stroke(); c.fill();
@@ -1265,17 +1288,21 @@ function artCharizardGmaxSide(c, x, y, t) {
   c.fillStyle = 'rgba(120,50,10,.22)'; c.beginPath(); c.ellipse(8, 38, 34, 14, 0, 0, 7); c.fill();
   c.fillStyle = 'rgba(255,230,170,.20)'; c.beginPath(); c.ellipse(-17, 6, 6, 18, 0.15, 0, 7); c.fill();
   c.restore();
-  c.save(); c.translate(-1, 0); bezTail(c, [4, -20, 6, -31, 12, -42, 16, -52].map((v, i) => i % 2 ? v : v - 5), 4, 2.2, 'rgba(255,225,160,.45)'); c.restore();
+  c.save(); c.translate(-1, 0); bezTail(c, [4, -20, 10, -33, 24, -42, 30, -44].map((v, i) => i % 2 ? v : v - 5), 4, 2.2, 'rgba(255,225,160,.45)'); c.restore();
   // belly: a smaller egg on the front, cream-pink, with the yellow diamonds low on it
   c.save(); c.translate(7, 7); c.scale(0.62, 0.8); egg(); c.fillStyle = BELLY; c.fill(); c.restore();
   c.save(); c.translate(7, 7); c.scale(0.62, 0.8); egg(); c.clip(); c.fillStyle = 'rgba(214,150,175,.30)'; c.beginPath(); c.ellipse(8, 28, 22, 14, 0, 0, 7); c.fill(); c.restore();
   for (const [dx, dy, s] of [[13, 14, 3.6], [19, 19, 3], [10, 22, 2.8], [16, 26, 2.4], [22, 13, 2.3], [8, 29, 1.8], [14, 32, 1.8], [21, 28, 1.6]]) poly(c, [[dx, dy - s * 1.5], [dx + s, dy], [dx, dy + s * 1.5], [dx - s, dy]], DIA, '#a89a1c');
   // ---- near leg and its three-clawed foot
+  c.save(); c.translate(sw * 7, -Math.max(0, sw) * 5);
   ov(c, -14, 34.5, 10.5, 13.5, OD); ov(c, -16, 48, 13.5, 5.6, O);
-  for (const k of [0, 1, 2]) poly(c, [[-26 + k * 7.5, 49], [-20 + k * 7.5, 49], [-19 + k * 7.5, 58]], CLAW, CLAWD);
+  for (const k of [0, 1, 2]) gclaw(c, [[-26 + k * 7.5, 49], [-20 + k * 7.5, 49], [-19 + k * 7.5, 58]], 1);
+  c.restore();
   // ---- arms: the near one raised with big claws, the far one small on the right
-  { const sx = -12, sy = -3, L = 17.5, a = -3.05; pikaLimb(c, sx, sy, L, a, 6.4, O); const ex = sx + Math.sin(a) * L, ey = sy + Math.cos(a) * L; ov(c, ex, ey, 5.4, 4.86, O); for (const k of [-3.6, 0, 3.6]) poly(c, [[ex + k - 1.5, ey - 2], [ex + k + 1.5, ey - 2], [ex + k * 1.2 + -1 * 1.8, ey - 2 + 11]], CLAW, CLAWD); }
-  { const sx = 21, sy = -6, L = 15, a = 2.9; pikaLimb(c, sx, sy, L, a, 5.3, OD); const ex = sx + Math.sin(a) * L, ey = sy + Math.cos(a) * L; ov(c, ex, ey, 5.1, 4.6, OD); for (const k of [-3, 0, 3]) poly(c, [[ex + k - 1.5, ey - 2], [ex + k + 1.5, ey - 2], [ex + k * 1.2 + 1 * 1.8, ey - 2 + 9.5]], CLAW, CLAWD); }
+  { const sx = -12, sy = -3, L = 17.5, a = -3.05; ov(c, sx + Math.sin(a) * (L + 1) / 2, sy + Math.cos(a) * (L + 1) / 2, 6.4, (L + 1) / 2 + 1, O, -a); /* the arm runs 1 longer, up under the 手軸 */ const ex0 = sx + Math.sin(a) * L, ey0 = sy + Math.cos(a) * L, ex = ex0 + 19 * Math.cos(0.2) - 3, ey = ey0 + 19 * Math.sin(0.2), jx = ex0 + 6, jy = ey0 + 0.8; bezTail(c, [jx, jy, jx, jy, ex, ey, ex, ey], 6.2, 5.6, O); ov(c, jx, jy, 7.2, 5.1, O, -a); // arm, then the elbow (the forearm joint) 4 further right, then the palm 3 back // the forearm: a short joint, tilted a little down
+    ov(c, ex, ey, 5.4, 4.86, O); c.save(); c.translate(ex + 4.5, ey); c.rotate(-Math.PI / 4); c.scale(0.8, 0.8); c.translate(-ex, -ey); for (const k of [-3.6, 0, 3.6]) gclaw(c, [[ex + k - 1.5, ey - 2], [ex + k + 1.5, ey - 2], [ex + k * 1.2 + -1 * 1.8, ey - 2 + 11]], 1); c.restore(); } /* the hand claws turned 45 degrees counterclockwise, to point forward */
+  { const sx = 21, sy = -6, L = 15, a = 2.9; /* the arm is drawn after the forearm and the 手軸: on top of them */ const ex0 = sx + Math.sin(a) * L, ey0 = sy + Math.cos(a) * L, ex = ex0 + 19 * Math.cos(0.2) - 6, ey = ey0 + 19 * Math.sin(0.2) + 2.5, jx = ex0 + 3, jy = ey0 + 3.3; bezTail(c, [jx, jy, jx, jy, ex, ey, ex, ey], 5.1, 4.6, OD);  // the forearm
+    ov(c, ex, ey, 5.1, 4.6, OD); c.save(); c.translate(ex + 4.5, ey); c.rotate(-Math.PI / 4); c.scale(0.8, 0.8); c.translate(-ex, -ey); for (const k of [-3, 0, 3]) gclaw(c, [[ex + k - 1.5, ey - 2], [ex + k + 1.5, ey - 2], [ex + k * 1.2 + 1 * 1.8, ey - 2 + 9.5]], 1); c.restore(); } /* the hand claws turned 45 degrees counterclockwise, to point forward */
   // ---- head fills: mouth open, glowing inside
   place(() => {
     const up = () => { c.beginPath(); c.moveTo(-10, 2); c.bezierCurveTo(-12, -8, -4, -13, 5, -11); c.bezierCurveTo(12, -10, 19, -8, 25, -5); c.quadraticCurveTo(27, -3, 25, -1); c.lineTo(14, -0.6); c.lineTo(2, 1.4); c.closePath(); };
@@ -1301,12 +1328,13 @@ function artCharizardGmaxSide(c, x, y, t) {
     c.restore && 0;
   });
   // fire pouring out of the mouth
-  c.save(); c.translate(17, -52); c.rotate(-0.4); c.scale(1.25, 1.25);
+  c.save(); c.translate(30, -44); c.rotate(0.3); c.scale(1.25, 1.25);
   mass([[20.8, 3, -10 * D, 70, 8, 20], [20.8, 4, 10 * D, 60, 7, 21], [20.8, 3, -28 * D, 50, 6, 22]], 1, 0.7, DARK);
   c.restore();
   c.restore();
 }
-function artCharizardGmaxFront(c, x, y, t) {
+function artCharizardGmaxFront(c, x, y, t, pose = { mv: 0, ph: 0 }) {
+  const sw = Math.sin(pose.ph) * pose.mv; // the walk: the leg that steps lifts and swings, the other goes back
   const O = '#e8821f', OD = '#b85a14', OL = '#f6a73c', LINE = '#7a3a10', BELLY = '#fbe9ee', DIA = '#e3cf3a', CLAW = '#f6f6f8', CLAWD = '#8a90a0';
   c.save(); c.translate(x, y); c.lineJoin = 'round'; c.lineCap = 'round';
   const w = (a, s = 1) => Math.sin(t * a) * s, D = Math.PI / 180;
@@ -1350,11 +1378,13 @@ function artCharizardGmaxFront(c, x, y, t) {
   for (const [dx, dy, s] of [[0, 14, 3.6], [-6.5, 20, 2.8], [6.5, 20, 2.8], [0, 26, 3], [-11, 27, 2], [11, 27, 2], [-4.5, 32, 1.8], [4.5, 32, 1.8]]) poly(c, [[dx, dy - s * 1.5], [dx + s, dy], [dx, dy + s * 1.5], [dx - s, dy]], DIA, '#a89a1c');
   // ---- legs, side by side, each foot with three claws toward us
   for (const sd of [-1, 1]) {
+    c.save(); c.translate(0, -Math.max(0, sd * sw) * 5); // the leg that steps lifts
     ov(c, sd * 25, 36, 10.5, 14, OD); ov(c, sd * 27, 49, 13.5, 5.6, O);
-    for (const k of [-1, 0, 1]) poly(c, [[sd * 27 + k * 7 - 3, 50], [sd * 27 + k * 7 + 3, 50], [sd * 27 + k * 7.6, 58]], CLAW, CLAWD);
+    for (const k of [-1, 0, 1]) gclaw(c, [[sd * 27 + k * 7 - 3, 50], [sd * 27 + k * 7 + 3, 50], [sd * 27 + k * 7.6, 58]]);
+    c.restore();
   }
   // ---- arms raised, hands bent over with the claws pointing up and out
-  const arm = (sx, a, out) => { const sy = -3, L = 17.5; pikaLimb(c, sx, sy, L, a, 6.2, O); const ex = sx + Math.sin(a) * L, ey = sy + Math.cos(a) * L; ov(c, ex, ey, 5.3, 4.8, O); for (const k of [-3.6, 0, 3.6]) poly(c, [[ex + k - 1.5, ey - 2], [ex + k + 1.5, ey - 2], [ex + k * 1.2 + out * 1.8, ey - 2 + 11]], CLAW, CLAWD); };
+  const arm = (sx, a, out) => { const sy = -3, L = 17.5; pikaLimb(c, sx, sy, L, a, 6.2, O); const ex = sx + Math.sin(a) * L, ey = sy + Math.cos(a) * L; ov(c, ex, ey, 5.3, 4.8, O); for (const k of [-3.6, 0, 3.6]) gclaw(c, [[ex + k - 1.5, ey - 2], [ex + k + 1.5, ey - 2], [ex + k * 1.2 + out * 1.8, ey - 2 + 11]]); };
   arm(-18, -2.95, -1); arm(18, 2.95, 1);
   // ---- head from the front: horns, skull, snout toward us with the mouth open and glowing, glowing eyes
   const hy = -53;
@@ -1374,7 +1404,8 @@ function artCharizardGmaxFront(c, x, y, t) {
   mass([[0, hy + 10, 95 * D, 40, 7, 20], [-3, hy + 10, 115 * D, 32, 5, 21], [3, hy + 10, 75 * D, 32, 5, 22]], 1, DARK);
   c.restore();
 }
-function artCharizardGmaxBack(c, x, y, t) {
+function artCharizardGmaxBack(c, x, y, t, pose = { mv: 0, ph: 0 }) {
+  const sw = Math.sin(pose.ph) * pose.mv; // the walk: the leg that steps lifts and swings, the other goes back
   const O = '#e8821f', OD = '#b85a14', OL = '#f6a73c', LINE = '#7a3a10', CLAW = '#f6f6f8', CLAWD = '#8a90a0', BK = '#d4701a';
   c.save(); c.translate(x, y); c.lineJoin = 'round'; c.lineCap = 'round';
   const D = Math.PI / 180;
@@ -1407,13 +1438,13 @@ function artCharizardGmaxBack(c, x, y, t) {
   for (let r = 0; r < 5; r++) poly(c, [[-3.4, -14 + r * 8], [0, -19 + r * 8], [3.4, -14 + r * 8]], '#a3480f', LINE); // the ridge down the back
   for (const sd of [-1, 1]) { ov(c, sd * 13, -13, 6, 8, OD, sd * 0.3); }                                        // the shoulder blades the wings grow from
   // ---- legs seen from behind: thigh and heel, no claws on show
-  for (const sd of [-1, 1]) { ov(c, sd * 25, 36, 10.5, 14, OD); ov(c, sd * 27, 49, 13.5, 5.6, O); ov(c, sd * 27, 47, 8, 3, OD, 0, null); }
+  for (const sd of [-1, 1]) { c.save(); c.translate(0, -Math.max(0, sd * sw) * 5); ov(c, sd * 25, 36, 10.5, 14, OD); ov(c, sd * 27, 49, 13.5, 5.6, O); ov(c, sd * 27, 47, 8, 3, OD, 0, null); c.restore(); }
   // ---- the tail comes down from the lower back and curls out to the left, a dark-red flame on its tip
   const tp = [0, 30, -4, 52, -36, 62, -50, 36];
   bezTail(c, tp, 28.8, 11, LINE); bezTail(c, tp, 24.6, 8.4, O); bezTail(c, tp, 6, 2.4, OL);
   mass([[-50, 36, -88 * D, 80, 11, 14], [-54, 38, -112 * D, 55, 8, 15], [-46, 38, -66 * D, 52, 7, 16]], 0.7, DARK);
   // ---- arms raised, the backs of the hands toward us
-  const arm = (sx, a, out) => { const sy = -3, L = 17.5; pikaLimb(c, sx, sy, L, a, 6.2, O); const ex = sx + Math.sin(a) * L, ey = sy + Math.cos(a) * L; ov(c, ex, ey, 5.3, 4.8, BK); for (const k of [-3.6, 0, 3.6]) poly(c, [[ex + k - 1.5, ey - 3], [ex + k + 1.5, ey - 3], [ex + k * 1.2 + out * 1.8, ey - 3 + 7]], CLAW, CLAWD); };
+  const arm = (sx, a, out) => { const sy = -3, L = 17.5; pikaLimb(c, sx, sy, L, a, 6.2, O); const ex = sx + Math.sin(a) * L, ey = sy + Math.cos(a) * L; ov(c, ex, ey, 5.3, 4.8, BK); for (const k of [-3.6, 0, 3.6]) gclaw(c, [[ex + k - 1.5, ey - 3], [ex + k + 1.5, ey - 3], [ex + k * 1.2 + out * 1.8, ey - 3 + 7]]); };
   arm(-18, -2.95, -1); arm(18, 2.95, 1);
   // ---- the wing fire grows from the shoulder blades, in front of the body from here: the dragon's right wing (screen right now) is the smaller one
   const WL = [[-150, 150, 27], [-128, 170, 31], [-168, 130, 25], [-138, 120, 33], [-175, 105, 21], [-158, 165, 26], [-118, 135, 22]];
@@ -1430,9 +1461,9 @@ function artCharizardGmaxBack(c, x, y, t) {
   c.restore();
 }
 function artCharizardGmaxView(c, x, y, t, pose) {
-  c.save(); c.translate(x, y - 20); // the feet near the ground point, not the middle of the egg
+  c.save(); c.translate(x, y - 20 - Math.abs(Math.sin(pose.ph)) * 2 * pose.mv); // the feet near the ground point, not the middle of the egg
   if (pose.dir === 2) c.scale(-1, 1);
-  (pose.dir === 0 ? artCharizardGmaxFront : pose.dir === 1 ? artCharizardGmaxBack : artCharizardGmaxSide)(c, 0, 0, t);
+  (pose.dir === 0 ? artCharizardGmaxFront : pose.dir === 1 ? artCharizardGmaxBack : artCharizardGmaxSide)(c, 0, 0, t, pose);
   c.restore();
 }
 
