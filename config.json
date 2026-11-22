@@ -186,7 +186,7 @@
         "min_height": 0,
         "max_height": 60,
         "summon_duration": 1.8,
-        "sky_height": 150,
+        "sky_height": 250,
         "dive_speed": 400,
         "lock_distance": 750,
         "explosion_radius": 220,
