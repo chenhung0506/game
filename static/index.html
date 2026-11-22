@@ -1845,14 +1845,15 @@ function drawFirebird(b) {
   drawFirebirdBody(b);
   if (b.ph === 1 && b.hp < cgmaxCfg.bhp) { // worn down: its HP over it
     const s = 46 * cgmaxCfg.scale, w = s * 1.2;
-    upright(b.x, b.y - b.z - s * 2.2, () => { ctx.fillStyle = '#000a'; ctx.fillRect(-w / 2, 0, w, 5); ctx.fillStyle = '#ffb030'; ctx.fillRect(-w / 2, 0, w * Math.max(b.hp, 0) / cgmaxCfg.bhp, 5); });
+    upright(b.x, b.y, () => { ctx.translate(0, -b.z - s * 2.2); ctx.fillStyle = '#000a'; ctx.fillRect(-w / 2, 0, w, 5); ctx.fillStyle = '#ffb030'; ctx.fillRect(-w / 2, 0, w * Math.max(b.hp, 0) / cgmaxCfg.bhp, 5); });
   }
 }
 function drawFirebirdBody(b) {
   const now = performance.now() / 1000, grow = b.ph === 0 ? Math.min(1, 0.3 + 0.7 * (b.z / Math.max(1, cgmaxCfg.sky))) : 1, s = 46 * cgmaxCfg.scale * grow, lift = Math.min(b.z, 400) / 400;
   const [vx, vy] = b.dx || b.dy ? rv(b.dx || 0, b.dy || 0) : [1, 0], view = Math.abs(vy) > Math.abs(vx) * 1.2 ? (vy > 0 ? 'front' : 'back') : 'side', face = vx < 0 ? -1 : 1; // which way it is flying, on the screen
   upright(b.x, b.y, () => { ctx.fillStyle = `rgba(0,0,0,${0.32 - 0.14 * lift})`; ctx.beginPath(); ctx.ellipse(0, 6, s * (0.9 + 0.5 * lift), s * (0.26 + 0.12 * lift), 0, 0, 7); ctx.fill(); });
-  upright(b.x, b.y - b.z - s * 0.7, () => {
+  upright(b.x, b.y, () => { // (the height is taken off in the upright frame: taking it off y would slide it sideways on a phone, where the court is turned)
+    ctx.translate(0, -b.z - s * 0.7);
     const gl = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 2.4); gl.addColorStop(0, 'rgba(255,170,50,0.5)'); gl.addColorStop(1, 'rgba(255,60,10,0)');
     ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0, 0, s * 2.4, 0, 7); ctx.fill();
     const rate = b.ph === 1 ? 20 : 12, tongue = (x0, y0, x1, y1, w, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x0, y0 - w); ctx.quadraticCurveTo((x0 + x1) / 2, (y0 + y1) / 2 - w * 1.4, x1, y1); ctx.quadraticCurveTo((x0 + x1) / 2, (y0 + y1) / 2 + w * 1.4, x0, y0 + w); ctx.closePath(); ctx.fill(); };
@@ -1899,12 +1900,25 @@ function drawGmaxCharge() {
   const now = performance.now() / 1000;
   for (const [i, p] of snap.p.entries()) {
     if ((p.k !== 2 && p.k !== 8) || !(p.uct > 0)) continue;
-    const d = disp[i], total = Math.max(0.2, (p.k === 2 ? cgmaxCfg : gmaxCfg).charge), k = Math.min(1, Math.max(0, 1 - p.uct / total)), r0 = radius[p.k], col = p.k === 2 ? '255,160,40' : '190,120,255';
-    const R = r0 * (3.2 - 2.0 * k), gr = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, r0 * (1.2 + 1.8 * k));
-    gr.addColorStop(0, `rgba(255,255,230,${0.5 * k})`); gr.addColorStop(0.6, `rgba(${col},${0.35 * k})`); gr.addColorStop(1, `rgba(${col},0)`);
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(d.x, d.y, r0 * (1.2 + 1.8 * k), 0, 7); ctx.fill();
-    ctx.strokeStyle = `rgba(${col},${0.5 + 0.4 * k})`; ctx.lineWidth = 3 + 3 * k; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.stroke();
-    for (let n = 0; n < 12; n++) { const a = n / 12 * 6.283 + now * 3, rr = R * (0.9 + 0.1 * Math.sin(now * 9 + n)); ctx.fillStyle = `rgba(255,235,150,${0.9 - 0.4 * k})`; ctx.beginPath(); ctx.arc(d.x + Math.cos(a) * rr, d.y + Math.sin(a) * rr, 2.5 + 2 * k, 0, 7); ctx.fill(); }
+    const d = disp[i], total = Math.max(0.2, (p.k === 2 ? cgmaxCfg : gmaxCfg).charge), k = Math.min(1, Math.max(0, 1 - p.uct / total)), r0 = Math.max(radius[p.k], 18), col = p.k === 2 ? '255,150,30' : '190,110,255', hot = p.k === 2 ? '255,235,150' : '235,210,255';
+    const G = r0 * (3 + 5 * k), gr = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, G); // a big glow that swells to fill the screen round it
+    gr.addColorStop(0, `rgba(255,255,240,${0.55 * k + 0.1})`); gr.addColorStop(0.35, `rgba(${col},${0.5 * k + 0.1})`); gr.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(d.x, d.y, G, 0, 7); ctx.fill();
+    ctx.save(); ctx.lineCap = 'round';
+    for (let n = 0; n < 3; n++) { // three rings racing in, one after another, the faster the nearer it is to the end
+      const ph = (k * 3 + n / 3) % 1, R = r0 * (9 * (1 - ph) + 1.2);
+      ctx.strokeStyle = `rgba(${hot},${0.25 + 0.7 * ph})`; ctx.lineWidth = 3 + 7 * ph; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.stroke();
+    }
+    for (let n = 0; n < 18; n++) { // rays turning round it, longer as it fills
+      const a = n / 18 * 6.283 + now * 2.5, r1 = r0 * (1.4 + 0.6 * Math.sin(now * 12 + n)), r2 = r1 + r0 * (2 + 5 * k);
+      ctx.strokeStyle = `rgba(${hot},${0.2 + 0.5 * k})`; ctx.lineWidth = 2 + 2 * k; ctx.beginPath(); ctx.moveTo(d.x + Math.cos(a) * r1, d.y + Math.sin(a) * r1); ctx.lineTo(d.x + Math.cos(a) * r2, d.y + Math.sin(a) * r2); ctx.stroke();
+    }
+    ctx.restore();
+    for (let n = 0; n < 28; n++) { // sparks drawn in and up
+      const ph = (now * 0.9 + n / 28) % 1, a = n * 2.4 + now, rr = r0 * (6 * (1 - ph) + 0.8);
+      upright(d.x + Math.cos(a) * rr, d.y + Math.sin(a) * rr, () => { ctx.fillStyle = `rgba(${hot},${0.9 * ph})`; ctx.beginPath(); ctx.arc(0, -ph * r0 * 1.5, 2 + 3 * ph, 0, 7); ctx.fill(); });
+    }
+    if (k > 0.85) { ctx.fillStyle = `rgba(255,255,255,${(k - 0.85) / 0.15 * 0.55})`; ctx.beginPath(); ctx.arc(d.x, d.y, r0 * 4, 0, 7); ctx.fill(); } // and a white flash as it changes
   }
 }
 
