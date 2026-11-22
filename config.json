@@ -408,7 +408,7 @@
       "min_height": 0,
       "max_height": 1000,
       "hp": 50,
-      "speed": 130,
+      "speed": 100,
       "radius": 60,
       "duration": 8,
       "distance": 800,
