@@ -588,6 +588,7 @@ func (c *bctx) hazards() []hazard {
 		}
 		switch bl.K {
 		case ballPillar, ballGhost: // a ghost flame turns round, so a straight line is wrong for it: see flames
+		case ballFirebird: // its landing is a threat of its own (see the bird of fire's)
 		case ballVolt: // a bolt flies out and then chases, like a tornado
 			chase(bl.X, bl.Y, cfg.Pikachu.ThousandVolt.FollowSpeed, cfg.Pikachu.ThousandVolt.Radius)
 		case ballTornado:

@@ -13,6 +13,7 @@ type gmaxStats struct {
 	WalkSpeed float64
 	Radius    float64
 	Duration  float64
+	Charge    float64 // seconds of gathering before the change
 }
 
 // gigantamaxOf is the body of a character's Gigantamax form, and whether the character has one.
@@ -20,10 +21,10 @@ func (c Config) gigantamaxOf(kind int) (gmaxStats, bool) {
 	switch kind {
 	case machamp:
 		gm := c.Machamp.Gigantamax
-		return gmaxStats{gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration}, true
+		return gmaxStats{gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration, gm.ChargeDuration}, true
 	case charizard:
 		gm := c.Charizard.Gigantamax
-		return gmaxStats{gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration}, true
+		return gmaxStats{gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration, gm.ChargeDuration}, true
 	}
 	return gmaxStats{}, false
 }
@@ -74,6 +75,14 @@ func (g *Game) stepGigantamax(i int, in Input, u Ultimate, dt float64) ([]Event,
 		}
 		return nil, false
 	}
+	gm, _ := g.cfg.gigantamaxOf(p.Kind)
+	if p.UltT > 0 { // gathering: rooted until the time is up (a stun, a freeze or a catch ends it, see Step), and then it changes
+		if p.UltT -= dt; p.UltT >= 1e-9 {
+			return nil, true
+		}
+		p.UltT = 0
+		return g.becomeGigantamax(i, gm), false
+	}
 	busy := p.TreePhase != treeNone || p.CometT > 0 || p.RockT > 0 || p.MegaT > 0 || p.MegaJT > 0 || p.KickPhase != kickNone || p.UpPhase != upNone || p.LpT > 0 ||
 		p.Z != 0 || p.Held || p.FrozenT > 0 || p.StunT > 0 ||
 		p.TossPhase != tossNone || p.FlyT > 0 || p.BreathT > 0 || p.InfT > 0 // Charizard: in a toss, a flight, a breath or calling its bird
@@ -81,9 +90,18 @@ func (g *Game) stepGigantamax(i int, in Input, u Ultimate, dt float64) ([]Event,
 		return nil, false
 	}
 	p.Charge = 0
+	if gm.Charge > 0 {
+		p.UltT = gm.Charge
+		return nil, true
+	}
+	return g.becomeGigantamax(i, gm), false
+}
+
+// becomeGigantamax makes p its Gigantamax self for the whole of its time, scaling its HP to the new maximum.
+func (g *Game) becomeGigantamax(i int, gm gmaxStats) []Event {
+	p := &g.P[i]
 	before := g.maxHP(i)
-	gm, _ := g.cfg.gigantamaxOf(p.Kind)
 	p.GmaxT = gm.Duration
 	g.rescaleHP(i, before)
-	return []Event{{T: "gmax", X: p.X, Y: p.Y, R: g.radius(i), K: p.Kind}}, false
+	return []Event{{T: "gmax", X: p.X, Y: p.Y, R: g.radius(i), K: p.Kind}}
 }

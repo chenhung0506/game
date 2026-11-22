@@ -186,9 +186,13 @@ func (g *Game) stepVoltBolt(b *Ball, dt float64) (bool, []Event) {
 		step := math.Min(tv.SpreadSpeed*dt, b.Left)
 		b.X, b.Y, b.Left = b.X+b.DX*step, b.Y+b.DY*step, b.Left-step
 		b.X, b.Y = math.Min(math.Max(b.X, 0), g.court.Length), math.Min(math.Max(b.Y, 0), g.court.Width)
-	} else { // straight at where the nearest foe is now, without overshooting it
+	} else { // straight at where the nearest foe is now, without overshooting it (or, with hunt_hp, at a big projectile of the foe's if there is one)
 		foe := g.foeNearTo(b.Owner, b.X, b.Y)
-		dx, dy := foe.X-b.X, foe.Y-b.Y
+		tx, ty := foe.X, foe.Y
+		if prey := g.huntedBall(b, tv.HuntHP, tv.HuntRange); prey != nil {
+			tx, ty = prey.X, prey.Y
+		}
+		dx, dy := tx-b.X, ty-b.Y
 		if d := math.Hypot(dx, dy); d > 1e-9 {
 			step := math.Min(d, tv.FollowSpeed*dt)
 			b.DX, b.DY = dx/d, dy/d
@@ -216,4 +220,24 @@ func (g *Game) stepVoltBolt(b *Ball, dt float64) (bool, []Event) {
 		}
 	}
 	return false, []Event{{T: "voltburst", X: b.X, Y: b.Y, R: tv.ExplosionRadius}}
+}
+
+// huntedBall is the projectile of a foe a Thousand Volt bolt goes after before the foe itself: the nearest one with at least minHP HP that is not a standing pillar or stone (nothing
+// when minHP is 0, or when none is within rng of the bolt, rng 0 meaning anywhere).
+func (g *Game) huntedBall(bolt *Ball, minHP int, rng float64) *Ball {
+	if minHP <= 0 {
+		return nil
+	}
+	var best *Ball
+	bestD := math.MaxFloat64
+	for j := range g.Balls {
+		o := &g.Balls[j]
+		if o.HP < minHP || o.Wait || solid(o.K) || g.side(o.Owner) == g.side(bolt.Owner) || (o.K == ballFirebird && o.Phase == birdCalled) { // (a bird still being called cannot be hurt)
+			continue
+		}
+		if d := math.Hypot(o.X-bolt.X, o.Y-bolt.Y); d < bestD && (rng <= 0 || d <= rng) {
+			best, bestD = o, d
+		}
+	}
+	return best
 }

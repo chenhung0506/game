@@ -47,6 +47,8 @@
       "mass": 50
     },
     "thousand_volt": {
+      "hunt_hp": 40,
+      "hunt_range": 0,
       "min_height": 0,
       "max_height": 60,
       "ring_duration": 0.8,
@@ -175,6 +177,7 @@
     },
     "ultimate": { "max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_ultimate_dealt": 0.3, "gain_per_second": 1 },
     "gigantamax": {
+      "charge_duration": 1,
       "max_hp": 510,
       "walk_speed": 200,
       "radius": 60,
@@ -182,7 +185,7 @@
       "inferno": {
         "min_height": 0,
         "max_height": 60,
-        "summon_duration": 1,
+        "summon_duration": 1.8,
         "sky_height": 150,
         "dive_speed": 400,
         "lock_distance": 750,
@@ -191,6 +194,9 @@
         "launch_height": 150,
         "launch_duration": 0.8,
         "cooldown": 14,
+        "hp": 60,
+        "radius": 50,
+        "ball_damage": 4,
         "bird_scale": 4,
         "fire_radius": 380,
         "fire_duration": 8,
@@ -402,7 +408,7 @@
       "min_height": 0,
       "max_height": 1000,
       "hp": 50,
-      "speed": 200,
+      "speed": 130,
       "radius": 60,
       "duration": 8,
       "distance": 800,
@@ -781,6 +787,7 @@
       "gain_per_second": 1
     },
     "gigantamax": {
+      "charge_duration": 1,
       "max_hp":  510,
       "walk_speed": 280,
       "radius": 100,

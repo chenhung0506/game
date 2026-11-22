@@ -354,3 +354,148 @@ func TestOrdinaryCharizardStillFliesAndHasNoInferno(t *testing.T) {
 		t.Fatalf("FlyT %v InfT %v birds %d: the main button is Fly when it is not Gigantamax", g.P[0].FlyT, g.P[0].InfT, len(birds(g)))
 	}
 }
+
+// ---- the bird has HP, Thousand Volt hunts it, and the change needs a charge ----
+
+func TestABirdOfFireIsShotDownBeforeItLandsAndNothingBursts(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Charizard.Gigantamax.Inferno.SummonDuration = 0.2
+	cfg.Charizard.Gigantamax.Inferno.HP = 40
+	g := infGame(cfg, 600)
+	gpress(g, Input{Skill: true})
+	g.Balls[0].HP = 1 // being called: nothing can hurt it yet
+	g.Step(dt)
+	if birds(g)[0].HP != 40 {
+		t.Fatalf("HP %d: a bird still being called cannot be hurt", birds(g)[0].HP)
+	}
+	steps(g, 10)
+	if len(birds(g)) != 1 || birds(g)[0].Phase != birdDiving {
+		t.Fatalf("birds %+v: it should be diving", birds(g))
+	}
+	for i := range g.Balls {
+		if g.Balls[i].K == ballFirebird {
+			g.Balls[i].HP = 0 // shot down
+		}
+	}
+	var popped bool
+	for _, e := range g.Step(dt) {
+		popped = popped || e.T == "infpop"
+	}
+	if !popped || len(birds(g)) != 0 || len(g.Fires) != 0 || g.P[1].HP != g.maxHP(1) {
+		t.Fatalf("popped %v birds %d fires %d HP %d: it should be gone with no burst and no fire", popped, len(birds(g)), len(g.Fires), g.P[1].HP)
+	}
+}
+
+func TestAThousandVoltBoltHuntsABigProjectileBeforeTheFoe(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.ThousandVolt.HuntHP = 40
+	g := duel(cfg, pikachu, charizard)
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 300, 400, 1300, 400
+	bolt := &Ball{K: ballVolt, Owner: 0, X: 300, Y: 400, HP: 30, Life: 5, Burst: &[maxSlots]bool{}}
+	big := Ball{K: ballFirebird, Owner: 1, Phase: birdDiving, X: 300, Y: 900, HP: 60}
+	small := Ball{K: ballFire, Owner: 1, X: 300, Y: 450, HP: 4}
+	pillar := Ball{K: ballPillar, Owner: 1, X: 300, Y: 420, HP: 200}
+	g.Balls = []Ball{big, small, pillar}
+	if p := g.huntedBall(bolt, 40, 0); p == nil || p.K != ballFirebird {
+		t.Fatalf("hunted %+v: want the bird (the small fire ball and the pillar do not count)", p)
+	}
+	if g.huntedBall(bolt, 0, 0) != nil {
+		t.Fatal("it hunts with hunt_hp 0")
+	}
+	if g.huntedBall(bolt, 40, 100) != nil {
+		t.Fatal("the bird is out of range")
+	}
+	bolt.Left = 0
+	y0 := bolt.Y
+	g.stepVoltBolt(bolt, dt)
+	if bolt.Y <= y0 || bolt.X > 301 {
+		t.Fatalf("the bolt went to (%v, %v): it should go for the bird straight below it, not the foe far to the right", bolt.X, bolt.Y)
+	}
+	cfg.Pikachu.ThousandVolt.HuntHP = 0
+	g2 := duel(cfg, pikachu, charizard)
+	g2.P[0].X, g2.P[0].Y, g2.P[1].X, g2.P[1].Y = 300, 400, 1300, 400
+	g2.Balls = []Ball{big}
+	b2 := &Ball{K: ballVolt, Owner: 0, X: 300, Y: 400, HP: 30, Life: 5, Burst: &[maxSlots]bool{}}
+	g2.stepVoltBolt(b2, dt)
+	if b2.Y != 400 || b2.X <= 300 {
+		t.Fatalf("the bolt went to (%v, %v): with hunt_hp 0 it goes for the foe", b2.X, b2.Y)
+	}
+}
+
+func TestABoltAndABirdOfFireHurtEachOther(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Pikachu.ThousandVolt.ContactDamage = 5
+	cfg.Charizard.Gigantamax.Inferno.BallDamage = 2
+	g := duel(cfg, pikachu, charizard)
+	g.Balls = []Ball{
+		{K: ballVolt, Owner: 0, X: 500, Y: 500, X0: 500, Y0: 500, HP: 30},
+		{K: ballFirebird, Owner: 1, Phase: birdDiving, X: 500, Y: 500, X0: 500, Y0: 500, HP: 60},
+	}
+	g.clashBalls()
+	var bolt, bird *Ball
+	for i := range g.Balls {
+		switch g.Balls[i].K {
+		case ballVolt:
+			bolt = &g.Balls[i]
+		case ballFirebird:
+			bird = &g.Balls[i]
+		}
+	}
+	if bolt == nil || bird == nil || bolt.HP != 28 || bird.HP != 55 {
+		t.Fatalf("bolt %+v bird %+v: each should lose the other's damage", bolt, bird)
+	}
+}
+
+func TestTheGigantamaxChangeTakesItsChargeTimeRootedAndAStunEndsIt(t *testing.T) {
+	for _, kind := range []int{machamp, charizard} {
+		cfg := DefaultConfig()
+		cfg.Machamp.Gigantamax.ChargeDuration, cfg.Charizard.Gigantamax.ChargeDuration = 0.5, 0.5
+		cfg.Machamp.Gigantamax.Duration, cfg.Charizard.Gigantamax.Duration = 3, 3
+		g := duel(cfg, kind, snorlax)
+		g.P[1].X = g.P[0].X + 1500
+		u, _ := cfg.ultimateOf(kind)
+		g.P[0].Charge = u.Max
+		x0 := g.P[0].X
+		gpress(g, Input{Ult: true})
+		if g.P[0].UltT <= 0 || g.P[0].GmaxT != 0 || g.P[0].Charge >= 1 {
+			t.Fatalf("%s: UltT %v GmaxT %v charge %v: the press should start the gathering and empty the charge", NAMEOF[kind], g.P[0].UltT, g.P[0].GmaxT, g.P[0].Charge)
+		}
+		g.P[0].In = Input{DX: 1}
+		steps(g, 5)
+		g.P[0].In = Input{}
+		if g.P[0].X != x0 || g.P[0].GmaxT != 0 {
+			t.Fatalf("%s: X %v GmaxT %v: it should stand rooted, not yet changed", NAMEOF[kind], g.P[0].X, g.P[0].GmaxT)
+		}
+		steps(g, 15)
+		if g.P[0].GmaxT <= 0 || g.P[0].UltT != 0 {
+			t.Fatalf("%s: GmaxT %v UltT %v: it should have changed when the gathering was over", NAMEOF[kind], g.P[0].GmaxT, g.P[0].UltT)
+		}
+		// a second one, stunned while it gathers: it does not change and the charge is not given back
+		g2 := duel(cfg, kind, snorlax)
+		g2.P[1].X = g2.P[0].X + 1500
+		g2.P[0].Charge = u.Max
+		gpress(g2, Input{Ult: true})
+		g2.stun(&g2.P[0], 1)
+		steps(g2, 30)
+		if g2.P[0].GmaxT != 0 || g2.P[0].UltT != 0 || g2.P[0].Charge >= u.Max {
+			t.Fatalf("%s: GmaxT %v UltT %v charge %v: a stun should end the gathering without changing it", NAMEOF[kind], g2.P[0].GmaxT, g2.P[0].UltT, g2.P[0].Charge)
+		}
+	}
+}
+
+func TestTheNewNumbersAreChecked(t *testing.T) {
+	for name, edit := range map[string]func(*Config){
+		"bird hp":           func(c *Config) { c.Charizard.Gigantamax.Inferno.HP = 0 },
+		"bird radius":       func(c *Config) { c.Charizard.Gigantamax.Inferno.Radius = 0 },
+		"negative charge":   func(c *Config) { c.Charizard.Gigantamax.ChargeDuration = -1 },
+		"machamp charge":    func(c *Config) { c.Machamp.Gigantamax.ChargeDuration = -1 },
+		"negative hunt_hp":  func(c *Config) { c.Pikachu.ThousandVolt.HuntHP = -1 },
+		"negative hunt_rng": func(c *Config) { c.Pikachu.ThousandVolt.HuntRange = -1 },
+	} {
+		c := DefaultConfig()
+		edit(&c)
+		if c.validate() == nil {
+			t.Fatalf("%s: a nonsense number was accepted", name)
+		}
+	}
+}

@@ -138,8 +138,8 @@ let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewis
 // that is also the size the server hits with, and it does not depend on the court's size.
 let radius = [16, 24, 26, 18, 14, 13]; // indexed by character
 const REF = [16, 24, 26, 18, 14, 13, 10, 30, 30, 20, 36, 28];
-let gmaxCfg = { hp: 190, radius: 40, dur: 15 }; // the Gigantamax Machamp's HP, body size and time, from 'hi'
-let cgmaxCfg = { hp: 600, radius: 60, dur: 8, fire: 28, firehp: 12, toss: 160, scale: 1, sky: 300, boom: 220, cd: { fly: 14, fire: 8, toss: 7 } }; // the Gigantamax Charizard's: HP, body size, time, fire ball size and HP, the toss's glow, and the cooldowns of its three skills, from 'hi'
+let gmaxCfg = { hp: 190, radius: 40, dur: 15, charge: 1.5 }; // the Gigantamax Machamp's HP, body size and time, from 'hi'
+let cgmaxCfg = { hp: 600, radius: 60, dur: 8, fire: 28, firehp: 12, toss: 160, scale: 1, sky: 300, boom: 220, bhp: 60, charge: 1.5, cd: { fly: 14, fire: 8, toss: 7 } }; // the Gigantamax Charizard's: HP, body size, time, fire ball size and HP, the toss's glow, and the cooldowns of its three skills, from 'hi'
 const isGmax = (p) => (p.k === 8 || p.k === 2) && p.gmt > 0; // p is a Gigantamax Machamp or Charizard now
 const gmaxOf = (k) => (k === 2 ? cgmaxCfg : gmaxCfg);
 const bodyR = (p) => (isGmax(p) ? gmaxOf(p.k).radius : radius[p.k]); // how big p's body is now
@@ -250,6 +250,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'ult') shake = 10;
       if (ev.t === 'bbboom') { shake = 18; bbLeaves(ev); }
       if (ev.t === 'infboom') shake = 26;
+      if (ev.t === 'infpop') shake = 8;
       if (ev.t === 'gvcast' || ev.t === 'gvplant' || ev.t === 'gvrise' || ev.t === 'gvslam') gvBurst(ev);
       if (ev.t === 'voltburst') { shake = Math.max(shake, 5); flashT = 4 * tvoltCfg.fevery; } // an explosion: one white and black flash (the bolts of a cast go off together, still one flash)
       if (ev.t === 'iceburst') shake = 12;
@@ -1841,6 +1842,13 @@ function fireTongues(c, tongues, t, pal, base = 0) {
 // The Gigantamax Charizard's Inferno: a bird of fire. It is drawn side-on, facing the way it flies (b.dx, b.dy turned to the screen), a glow round it, a flame tail behind, two flapping wings of fire and
 // a head with a beak; while it is being called (b.ph 0) it grows as it climbs, and diving it is tipped nose down. Its shadow stays on the ground where it will land.
 function drawFirebird(b) {
+  drawFirebirdBody(b);
+  if (b.ph === 1 && b.hp < cgmaxCfg.bhp) { // worn down: its HP over it
+    const s = 46 * cgmaxCfg.scale, w = s * 1.2;
+    upright(b.x, b.y - b.z - s * 2.2, () => { ctx.fillStyle = '#000a'; ctx.fillRect(-w / 2, 0, w, 5); ctx.fillStyle = '#ffb030'; ctx.fillRect(-w / 2, 0, w * Math.max(b.hp, 0) / cgmaxCfg.bhp, 5); });
+  }
+}
+function drawFirebirdBody(b) {
   const now = performance.now() / 1000, grow = b.ph === 0 ? Math.min(1, 0.3 + 0.7 * (b.z / Math.max(1, cgmaxCfg.sky))) : 1, s = 46 * cgmaxCfg.scale * grow, lift = Math.min(b.z, 400) / 400;
   const [vx, vy] = b.dx || b.dy ? rv(b.dx || 0, b.dy || 0) : [1, 0], view = Math.abs(vy) > Math.abs(vx) * 1.2 ? (vy > 0 ? 'front' : 'back') : 'side', face = vx < 0 ? -1 : 1; // which way it is flying, on the screen
   upright(b.x, b.y, () => { ctx.fillStyle = `rgba(0,0,0,${0.32 - 0.14 * lift})`; ctx.beginPath(); ctx.ellipse(0, 6, s * (0.9 + 0.5 * lift), s * (0.26 + 0.12 * lift), 0, 0, 7); ctx.fill(); });
@@ -1883,6 +1891,21 @@ function drawFirebird(b) {
       }
     }
   });
+}
+
+// The gathering before a Gigantamax change (Machamp's and Charizard's, p.uct > 0): light climbs round the character in a ring that closes in while a glow swells, so everybody can see it is
+// coming and has the charge time to stop it.
+function drawGmaxCharge() {
+  const now = performance.now() / 1000;
+  for (const [i, p] of snap.p.entries()) {
+    if ((p.k !== 2 && p.k !== 8) || !(p.uct > 0)) continue;
+    const d = disp[i], total = Math.max(0.2, (p.k === 2 ? cgmaxCfg : gmaxCfg).charge), k = Math.min(1, Math.max(0, 1 - p.uct / total)), r0 = radius[p.k], col = p.k === 2 ? '255,160,40' : '190,120,255';
+    const R = r0 * (3.2 - 2.0 * k), gr = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, r0 * (1.2 + 1.8 * k));
+    gr.addColorStop(0, `rgba(255,255,230,${0.5 * k})`); gr.addColorStop(0.6, `rgba(${col},${0.35 * k})`); gr.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(d.x, d.y, r0 * (1.2 + 1.8 * k), 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(${col},${0.5 + 0.4 * k})`; ctx.lineWidth = 3 + 3 * k; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.stroke();
+    for (let n = 0; n < 12; n++) { const a = n / 12 * 6.283 + now * 3, rr = R * (0.9 + 0.1 * Math.sin(now * 9 + n)); ctx.fillStyle = `rgba(255,235,150,${0.9 - 0.4 * k})`; ctx.beginPath(); ctx.arc(d.x + Math.cos(a) * rr, d.y + Math.sin(a) * rr, 2.5 + 2 * k, 0, 7); ctx.fill(); }
+  }
 }
 
 // Inferno's calling: while the Gigantamax Charizard stands rooted (p.it > 0) fire climbs round it in a ring, thicker as the bird grows.
@@ -4179,6 +4202,7 @@ function frame() {
     drawSilenced();
     drawToss();
     drawInfernoSummon();
+    drawGmaxCharge();
     drawIcePunch();
     drawBeams();
     drawSmoke(); // under the players, so the labels and HP bars stay readable
@@ -4188,12 +4212,12 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
       else if (f.t === 'explode' || f.t === 'voltburst' || f.t === 'bbboom') drawExplosion(f);
-      else if (f.t === 'infboom') drawInfernoBoom(f);
+      else if (f.t === 'infboom' || f.t === 'infpop') drawInfernoBoom(f);
       else if (f.t === 'ult') drawUltRing(f);
       else if (f.t === 'airhit') drawAirHit(f);
       else if (f.t === 'freeze') drawFreezeBurst(f);

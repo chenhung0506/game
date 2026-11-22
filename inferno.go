@@ -17,7 +17,7 @@ const (
 func (g *Game) startInferno(i int, in InfernoCfg) {
 	p := &g.P[i]
 	p.InfT, p.FlyCD, p.BreathT = in.SummonDuration, in.Cooldown, 0
-	b := Ball{K: ballFirebird, Owner: i, X: p.X, Y: p.Y, Z: p.Z, Life: in.SummonDuration, Phase: birdCalled, Ult: true}
+	b := Ball{K: ballFirebird, Owner: i, X: p.X, Y: p.Y, Z: p.Z, Life: in.SummonDuration, Phase: birdCalled, Ult: true, HP: in.HP}
 	b.DX, b.DY = float64(p.FX), float64(p.FY)
 	g.Balls = append(g.Balls, b)
 }
@@ -43,7 +43,8 @@ func (g *Game) dropInferno(i int) {
 func (g *Game) stepFirebird(b *Ball, dt float64) ([]Event, bool) {
 	in := g.cfg.Charizard.Gigantamax.Inferno
 	owner := &g.P[b.Owner]
-	if b.Phase == birdCalled { // it grows above Charizard, which is rooted and calling it
+	if b.Phase == birdCalled { // it grows above Charizard, which is rooted and calling it, and nothing can hurt it yet
+		b.HP = in.HP
 		b.X, b.Y = owner.X, owner.Y
 		if b.Life -= dt; b.Life > 1e-9 && in.SummonDuration > 0 {
 			b.Z = in.SkyHeight * (1 - b.Life/in.SummonDuration)
@@ -53,6 +54,9 @@ func (g *Game) stepFirebird(b *Ball, dt float64) ([]Event, bool) {
 		foe := &g.P[g.nearestFoe(b.Owner)]
 		b.AnchorX, b.AnchorY = foe.X, foe.Y
 		return nil, true
+	}
+	if b.HP <= 0 { // shot down on the way: it is gone, and nothing bursts
+		return []Event{{T: "infpop", X: b.X, Y: b.Y, R: in.Radius, K: charizard}}, false
 	}
 	total := math.Hypot(math.Hypot(b.AnchorX-b.X, b.AnchorY-b.Y), b.Z)
 	if total > in.LockDistance { // it follows the foe until it is that close

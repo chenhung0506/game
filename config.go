@@ -182,6 +182,7 @@ type LightningPunchCfg struct {
 // scaled to it, and back when it is over), `walk_speed` and body `radius`, and its own numbers for the skills it has: the Uppercut and the Comet Punch (read exactly like
 // machamp.uppercut and machamp.comet_punch, which it uses the rest of the time) and the Lightning Punch, which takes the place of the High Jump Kick.
 type GigantamaxCfg struct {
+	ChargeDuration float64           `json:"charge_duration"` // seconds it stands rooted gathering before it changes (0: at once); a stun, a freeze or a catch ends it and the charge is not given back
 	MaxHP          int               `json:"max_hp"`
 	WalkSpeed      float64           `json:"walk_speed"`
 	Radius         float64           `json:"radius"`
@@ -264,7 +265,7 @@ type SeismicTossCfg struct {
 // the way) from it, then the way is fixed, so a foe that steps aside in the last stretch is missed. Where it lands it bursts: foes within `explosion_radius` (and at a height inside
 // min_height..max_height) take `damage` and are thrown up `launch_height` and held helpless there for `launch_duration` seconds. The ground is left burning like the Seismic Toss's:
 // a disc of `fire_radius` for `fire_duration` seconds, `fire_damage` at once and every `fire_interval` seconds to whoever stands in it no higher than `fire_max_height`.
-// `bird_scale` only changes how big the bird is drawn. `cooldown` counts from the cast.
+// `bird_scale` only changes how big the bird is drawn. `cooldown` counts from the cast. The bird has `hp`: it is shot down (and nothing bursts) when that is worn away.
 type InfernoCfg struct {
 	Reach
 	SummonDuration  float64 `json:"summon_duration"`
@@ -276,6 +277,9 @@ type InfernoCfg struct {
 	LaunchHeight    float64 `json:"launch_height"`
 	LaunchDuration  float64 `json:"launch_duration"`
 	Cooldown        float64 `json:"cooldown"`
+	HP              int     `json:"hp"`          // the bird's HP: any skill that wears down projectiles (and Thousand Volt's bolts) can shoot it down before it lands; it cannot be hurt while it is still being called
+	Radius          float64 `json:"radius"`      // how big the bird is to the projectiles and skills that hit it (the sky and the ground do not matter to them)
+	BallDamage      int     `json:"ball_damage"` // what it takes off another projectile it runs into
 	BirdScale       float64 `json:"bird_scale"`
 	FireRadius      float64 `json:"fire_radius"`
 	FireDuration    float64 `json:"fire_duration"`
@@ -289,13 +293,14 @@ type InfernoCfg struct {
 // charizard.fire_breath and charizard.seismic_toss read exactly like the ones Charizard uses the rest of the time, and `inferno` takes the place of charizard.fly, which it uses the rest of the time. The fire balls and the burning ground it
 // makes keep these numbers after it has changed back.
 type CharizardGmaxCfg struct {
-	MaxHP       int            `json:"max_hp"`
-	WalkSpeed   float64        `json:"walk_speed"`
-	Radius      float64        `json:"radius"`
-	Duration    float64        `json:"duration"`
-	Inferno     InfernoCfg     `json:"inferno"` // takes the place of Fly on the main button
-	FireBreath  FireBreathCfg  `json:"fire_breath"`
-	SeismicToss SeismicTossCfg `json:"seismic_toss"`
+	ChargeDuration float64        `json:"charge_duration"` // seconds it stands rooted gathering before it changes (0: at once); a stun, a freeze or a catch ends it and the charge is not given back
+	MaxHP          int            `json:"max_hp"`
+	WalkSpeed      float64        `json:"walk_speed"`
+	Radius         float64        `json:"radius"`
+	Duration       float64        `json:"duration"`
+	Inferno        InfernoCfg     `json:"inferno"` // takes the place of Fly on the main button
+	FireBreath     FireBreathCfg  `json:"fire_breath"`
+	SeismicToss    SeismicTossCfg `json:"seismic_toss"`
 }
 
 // Config holds the tuning values. Distances are in game units and times are in seconds.
@@ -366,6 +371,10 @@ type Config struct {
 		// within `explosion_radius` a foe is hurt `explosion_damage`, once for the whole cast however many bolts reach it.
 		ThousandVolt struct {
 			Reach
+			// Once a bolt has flown out it chases the nearest foe; with hunt_hp above 0 it goes first for the nearest projectile of a foe that has at least that much HP (a big attack, like the Inferno's
+			// bird; not a standing pillar or stone) within hunt_range (0: anywhere), and only when there is none does it chase the foe.
+			HuntHP           int       `json:"hunt_hp"`
+			HuntRange        float64   `json:"hunt_range"`
 			RingDuration     float64   `json:"ring_duration"`
 			BallDuration     float64   `json:"ball_duration"`
 			BoltStart        float64   `json:"bolt_start"`
@@ -1278,7 +1287,7 @@ func DefaultConfig() Config {
 	cg := &c.Charizard.Gigantamax // the ultimate: bigger and tougher than Charizard, with bigger fire balls and a bigger toss
 	cg.MaxHP, cg.WalkSpeed, cg.Radius, cg.Duration = 600, 200, 60, 8
 	cg.FireBreath, cg.SeismicToss = c.Charizard.FireBreath, c.Charizard.SeismicToss
-	cg.Inferno = InfernoCfg{Reach: groundReach, SummonDuration: 1, SkyHeight: 300, DiveSpeed: 700, LockDistance: 250, ExplosionRadius: 220, Damage: 50, LaunchHeight: 150, LaunchDuration: 0.8, Cooldown: 14, BirdScale: 1.5,
+	cg.Inferno = InfernoCfg{Reach: groundReach, SummonDuration: 1, SkyHeight: 300, DiveSpeed: 700, LockDistance: 250, ExplosionRadius: 220, Damage: 50, LaunchHeight: 150, LaunchDuration: 0.8, Cooldown: 14, HP: 60, Radius: 50, BallDamage: 4, BirdScale: 1.5,
 		FireRadius: 380, FireDuration: 8, FireDamage: 6, FireInterval: 0.5, FireMaxHeight: 30}
 	cg.FireBreath.Radius, cg.FireBreath.Damage, cg.FireBreath.HP, cg.FireBreath.Quantity = 28, 6, 12, 30
 	cg.SeismicToss.Radius, cg.SeismicToss.Damage, cg.SeismicToss.FireRadius = 160, 60, 320
@@ -1407,6 +1416,8 @@ func (c Config) validateSkills() error {
 		{"charizard.gigantamax.inferno.dive_speed", c.Charizard.Gigantamax.Inferno.DiveSpeed, 0},
 		{"charizard.gigantamax.inferno.explosion_radius", c.Charizard.Gigantamax.Inferno.ExplosionRadius, 0},
 		{"charizard.gigantamax.inferno.bird_scale", c.Charizard.Gigantamax.Inferno.BirdScale, 0},
+		{"charizard.gigantamax.inferno.hp", float64(c.Charizard.Gigantamax.Inferno.HP), 0},
+		{"charizard.gigantamax.inferno.radius", c.Charizard.Gigantamax.Inferno.Radius, 0},
 		{"chikorita.max_hp", float64(c.Chikorita.MaxHP), 0},
 		{"vulpix.max_hp", float64(c.Vulpix.MaxHP), 0},
 		{"vulpix.walk_speed", c.Vulpix.WalkSpeed, 0},
@@ -1676,6 +1687,11 @@ func (c Config) validateSkills() error {
 		{"charizard.gigantamax.inferno.launch_height", c.Charizard.Gigantamax.Inferno.LaunchHeight},
 		{"charizard.gigantamax.inferno.launch_duration", c.Charizard.Gigantamax.Inferno.LaunchDuration},
 		{"charizard.gigantamax.inferno.cooldown", c.Charizard.Gigantamax.Inferno.Cooldown},
+		{"charizard.gigantamax.inferno.ball_damage", float64(c.Charizard.Gigantamax.Inferno.BallDamage)},
+		{"charizard.gigantamax.charge_duration", c.Charizard.Gigantamax.ChargeDuration},
+		{"machamp.gigantamax.charge_duration", c.Machamp.Gigantamax.ChargeDuration},
+		{"pikachu.thousand_volt.hunt_hp", float64(c.Pikachu.ThousandVolt.HuntHP)},
+		{"pikachu.thousand_volt.hunt_range", c.Pikachu.ThousandVolt.HuntRange},
 		{"charizard.gigantamax.inferno.fire_radius", c.Charizard.Gigantamax.Inferno.FireRadius},
 		{"charizard.gigantamax.inferno.fire_duration", c.Charizard.Gigantamax.Inferno.FireDuration},
 		{"charizard.gigantamax.inferno.fire_damage", float64(c.Charizard.Gigantamax.Inferno.FireDamage)},

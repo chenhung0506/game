@@ -644,6 +644,8 @@ func (g *Game) ballRadius(b *Ball) float64 {
 	switch b.K {
 	case ballFire:
 		return g.fireBreathOf(b.Ult).Radius
+	case ballFirebird:
+		return g.cfg.Charizard.Gigantamax.Inferno.Radius
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Radius
 	case ballPillar:
@@ -672,6 +674,8 @@ func (g *Game) ballMass(b *Ball) float64 {
 	switch b.K {
 	case ballFire:
 		return g.fireBreathOf(b.Ult).Mass
+	case ballFirebird:
+		return g.cfg.Charizard.Gigantamax.SeismicToss.Mass // heavy: a beam hardly moves it
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Mass
 	case ballPillar, ballStone:
@@ -1561,6 +1565,8 @@ func (g *Game) ballDamage(b *Ball) int {
 	switch b.K {
 	case ballFire:
 		return g.fireBreathOf(b.Ult).Damage
+	case ballFirebird:
+		return g.cfg.Charizard.Gigantamax.Inferno.BallDamage
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Damage
 	case ballPillar, ballStone:
