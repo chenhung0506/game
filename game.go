@@ -159,7 +159,9 @@ type Player struct {
 
 	// Charizard. Fly: seconds of flight left (the height follows in Z) and the cooldown, which starts on landing.
 	FlyT  float64 `json:"ft"`
-	FlyCD float64 `json:"fcd"`
+	FlyCD float64 `json:"fcd"` // (the Gigantamax Charizard's Inferno uses this cooldown too: it is on the same button)
+	// Inferno (the Gigantamax Charizard's main skill): the seconds left of the calling, in which it stands rooted while its bird grows in the sky.
+	InfT float64 `json:"it"`
 	// Fire Breath: seconds of breathing left, and how many of the config's quantity have left the mouth.
 	BreathT    float64 `json:"ht"`
 	BreathN    int     `json:"-"`
@@ -351,6 +353,7 @@ const (
 	ballGiantHead = 12 // the thick vine that runs underground after the foe in Chikorita's Giant Vines (it has no HP and nothing touches it)
 	ballGiantVine = 13 // one of the giant vines of that skill (waiting underground, standing up, coming down, or lying there); HP 0, so no projectile meets it
 	ballVolt      = 11 // one of Pikachu's Thousand Volt bolts: it flies out, chases the foe, pushes it back and explodes when its time is up; it has HP like a fire ball
+	ballFirebird  = 14 // the Gigantamax Charizard's bird of fire (Inferno): it grows in the sky above it, then dives at the foe and bursts where it lands; HP 0, so no projectile meets it
 	ballShadow    = 9  // Gengar's Shadow Ball in charge mode: it flies straight like the Electro Ball, bursts where it is stopped and drags the opponent in; it has HP
 )
 
@@ -402,9 +405,10 @@ type FireZone struct {
 	X     float64 `json:"x"`
 	Y     float64 `json:"y"`
 	R     float64 `json:"r"`
-	Left  float64 `json:"l"`            // seconds before it burns out
-	HitCD float64 `json:"-"`            // until it may burn the opponent again
-	Ult   bool    `json:"ug,omitempty"` // a Gigantamax Charizard lit it: it burns by charizard.gigantamax.seismic_toss's numbers and its damage is the ultimate's
+	Left  float64 `json:"l"`             // seconds before it burns out
+	HitCD float64 `json:"-"`             // until it may burn the opponent again
+	Ult   bool    `json:"ug,omitempty"`  // a Gigantamax Charizard lit it: it burns by charizard.gigantamax.seismic_toss's numbers and its damage is the ultimate's
+	Inf   bool    `json:"inf,omitempty"` // ... or by charizard.gigantamax.inferno's, when the bird of fire lit it
 }
 
 type Frost struct {
@@ -801,6 +805,7 @@ func (g *Game) Step(dt float64) []Event {
 			in = Input{}
 			p.DashT, p.BallT, p.BreathT, p.UltT, p.BirdDive = 0, 0, 0, 0, false // a dash, a charge, a breath or a gathering ultimate in progress is cut short
 			g.dropToss(i)                                                       // a Charizard caught mid-toss lets go
+			g.dropInferno(i)                                                    // and a bird it was still calling is gone
 			g.dropLeaf(i)                                                       // a Chikorita mid-hop or mid-slash is stopped
 			g.dropMachamp(i)                                                    // so is a Machamp mid-jump, mid-smash or mid-flurry
 			g.dropGengar(i)                                                     // and a Gengar comes up out of the ground
@@ -964,7 +969,7 @@ func (g *Game) Step(dt float64) []Event {
 
 		if p.Kind == charizard {
 			events = append(events, g.stepCharizard(i, in, dt)...)
-			casting = p.TossPhase != tossNone // rooted but for the dash itself, which moves it
+			casting = p.TossPhase != tossNone || p.InfT > 0 // rooted but for the dash itself, which moves it; and rooted while it calls its bird
 		}
 
 		if p.Kind == chikorita {
@@ -1440,6 +1445,14 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}
 			continue
 		}
+		if b.K == ballFirebird {
+			ev, keep := g.stepFirebird(&b, dt)
+			events = append(events, ev...)
+			if keep {
+				kept = append(kept, b)
+			}
+			continue
+		}
 		if b.K == ballFire {
 			if b.HP > 0 {
 				fb := g.fireBreathOf(b.Ult)
@@ -1674,12 +1687,17 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 		}
 	}
 	tick(&p.FlyCD)
+	tick(&p.InfT)
 	tick(&p.BreathCD)
 	tick(&p.TossCD)
 
 	// ---- Fly ----
 	rise := cz.Fly.Height / flyRiseTime
-	if in.Skill && p.FlyT == 0 && p.FlyCD == 0 && p.Z == 0 && p.TossPhase == tossNone && !stunned {
+	if p.gigantamax() { // the Gigantamax Charizard does not fly: the main button calls the bird of fire
+		if in.Skill && p.FlyCD == 0 && p.InfT == 0 && p.Z == 0 && p.TossPhase == tossNone && !stunned {
+			g.startInferno(i, cz.Inferno)
+		}
+	} else if in.Skill && p.FlyT == 0 && p.FlyCD == 0 && p.Z == 0 && p.TossPhase == tossNone && !stunned {
 		p.FlyT = cz.Fly.Duration
 	}
 	if p.TossPhase == tossNone {
@@ -1726,7 +1744,7 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 
 	// ---- Seismic Toss ----
 	ts := cz.SeismicToss
-	if in.Toss && p.TossPhase == tossNone && p.TossCD == 0 && !stunned {
+	if in.Toss && p.TossPhase == tossNone && p.TossCD == 0 && !stunned && p.InfT == 0 {
 		// It may start in the air: the flight ends there and the run goes on at that height; the flight cooldown
 		// starts when Charizard is back on the ground.
 		p.TossAir, p.FlyT = p.Z > 0, 0
@@ -2081,6 +2099,10 @@ func (g *Game) tickFires(dt float64) {
 		ts := g.cfg.Charizard.SeismicToss
 		if z.Ult {
 			ts = g.cfg.Charizard.Gigantamax.SeismicToss
+		}
+		if z.Inf { // lit by the bird of fire: its own numbers
+			in := g.cfg.Charizard.Gigantamax.Inferno
+			ts.FireMaxHeight, ts.FireDamage, ts.FireInterval = in.FireMaxHeight, in.FireDamage, in.FireInterval
 		}
 		if z.HitCD > 0 {
 			z.HitCD -= dt

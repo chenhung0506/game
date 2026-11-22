@@ -107,7 +107,7 @@ const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光
 const HELP = [
   '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝千萬伏特（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能放；朝四周放出一圈閃電，之後追著敵人跑、碰到會擊退，時間到全部爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）',
-  '你是噴火龍　移動 WASD　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　J＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　K＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）　L＝極巨化（絕招，蓄能滿了才能放：變成又大又壯的極巨化噴火龍一段時間，血量、速度和體型大增，飛行、噴火、地球上投都換成更強的數值，火球更大、顆數更少，摔下去留下的火更大片；變身時鏡頭會拉到最遠，時間到變回原形，血量依比例縮回）',
+  '你是噴火龍　移動 WASD　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　J＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　K＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）　L＝極巨化（絕招，蓄能滿了才能放：變成又大又壯的極巨化噴火龍一段時間，血量、速度和體型大增，空白鍵的飛行換成「極巨地獄滅焰」（站定召喚一隻燃燒的火焰鳥，飛上天後朝敵人俯衝，落地爆炸、把敵人炸上天並留下一片火海），噴火和地球上投換成更強的數值，火球更大、顆數更少，摔下去留下的火更大片；變身時鏡頭會拉到最遠，時間到變回原形，血量依比例縮回）',
   '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　J＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　K＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）　L＝大藤蔓（絕招，蓄能滿了才能放；一根粗藤蔓從地底追著敵人跑，碰到敵人或時間到就在那裡冒出來，周圍一圈大藤蔓依序衝出地面，各自鎖定敵人朝下拍打，打中的人受傷、變慢，被藤蔓打中好幾次還會被打暈；整個過程無法移動）',
   '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
   '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝空氣斬（朝按住的方向衝出一道半月形弧線，彎向敵人那一側，沿途朝最近的敵人射出一道道白色的空氣斬擊，打得到貼地的敵人）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）　L＝神鳥猛攻（絕招，蓄能滿才能放：先定身集氣，飛上高空、身上的鳥形光芒愈來愈大，然後朝敵人俯衝，撞擊地面爆炸，把敵人打上天、在空中動彈不得）',
@@ -139,7 +139,7 @@ let thunderCfg = { radius: 60, delay: 1, interval: 0.5, strikes: 3 }; // likewis
 let radius = [16, 24, 26, 18, 14, 13]; // indexed by character
 const REF = [16, 24, 26, 18, 14, 13, 10, 30, 30, 20, 36, 28];
 let gmaxCfg = { hp: 190, radius: 40, dur: 15 }; // the Gigantamax Machamp's HP, body size and time, from 'hi'
-let cgmaxCfg = { hp: 600, radius: 60, dur: 8, fire: 28, firehp: 12, toss: 160, cd: { fly: 6, fire: 8, toss: 7 } }; // the Gigantamax Charizard's: HP, body size, time, fire ball size and HP, the toss's glow, and the cooldowns of its three skills, from 'hi'
+let cgmaxCfg = { hp: 600, radius: 60, dur: 8, fire: 28, firehp: 12, toss: 160, scale: 1, sky: 300, boom: 220, cd: { fly: 14, fire: 8, toss: 7 } }; // the Gigantamax Charizard's: HP, body size, time, fire ball size and HP, the toss's glow, and the cooldowns of its three skills, from 'hi'
 const isGmax = (p) => (p.k === 8 || p.k === 2) && p.gmt > 0; // p is a Gigantamax Machamp or Charizard now
 const gmaxOf = (k) => (k === 2 ? cgmaxCfg : gmaxCfg);
 const bodyR = (p) => (isGmax(p) ? gmaxOf(p.k).radius : radius[p.k]); // how big p's body is now
@@ -249,6 +249,7 @@ ws.onmessage = (e) => {
       if (ev.t === 'explode') shake = 14;
       if (ev.t === 'ult') shake = 10;
       if (ev.t === 'bbboom') { shake = 18; bbLeaves(ev); }
+      if (ev.t === 'infboom') shake = 26;
       if (ev.t === 'gvcast' || ev.t === 'gvplant' || ev.t === 'gvrise' || ev.t === 'gvslam') gvBurst(ev);
       if (ev.t === 'voltburst') { shake = Math.max(shake, 5); flashT = 4 * tvoltCfg.fevery; } // an explosion: one white and black flash (the bolts of a cast go off together, still one flash)
       if (ev.t === 'iceburst') shake = 12;
@@ -617,7 +618,7 @@ function buildPad() {
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
     if (name === 'ult') { // no cooldown: the dark pie is the charge still missing, and the button lights up when it is full
       const pct = document.createElement('div'); pct.className = 'pct'; b.append(pct); b.classList.add('ult'); ultBtn = { b, span, pct };
-    } else cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1], b, label, gmLabel: padKind === 8 && name === 'rock' ? '閃電拳' : null }); // gmLabel: what the button says while Machamp is Gigantamax
+    } else cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1], b, label, gmLabel: padKind === 8 && name === 'rock' ? '閃電拳' : padKind === 2 && name === 'skill' ? '地獄滅焰' : null }); // gmLabel: what the button says while Machamp is Gigantamax
     if (padKind === 0 && name === 'skill') { usesBadge = document.createElement('div'); usesBadge.className = 'uses'; b.append(usesBadge); }
     if (aimed) { // the button turns into a stick while it is held: the way it is dragged is the way the skill goes
       const ring = document.createElement('div'), dot = document.createElement('div'); ring.className = 'aimring'; dot.className = 'aimdot'; b.append(ring, dot);
@@ -1765,6 +1766,7 @@ function drawBall(b) {
   if (b.k === 11) { drawVoltBolt(b); return; }
   if (b.k === 12) { drawGiantHead(b); return; }
   if (b.k === 13) { drawGiantVine(b); return; }
+  if (b.k === 14) { drawFirebird(b); return; }
   {
     const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,170,20,0)');
@@ -1812,6 +1814,107 @@ function drawFireBall(b) {
       ctx.fillStyle = '#ffb030'; ctx.fillRect(-bw / 2, -up - 8, bw * Math.max(b.hp, 0) / fhp, 3);
     }
   });
+}
+
+// Tongues of fire, drawn the way the Gigantamax Charizard's wing fire is: each tongue is four nested layers with licking edges that sway, thin at its root and tapering to a tip; every layer is
+// drawn across all the tongues first so they melt together. A tongue is [root x, root y, angle, length, width, seed]; `base` > 0 makes the first part of it thinner (a wing's root).
+const FIRE_PAL = [[1, 1, '#d8340f'], [0.78, 0.82, '#ff6a14'], [0.52, 0.62, '#ffb81f'], [0.27, 0.42, '#fff0a0']];
+const FIRE_PAL_LIGHT = [[1, 1, '#ffc93a'], [0.78, 0.82, '#ffe27a'], [0.52, 0.62, '#fff4b8'], [0.27, 0.42, '#ffffff']];
+const FIRE_PAL_DARK = [[1, 1, '#8a1608'], [0.78, 0.82, '#c42a0c'], [0.52, 0.62, '#ee5a14'], [0.27, 0.42, '#ffb02a']];
+function fireTongues(c, tongues, t, pal, base = 0) {
+  const N = 20;
+  for (const [ls, lw, col] of pal) {
+    c.fillStyle = col;
+    for (const [bx, by, ang, len, wid, seed] of tongues) {
+      const dx = Math.cos(ang), dy = Math.sin(ang), nx = -dy, ny = dx, L = [], R = [];
+      for (let i = 0; i <= N; i++) {
+        const u = i / N, lick = 1 + 0.28 * Math.sin(u * 15 - t * 9 + seed * 3.1) + 0.12 * Math.sin(u * 31 - t * 14 + seed);
+        const hw = wid * lw * Math.pow(Math.sin(Math.PI * Math.pow(u, 0.5)), 0.95) * (1 - u * 0.3) * lick * (base ? Math.min(1, Math.pow(u / base, 1.4)) : 1);
+        const sway = len * 0.2 * u * u * Math.sin(t * 3.1 + seed * 2.3 - u * 3.2) + len * 0.05 * u * Math.sin(t * 7 + seed), px = bx + dx * len * ls * u + nx * sway, py = by + dy * len * ls * u + ny * sway;
+        L.push([px + nx * hw, py + ny * hw]); R.push([px - nx * hw, py - ny * hw]);
+      }
+      c.beginPath(); c.moveTo(L[0][0], L[0][1]); for (const q of L) c.lineTo(q[0], q[1]); for (let i = N; i >= 0; i--) c.lineTo(R[i][0], R[i][1]); c.closePath(); c.fill();
+    }
+  }
+}
+
+// The Gigantamax Charizard's Inferno: a bird of fire. It is drawn side-on, facing the way it flies (b.dx, b.dy turned to the screen), a glow round it, a flame tail behind, two flapping wings of fire and
+// a head with a beak; while it is being called (b.ph 0) it grows as it climbs, and diving it is tipped nose down. Its shadow stays on the ground where it will land.
+function drawFirebird(b) {
+  const now = performance.now() / 1000, grow = b.ph === 0 ? Math.min(1, 0.3 + 0.7 * (b.z / Math.max(1, cgmaxCfg.sky))) : 1, s = 46 * cgmaxCfg.scale * grow, lift = Math.min(b.z, 400) / 400;
+  const [vx, vy] = b.dx || b.dy ? rv(b.dx || 0, b.dy || 0) : [1, 0], view = Math.abs(vy) > Math.abs(vx) * 1.2 ? (vy > 0 ? 'front' : 'back') : 'side', face = vx < 0 ? -1 : 1; // which way it is flying, on the screen
+  upright(b.x, b.y, () => { ctx.fillStyle = `rgba(0,0,0,${0.32 - 0.14 * lift})`; ctx.beginPath(); ctx.ellipse(0, 6, s * (0.9 + 0.5 * lift), s * (0.26 + 0.12 * lift), 0, 0, 7); ctx.fill(); });
+  upright(b.x, b.y - b.z - s * 0.7, () => {
+    const gl = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 2.4); gl.addColorStop(0, 'rgba(255,170,50,0.5)'); gl.addColorStop(1, 'rgba(255,60,10,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0, 0, s * 2.4, 0, 7); ctx.fill();
+    const rate = b.ph === 1 ? 20 : 12, tongue = (x0, y0, x1, y1, w, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x0, y0 - w); ctx.quadraticCurveTo((x0 + x1) / 2, (y0 + y1) / 2 - w * 1.4, x1, y1); ctx.quadraticCurveTo((x0 + x1) / 2, (y0 + y1) / 2 + w * 1.4, x0, y0 + w); ctx.closePath(); ctx.fill(); };
+    const WING = [[-2.3, 1.7, 0.42], [-2.05, 2.0, 0.46], [-1.8, 1.95, 0.45], [-1.55, 1.75, 0.4], [-1.3, 1.5, 0.35], [-1.05, 1.2, 0.3]]; // the wing's tongues: angle, length and width (in s); the wings are fire like the Gigantamax Charizard's, thin at the root and wide at the far end
+    const eye = (ex, ey, r, n) => { const eg = ctx.createRadialGradient(ex, ey, 0, ex, ey, r); eg.addColorStop(0, 'rgba(255,90,10,1)'); eg.addColorStop(0.4, 'rgba(255,60,10,.95)'); eg.addColorStop(1, 'rgba(255,60,10,0)'); ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(ex, ey, r, 0, 7); ctx.fill(); // the eye is a ball of fire, with flames licking up from it
+      fireTongues(ctx, [[ex, ey, -1.5 + Math.sin(now * 11 + n) * 0.3, r * 2.4, r * 0.55, 40 + n], [ex - r * 0.3, ey, -1.9, r * 1.9, r * 0.4, 41 + n], [ex + r * 0.3, ey, -1.2, r * 1.9, r * 0.4, 42 + n]], now, FIRE_PAL); };
+    const crest = (hx, hy, r) => { for (let k = 0; k < 3; k++) tongue(hx - r * 0.5 + k * r * 0.5, hy - r * 0.8, hx - r * 0.7 + k * r * 0.7, hy - r * (2.0 + 0.4 * Math.sin(now * 14 + k)), r * 0.16, k === 1 ? '#ffe9a0' : '#ffb21e'); };
+    const bodyGlow = (rx, ry) => { const bd = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(rx, ry)); bd.addColorStop(0, '#ffffff'); bd.addColorStop(0.5, '#fff3a8'); bd.addColorStop(1, '#ffd23a'); ctx.fillStyle = bd; ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, 7); ctx.fill(); };
+    if (view === 'side') {
+      ctx.scale(face, 1); ctx.rotate(b.ph === 1 ? 0.55 : 0);
+      fireTongues(ctx, [-2, -1, 0, 1, 2].map((k) => [-s * 0.32, k * s * 0.08, Math.PI + k * 0.2, s * (2.0 + 0.3 * Math.sin(now * 13 + k)) * (1 - Math.abs(k) * 0.12), s * 0.3, k + 7]), now, FIRE_PAL); // the tail: five long, fat flames trailing behind
+      for (const far of [true, false]) { // the wings, swept up and back and beating
+        const sh = far ? 0.3 : 0, beat = Math.sin(now * rate + (far ? 0.6 : 0)) * 0.55, k0 = far ? 0.85 : 1.1;
+        fireTongues(ctx, WING.map(([a, l, w], n) => [-s * 0.05, -s * 0.1, a + sh + beat * 0.7, s * l * k0, s * w, n + (far ? 20 : 10)]), now, far ? FIRE_PAL_DARK : FIRE_PAL, 0.6);
+      }
+      // the body is a small flame of its own, a paler one (yellow and white) so it reads against the red and orange of the wings and the tail
+      fireTongues(ctx, [[-0.3, 0.08, 3.1, 0.8], [-0.22, -0.12, -2.6, 0.7], [-0.08, -0.16, -2.2, 0.65], [0.08, -0.16, -1.9, 0.5], [-0.26, 0.15, 2.7, 0.6], [-0.14, 0.16, 2.4, 0.45]].map(([x, y, a, l], n) => [s * x, s * y, a + Math.sin(now * 8 + n) * 0.12, s * l * (0.9 + 0.15 * Math.sin(now * 11 + n)), s * 0.14, n + 30]), now, FIRE_PAL_LIGHT);
+      bodyGlow(s * 0.4, s * 0.2);
+      const hx = s * 0.42, hy = -s * 0.14, hr = s * 0.27; // the head, big
+      ctx.beginPath(); ctx.arc(hx, hy, hr, 0, 7); ctx.fill();
+      ctx.fillStyle = '#ff9a1f'; ctx.beginPath(); ctx.moveTo(hx + hr * 0.75, hy - hr * 0.35); ctx.lineTo(hx + hr * 1.9, hy + hr * 0.1); ctx.lineTo(hx + hr * 0.75, hy + hr * 0.3); ctx.closePath(); ctx.fill(); // the beak
+      eye(hx + hr * 0.25, hy - hr * 0.25, hr * 0.42, 0); crest(hx - hr * 0.2, hy - hr * 0.6, hr * 0.7);
+    } else { // flying at the screen or away from it: the wings spread to both sides
+      const sg = view === 'front' ? 1 : -1, wings = () => { for (const far of [true, false]) { // (both pairs, the far one darker and a little lower)
+        const beat = Math.sin(now * rate + (far ? 0.6 : 0)) * 0.4, k0 = far ? 0.85 : 1.1;
+        for (const side of [-1, 1]) fireTongues(ctx, WING.map(([a, l, w], n) => { const aa = -Math.PI / 2 + (a + Math.PI / 2 - 0.0) * 0.6 * (far ? 1.1 : 1) - beat * 0.3; return [side * s * 0.1, -s * 0.05, side < 0 ? aa - 0.5 : Math.PI - aa + 0.5, s * l * k0 * 0.9, s * w, n + (far ? 20 : 10) + (side < 0 ? 0 : 6)]; }), now, far ? FIRE_PAL_DARK : FIRE_PAL, 0.6); } };
+      const tail = (dir) => fireTongues(ctx, [-2, -1, 0, 1, 2].map((k) => [0, s * 0.1 * dir, Math.PI / 2 * dir + k * 0.28 * dir, s * (1.5 + 0.3 * Math.sin(now * 13 + k)) * (1 - Math.abs(k) * 0.1), s * 0.3, k + 7]), now, FIRE_PAL);
+      const bodyFlames = () => fireTongues(ctx, [-2, -1, 0, 1, 2].map((k) => [k * s * 0.1, s * 0.2, Math.PI / 2 + k * 0.45, s * 0.6, s * 0.13, k + 30]), now, FIRE_PAL_LIGHT);
+      if (sg > 0) { tail(-1); wings(); bodyFlames(); bodyGlow(s * 0.28, s * 0.36); // the front: the tail is behind it, the face towards us
+        const hr = s * 0.28, hy = -s * 0.3; ctx.beginPath(); ctx.arc(0, hy, hr, 0, 7); ctx.fill();
+        ctx.fillStyle = '#ff9a1f'; ctx.beginPath(); ctx.moveTo(-hr * 0.3, hy + hr * 0.25); ctx.lineTo(hr * 0.3, hy + hr * 0.25); ctx.lineTo(0, hy + hr * 0.95); ctx.closePath(); ctx.fill();
+        eye(-hr * 0.45, hy - hr * 0.15, hr * 0.36, 0); eye(hr * 0.45, hy - hr * 0.15, hr * 0.36, 3); crest(0, hy - hr * 0.5, hr * 0.7);
+      } else { wings(); bodyGlow(s * 0.28, s * 0.36); // the back: the head is only its top, the tail is out in front, towards us
+        const hr = s * 0.26, hy = -s * 0.3; ctx.beginPath(); ctx.arc(0, hy, hr, 0, 7); ctx.fill(); crest(0, hy - hr * 0.4, hr * 0.7);
+        tail(1);
+      }
+    }
+  });
+}
+
+// Inferno's calling: while the Gigantamax Charizard stands rooted (p.it > 0) fire climbs round it in a ring, thicker as the bird grows.
+function drawInfernoSummon() {
+  const now = performance.now() / 1000;
+  for (const [i, p] of snap.p.entries()) {
+    if (p.k !== 2 || !(p.it > 0)) continue;
+    const d = disp[i], R = bodyR(p) * 1.9;
+    const gr = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, R); gr.addColorStop(0, 'rgba(255,230,120,0.45)'); gr.addColorStop(0.7, 'rgba(255,110,25,0.4)'); gr.addColorStop(1, 'rgba(255,60,10,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.fill();
+    for (let k = 0; k < 14; k++) {
+      const a = k / 14 * 6.283 + now * 1.5, fx = d.x + Math.cos(a) * R * 0.8, fy = d.y + Math.sin(a) * R * 0.8, h = (40 + 30 * Math.abs(Math.sin(now * 9 + k * 1.7))) * (bodyR(p) / 40), w = h * 0.22;
+      upright(fx, fy, () => {
+        ctx.fillStyle = 'rgba(255,100,20,0.85)'; ctx.beginPath(); ctx.moveTo(-w, 0); ctx.quadraticCurveTo(-w * 0.9, -h * 0.6, 0, -h); ctx.quadraticCurveTo(w * 0.9, -h * 0.6, w, 0); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,220,90,0.9)'; ctx.beginPath(); ctx.moveTo(-w * 0.5, 0); ctx.quadraticCurveTo(-w * 0.45, -h * 0.4, 0, -h * 0.65); ctx.quadraticCurveTo(w * 0.45, -h * 0.4, w * 0.5, 0); ctx.closePath(); ctx.fill();
+      });
+    }
+  }
+}
+
+// The Inferno's burst: a bright disc of the real reach (f.r), a ring racing out and flames thrown up all round it.
+function drawInfernoBoom(f) {
+  const R = f.r, k = f.age / 0.7, a = Math.max(0, 1 - k);
+  ctx.save();
+  const disc = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R); disc.addColorStop(0, `rgba(255,250,200,${0.9 * a})`); disc.addColorStop(0.45, `rgba(255,150,40,${0.6 * a})`); disc.addColorStop(1, `rgba(220,50,10,${0.2 * a})`);
+  ctx.fillStyle = disc; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,220,120,${a})`; ctx.lineWidth = 10 * a + 1; ctx.beginPath(); ctx.arc(f.x, f.y, R * Math.min(1, k * 2.2), 0, 7); ctx.stroke();
+  for (let n = 0; n < 16; n++) {
+    const ang = n / 16 * 6.283 + 0.3, rr = R * (0.25 + 0.7 * Math.min(1, k * 1.8)), h = R * 0.5 * (1 - k * 0.6) * (0.7 + 0.3 * Math.sin(n * 5.3)), w = h * 0.22;
+    upright(f.x + Math.cos(ang) * rr, f.y + Math.sin(ang) * rr, () => { ctx.fillStyle = `rgba(255,110,25,${0.9 * a})`; ctx.beginPath(); ctx.moveTo(-w, 0); ctx.quadraticCurveTo(-w * 0.9, -h * 0.6, 0, -h); ctx.quadraticCurveTo(w * 0.9, -h * 0.6, w, 0); ctx.closePath(); ctx.fill(); ctx.fillStyle = `rgba(255,225,100,${0.9 * a})`; ctx.beginPath(); ctx.moveTo(-w * 0.5, 0); ctx.quadraticCurveTo(-w * 0.4, -h * 0.4, 0, -h * 0.65); ctx.quadraticCurveTo(w * 0.4, -h * 0.4, w * 0.5, 0); ctx.closePath(); ctx.fill(); });
+  }
+  ctx.restore();
 }
 
 // Seismic Toss: while it runs Charizard is wrapped in flame, shedding flames behind it; while it carries
@@ -3829,7 +3932,7 @@ function drawCooldowns() {
   if (!snap) return;
   const gm = snap.p[you].k === 8 && snap.p[you].gmt > 0; // the Gigantamax Machamp's K is the Lightning Punch, with a cooldown of its own
   for (const c of cdBtns) {
-    if (c.gmLabel && c.b.firstChild && c.b.firstChild.nodeType === 3) { const want = gm ? c.gmLabel : c.label; if (c.b.firstChild.nodeValue !== want) c.b.firstChild.nodeValue = want; }
+    if (c.gmLabel && c.b.firstChild && c.b.firstChild.nodeType === 3) { const want = isGmax(snap.p[you]) ? c.gmLabel : c.label; if (c.b.firstChild.nodeValue !== want) c.b.firstChild.nodeValue = want; }
     const cgm = snap.p[you].k === 2 && snap.p[you].gmt > 0 && cgmaxCfg.cd[c.total] != null; // the Gigantamax Charizard's skills have cooldowns of their own
     const total = cgm ? cgmaxCfg.cd[c.total] : cdCfg[gm && c.total === 'mkick' ? 'glp' : c.total], left = snap.p[you][gm && c.field === 'kkcd' ? 'lpcd' : c.field];
     c.span.style.setProperty('--cd', (total > 0 ? Math.min(Math.max(left / total, 0), 1) * 360 : 0) + 'deg');
@@ -4075,6 +4178,7 @@ function frame() {
     drawShadowBalls();
     drawSilenced();
     drawToss();
+    drawInfernoSummon();
     drawIcePunch();
     drawBeams();
     drawSmoke(); // under the players, so the labels and HP bars stay readable
@@ -4084,11 +4188,12 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
       else if (f.t === 'explode' || f.t === 'voltburst' || f.t === 'bbboom') drawExplosion(f);
+      else if (f.t === 'infboom') drawInfernoBoom(f);
       else if (f.t === 'ult') drawUltRing(f);
       else if (f.t === 'airhit') drawAirHit(f);
       else if (f.t === 'freeze') drawFreezeBurst(f);

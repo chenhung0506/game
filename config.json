@@ -132,13 +132,13 @@
     }
   },
   "charizard": {
-    "max_hp": 200,
-    "walk_speed": 140,
+    "max_hp": 170,
+    "walk_speed": 130,
     "radius": 20,
     "fly": {
       "duration": 6,
       "cooldown": 6,
-      "speed": 260,
+      "speed": 270,
       "height": 60,
       "ring_count": 16,
       "ring_length": 350
@@ -175,25 +175,36 @@
     },
     "ultimate": { "max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_ultimate_dealt": 0.3, "gain_per_second": 1 },
     "gigantamax": {
-      "max_hp": 600,
+      "max_hp": 510,
       "walk_speed": 200,
       "radius": 60,
       "duration": 8,
-      "fly": {
-        "duration": 8,
-        "cooldown": 6,
-        "speed": 340,
-        "height": 100,
-        "ring_count": 24,
-        "ring_length": 500
+      "inferno": {
+        "min_height": 0,
+        "max_height": 60,
+        "summon_duration": 1,
+        "sky_height": 150,
+        "dive_speed": 400,
+        "lock_distance": 750,
+        "explosion_radius": 220,
+        "damage": 30,
+        "launch_height": 150,
+        "launch_duration": 0.8,
+        "cooldown": 14,
+        "bird_scale": 4,
+        "fire_radius": 380,
+        "fire_duration": 8,
+        "fire_damage": 6,
+        "fire_interval": 0.5,
+        "fire_max_height": 30
       },
       "fire_breath": {
         "min_height": 0,
         "max_height": 80,
-        "speed": 255,
+        "speed": 275,
         "radius": 28,
-        "hp": 12,
-        "damage": 8,
+        "hp": 8,
+        "damage": 4,
         "cooldown": 7,
         "mass": 60,
         "duration": 4.5,
@@ -204,9 +215,9 @@
       "seismic_toss": {
         "min_height": 0,
         "max_height": 60,
-        "speed": 600,
+        "speed": 500,
         "radius": 160,
-        "damage": 60,
+        "damage": 30,
         "cooldown": 7,
         "length": 450,
         "high": 400,
@@ -350,23 +361,23 @@
     }
   },
   "rowlet": {
-    "max_hp": 140,
+    "max_hp": 150,
     "walk_speed": 160,
     "radius": 13,
     "fly_high": 30,
     "tailwind": {
       "radius": 450,
-      "speed": 650,
-      "duration": 1,
+      "speed": 550,
+      "duration": 1.2,
       "cooldown": 3.5,
       "slash": {
         "min_height": 0,
         "max_height": 15,
         "count": 6,
-        "speed": 650,
-        "radius": 8,
-        "hp": 1,
-        "damage": 2,
+        "speed": 600,
+        "radius": 12,
+        "hp": 4,
+        "damage": 4,
         "mass": 20,
         "scale": 0.5
       }
@@ -376,7 +387,7 @@
       "max_height": 60,
       "speed": 400,
       "radius": 8,
-      "hp": 2,
+      "hp": 4,
       "damage": 10,
       "count": 5,
       "angle": 13,
@@ -385,13 +396,13 @@
       "cooldown": 4,
       "mass": 20,
       "charge_duration": 2,
-      "scale": 1
+      "scale": 1.2
     },
     "tornado": {
       "min_height": 0,
       "max_height": 1000,
       "hp": 50,
-      "speed": 100,
+      "speed": 200,
       "radius": 60,
       "duration": 8,
       "distance": 800,

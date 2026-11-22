@@ -33,16 +33,17 @@ type CharizardSkills struct {
 	Fly         FlyCfg
 	FireBreath  FireBreathCfg
 	SeismicToss SeismicTossCfg
+	Inferno     InfernoCfg // the Gigantamax Charizard's, in place of Fly (the zero value for Charizard itself)
 }
 
 // charizardP is the numbers p (a Charizard) plays by right now.
 func (g *Game) charizardP(p *Player) CharizardSkills {
 	if p.gigantamax() {
 		gm := g.cfg.Charizard.Gigantamax
-		return CharizardSkills{gm.Fly, gm.FireBreath, gm.SeismicToss}
+		return CharizardSkills{g.cfg.Charizard.Fly, gm.FireBreath, gm.SeismicToss, gm.Inferno} // it does not fly: the main button is the Inferno
 	}
 	cz := g.cfg.Charizard
-	return CharizardSkills{cz.Fly, cz.FireBreath, cz.SeismicToss}
+	return CharizardSkills{cz.Fly, cz.FireBreath, cz.SeismicToss, InfernoCfg{}}
 }
 
 // fireBreathOf is the fire ball numbers of a fire ball: a ball breathed out by a Gigantamax Charizard keeps the Gigantamax numbers after it has changed back.
@@ -75,7 +76,7 @@ func (g *Game) stepGigantamax(i int, in Input, u Ultimate, dt float64) ([]Event,
 	}
 	busy := p.TreePhase != treeNone || p.CometT > 0 || p.RockT > 0 || p.MegaT > 0 || p.MegaJT > 0 || p.KickPhase != kickNone || p.UpPhase != upNone || p.LpT > 0 ||
 		p.Z != 0 || p.Held || p.FrozenT > 0 || p.StunT > 0 ||
-		p.TossPhase != tossNone || p.FlyT > 0 || p.BreathT > 0 // Charizard: in a toss, a flight or a breath
+		p.TossPhase != tossNone || p.FlyT > 0 || p.BreathT > 0 || p.InfT > 0 // Charizard: in a toss, a flight, a breath or calling its bird
 	if !in.Ult || p.Charge < u.Max || busy {
 		return nil, false
 	}

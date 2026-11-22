@@ -435,10 +435,24 @@ func (c *bctx) findThreat() threat {
 		}
 	}
 
+	for _, bl := range g.Balls { // a bird of fire coming down: leave the place it is aimed at (it keeps following the foe until it is near, so it is the way out of its burst that counts)
+		if bl.K != ballFirebird || g.side(bl.Owner) == g.side(c.me) {
+			continue
+		}
+		in := cfg.Charizard.Gigantamax.Inferno
+		if bl.Phase == birdDiving && math.Hypot(p.X-bl.AnchorX, p.Y-bl.AnchorY) <= in.ExplosionRadius+c.pr+60 {
+			bx, by := bl.AnchorX, bl.AnchorY
+			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-bx, y-by) <= in.ExplosionRadius+c.pr+60 })
+			consider(threat{thFire, math.Max(0.3, math.Hypot(math.Hypot(bx-bl.X, by-bl.Y), bl.Z)/in.DiveSpeed), ax, ay})
+		}
+	}
 	for _, z := range g.Fires { // burning ground: it burns whoever stands in it every half second, so get out of it
 		fmh := cfg.Charizard.SeismicToss.FireMaxHeight
 		if z.Ult { // ground a Gigantamax Charizard lit burns by its own numbers
 			fmh = cfg.Charizard.Gigantamax.SeismicToss.FireMaxHeight
+		}
+		if z.Inf { // ... the bird of fire's by its own
+			fmh = cfg.Charizard.Gigantamax.Inferno.FireMaxHeight
 		}
 		if g.side(z.Owner) != g.side(c.me) && p.Z <= fmh && math.Hypot(p.X-z.X, p.Y-z.Y) <= z.R+c.pr+10 {
 			zz := z
@@ -1081,8 +1095,8 @@ func (b *Bot) charizard(c *bctx) Input {
 	g, p, f := c.g, c.p, c.f
 	cz := g.charizardP(p) // the Gigantamax Charizard plays by its own numbers
 	ts, fb, fly := cz.SeismicToss, cz.FireBreath, cz.Fly
-	if p.FrozenT > 0 || p.Held || p.TossPhase != tossNone {
-		return c.stay() // rooted, or the run (and the lift) moves it
+	if p.FrozenT > 0 || p.Held || p.TossPhase != tossNone || p.InfT > 0 {
+		return c.stay() // rooted (calling its bird too), or the run (and the lift) moves it
 	}
 	th := c.th
 	danger := f.Kind == rowlet && f.ArrowT > 0
@@ -1113,7 +1127,12 @@ func (b *Bot) charizard(c *bctx) Input {
 			in = c.move(tx, ty)
 		}
 	}
-	if p.FlyCD == 0 && p.FlyT == 0 && p.Z == 0 && fly.RingCount > 0 && th.kind == thNone && c.dist < fly.RingLength*0.7 && b.rng.Float64() < 0.15 {
+	if p.gigantamax() { // the main button calls the bird of fire: it needs the foe on the ground (the burst is a ground attack) and in sight
+		if p.FlyCD == 0 && p.InfT == 0 && p.Z == 0 && cz.Inferno.Reach.hits(f) && th.kind == thNone && b.rng.Float64() < 0.2 {
+			in = c.stay()
+			in.Skill = true
+		}
+	} else if p.FlyCD == 0 && p.FlyT == 0 && p.Z == 0 && fly.RingCount > 0 && th.kind == thNone && c.dist < fly.RingLength*0.7 && b.rng.Float64() < 0.15 {
 		in.Skill = true // up, and a ring of fire where it comes down
 	}
 	if p.BreathCD == 0 && p.BreathT == 0 && fb.Reach.hits(f) && c.dist >= 150 && b.rng.Float64() < 0.7 {

@@ -259,16 +259,41 @@ type SeismicTossCfg struct {
 	FireMaxHeight float64 `json:"fire_max_height"`
 }
 
+// InfernoCfg is the Gigantamax Charizard's Inferno (the main button, in place of Fly): it stands rooted for `summon_duration` seconds calling a bird of fire, which grows in the
+// sky `sky_height` above it; then the bird dives at the nearest foe, `dive_speed` along the straight way, and it aims at where the foe stands until it is `lock_distance` (along
+// the way) from it, then the way is fixed, so a foe that steps aside in the last stretch is missed. Where it lands it bursts: foes within `explosion_radius` (and at a height inside
+// min_height..max_height) take `damage` and are thrown up `launch_height` and held helpless there for `launch_duration` seconds. The ground is left burning like the Seismic Toss's:
+// a disc of `fire_radius` for `fire_duration` seconds, `fire_damage` at once and every `fire_interval` seconds to whoever stands in it no higher than `fire_max_height`.
+// `bird_scale` only changes how big the bird is drawn. `cooldown` counts from the cast.
+type InfernoCfg struct {
+	Reach
+	SummonDuration  float64 `json:"summon_duration"`
+	SkyHeight       float64 `json:"sky_height"`
+	DiveSpeed       float64 `json:"dive_speed"`
+	LockDistance    float64 `json:"lock_distance"`
+	ExplosionRadius float64 `json:"explosion_radius"`
+	Damage          int     `json:"damage"`
+	LaunchHeight    float64 `json:"launch_height"`
+	LaunchDuration  float64 `json:"launch_duration"`
+	Cooldown        float64 `json:"cooldown"`
+	BirdScale       float64 `json:"bird_scale"`
+	FireRadius      float64 `json:"fire_radius"`
+	FireDuration    float64 `json:"fire_duration"`
+	FireDamage      int     `json:"fire_damage"`
+	FireInterval    float64 `json:"fire_interval"`
+	FireMaxHeight   float64 `json:"fire_max_height"`
+}
+
 // CharizardGmaxCfg is Charizard's ultimate (Z, once the charge is full): for `duration` seconds it is the Gigantamax Charizard, with its own `max_hp` (the HP it has is
-// scaled to it, and back when it is over), `walk_speed` and body `radius`, and its own numbers for its three skills (Fly on the main button, Fire Breath, Seismic Toss),
-// each read exactly like charizard.fly, charizard.fire_breath and charizard.seismic_toss, which it uses the rest of the time. The fire balls and the burning ground it
+// scaled to it, and back when it is over), `walk_speed` and body `radius`, and its own numbers for its three skills (Inferno on the main button, in place of Fly, then Fire Breath and Seismic Toss),
+// charizard.fire_breath and charizard.seismic_toss read exactly like the ones Charizard uses the rest of the time, and `inferno` takes the place of charizard.fly, which it uses the rest of the time. The fire balls and the burning ground it
 // makes keep these numbers after it has changed back.
 type CharizardGmaxCfg struct {
 	MaxHP       int            `json:"max_hp"`
 	WalkSpeed   float64        `json:"walk_speed"`
 	Radius      float64        `json:"radius"`
 	Duration    float64        `json:"duration"`
-	Fly         FlyCfg         `json:"fly"`
+	Inferno     InfernoCfg     `json:"inferno"` // takes the place of Fly on the main button
 	FireBreath  FireBreathCfg  `json:"fire_breath"`
 	SeismicToss SeismicTossCfg `json:"seismic_toss"`
 }
@@ -1252,8 +1277,9 @@ func DefaultConfig() Config {
 	c.Charizard.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
 	cg := &c.Charizard.Gigantamax // the ultimate: bigger and tougher than Charizard, with bigger fire balls and a bigger toss
 	cg.MaxHP, cg.WalkSpeed, cg.Radius, cg.Duration = 600, 200, 60, 8
-	cg.Fly, cg.FireBreath, cg.SeismicToss = c.Charizard.Fly, c.Charizard.FireBreath, c.Charizard.SeismicToss
-	cg.Fly.Height, cg.Fly.Speed = 130, 340
+	cg.FireBreath, cg.SeismicToss = c.Charizard.FireBreath, c.Charizard.SeismicToss
+	cg.Inferno = InfernoCfg{Reach: groundReach, SummonDuration: 1, SkyHeight: 300, DiveSpeed: 700, LockDistance: 250, ExplosionRadius: 220, Damage: 50, LaunchHeight: 150, LaunchDuration: 0.8, Cooldown: 14, BirdScale: 1.5,
+		FireRadius: 380, FireDuration: 8, FireDamage: 6, FireInterval: 0.5, FireMaxHeight: 30}
 	cg.FireBreath.Radius, cg.FireBreath.Damage, cg.FireBreath.HP, cg.FireBreath.Quantity = 28, 6, 12, 30
 	cg.SeismicToss.Radius, cg.SeismicToss.Damage, cg.SeismicToss.FireRadius = 160, 60, 320
 	return c
@@ -1301,7 +1327,7 @@ func (c Config) validate() error {
 		return fmt.Errorf("charizard.gigantamax: max_hp (%d), walk_speed (%v), radius (%v) and duration (%v) must be above 0", cg.MaxHP, cg.WalkSpeed, cg.Radius, cg.Duration)
 	}
 	tmp = c
-	tmp.Charizard.Fly, tmp.Charizard.FireBreath, tmp.Charizard.SeismicToss = cg.Fly, cg.FireBreath, cg.SeismicToss
+	tmp.Charizard.FireBreath, tmp.Charizard.SeismicToss = cg.FireBreath, cg.SeismicToss
 	if err := tmp.validateSkills(); err != nil {
 		return fmt.Errorf("charizard.gigantamax's skills are checked like Charizard's, and: %w", err)
 	}
@@ -1377,6 +1403,10 @@ func (c Config) validateSkills() error {
 		{"charizard.seismic_toss.radius", c.Charizard.SeismicToss.Radius, 0},
 		{"charizard.seismic_toss.length", c.Charizard.SeismicToss.Length, 0},
 		{"charizard.seismic_toss.high", c.Charizard.SeismicToss.High, 0},
+		{"charizard.gigantamax.inferno.sky_height", c.Charizard.Gigantamax.Inferno.SkyHeight, 0},
+		{"charizard.gigantamax.inferno.dive_speed", c.Charizard.Gigantamax.Inferno.DiveSpeed, 0},
+		{"charizard.gigantamax.inferno.explosion_radius", c.Charizard.Gigantamax.Inferno.ExplosionRadius, 0},
+		{"charizard.gigantamax.inferno.bird_scale", c.Charizard.Gigantamax.Inferno.BirdScale, 0},
 		{"chikorita.max_hp", float64(c.Chikorita.MaxHP), 0},
 		{"vulpix.max_hp", float64(c.Vulpix.MaxHP), 0},
 		{"vulpix.walk_speed", c.Vulpix.WalkSpeed, 0},
@@ -1640,6 +1670,17 @@ func (c Config) validateSkills() error {
 		{"charizard.seismic_toss.fire_damage", float64(c.Charizard.SeismicToss.FireDamage)},
 		{"charizard.seismic_toss.fire_interval", c.Charizard.SeismicToss.FireInterval},
 		{"charizard.seismic_toss.fire_max_height", c.Charizard.SeismicToss.FireMaxHeight},
+		{"charizard.gigantamax.inferno.summon_duration", c.Charizard.Gigantamax.Inferno.SummonDuration},
+		{"charizard.gigantamax.inferno.lock_distance", c.Charizard.Gigantamax.Inferno.LockDistance},
+		{"charizard.gigantamax.inferno.damage", float64(c.Charizard.Gigantamax.Inferno.Damage)},
+		{"charizard.gigantamax.inferno.launch_height", c.Charizard.Gigantamax.Inferno.LaunchHeight},
+		{"charizard.gigantamax.inferno.launch_duration", c.Charizard.Gigantamax.Inferno.LaunchDuration},
+		{"charizard.gigantamax.inferno.cooldown", c.Charizard.Gigantamax.Inferno.Cooldown},
+		{"charizard.gigantamax.inferno.fire_radius", c.Charizard.Gigantamax.Inferno.FireRadius},
+		{"charizard.gigantamax.inferno.fire_duration", c.Charizard.Gigantamax.Inferno.FireDuration},
+		{"charizard.gigantamax.inferno.fire_damage", float64(c.Charizard.Gigantamax.Inferno.FireDamage)},
+		{"charizard.gigantamax.inferno.fire_interval", c.Charizard.Gigantamax.Inferno.FireInterval},
+		{"charizard.gigantamax.inferno.fire_max_height", c.Charizard.Gigantamax.Inferno.FireMaxHeight},
 		{"chikorita.leaf_slash.jump_height", c.Chikorita.LeafSlash.JumpHeight},
 		{"chikorita.leaf_slash.slash_step", c.Chikorita.LeafSlash.SlashStep},
 		{"chikorita.leaf_slash.damage", float64(c.Chikorita.LeafSlash.Damage)},
@@ -1900,6 +1941,7 @@ func (c Config) validateSkills() error {
 		"gyarados.hyper_beam":                c.Gyarados.HyperBeam.Reach,
 		"charizard.fire_breath":              c.Charizard.FireBreath.Reach,
 		"charizard.seismic_toss":             c.Charizard.SeismicToss.Reach,
+		"charizard.gigantamax.inferno":       c.Charizard.Gigantamax.Inferno.Reach,
 		"chikorita.leaf_slash":               c.Chikorita.LeafSlash.Reach,
 		"chikorita.razor_leaf":               c.Chikorita.RazorLeaf.Reach,
 		"chikorita.vine_whip":                c.Chikorita.VineWhip.Reach,
