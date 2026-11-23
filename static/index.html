@@ -128,7 +128,7 @@ let upText = { slide: '閃身步', punch: '上鉤拳' }, upWarn = 0; // the name
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
 let gvCfg = { warn: 1, hw: 50, wo: 100, wi: 100, hr: 40, len: 320, w: 80, tw: 20, rs: 0.8, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
 let megaCfg = { fevery: 0, charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
-let bpCfg = { charge: 0.8, dist: 450, radius: 250, height: 300, erad: 70, warn: 1, fscale: 1, escale: 1, count: 24, dur: 1.2 }; // the Gigantamax Machamp's Burst Punch, from 'hi'
+let bpCfg = { charge: 0.8, dist: 450, radius: 250, height: 300, erad: 70, warn: 1, fscale: 1, escale: 1, count: 24, dur: 1.2, c1: 'rgba(8,8,13,0.55)', c2: '#fafafa' }; // the Gigantamax Machamp's Burst Punch, from 'hi'
 let lpCfg = { charge: 1.2, dist: 700, radius: 120, warn: 1, fscale: 1, lscale: 1, lrad: 250 }; // the Gigantamax Machamp's Lightning Punch, from 'hi'
 let gFistCfg = { radius: 26, hp: 20, life: 0.2 }; // the Gigantamax Machamp's fists, from 'hi'
 let treeCfgs = [{ len: 300, w: 70, scale: 1, leaf: 180, leafscale: 1, angle: 180, charge: 0.6, swing: 0.25, dist: 250, jump: 0.5 }], fistCfgs = [{ radius: 22, hp: 20, life: 0.2 }], stoneCfgs = [{ radius: 60, hp: 100, life: 8 }]; // Ash's, then Machamp's (from 'hi'); the brawler a thing belongs to is told by its owner's kind // Machamp's, from 'hi'
@@ -1041,7 +1041,7 @@ function artMachampSide(c, t, pose, gmax) {
   const arm = (m, near) => { // the upper arm swings forward and back with the run, the fists stay up front
     const col = near ? B : BD, s = sw * m * 3;
     const o = near ? 0 : -5, sh = [near ? 1 : -1, -8], g = gmax ? 4 : 0, el = [-12 + o + s * 0.4, -26 - g], hand = [10 + o * 0.6 + s * 0.3, -32 - g - s * 0.4]; // the upper arms are raised over the head // upper arm: shoulder, bent elbow, fist up in a guard
-    const sh2 = [near ? 2 : -2, 1], el2 = [-9 + o * 0.6 - s * 0.4, 14.6], hand2 = [15 + o - s * 0.3, 7.5 + s * 0.4]; // the elbow of the lower arm hooks back, like the upper one's // lower arm: held out in front of the belt
+    const sh2 = [near ? 2 : -2, 1], el2 = [-9 + o * 0.6 - s * 0.4, 14.6], hand2 = [15 + o - s * 0.3, 11 + s * 0.4]; // the elbow of the lower arm hooks back, like the upper one's // lower arm: held out in front of the belt
     for (const [a, b, h, w, r] of [[sh, el, hand, gmax ? 8.6 : 6.9, gmax ? 9.5 : 6], [sh2, el2, hand2, gmax ? 8.4 : 6.8, gmax ? 9 : 5.6]]) {
       limb(a, b, w, col); limb(b, h, w * 0.92, col); fist(h[0] + 1, h[1], r, near ? BD : '#3b3150');
     }
@@ -3200,18 +3200,29 @@ function drawBurstFist(f) {
   }
   ctx.restore();
 }
+// Whether a CSS colour is a dark one (so what is drawn on it is light): read back from a pixel painted with it.
+const darkColors = {};
+function isDarkColor(col) {
+  if (!(col in darkColors)) {
+    const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d');
+    x.fillStyle = '#000'; x.fillStyle = col; x.fillRect(0, 0, 1, 1);
+    const [r, g, b] = x.getImageData(0, 0, 1, 1).data;
+    darkColors[col] = 0.299 * r + 0.587 * g + 0.114 * b < 128;
+  }
+  return darkColors[col];
+}
 // One small explosion of the Burst Punch, somewhere in the air above the ground: a ball that flickers black and white, a spiky star round it and lightning inside, and a shadow on the ground
 // below it (so how high it is can be read). Each flickers out of step with the next.
 function drawBurstBoom(f) {
   const k = f.age / 0.45;
   if (k >= 1) return;
-  const a = 1 - k, R = (f.r || bpCfg.erad) * bpCfg.escale * (0.45 + 0.75 * Math.sqrt(k)), black = megaBlack(50) !== ((Math.floor(f.x + f.y) & 1) === 1);
+  const a = 1 - k, R = (f.r || bpCfg.erad) * bpCfg.escale * (0.45 + 0.75 * Math.sqrt(k)), col = megaBlack(50) !== ((Math.floor(f.x + f.y) & 1) === 1) ? bpCfg.c1 : bpCfg.c2, black = isDarkColor(col); // black: the colour it is now is a dark one
   upright(f.x, f.y, () => {
     if (f.z > 4) { ctx.fillStyle = `rgba(0,0,0,${0.3 * a})`; ctx.beginPath(); ctx.ellipse(0, 0, R * 0.8, R * 0.3, 0, 0, 7); ctx.fill(); }
     ctx.translate(0, -(f.z || 0)); ctx.lineJoin = 'round';
-    const glow = ctx.createRadialGradient(0, 0, R * 0.5, 0, 0, R * 1.9); glow.addColorStop(0, black ? `rgba(255,255,255,${0.6 * a})` : `rgba(0,0,0,${0.5 * a})`); glow.addColorStop(1, 'rgba(255,255,255,0)');
+    const glow = ctx.createRadialGradient(0, 0, R * 0.5, 0, 0, R * 1.9); glow.addColorStop(0, black ? `rgba(255,255,255,${0.25 * a})` : `rgba(0,0,0,${0.5 * a})`); glow.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, R * 1.9, 0, 7); ctx.fill();
-    ctx.globalAlpha = Math.min(1, a * 1.8); ctx.fillStyle = black ? '#08080d' : '#fafafa'; ctx.strokeStyle = black ? '#fff' : '#000'; ctx.lineWidth = 3; // the star
+    ctx.globalAlpha = Math.min(1, a * 1.8); ctx.fillStyle = col; ctx.strokeStyle = black ? '#fff' : '#000'; ctx.lineWidth = 3; // the star, in whichever of the two colours of the config it is now
     const sp = 9, rot = f.x * 0.07; ctx.beginPath();
     for (let q = 0; q < sp * 2; q++) { const rr = q % 2 ? R * 0.62 : R * 1.25, an = rot + q * Math.PI / sp; q ? ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr) : ctx.moveTo(Math.cos(an) * rr, Math.sin(an) * rr); }
     ctx.closePath(); ctx.fill(); ctx.stroke();

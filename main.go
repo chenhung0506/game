@@ -770,9 +770,9 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 		"fist":     []map[string]float64{aFist, mFist},
 		"gfist":    gFist, // the fists of the Gigantamax Machamp
 		"kicktext": map[string]map[string]string{"ash": {"slide": cfg.Ash.HighJumpKick.SlideText, "kick": cfg.Ash.HighJumpKick.KickText}, "machamp": {"slide": cfg.Machamp.HighJumpKick.SlideText, "kick": cfg.Machamp.HighJumpKick.KickText}},
-		"gbp": func() map[string]float64 { // the Gigantamax Machamp's Burst Punch, for the page
+		"gbp": func() map[string]any { // the Gigantamax Machamp's Burst Punch, for the page
 			b := cfg.Machamp.Gigantamax.BurstPunch
-			return map[string]float64{"charge": b.ChargeDuration, "dist": b.Distance, "radius": b.Radius, "height": b.Height, "erad": b.ExplosionRadius, "warn": b2f(b.ShowWarning), "fscale": b.FistScale, "escale": b.ExplosionScale, "count": float64(b.Count), "dur": b.Duration}
+			return map[string]any{"c1": b.ExplosionColor1, "c2": b.ExplosionColor2, "charge": b.ChargeDuration, "dist": b.Distance, "radius": b.Radius, "height": b.Height, "erad": b.ExplosionRadius, "warn": b2f(b.ShowWarning), "fscale": b.FistScale, "escale": b.ExplosionScale, "count": float64(b.Count), "dur": b.Duration}
 		}(),
 		"glp":  map[string]float64{"charge": cfg.Machamp.Gigantamax.LightningPunch.ChargeDuration, "dist": cfg.Machamp.Gigantamax.LightningPunch.Distance, "radius": cfg.Machamp.Gigantamax.LightningPunch.Radius, "warn": b2f(cfg.Machamp.Gigantamax.LightningPunch.ShowWarning), "fscale": cfg.Machamp.Gigantamax.LightningPunch.FistScale, "lscale": cfg.Machamp.Gigantamax.LightningPunch.LightningScale, "lrad": cfg.Machamp.Gigantamax.LightningPunch.LightningRadius}, // the Gigantamax Machamp's Lightning Punch, for the page
 		"gmax": map[string]float64{"hp": float64(cfg.Machamp.Gigantamax.MaxHP), "radius": cfg.Machamp.Gigantamax.Radius, "dur": cfg.Machamp.Gigantamax.Duration, "charge": cfg.Machamp.Gigantamax.ChargeDuration},

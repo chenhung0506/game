@@ -837,7 +837,9 @@
         "cooldown": 10,
         "show_warning": true,
         "fist_scale": 1,
-        "explosion_scale": 2
+        "explosion_scale": 2,
+        "explosion_color_1": "rgba(8,8,13,0.55)",
+        "explosion_color_2": "#fafafa"
       },
       "lightning_punch": {
         "min_height": 0,

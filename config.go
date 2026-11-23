@@ -184,7 +184,9 @@ type LightningPunchCfg struct {
 // nearest foe all the while (`show_warning` draws the cylinder it will burst in on the ground), and then the fist comes out `distance` ahead of it. Round that point, in a cylinder `radius` wide and
 // `height` tall, `count` small explosions go off at random places spread over `duration` seconds, each higher than the one before: the cylinder is filled from the ground up. A foe an explosion (`explosion_radius`, a sphere) touches takes
 // `explosion_damage` and is thrown up to `explosion_height`, helpless there for `launch_duration` seconds; every further explosion that touches it in the same cast throws it `height_gain`
-// higher than the one before, up to `launch_cap`. `fist_scale` and `explosion_scale` only change how big the fist and the explosions are drawn.
+// higher than the one before, up to `launch_cap`. `fist_scale` and `explosion_scale` only change how big the fist and the explosions are drawn, and `explosion_color_1` and
+// `explosion_color_2` are the two colours an explosion flickers between (any CSS colour, so `rgba(...)` makes one see-through; the outline and the lightning inside are light on a dark colour
+// and dark on a light one).
 type BurstPunchCfg struct {
 	SlideDistance   float64 `json:"slide_distance"`
 	SlideDuration   float64 `json:"slide_duration"`
@@ -204,6 +206,8 @@ type BurstPunchCfg struct {
 	ShowWarning     bool    `json:"show_warning"`
 	FistScale       float64 `json:"fist_scale"`
 	ExplosionScale  float64 `json:"explosion_scale"`
+	ExplosionColor1 string  `json:"explosion_color_1"`
+	ExplosionColor2 string  `json:"explosion_color_2"`
 }
 
 // maxBursts is the most explosions one Burst Punch may let off.
@@ -1350,7 +1354,7 @@ func DefaultConfig() Config {
 	gm := &c.Machamp.Gigantamax // the ultimate: bigger, tougher and harder-hitting than Machamp
 	gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration = 190, 125, 40, 15
 	gm.CometPunch = c.Machamp.CometPunch
-	gm.BurstPunch = BurstPunchCfg{SlideDistance: 150, SlideDuration: 0.25, ChargeDuration: 0.8, Distance: 350, Radius: 220, Height: 300, Count: 24, Duration: 1.2, ExplosionRadius: 70, ExplosionDamage: 8, ExplosionHeight: 90, HeightGain: 60, LaunchCap: 420, LaunchDuration: 0.6, Cooldown: 10, ShowWarning: true, FistScale: 1, ExplosionScale: 1}
+	gm.BurstPunch = BurstPunchCfg{SlideDistance: 150, SlideDuration: 0.25, ChargeDuration: 0.8, Distance: 350, Radius: 220, Height: 300, Count: 24, Duration: 1.2, ExplosionRadius: 70, ExplosionDamage: 8, ExplosionHeight: 90, HeightGain: 60, LaunchCap: 420, LaunchDuration: 0.6, Cooldown: 10, ShowWarning: true, FistScale: 1, ExplosionScale: 1, ExplosionColor1: "rgba(8,8,13,0.55)", ExplosionColor2: "#fafafa"}
 	gm.LightningPunch = LightningPunchCfg{Reach: Reach{MinHeight: 0, MaxHeight: 80}, ChargeDuration: 1.2, Distance: 500, Radius: 70, Damage: 40, StunDuration: 1, Knockback: 200, LightningRadius: 160, LightningDamage: 30, Cooldown: 9, FistScale: 1, LightningScale: 1}
 	gm.CometPunch.Damage, gm.CometPunch.Quantity, gm.CometPunch.Radius = 3, 28, 26
 	c.Charizard.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
@@ -1387,6 +1391,19 @@ func LoadConfig(path string) (Config, error) {
 	return c, nil
 }
 
+// validCSSColor is whether s is short and made only of the characters a CSS colour is (a name, #hex, rgb()/rgba()/hsl()): it is only ever given to the canvas as a colour.
+func validCSSColor(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("#(),.% /-", r)) {
+			return false
+		}
+	}
+	return true
+}
+
 // validate checks the Burst Punch's numbers.
 func (b BurstPunchCfg) validate() error {
 	if b.Count < 1 || b.Count > maxBursts {
@@ -1407,6 +1424,11 @@ func (b BurstPunchCfg) validate() error {
 	}{{"slide_distance", b.SlideDistance}, {"slide_duration", b.SlideDuration}, {"charge_duration", b.ChargeDuration}, {"distance", b.Distance}, {"height", b.Height}, {"duration", b.Duration}, {"height_gain", b.HeightGain}, {"launch_duration", b.LaunchDuration}, {"cooldown", b.Cooldown}, {"explosion_damage", float64(b.ExplosionDamage)}} {
 		if !(f.v >= 0) || math.IsInf(f.v, 0) {
 			return fmt.Errorf("%s must not be negative, got %v", f.name, f.v)
+		}
+	}
+	for name, col := range map[string]string{"explosion_color_1": b.ExplosionColor1, "explosion_color_2": b.ExplosionColor2} {
+		if !validCSSColor(col) {
+			return fmt.Errorf("%s must be a CSS colour such as #fafafa or rgba(8,8,13,0.55), got %q", name, col)
 		}
 	}
 	if b.LaunchCap < b.ExplosionHeight {

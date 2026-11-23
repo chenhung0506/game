@@ -2,6 +2,7 @@ package main
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -350,5 +351,24 @@ func TestTheBurstPunchSlideIsChecked(t *testing.T) {
 	c.Machamp.Gigantamax.BurstPunch.SlideDistance = -1
 	if c.validate() == nil {
 		t.Fatal("a negative slide was accepted")
+	}
+}
+
+func TestTheExplosionColoursAreChecked(t *testing.T) {
+	for name, edit := range map[string]func(*BurstPunchCfg){
+		"empty":     func(b *BurstPunchCfg) { b.ExplosionColor1 = "" },
+		"not color": func(b *BurstPunchCfg) { b.ExplosionColor2 = "red;</script>" },
+		"too long":  func(b *BurstPunchCfg) { b.ExplosionColor1 = "#" + strings.Repeat("a", 80) },
+	} {
+		c := DefaultConfig()
+		edit(&c.Machamp.Gigantamax.BurstPunch)
+		if c.validate() == nil {
+			t.Fatalf("%s: a bad colour was accepted", name)
+		}
+	}
+	c := DefaultConfig()
+	c.Machamp.Gigantamax.BurstPunch.ExplosionColor1, c.Machamp.Gigantamax.BurstPunch.ExplosionColor2 = "rgba(255, 0, 0, 0.5)", "hsl(120, 50%, 50%)"
+	if err := c.validate(); err != nil {
+		t.Fatal(err)
 	}
 }
