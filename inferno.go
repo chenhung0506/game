@@ -55,8 +55,9 @@ func (g *Game) stepFirebird(b *Ball, dt float64) ([]Event, bool) {
 		b.AnchorX, b.AnchorY = foe.X, foe.Y
 		return nil, true
 	}
-	if b.HP <= 0 { // shot down on the way: it is gone, and nothing bursts
-		return []Event{{T: "infpop", X: b.X, Y: b.Y, R: in.Radius, K: charizard}}, false
+	if b.HP <= 0 { // shot down on the way: it bursts where it is, in the air (the foes near it are hurt and the ground under it burns, but nothing is thrown up)
+		g.firebirdBurst(b, false)
+		return []Event{{T: "infpop", X: b.X, Y: b.Y, R: in.ExplosionRadius, K: charizard}}, false
 	}
 	total := math.Hypot(math.Hypot(b.AnchorX-b.X, b.AnchorY-b.Y), b.Z)
 	if total > in.LockDistance { // it follows the foe until it is that close
@@ -77,6 +78,14 @@ func (g *Game) stepFirebird(b *Ball, dt float64) ([]Event, bool) {
 	}
 	// down: it bursts
 	b.X, b.Y, b.Z = b.AnchorX, b.AnchorY, 0
+	g.firebirdBurst(b, true)
+	return []Event{{T: "infboom", X: b.X, Y: b.Y, R: in.ExplosionRadius, K: charizard}}, false
+}
+
+// firebirdBurst is the burst of a bird of fire where it is (b.X, b.Y): the foes within `explosion_radius` take `damage`, and the ground there burns
+// for `fire_duration` seconds within `fire_radius`. Where it landed (launch) they are also thrown up; shot down in the air they are not.
+func (g *Game) firebirdBurst(b *Ball, launch bool) {
+	in := g.cfg.Charizard.Gigantamax.Inferno
 	defer g.ultimateDamage()()
 	for _, j := range g.foes(b.Owner) {
 		f := &g.P[j]
@@ -84,7 +93,7 @@ func (g *Game) stepFirebird(b *Ball, dt float64) ([]Event, bool) {
 			continue
 		}
 		g.hit(f, in.Damage)
-		if !f.Held {
+		if launch && !f.Held {
 			g.launch(f, in.LaunchHeight, in.LaunchDuration)
 		}
 	}
@@ -94,5 +103,4 @@ func (g *Game) stepFirebird(b *Ball, dt float64) ([]Event, bool) {
 			g.Fires = g.Fires[over:]
 		}
 	}
-	return []Event{{T: "infboom", X: b.X, Y: b.Y, R: in.ExplosionRadius, K: charizard}}, false
 }

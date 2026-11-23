@@ -357,10 +357,11 @@ func TestOrdinaryCharizardStillFliesAndHasNoInferno(t *testing.T) {
 
 // ---- the bird has HP, Thousand Volt hunts it, and the change needs a charge ----
 
-func TestABirdOfFireIsShotDownBeforeItLandsAndNothingBursts(t *testing.T) {
+func TestABirdOfFireShotDownInTheAirBurstsThereHurtingAndBurningButNotThrowingUp(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Charizard.Gigantamax.Inferno.SummonDuration = 0.2
-	cfg.Charizard.Gigantamax.Inferno.HP = 40
+	in := &cfg.Charizard.Gigantamax.Inferno
+	in.SummonDuration, in.HP = 0.2, 40
+	in.ExplosionRadius, in.Damage, in.FireRadius, in.FireDuration = 150, 17, 200, 5
 	g := infGame(cfg, 600)
 	gpress(g, Input{Skill: true})
 	g.Balls[0].HP = 1 // being called: nothing can hurt it yet
@@ -372,17 +373,49 @@ func TestABirdOfFireIsShotDownBeforeItLandsAndNothingBursts(t *testing.T) {
 	if len(birds(g)) != 1 || birds(g)[0].Phase != birdDiving {
 		t.Fatalf("birds %+v: it should be diving", birds(g))
 	}
+	var bx, by float64
 	for i := range g.Balls {
 		if g.Balls[i].K == ballFirebird {
 			g.Balls[i].HP = 0 // shot down
+			bx, by = g.Balls[i].X, g.Balls[i].Y
 		}
 	}
-	var popped bool
+	// A foe standing under where it is shot down (not where it was headed): hurt, and not thrown up.
+	g.P[1].X, g.P[1].Y = bx+100, by
+	hp0 := g.P[1].HP
+	var popped *Event
 	for _, e := range g.Step(dt) {
-		popped = popped || e.T == "infpop"
+		if e.T == "infpop" {
+			e := e
+			popped = &e
+		}
 	}
-	if !popped || len(birds(g)) != 0 || len(g.Fires) != 0 || g.P[1].HP != g.maxHP(1) {
-		t.Fatalf("popped %v birds %d fires %d HP %d: it should be gone with no burst and no fire", popped, len(birds(g)), len(g.Fires), g.P[1].HP)
+	if popped == nil || popped.R != in.ExplosionRadius || len(birds(g)) != 0 {
+		t.Fatalf("popped %+v birds %d: it should be gone, bursting at the size of explosion_radius", popped, len(birds(g)))
+	}
+	if g.P[1].HP != hp0-in.Damage {
+		t.Fatalf("foe HP %d -> %d, want %d taken (the burst's damage)", hp0, g.P[1].HP, in.Damage)
+	}
+	if g.P[1].Juggle || g.P[1].Z != 0 {
+		t.Fatal("a bird shot down in the air threw the foe up")
+	}
+	if len(g.Fires) != 1 || g.Fires[0].X != bx || g.Fires[0].Y != by || g.Fires[0].R != in.FireRadius || !g.Fires[0].Inf {
+		t.Fatalf("fires %+v: want one patch at (%v,%v) of fire_radius %v", g.Fires, bx, by, in.FireRadius)
+	}
+
+	// A foe outside explosion_radius is not hurt (the burst is where the bird is, not where it was going).
+	g = infGame(cfg, 600)
+	gpress(g, Input{Skill: true})
+	steps(g, 12)
+	for i := range g.Balls {
+		if g.Balls[i].K == ballFirebird {
+			g.Balls[i].HP = 0
+		}
+	}
+	hp0 = g.P[1].HP
+	g.Step(dt)
+	if g.P[1].HP != hp0 {
+		t.Fatalf("a foe far from the bird lost %d HP", hp0-g.P[1].HP)
 	}
 }
 
