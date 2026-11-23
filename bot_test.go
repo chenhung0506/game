@@ -721,16 +721,32 @@ func TestSafeDirLeavesTheCourseOfEveryArrowInAVolley(t *testing.T) {
 	}
 }
 
+// A bot that walks faster than the tornado gets away from it altogether. One that is slower (Snorlax, against a tornado at 150) cannot
+// outrun it, so there the test is that it still walks away and so holds out far longer than a body that stands still would.
 func TestTheBotWalksAwayFromATornado(t *testing.T) {
 	cfg := liveConfig(t)
 	tn := cfg.Rowlet.Tornado
+	const standStillCaughtAt = 1.0 // a body that does not move is taken by the tornado well before this (about 0.7 s)
 	for _, kind := range []int{pikachu, snorlax} {
+		faster := cfg.walkSpeedOf(kind) >= tn.Speed
 		for seed := uint64(1); seed <= 10; seed++ {
 			g := duel(cfg, kind, rowlet)
 			g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 700, 450, 1500, 450
 			g.Balls = []Ball{{K: ballTornado, Owner: 1, HP: tn.HP, Left: tn.Distance, Life: tn.Duration, X: 900, Y: 450}}
-			if lost := survive(g, newBot(kind, seed), 0, 8); lost > 0 || g.P[0].Held {
-				t.Fatalf("%s seed %d: lost %d HP to the tornado (held %v)", NAMEOF[kind], seed, lost, g.P[0].Held)
+			b := newBot(kind, seed)
+			caught, hp0 := -1.0, g.P[0].HP
+			for tt := 0.0; tt < 8; tt += dt {
+				g.P[0].In = b.Decide(g, 0)
+				g.Step(dt)
+				if g.P[0].Held && caught < 0 {
+					caught = tt
+				}
+			}
+			switch {
+			case faster && (caught >= 0 || g.P[0].HP < hp0):
+				t.Fatalf("%s seed %d: caught at %.2fs, lost %d HP (it is faster than the tornado, so it should get away)", NAMEOF[kind], seed, caught, hp0-g.P[0].HP)
+			case !faster && caught >= 0 && caught < 3*standStillCaughtAt:
+				t.Fatalf("%s seed %d: caught at %.2fs, no later than a body standing still would be: it did not walk away", NAMEOF[kind], seed, caught)
 			}
 		}
 	}

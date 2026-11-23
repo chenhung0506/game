@@ -358,6 +358,7 @@ type Config struct {
 			Knockback       float64 `json:"knockback"` // the blast pushes the target this far straight away from its centre
 			Cooldown        float64 `json:"cooldown"`  // before the next ball; counted from the start of the charge
 			Mass            float64 `json:"mass"`      // see hyper_beam.mass: a heavier beam pushes the ball back by the difference
+			Scale           float64 `json:"scale"`     // how big the ball and its blast are drawn, times radius and explosion_radius; looks only, the reach is unchanged
 		} `json:"electro_ball"`
 		// Thousand Volt (Z, the ultimate; the button is lit once `ultimate` is full, and the cast empties the charge): Pikachu first
 		// gathers, rooted, for `ring_duration` + `ball_duration` seconds (like the Megaton Punch: rings closing in on the hand, then a
@@ -699,13 +700,16 @@ type Config struct {
 			Damage          int          `json:"damage"`
 			LaunchHeight    float64      `json:"launch_height"`
 			LaunchDuration  float64      `json:"launch_duration"`
-			RingScale       float64      `json:"ring_scale"`  // looks only: the size of the rings that close in
-			LightScale      float64      `json:"light_scale"` // looks only: how big the bird of light grows
-			LeafScale       float64      `json:"leaf_scale"`  // looks only: how many times bigger the leaves that burst out where it lands are drawn
-			Tornado         StillTornado `json:"tornado"`     // the tornado left where it lands (see StillTornado)
-			SkyDark         float64      `json:"sky_dark"`    // looks only: how dark the overcast half of the flicker is (0..1) while the bird is gathered and dives
-			FlashEvery      float64      `json:"flash_every"` // looks only: how many frames the sky stays overcast, then bright (0 = no flicker, just overcast)
-			FlashAlpha      float64      `json:"flash_alpha"` // looks only: how bright the bright half is (0..1)
+			RingScale       float64      `json:"ring_scale"`     // looks only: the size of the rings that close in
+			LightScale      float64      `json:"light_scale"`    // looks only: how big the bird of light grows
+			LeafScale       float64      `json:"leaf_scale"`     // looks only: how many times bigger the leaves that burst out where it lands are drawn
+			GravityRadius   float64      `json:"gravity_radius"` // after the burst, foes within this far of where it landed (plus their body) are dragged toward that spot (0 = no pull)
+			Gravity         float64      `json:"gravity"`        // pixels a second they are dragged, never past the middle (like shadow_ball.gravity; 0 = no pull)
+			PullDuration    float64      `json:"pull_duration"`  // seconds the pull lasts (0 = no pull)
+			Tornado         StillTornado `json:"tornado"`        // the tornado left where it lands (see StillTornado)
+			SkyDark         float64      `json:"sky_dark"`       // looks only: how dark the overcast half of the flicker is (0..1) while the bird is gathered and dives
+			FlashEvery      float64      `json:"flash_every"`    // looks only: how many frames the sky stays overcast, then bright (0 = no flicker, just overcast)
+			FlashAlpha      float64      `json:"flash_alpha"`    // looks only: how bright the bright half is (0..1)
 		} `json:"brave_bird"`
 	} `json:"rowlet"`
 	// Magikarp evolves into Gyarados (the red one): each hop it lands from counts, and the `evolve_hops`-th landing
@@ -1003,6 +1007,7 @@ func DefaultConfig() Config {
 	c.Pikachu.ElectroBall.ExplosionDamage = 25
 	c.Pikachu.ElectroBall.Knockback = 120
 	c.Pikachu.ElectroBall.Cooldown = 3
+	c.Pikachu.ElectroBall.Scale = 1
 	tv := &c.Pikachu.ThousandVolt
 	tv.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	tv.RingDuration, tv.BallDuration, tv.BoltStart, tv.BoltCount, tv.BoltInterval = 0.6, 1.8, 1.2, 6, 0.2
@@ -1375,6 +1380,7 @@ func (c Config) validateSkills() error {
 		{"pikachu.electro_ball.hp", float64(c.Pikachu.ElectroBall.HP), 0},
 		{"pikachu.electro_ball.explosion_radius", c.Pikachu.ElectroBall.ExplosionRadius, 0},
 		{"pikachu.electro_ball.explosion_damage", float64(c.Pikachu.ElectroBall.ExplosionDamage), 0},
+		{"pikachu.electro_ball.scale", c.Pikachu.ElectroBall.Scale, 0},
 		{"snorlax.max_hp", float64(c.Snorlax.MaxHP), 0},
 		{"snorlax.walk_speed", c.Snorlax.WalkSpeed, 0},
 		{"snorlax.jump.height", c.Snorlax.Jump.Height, 0},
@@ -1893,6 +1899,9 @@ func (c Config) validateSkills() error {
 		{"gengar.shadow_ball.cooldown", c.Gengar.ShadowBall.Cooldown},
 		{"gengar.shadow_ball.charge_time", c.Gengar.ShadowBall.ChargeTime},
 		{"gengar.shadow_ball.mass", c.Gengar.ShadowBall.Mass},
+		{"rowlet.brave_bird.gravity_radius", c.Rowlet.BraveBird.GravityRadius},
+		{"rowlet.brave_bird.gravity", c.Rowlet.BraveBird.Gravity},
+		{"rowlet.brave_bird.pull_duration", c.Rowlet.BraveBird.PullDuration},
 		{"gengar.shadow_ball.gravity", c.Gengar.ShadowBall.Gravity},
 		{"gengar.shadow_ball.pull_duration", c.Gengar.ShadowBall.PullDuration},
 		{"ash.comet_punch.mass", c.Ash.CometPunch.Mass},

@@ -147,7 +147,7 @@ const dummyHit = { n: 0, at: 0, hp: null }; // the last blow the dummy took: how
 const DUMMY = 11; // the practice dummy (only the computer's)
 const PLAY = (() => { const p = new URLSearchParams(location.search).get('play'); return p === 'player' || p === 'dummy' || p === 'squad' || p === 'vs2' ? p : 'computer'; })(); // the way to play: against the computer (the default), a person, or the practice dummy
 let maxHp = [100, 100, 120, 110, 100, 100]; // each character's full HP, from 'hi'
-let ballCfg = { radius: 14, hp: 30, charge: 0.5 }; // Electro Ball, from 'hi'
+let ballCfg = { radius: 14, hp: 30, charge: 0.5, scale: 1 }; // Electro Ball, from 'hi'
 let punchCfg = { charge: 0.4, radius: 40, freeze: 1.5, distance: 250 }; // Ice Punch, from 'hi'
 const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
@@ -1620,7 +1620,7 @@ function drawAimFan(p, d) {
     ctx.save(); ctx.globalAlpha = p.ecd > 0 ? 0.4 : 1;
     ctx.strokeStyle = 'rgba(255,235,120,0.85)'; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
     ctx.beginPath(); ctx.moveTo(d.x + Math.cos(base) * 30, d.y + Math.sin(base) * 30); ctx.lineTo(d.x + Math.cos(base) * 420, d.y + Math.sin(base) * 420); ctx.stroke(); ctx.setLineDash([]);
-    ctx.strokeStyle = 'rgba(255,225,74,0.9)'; ctx.beginPath(); ctx.arc(d.x + Math.cos(base) * (radius[0] + ballCfg.radius), d.y + Math.sin(base) * (radius[0] + ballCfg.radius), ballCfg.radius, 0, 7); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,225,74,0.9)'; ctx.beginPath(); ctx.arc(d.x + Math.cos(base) * (radius[0] + ballCfg.radius * ballCfg.scale), d.y + Math.sin(base) * (radius[0] + ballCfg.radius * ballCfg.scale), ballCfg.radius * ballCfg.scale, 0, 7); ctx.stroke();
     ctx.restore(); return;
   }
   const vine = aiming.name === 'vine'; // the vines sweep in from +-angle, the tail covers its whole angle
@@ -1702,7 +1702,7 @@ function drawBallCharge(p, d) {
       ctx.beginPath(); ctx.moveTo(d.x + ux * 30, d.y + uy * 30); ctx.lineTo(d.x + ux * 220, d.y + uy * 220); ctx.stroke();
     }
     ctx.setLineDash([]);
-    const r = ballCfg.radius * (0.3 + 0.7 * k), ox = d.x + ux * (radius[0] + ballCfg.radius), oy = d.y + uy * (radius[0] + ballCfg.radius);
+    const r = ballCfg.radius * ballCfg.scale * (0.3 + 0.7 * k), ox = d.x + ux * (radius[0] + ballCfg.radius * ballCfg.scale), oy = d.y + uy * (radius[0] + ballCfg.radius * ballCfg.scale);
     const gr = ctx.createRadialGradient(ox, oy, 0, ox, oy, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.4, '#ffe14a'); gr.addColorStop(1, 'rgba(255,200,40,0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(ox, oy, r * 1.8, 0, 7); ctx.fill();
@@ -1769,7 +1769,7 @@ function drawBall(b) {
   if (b.k === 13) { drawGiantVine(b); return; }
   if (b.k === 14) { drawFirebird(b); return; }
   {
-    const r = ballCfg.radius, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
+    const r = ballCfg.radius * ballCfg.scale, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,170,20,0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.8, 0, 7); ctx.fill();
     const core = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r); core.addColorStop(0, '#fff'); core.addColorStop(0.5, '#ffe14a'); core.addColorStop(1, '#ffb000');
@@ -2410,7 +2410,7 @@ let gvBits = [];
 // Rowlet's Brave Bird. First the rings of the Megaton Punch close in on it; then, as it climbs, a bird made of light grows out of its middle (bigger
 // as the charge goes on) with its head turned to the foe; in the dive that bird is at full size, its head along the way it dives, with a streak of light behind it.
 // The bird flashes between green and black, and the sky flickers between overcast and bright for as long as it lasts (drawBirdSky).
-let bbCfg = { ring: 0.5, charge: 1.5, rs: 1, ls: 1, lf: 1, dark: 0.5, fevery: 6, falpha: 0.3 }; // from 'hi'
+let bbCfg = { pull: 0, ring: 0.5, charge: 1.5, rs: 1, ls: 1, lf: 1, dark: 0.5, fevery: 6, falpha: 0.3 }; // from 'hi'
 const BIRD_PAL = [
   { main: '#6ff35a', edge: '#e4ffa8', glow: '90,255,110', ray: 'rgba(110,255,100,.55)', deep: '#1c8a2b' }, // grass green with a pale edge
   { main: '#14171a', edge: '#6ff35a', glow: '20,70,35', ray: 'rgba(16,48,24,.6)', deep: '#6ff35a' }, // black with a green edge
@@ -3366,15 +3366,15 @@ function drawShadowOrb(b) {
 }
 // Where a Shadow Ball burst and is dragging the opponent in: dark rings that run in toward the middle, for as long as the drag lasts.
 function drawPullWell(f) {
-  const life = Math.max(gengarCfg.pull, 1e-6), k = f.age / life, a = Math.min(1, (1 - k) * 2), R = f.r, now = performance.now() / 1000;
+  const bird = f.t === 'bbwell', life = Math.max(bird ? bbCfg.pull : gengarCfg.pull, 1e-6), k = f.age / life, a = Math.min(1, (1 - k) * 2), R = f.r, now = performance.now() / 1000; // Brave Bird's is green, Shadow Ball's purple
   ctx.save(); ctx.translate(f.x, f.y);
   const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
-  g.addColorStop(0, `rgba(10,0,25,${0.75 * a})`); g.addColorStop(1, `rgba(60,20,110,${0.15 * a})`);
+  g.addColorStop(0, bird ? `rgba(5,25,10,${0.75 * a})` : `rgba(10,0,25,${0.75 * a})`); g.addColorStop(1, bird ? `rgba(20,90,40,${0.15 * a})` : `rgba(60,20,110,${0.15 * a})`);
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
   ctx.lineWidth = 3;
   for (let n = 0; n < 3; n++) { // rings shrinking toward the middle, one after another
     const u = (now * 1.3 + n / 3) % 1;
-    ctx.strokeStyle = `rgba(200,150,255,${a * (1 - u) * 0.9})`; ctx.beginPath(); ctx.arc(0, 0, R * (1 - u), 0, 7); ctx.stroke();
+    ctx.strokeStyle = bird ? `rgba(150,255,170,${a * (1 - u) * 0.9})` : `rgba(200,150,255,${a * (1 - u) * 0.9})`; ctx.beginPath(); ctx.arc(0, 0, R * (1 - u), 0, 7); ctx.stroke();
   }
   ctx.restore();
 }
@@ -4226,11 +4226,12 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
-      else if (f.t === 'explode' || f.t === 'voltburst' || f.t === 'bbboom') drawExplosion(f);
+      else if (f.t === 'explode') drawExplosion({ ...f, r: f.r * ballCfg.scale }); // the Electro Ball's blast, drawn at `scale` times its reach
+      else if (f.t === 'voltburst' || f.t === 'bbboom') drawExplosion(f);
       else if (f.t === 'infboom' || f.t === 'infpop') drawInfernoBoom(f);
       else if (f.t === 'ult') drawUltRing(f);
       else if (f.t === 'airhit') drawAirHit(f);
@@ -4247,7 +4248,7 @@ function frame() {
       else if (f.t === 'lpunch') drawLightningFist(f);
       else if (f.t === 'lpbolt') drawLightningBolt(f);
       else if (f.t === 'gslam') drawGhostSlam(f);
-      else if (f.t === 'gwell') drawPullWell(f);
+      else if (f.t === 'gwell' || f.t === 'bbwell') drawPullWell(f);
       else if (f.t === 'evolve') drawEvolve(f);
       else if (f.t === 'gvplant') drawGvRing(f);
       else if (f.t === 'gvrise') drawGvSpikes(f, 0);

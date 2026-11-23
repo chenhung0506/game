@@ -255,3 +255,37 @@ func TestTheVoltTackleScaleReachesThePageAndMustBePositive(t *testing.T) {
 		}
 	}
 }
+
+// The Electro Ball and its blast are drawn by the page at `scale` times their radius; the reach is not touched.
+func TestTheElectroBallScaleReachesThePageAndMustBePositive(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Pikachu.ElectroBall.Scale != 1 {
+		t.Fatalf("default scale = %v, want 1", cfg.Pikachu.ElectroBall.Scale)
+	}
+	cfg.Pikachu.ElectroBall.Scale = 2.5
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	hi := next(t, dialIn(t, srv, "mobile"), "hi")
+	if v := hi["ball"].(map[string]any); v["scale"] != 2.5 {
+		t.Fatalf("hi.ball.scale = %v, want 2.5", v["scale"])
+	}
+	for _, bad := range []float64{0, -1} {
+		cfg := DefaultConfig()
+		cfg.Pikachu.ElectroBall.Scale = bad
+		if cfg.validate() == nil {
+			t.Errorf("a scale of %v was accepted", bad)
+		}
+	}
+}
+
+// The green well Brave Bird leaves lasts as long as the page is told: hi.bbird.pull is rowlet.brave_bird.pull_duration.
+func TestTheBraveBirdPullDurationReachesThePage(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Rowlet.BraveBird.PullDuration = 3.5
+	srv := httptest.NewServer(newMux(cfg))
+	defer srv.Close()
+	hi := next(t, dialIn(t, srv, "mobile"), "hi")
+	if v := hi["bbird"].(map[string]any); v["pull"] != 3.5 {
+		t.Fatalf("hi.bbird.pull = %v, want 3.5", v["pull"])
+	}
+}

@@ -78,7 +78,12 @@ func (g *Game) diveBird(i int, dt float64) ([]Event, bool) {
 		sp := tn.spin()
 		g.Balls = append(g.Balls, Ball{K: ballTornado, Owner: i, HP: tn.HP, Life: tn.Duration, Still: true, Spin: &sp, Rad: tn.Radius, Scale: tn.Scale, X: p.X, Y: p.Y})
 	}
-	return []Event{{T: "bbboom", X: p.X, Y: p.Y, R: bb.ExplosionRadius, K: p.Kind}}, true
+	events := []Event{{T: "bbboom", X: p.X, Y: p.Y, R: bb.ExplosionRadius, K: p.Kind}}
+	if bb.PullDuration > 0 && bb.Gravity > 0 && bb.GravityRadius > 0 { // the landing drags the foes near it toward the spot, like a Shadow Ball's well
+		g.Wells = append(g.Wells, pullWell{Owner: i, X: p.X, Y: p.Y, T: bb.PullDuration, R: bb.GravityRadius, Gravity: bb.Gravity, Reach: bb.Reach, Juggled: true})
+		events = append(events, Event{T: "bbwell", X: p.X, Y: p.Y, R: bb.GravityRadius})
+	}
+	return events, true
 }
 
 // launch throws f up to `height` and holds it helpless there for `duration` seconds (Brave Bird's, the Uppercut's): nothing happens to a body

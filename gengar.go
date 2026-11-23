@@ -52,11 +52,16 @@ type shadowBall struct {
 	Y0    float64 `json:"-"`
 }
 
-// pullWell is where a Shadow Ball burst, dragging the opponent toward its middle for as long as it lasts.
+// pullWell is where a Shadow Ball (or Brave Bird) burst, dragging the opponent toward its middle for as long as it lasts. It carries its own
+// numbers, so the config of whichever skill made it can change without touching wells already on the court.
 type pullWell struct {
-	Owner int
-	X, Y  float64
-	T     float64 // seconds left
+	Owner   int
+	X, Y    float64
+	T       float64 // seconds left
+	R       float64 // the reach of the pull, from its middle (plus the opponent's body)
+	Gravity float64 // pixels a second
+	Reach   Reach   // the heights the pull takes hold of
+	Juggled bool    // also drags the bodies Brave Bird threw up (Held in the air); false: anything Held stays put
 }
 
 // maxGhostFires bounds the flames on the court, whatever the config says.
@@ -196,7 +201,7 @@ func (g *Game) shadowBlast(owner int, x, y float64) []Event {
 		}
 	}
 	if sb.PullDuration > 0 && sb.Gravity > 0 {
-		g.Wells = append(g.Wells, pullWell{Owner: owner, X: x, Y: y, T: sb.PullDuration})
+		g.Wells = append(g.Wells, pullWell{Owner: owner, X: x, Y: y, T: sb.PullDuration, R: sb.SlamRadius, Gravity: sb.Gravity, Reach: sb.Reach})
 		events = append(events, Event{T: "gwell", X: x, Y: y, R: sb.SlamRadius})
 	}
 	return events
@@ -221,17 +226,16 @@ func (g *Game) nightShadeBlast(owner int, x, y float64) []Event {
 	return events
 }
 
-// stepWells drags the opponent toward the middle of every burst that is still pulling: at `gravity` pixels a second, never past
-// the middle, for the opponent whose body touches the reach of the blast at the heights the skill hits. A planted dummy, and one
-// carried off by something else, stay where they are.
+// stepWells drags the opponent toward the middle of every burst that is still pulling: at the well's `gravity` pixels a second, never past
+// the middle, for the opponent whose body touches the reach of the well at the heights its skill hits. A planted dummy, and one
+// carried off by something else, stay where they are (a body Brave Bird threw up is dragged too, by a well that says so).
 func (g *Game) stepWells(dt float64) {
-	sb := g.cfg.Gengar.ShadowBall
 	kept := g.Wells[:0]
 	for _, w := range g.Wells {
 		for _, j := range g.foes(w.Owner) {
 			foe := &g.P[j]
-			if d := math.Hypot(w.X-foe.X, w.Y-foe.Y); foe.Kind != dummy && !foe.Held && sb.Reach.hits(foe) && d > 1e-9 && d <= sb.SlamRadius+g.radius(j) {
-				step := math.Min(sb.Gravity*dt, d)
+			if d := math.Hypot(w.X-foe.X, w.Y-foe.Y); foe.Kind != dummy && (!foe.Held || (w.Juggled && foe.Juggle)) && w.Reach.hits(foe) && d > 1e-9 && d <= w.R+g.radius(j) {
+				step := math.Min(w.Gravity*dt, d)
 				foe.X, foe.Y = foe.X+(w.X-foe.X)/d*step, foe.Y+(w.Y-foe.Y)/d*step
 			}
 		}

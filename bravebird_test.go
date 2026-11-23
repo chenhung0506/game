@@ -257,3 +257,98 @@ func TestTheDiveFollowsTheFoeUntilItIsLockDistanceAwayAndNotAfter(t *testing.T) 
 		}
 	}
 }
+
+// landBirdWithFoeAt starts a Brave Bird dive that is fixed on the foe's place, then puts the foe `off` pixels further along x before the bird
+// lands, so the foe is that far from the spot it came down on. It returns the game just after the landing, and whether a bbwell event came.
+// secs is how many ticks last that many seconds.
+func secs(s float64) int { return int(s / dt) }
+
+func landBirdWithFoeAt(cfg Config, off float64) (g *Game, well bool, tx float64) {
+	g = bbGame(cfg, 400)
+	gpress(g, Input{Ult: true})
+	for n := 0; n < 600 && !g.P[0].BirdDive; n++ {
+		g.Step(dt)
+	}
+	tx = g.P[0].BirdTX
+	g.P[1].X = tx + off
+	for n := 0; n < 200 && g.P[0].BirdDive; n++ {
+		for _, e := range g.Step(dt) {
+			well = well || e.T == "bbwell"
+		}
+	}
+	return g, well, tx
+}
+
+func TestBraveBirdLandingDragsFoesWithinGravityRadiusTowardTheSpotForPullDurationAndNoFurther(t *testing.T) {
+	cfg := DefaultConfig()
+	bb := &cfg.Rowlet.BraveBird
+	bb.RingDuration, bb.ChargeDuration, bb.SkyHeight, bb.DiveSpeed = 0.3, 0.6, 300, 1000
+	bb.LockDistance = 1e6 // the dive does not follow the foe, so the foe can be put off to the side
+	bb.ExplosionRadius, bb.Damage, bb.LaunchHeight, bb.LaunchDuration = 120, 25, 150, 1
+	bb.Tornado.Duration = 0
+	bb.GravityRadius, bb.Gravity, bb.PullDuration = 300, 200, 1
+
+	// Outside the blast (250 away) but inside the pull: dragged 200 px a second for one second, then left where it is.
+	g, well, tx := landBirdWithFoeAt(cfg, 250)
+	if !well {
+		t.Fatal("no bbwell event at the landing")
+	}
+	steps(g, secs(0.5))
+	if d := g.P[1].X - tx; d > 250-90 || d < 250-110 {
+		t.Fatalf("after half a second the foe is %v from the spot, want about 150", d)
+	}
+	steps(g, secs(1))
+	end := g.P[1].X
+	if d := end - tx; d > 250-190 || d < 250-210 {
+		t.Fatalf("after the pull the foe is %v from the spot, want about 50 (Gravity x PullDuration = 200 px)", d)
+	}
+	steps(g, secs(1))
+	if g.P[1].X != end {
+		t.Fatalf("the pull went on after pull_duration: x %v -> %v", end, g.P[1].X)
+	}
+
+	// Thrown up by the blast (100 away, inside explosion_radius): it hangs in the air, and is dragged there too.
+	g, _, tx = landBirdWithFoeAt(cfg, 100)
+	if !g.P[1].Juggle {
+		t.Fatal("the foe in the blast was not thrown up")
+	}
+	steps(g, secs(0.25))
+	if d := g.P[1].X - tx; d > 100-40 {
+		t.Fatalf("the foe thrown up is %v from the spot, want it dragged in (about 50)", d)
+	}
+
+	// Beyond gravity_radius (+ the body): not touched.
+	g, _, tx = landBirdWithFoeAt(cfg, 500)
+	steps(g, secs(1.5))
+	if g.P[1].X != tx+500 {
+		t.Fatalf("a foe outside gravity_radius moved to %v", g.P[1].X-tx)
+	}
+
+	// Off by default of any one number: no well, no event.
+	for _, off := range []func(){func() { bb.GravityRadius = 0 }, func() { bb.Gravity = 0 }, func() { bb.PullDuration = 0 }} {
+		c := cfg
+		b := &c.Rowlet.BraveBird
+		*b = cfg.Rowlet.BraveBird
+		bb = b
+		off()
+		g, well, tx = landBirdWithFoeAt(c, 250)
+		steps(g, secs(1))
+		if well || g.P[1].X != tx+250 {
+			t.Fatalf("well %v, foe moved to %v: a pull that is switched off still pulled", well, g.P[1].X-tx)
+		}
+	}
+}
+
+func TestBraveBirdPullNumbersMustNotBeNegative(t *testing.T) {
+	for _, set := range []func(*Config){
+		func(c *Config) { c.Rowlet.BraveBird.GravityRadius = -1 },
+		func(c *Config) { c.Rowlet.BraveBird.Gravity = -1 },
+		func(c *Config) { c.Rowlet.BraveBird.PullDuration = -1 },
+	} {
+		cfg := DefaultConfig()
+		set(&cfg)
+		if cfg.validate() == nil {
+			t.Error("a negative pull number was accepted")
+		}
+	}
+}
