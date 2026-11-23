@@ -461,7 +461,7 @@
       "launch_height": 200,
       "launch_duration": 1,
       "gravity_radius": 300,
-      "gravity": 300,
+      "gravity": 200,
       "pull_duration": 2,
       "ring_scale": 1,
       "light_scale": 1,
