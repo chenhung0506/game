@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -178,17 +179,47 @@ type LightningPunchCfg struct {
 	LightningScale  float64 `json:"lightning_scale"`
 }
 
+// BurstPunchCfg is the Gigantamax Machamp's Burst Punch (its main button, in place of the Uppercut): it first slides `slide_distance` along the stick (facing, with none) in `slide_duration`
+// seconds (0 for either: no slide), then stands rooted for `charge_duration` seconds gathering, its fist aimed at the
+// nearest foe all the while (`show_warning` draws the cylinder it will burst in on the ground), and then the fist comes out `distance` ahead of it. Round that point, in a cylinder `radius` wide and
+// `height` tall, `count` small explosions go off at random places spread over `duration` seconds, each higher than the one before: the cylinder is filled from the ground up. A foe an explosion (`explosion_radius`, a sphere) touches takes
+// `explosion_damage` and is thrown up to `explosion_height`, helpless there for `launch_duration` seconds; every further explosion that touches it in the same cast throws it `height_gain`
+// higher than the one before, up to `launch_cap`. `fist_scale` and `explosion_scale` only change how big the fist and the explosions are drawn.
+type BurstPunchCfg struct {
+	SlideDistance   float64 `json:"slide_distance"`
+	SlideDuration   float64 `json:"slide_duration"`
+	ChargeDuration  float64 `json:"charge_duration"`
+	Distance        float64 `json:"distance"`
+	Radius          float64 `json:"radius"`
+	Height          float64 `json:"height"`
+	Count           int     `json:"count"`
+	Duration        float64 `json:"duration"`
+	ExplosionRadius float64 `json:"explosion_radius"`
+	ExplosionDamage int     `json:"explosion_damage"`
+	ExplosionHeight float64 `json:"explosion_height"`
+	HeightGain      float64 `json:"height_gain"`
+	LaunchCap       float64 `json:"launch_cap"`
+	LaunchDuration  float64 `json:"launch_duration"`
+	Cooldown        float64 `json:"cooldown"` // counted from the start of the gathering
+	ShowWarning     bool    `json:"show_warning"`
+	FistScale       float64 `json:"fist_scale"`
+	ExplosionScale  float64 `json:"explosion_scale"`
+}
+
+// maxBursts is the most explosions one Burst Punch may let off.
+const maxBursts = 200
+
 // GigantamaxCfg is Machamp's ultimate (Z, once the charge is full): for `duration` seconds it is the Gigantamax Machamp, with its own `max_hp` (the HP it has is
-// scaled to it, and back when it is over), `walk_speed` and body `radius`, and its own numbers for the skills it has: the Uppercut and the Comet Punch (read exactly like
-// machamp.uppercut and machamp.comet_punch, which it uses the rest of the time) and the Lightning Punch, which takes the place of the High Jump Kick.
+// scaled to it, and back when it is over), `walk_speed` and body `radius`, and its own numbers for the skills it has: the Comet Punch (read exactly like
+// machamp.comet_punch, which it uses the rest of the time), the Burst Punch, which takes the place of the Uppercut, and the Lightning Punch, which takes the place of the High Jump Kick.
 type GigantamaxCfg struct {
 	ChargeDuration float64           `json:"charge_duration"` // seconds it stands rooted gathering before it changes (0: at once); a stun, a freeze or a catch ends it and the charge is not given back
 	MaxHP          int               `json:"max_hp"`
 	WalkSpeed      float64           `json:"walk_speed"`
 	Radius         float64           `json:"radius"`
 	Duration       float64           `json:"duration"`
-	Uppercut       UppercutCfg       `json:"uppercut"`
 	CometPunch     CometPunchCfg     `json:"comet_punch"`
+	BurstPunch     BurstPunchCfg     `json:"burst_punch"`
 	LightningPunch LightningPunchCfg `json:"lightning_punch"`
 }
 
@@ -1318,8 +1349,8 @@ func DefaultConfig() Config {
 	c.Machamp.RockTomb.RingRadius, c.Machamp.RockTomb.Count, c.Machamp.RockTomb.StoneHP, c.Machamp.RockTomb.StoneDuration, c.Machamp.RockTomb.Cooldown = 450, 20, 80, 7, 14
 	gm := &c.Machamp.Gigantamax // the ultimate: bigger, tougher and harder-hitting than Machamp
 	gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration = 190, 125, 40, 15
-	gm.Uppercut, gm.CometPunch = c.Machamp.Uppercut, c.Machamp.CometPunch
-	gm.Uppercut.Damage, gm.Uppercut.LaunchHeight = 35, 260
+	gm.CometPunch = c.Machamp.CometPunch
+	gm.BurstPunch = BurstPunchCfg{SlideDistance: 150, SlideDuration: 0.25, ChargeDuration: 0.8, Distance: 350, Radius: 220, Height: 300, Count: 24, Duration: 1.2, ExplosionRadius: 70, ExplosionDamage: 8, ExplosionHeight: 90, HeightGain: 60, LaunchCap: 420, LaunchDuration: 0.6, Cooldown: 10, ShowWarning: true, FistScale: 1, ExplosionScale: 1}
 	gm.LightningPunch = LightningPunchCfg{Reach: Reach{MinHeight: 0, MaxHeight: 80}, ChargeDuration: 1.2, Distance: 500, Radius: 70, Damage: 40, StunDuration: 1, Knockback: 200, LightningRadius: 160, LightningDamage: 30, Cooldown: 9, FistScale: 1, LightningScale: 1}
 	gm.CometPunch.Damage, gm.CometPunch.Quantity, gm.CometPunch.Radius = 3, 28, 26
 	c.Charizard.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
@@ -1356,6 +1387,34 @@ func LoadConfig(path string) (Config, error) {
 	return c, nil
 }
 
+// validate checks the Burst Punch's numbers.
+func (b BurstPunchCfg) validate() error {
+	if b.Count < 1 || b.Count > maxBursts {
+		return fmt.Errorf("count must be 1..%d, got %d", maxBursts, b.Count)
+	}
+	for _, f := range []struct {
+		name string
+		v    float64
+		min  float64 // exclusive lower bound
+	}{{"radius", b.Radius, 0}, {"explosion_radius", b.ExplosionRadius, 0}, {"explosion_height", b.ExplosionHeight, 0}, {"fist_scale", b.FistScale, 0}, {"explosion_scale", b.ExplosionScale, 0}} {
+		if !(f.v > f.min) {
+			return fmt.Errorf("%s must be above %v, got %v", f.name, f.min, f.v)
+		}
+	}
+	for _, f := range []struct {
+		name string
+		v    float64
+	}{{"slide_distance", b.SlideDistance}, {"slide_duration", b.SlideDuration}, {"charge_duration", b.ChargeDuration}, {"distance", b.Distance}, {"height", b.Height}, {"duration", b.Duration}, {"height_gain", b.HeightGain}, {"launch_duration", b.LaunchDuration}, {"cooldown", b.Cooldown}, {"explosion_damage", float64(b.ExplosionDamage)}} {
+		if !(f.v >= 0) || math.IsInf(f.v, 0) {
+			return fmt.Errorf("%s must not be negative, got %v", f.name, f.v)
+		}
+	}
+	if b.LaunchCap < b.ExplosionHeight {
+		return fmt.Errorf("launch_cap (%v) must not be below explosion_height (%v)", b.LaunchCap, b.ExplosionHeight)
+	}
+	return nil
+}
+
 // validate checks the whole config: the numbers of every character, and then the Gigantamax Machamp's own (its three skills are checked just like Machamp's).
 func (c Config) validate() error {
 	if err := c.validateSkills(); err != nil {
@@ -1366,9 +1425,12 @@ func (c Config) validate() error {
 		return fmt.Errorf("machamp.gigantamax: max_hp (%d), walk_speed (%v), radius (%v) and duration (%v) must be above 0", gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration)
 	}
 	tmp := c
-	tmp.Machamp.Uppercut, tmp.Machamp.CometPunch = gm.Uppercut, gm.CometPunch
+	tmp.Machamp.CometPunch = gm.CometPunch
 	if err := tmp.validateSkills(); err != nil {
 		return fmt.Errorf("machamp.gigantamax's skills are checked like Machamp's, and: %w", err)
+	}
+	if err := gm.BurstPunch.validate(); err != nil {
+		return fmt.Errorf("machamp.gigantamax.burst_punch: %w", err)
 	}
 	cg := c.Charizard.Gigantamax
 	if cg.MaxHP <= 0 || !(cg.WalkSpeed > 0) || !(cg.Radius > 0) || !(cg.Duration > 0) {

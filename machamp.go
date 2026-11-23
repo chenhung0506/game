@@ -39,13 +39,13 @@ func (g *Game) brawler(i int) *BrawlerCfg { return g.brawlerP(&g.P[i]) }
 // gigantamax is whether p is a Gigantamax Machamp or a Gigantamax Charizard now (GmaxT is only ever set for those two).
 func (p *Player) gigantamax() bool { return (p.Kind == machamp || p.Kind == charizard) && p.GmaxT > 0 }
 
-// brawlerP is the numbers p plays by. The Gigantamax Machamp has Machamp's, with its own Uppercut and Comet Punch (its Lightning Punch is read from the config directly).
+// brawlerP is the numbers p plays by. The Gigantamax Machamp has Machamp's, with its own Comet Punch (its Burst Punch and Lightning Punch are read from the config directly).
 func (g *Game) brawlerP(p *Player) *BrawlerCfg {
 	if p.Kind == machamp && p.gigantamax() {
 		if g.gmaxCfg == nil {
 			b := g.cfg.Machamp
 			gm := b.Gigantamax
-			b.Uppercut, b.CometPunch = gm.Uppercut, gm.CometPunch
+			b.CometPunch = gm.CometPunch
 			g.gmaxCfg = &b
 		}
 		return g.gmaxCfg
@@ -66,7 +66,7 @@ func (g *Game) dropMachamp(i int) {
 	p.MegaJT = 0
 	p.KickPhase, p.KickT = kickNone, 0
 	p.UpPhase, p.UpT = upNone, 0
-	p.LpT = 0
+	p.LpT, p.BpT, p.BpS = 0, 0, 0
 }
 
 // machampAirSpeed is how fast Machamp is steered in the Rock Tomb jump: the first speed until the middle, the second after.
@@ -90,14 +90,14 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	}
 	ts, cp, rt := g.brawler(i).TreeSlam, g.brawler(i).CometPunch, g.brawler(i).RockTomb
 	mp, hk, uc := g.brawler(i).MegatonPunch, g.brawler(i).HighJumpKick, g.brawler(i).Uppercut
-	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD, &p.KickCD, &p.UpCD, &p.LpCD} {
+	for _, cd := range []*float64{&p.TreeCD, &p.CometCD, &p.RockCD, &p.MegaCD, &p.KickCD, &p.UpCD, &p.LpCD, &p.BpCD} {
 		if *cd > 0 {
 			if *cd -= dt; *cd < 1e-9 {
 				*cd = 0
 			}
 		}
 	}
-	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.KickPhase == kickNone && p.UpPhase == upNone && p.LpT == 0 && p.Z == 0
+	idle := p.TreePhase == treeNone && p.CometT == 0 && p.RockT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.KickPhase == kickNone && p.UpPhase == upNone && p.LpT == 0 && p.BpT == 0 && p.BpS == 0 && p.Z == 0
 
 	// ---- Tree slam: jump, then pull up a tree and smash it down ----
 	if in.Skill && idle && p.TreeCD == 0 && p.Kind != machamp { // Machamp kicks instead
@@ -206,8 +206,60 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		}
 	}
 
+	// ---- Burst Punch (the Gigantamax Machamp's Skill, in place of the Uppercut): gather, rooted, the fist aimed at the foe, then the fist comes out and the explosions go off round it ----
+	if in.Skill && p.Kind == machamp && p.gigantamax() && idle && p.BpCD == 0 {
+		bp := g.cfg.Machamp.Gigantamax.BurstPunch
+		p.BpX, p.BpY, p.BpCD = 0, 0, bp.Cooldown
+		if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
+			p.BpX, p.BpY = ux, uy
+		} else {
+			p.BpX, p.BpY = unit(float64(p.FX), float64(p.FY))
+		}
+		idle = false
+		if bp.SlideDistance > 0 && bp.SlideDuration > 0 { // slide first, along the stick (the way it faces with none), then gather
+			dx, dy := float64(in.DX), float64(in.DY)
+			if dx == 0 && dy == 0 {
+				dx, dy = float64(p.FX), float64(p.FY)
+			}
+			p.BpSX, p.BpSY = unit(dx, dy)
+			p.BpS = bp.SlideDuration
+		} else if p.BpT = bp.ChargeDuration; p.BpT == 0 {
+			events = append(events, g.burstPunch(i)...)
+			rooted = true
+		}
+	}
+	if p.BpS > 0 {
+		rooted = true
+		bp := g.cfg.Machamp.Gigantamax.BurstPunch
+		step := math.Min(dt, p.BpS) // the last step is clipped so the distance is exact
+		if !p.pinned() {
+			v := bp.SlideDistance / bp.SlideDuration
+			p.X = math.Min(math.Max(p.X+p.BpSX*v*step, 0), g.court.Length)
+			p.Y = math.Min(math.Max(p.Y+p.BpSY*v*step, 0), g.court.Width)
+		}
+		if p.BpS -= step; p.BpS < 1e-9 {
+			p.BpS, p.BpT = 0, bp.ChargeDuration
+			if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
+				p.BpX, p.BpY = ux, uy
+			}
+			if p.BpT == 0 {
+				events = append(events, g.burstPunch(i)...)
+			}
+		}
+	}
+	if p.BpT > 0 {
+		rooted = true
+		if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
+			p.BpX, p.BpY = ux, uy // the fist follows the foe while it gathers
+		}
+		if p.BpT -= dt; p.BpT < 1e-9 {
+			p.BpT = 0
+			events = append(events, g.burstPunch(i)...)
+		}
+	}
+
 	// ---- Uppercut (Machamp's Skill): slide along the stick, then rush at the opponent and throw it up ----
-	if in.Skill && p.Kind == machamp && idle && p.UpCD == 0 {
+	if in.Skill && p.Kind == machamp && !p.gigantamax() && idle && p.UpCD == 0 {
 		dx, dy := float64(in.DX), float64(in.DY)
 		if dx == 0 && dy == 0 {
 			dx, dy = float64(p.FX), float64(p.FY)

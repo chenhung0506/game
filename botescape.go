@@ -43,7 +43,7 @@ func (b *Bot) escapeBySkill(c *bctx) (Input, bool) {
 			return in, true
 		}
 	case ash, machamp:
-		idle := p.Z == 0 && p.TreePhase == treeNone && p.CometT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.KickPhase == kickNone && p.UpPhase == upNone && p.LpT == 0 && p.RockT == 0
+		idle := p.Z == 0 && p.TreePhase == treeNone && p.CometT == 0 && p.MegaT == 0 && p.MegaJT == 0 && p.KickPhase == kickNone && p.UpPhase == upNone && p.LpT == 0 && p.BpT == 0 && p.BpS == 0 && p.RockT == 0
 		switch {
 		case p.Kind == ash && idle && p.TreeCD == 0 && bc.TreeSlam.JumpDistance > 0: // the jump the Tree Slam starts with goes the way the stick says
 			in.Skill = true

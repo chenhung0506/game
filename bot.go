@@ -418,6 +418,33 @@ func (c *bctx) findThreat() threat {
 		}
 	}
 
+	if f.gigantamax() && f.Kind == machamp { // a Burst Punch: the cylinder it will burst in (as it gathers: round where the fist will be, which follows its target; once it is out: round the fist) is no place to be
+		bp := cfg.Machamp.Gigantamax.BurstPunch
+		reach := bp.Radius + bp.ExplosionRadius + c.pr + 15
+		if f.BpT > 0 {
+			if hx, hy := f.X+f.BpX*bp.Distance, f.Y+f.BpY*bp.Distance; math.Hypot(p.X-hx, p.Y-hy) < reach {
+				ax, ay := unit(p.X-hx, p.Y-hy)
+				if ax == 0 && ay == 0 { // dead on the middle: away from whoever throws it
+					ax, ay = unit(p.X-f.X, p.Y-f.Y)
+				}
+				consider(threat{thPunch, f.BpT, ax, ay})
+			}
+		}
+	}
+	for _, bc := range c.g.Bursts { // the explosions still to come of a Burst Punch that is out
+		if &c.g.P[bc.Owner] != f {
+			continue
+		}
+		bp := cfg.Machamp.Gigantamax.BurstPunch
+		if math.Hypot(p.X-bc.X, p.Y-bc.Y) < bp.Radius+bp.ExplosionRadius+c.pr+15 {
+			ax, ay := unit(p.X-bc.X, p.Y-bc.Y)
+			if ax == 0 && ay == 0 {
+				ax, ay = unit(p.X-f.X, p.Y-f.Y)
+			}
+			consider(threat{thPunch, 0.3, ax, ay})
+		}
+	}
+
 	if f.gigantamax() && f.LpT > 0 { // a Lightning Punch gathering: the line of the fist is on the ground and follows its target, so only getting out of its reach helps
 		lp := cfg.Machamp.Gigantamax.LightningPunch
 		if segDist(p.X, p.Y, f.X, f.Y, f.X+f.LpX*lp.Distance, f.Y+f.LpY*lp.Distance) < lp.Radius+c.pr+15 {
@@ -1030,7 +1057,7 @@ func (b *Bot) ash(c *bctx) Input {
 	g, p, f := c.g, c.p, c.f
 	bc := g.brawler(c.me)
 	ts, cp, rt := bc.TreeSlam, bc.CometPunch, bc.RockTomb
-	if p.FrozenT > 0 || p.Held || p.StunT > 0 || p.TreePhase != treeNone || p.CometT > 0 || p.MegaT > 0 || p.MegaJT > 0 || p.KickPhase != kickNone || p.UpPhase != upNone || p.LpT > 0 {
+	if p.FrozenT > 0 || p.Held || p.StunT > 0 || p.TreePhase != treeNone || p.CometT > 0 || p.MegaT > 0 || p.MegaJT > 0 || p.KickPhase != kickNone || p.UpPhase != upNone || p.LpT > 0 || p.BpT > 0 || p.BpS > 0 {
 		return c.stay() // rooted, or it moves itself
 	}
 	if p.RockT > 0 {
@@ -1044,6 +1071,11 @@ func (b *Bot) ash(c *bctx) Input {
 	if lp := g.cfg.Machamp.Gigantamax.LightningPunch; p.gigantamax() && p.LpCD == 0 && p.Z == 0 && lp.Reach.hits(f) && c.dist <= lp.Distance*0.85 && !danger { // the Lightning Punch: it gathers on the spot with the fist on the foe
 		in := c.stay()
 		in.Kick = true
+		return in
+	}
+	if bp := g.cfg.Machamp.Gigantamax.BurstPunch; p.gigantamax() && p.BpCD == 0 && p.Z == 0 && !danger && math.Abs(c.dist-bp.Distance) <= bp.Radius*0.7 && b.rng.Float64() < 0.6 { // the Burst Punch: the foe is inside the cylinder it will burst in
+		in := c.stay()
+		in.Skill = true
 		return in
 	}
 	if p.Kind == machamp && p.GmaxT == 0 && p.Charge >= g.cfg.Machamp.Ultimate.Max && !danger && c.dist <= 600 { // the ultimate, as soon as it is charged and the opponent is in reach
@@ -1084,7 +1116,7 @@ func (b *Bot) ash(c *bctx) Input {
 		return in
 	}
 	uc := bc.Uppercut // Machamp's main skill: slides at the opponent and rushes in to throw it up
-	upper := p.Kind == machamp && p.UpCD == 0 && p.Z == 0 && uc.Reach.hits(f) && c.dist <= uc.SlideDistance+uc.RushDistance*0.8
+	upper := p.Kind == machamp && !p.gigantamax() && p.UpCD == 0 && p.Z == 0 && uc.Reach.hits(f) && c.dist <= uc.SlideDistance+uc.RushDistance*0.8
 	upperIn := func() Input {
 		in := c.move(c.ux, c.uy)
 		in.Skill = true

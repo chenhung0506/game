@@ -64,7 +64,7 @@ func TestTheGigantamaxMachampsSkillsCountAsAnUltimatesAndTheNormalOnesDoNot(t *t
 	u := &cfg.Machamp.Ultimate
 	u.GainTaken, u.GainPerSecond, u.GainDealt, u.GainUltDealt, u.Max = 0, 0, 1, 3, 1000
 	cfg.Machamp.Uppercut.SlideDistance, cfg.Machamp.Uppercut.SlideDuration = 0, 0
-	cfg.Machamp.Gigantamax.Uppercut = cfg.Machamp.Uppercut
+	cfg.Machamp.Gigantamax.BurstPunch = BurstPunchCfg{Distance: 300, Radius: 50, Height: 50, Count: 10, ExplosionRadius: 600, ExplosionDamage: 2, ExplosionHeight: 50, LaunchCap: 50, LaunchDuration: 0.5, Cooldown: 5, FistScale: 1, ExplosionScale: 1} // everything it throws reaches the foe
 	for _, gmax := range []bool{false, true} {
 		g := kickDuel(cfg, 300)
 		g.P[1].HP = 100000

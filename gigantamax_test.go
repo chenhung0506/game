@@ -65,28 +65,18 @@ func TestTheHPIsScaledToTheGigantamaxMaximumAndBack(t *testing.T) {
 
 func TestTheGigantamaxMachampUsesItsOwnNumbersForItsSkills(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Machamp.Gigantamax.Uppercut.Damage = 77
 	cfg.Machamp.Gigantamax.CometPunch.Quantity = 5
-	cfg.Machamp.Uppercut.Damage = 11
+	cfg.Machamp.CometPunch.Quantity = 11
 	g := gmGame(cfg, 800)
-	if g.brawler(0).Uppercut.Damage != 11 {
-		t.Fatal("Machamp's own uppercut is not in force before it changes")
+	if g.brawler(0).CometPunch.Quantity != 11 {
+		t.Fatal("Machamp's own comet punch is not in force before it changes")
 	}
 	gpress(g, Input{Ult: true})
-	if b := g.brawler(0); b.Uppercut.Damage != 77 || b.CometPunch.Quantity != 5 {
-		t.Fatalf("uppercut %d fists %d", b.Uppercut.Damage, b.CometPunch.Quantity)
+	if b := g.brawler(0); b.CometPunch.Quantity != 5 {
+		t.Fatalf("fists %d", b.CometPunch.Quantity)
 	}
 	if b := g.brawler(1); b == &cfg.Machamp {
 		t.Fatal("the foe's numbers are Machamp's")
-	}
-	// the uppercut that is thrown does the Gigantamax damage
-	g.P[1].X, g.P[1].Y, g.P[1].HP = g.P[0].X+300, g.P[0].Y, 100000
-	hp := g.P[1].HP
-	g.P[0].UpCD = 0
-	press(g, 0, Input{Skill: true})
-	steps(g, 90)
-	if got := hp - g.P[1].HP; got != 77 {
-		t.Fatalf("the uppercut did %d, want the Gigantamax 77", got)
 	}
 }
 
@@ -112,7 +102,7 @@ func TestTheGigantamaxNumbersAreChecked(t *testing.T) {
 		"max_hp":    func(c *Config) { c.Machamp.Gigantamax.MaxHP = 0 },
 		"radius":    func(c *Config) { c.Machamp.Gigantamax.Radius = 0 },
 		"duration":  func(c *Config) { c.Machamp.Gigantamax.Duration = 0 },
-		"its skill": func(c *Config) { c.Machamp.Gigantamax.Uppercut.RushSpeed = 0 },
+		"its skill": func(c *Config) { c.Machamp.Gigantamax.BurstPunch.Count = 0 },
 	} {
 		c := DefaultConfig()
 		edit(&c)

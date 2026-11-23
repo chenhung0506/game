@@ -309,6 +309,14 @@ type Player struct {
 	LpX  float64 `json:"lpx"`
 	LpY  float64 `json:"lpy"`
 	LpCD float64 `json:"lpcd"`
+	// Burst Punch (the Gigantamax Machamp's main button): the seconds of the gathering left, the unit direction the fist is aimed along (it follows the foe) and the cooldown.
+	BpS  float64 `json:"bps"` // the seconds of the slide before it left, and the unit direction it goes along
+	BpSX float64 `json:"bsx"`
+	BpSY float64 `json:"bsy"`
+	BpT  float64 `json:"bpt"`
+	BpX  float64 `json:"bpx"`
+	BpY  float64 `json:"bpy"`
+	BpCD float64 `json:"bpcd"`
 	// Gengar: seconds left under the ground (the shadow shows), the three cooldowns, and how much longer it cannot start a skill
 	// (an opponent's shadow is on it).
 	SneakT           float64 `json:"gnt"`
@@ -426,6 +434,7 @@ type Event struct {
 	T  string  `json:"t"`           // "slam" | "leaf" | "thunder" | "skybolt" | "explode" | "freeze" | "paralyze" | "storm" | "iceburst" | "wave" | "tail" | "evolve"
 	X  float64 `json:"x"`
 	Y  float64 `json:"y"`
+	Z  float64 `json:"z,omitempty"`  // how high above the ground, where that matters (a Burst Punch's explosions are in the air)
 	R  float64 `json:"r,omitempty"`  // slam reach, so the effect can match it
 	DX float64 `json:"dx,omitempty"` // a direction (the tail whip's)
 	DY float64 `json:"dy,omitempty"`
@@ -457,6 +466,7 @@ type Game struct {
 	UltUsed [maxSlots]bool // slots whose character has used its ultimate (a Z skill or a Gigantamax) since it came out: it has only the one, so its charge does not fill again
 	Icicles []icicle       // Glaciate's icicles on their way down
 	Casts   []glaciateCast // Glaciates still calling icicles
+	Bursts  []burstCast    // the Burst Punches that have come out and are still letting off explosions
 	Wells   []pullWell     // where Shadow Balls burst and are still dragging the opponent in
 	Waves   []wave         // Gyarados's waves running out over the ground (the client draws them from an event)
 	rng     *rand.Rand     // the fire's random spread; tests replace it
@@ -564,7 +574,7 @@ func (g *Game) Reset() {
 		}
 		g.P[i] = Player{Kind: g.P[i].Kind, X: x, Y: y, HP: g.maxHP(i), FX: fx, AimX: float64(fx)}
 	}
-	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells, g.Icicles, g.Casts = nil, nil, nil, nil, nil, nil, nil, nil, nil
+	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells, g.Icicles, g.Casts, g.Bursts = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	g.UltUsed = [maxSlots]bool{} // a new round, a new match: everyone has their ultimate again (a team match gives it back only to whoever is new, see nextRound)
 	for i := range g.P {
 		if g.P[i].Kind == rowlet {
@@ -1194,6 +1204,7 @@ func (g *Game) Step(dt float64) []Event {
 	g.stepWaves(dt)
 	events = append(events, g.stepBalls(dt)...)
 	events = append(events, g.stepTwirl(dt)...)
+	events = append(events, g.stepBursts(dt)...)
 	g.stepJuggle(dt)
 	for i := range g.P {
 		if g.P[i].Charge < ch0[i] { // the ultimate started this tick: this character has had its one
