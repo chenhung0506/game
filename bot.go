@@ -73,6 +73,10 @@ func (b *Bot) Decide(g *Game, me int) Input {
 		b.strafe, b.strafeT = []float64{-1, 1}[b.rng.IntN(2)], 0.8+1.2*b.rng.Float64()
 	}
 	c := b.look(g, me)
+	if esc, ok := b.escapeBySkill(c); ok { // what threatens it cannot be walked out of: use the skill that moves the body
+		b.held = Input{DX: esc.DX, DY: esc.DY, AimX: esc.AimX, AimY: esc.AimY}
+		return esc
+	}
 	var in Input
 	switch b.kind {
 	case pikachu:
@@ -158,6 +162,7 @@ type bctx struct {
 	ux, uy float64 // unit vector from the bot to the opponent
 	vx, vy float64 // how fast the opponent was moving
 	th     threat
+	cant   bool // walking cannot get out of th in time: a skill that moves the body is the way out (escapeBySkill)
 }
 
 func (b *Bot) look(g *Game, me int) *bctx {
@@ -192,7 +197,7 @@ func (b *Bot) look(g *Game, me int) *bctx {
 		cc := *c
 		cc.f, cc.fr = &old.all[j], g.bodyRadius(&old.all[j])
 		if t := cc.findThreat(); t.eta < c.th.eta {
-			c.th = t
+			c.th, c.cant = t, cc.cant
 		}
 	}
 	return c
@@ -245,10 +250,16 @@ func (c *bctx) sideOf(ox, oy, ux, uy, px, py float64) (float64, float64) {
 func (c *bctx) findThreat() threat {
 	g, p, f := c.g, c.p, c.f
 	cfg := &g.cfg
-	best := threat{kind: thNone, eta: math.Inf(1)}
+	best, bestCant := threat{kind: thNone, eta: math.Inf(1)}, false
 	consider := func(t threat) {
 		if t.eta < best.eta {
-			best = t
+			best, bestCant = t, false
+		}
+	}
+	// considerBig is consider for a threat that may be too big to walk out of: cant says it is (see bctx.cant).
+	considerBig := func(t threat, cant bool) {
+		if t.eta < best.eta {
+			best, bestCant = t, cant
 		}
 	}
 	lag := botReact * dtBot
@@ -268,7 +279,9 @@ func (c *bctx) findThreat() threat {
 					ax, ay := c.safeDir(hz)
 					safe = &[2]float64{ax, ay}
 				}
-				consider(threat{thChase, 0.3, safe[0], safe[1]})
+				// faster than the bot walks and already at its heels: no walking gets away from it
+				gap := math.Hypot(rx, ry) - h.r - c.pr
+				considerBig(threat{thChase, 0.3, safe[0], safe[1]}, math.Hypot(h.vx, h.vy) >= c.g.walkSpeedOf(p)*0.95 && gap <= 80)
 			}
 			continue
 		}
@@ -442,16 +455,18 @@ func (c *bctx) findThreat() threat {
 		in := cfg.Charizard.Gigantamax.Inferno
 		if bl.Phase == birdDiving && math.Hypot(p.X-bl.AnchorX, p.Y-bl.AnchorY) <= in.ExplosionRadius+c.pr+60 {
 			bx, by := bl.AnchorX, bl.AnchorY
-			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-bx, y-by) <= in.ExplosionRadius+c.pr+60 })
-			consider(threat{thFire, math.Max(0.3, math.Hypot(math.Hypot(bx-bl.X, by-bl.Y), bl.Z)/in.DiveSpeed), ax, ay})
+			ax, ay, out := c.wayOutT(func(x, y float64) bool { return math.Hypot(x-bx, y-by) <= in.ExplosionRadius+c.pr+60 })
+			eta := math.Max(0.3, math.Hypot(math.Hypot(bx-bl.X, by-bl.Y), bl.Z)/in.DiveSpeed)
+			considerBig(threat{thFire, eta, ax, ay}, out > eta)
 		}
 	}
 	if f.Kind == rowlet && f.BirdDive { // Brave Bird coming down: leave the place it is aimed at (it follows the foe until it is lock_distance away, so only the way out of its burst counts)
 		bb := cfg.Rowlet.BraveBird
 		bx, by := f.BirdTX, f.BirdTY
 		if bb.Reach.hits(p) && math.Hypot(p.X-bx, p.Y-by) <= bb.ExplosionRadius+c.pr+60 {
-			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-bx, y-by) <= bb.ExplosionRadius+c.pr+60 })
-			consider(threat{thFire, math.Max(0, math.Hypot(math.Hypot(bx-f.X, by-f.Y), f.Z)/bb.DiveSpeed-lag), ax, ay})
+			ax, ay, out := c.wayOutT(func(x, y float64) bool { return math.Hypot(x-bx, y-by) <= bb.ExplosionRadius+c.pr+60 })
+			eta := math.Max(0, math.Hypot(math.Hypot(bx-f.X, by-f.Y), f.Z)/bb.DiveSpeed-lag)
+			considerBig(threat{thFire, eta, ax, ay}, out > eta)
 		}
 	}
 	for _, w := range g.Wells { // the pull Brave Bird leaves where it landed (Juggled marks it: a Shadow Ball's is not dodged): keep out of its reach
@@ -467,8 +482,9 @@ func (c *bctx) findThreat() threat {
 	for _, ic := range g.Icicles { // an icicle coming down: it shows where, so leave that place before it lands
 		if gl := cfg.Vulpix.Glaciate; g.side(ic.Owner) != g.side(c.me) && ic.T-lag <= botHorizon && math.Hypot(p.X-ic.X, p.Y-ic.Y) <= gl.Icicle.DamageRadius+c.pr+20 {
 			ix, iy, ir := ic.X, ic.Y, gl.Icicle.DamageRadius+c.pr+20
-			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-ix, y-iy) <= ir })
-			consider(threat{thFire, math.Max(0, ic.T-lag), ax, ay})
+			ax, ay, out := c.wayOutT(func(x, y float64) bool { return math.Hypot(x-ix, y-iy) <= ir })
+			eta := math.Max(0, ic.T-lag)
+			considerBig(threat{thFire, eta, ax, ay}, out > eta)
 		}
 	}
 	for _, z := range g.Fires { // burning ground: it burns whoever stands in it every half second, so get out of it
@@ -507,6 +523,7 @@ func (c *bctx) findThreat() threat {
 		ax, ay := unit(p.X-f.X, p.Y-f.Y) // a chain is on: the next dash is coming
 		consider(threat{thRush, 0.3, ax, ay})
 	}
+	c.cant = bestCant
 	return best
 }
 
@@ -565,6 +582,12 @@ func (c *bctx) walksIntoFlames(in Input) bool {
 // wayOutOf is the 8-way stick step that gets the bot out of an area soonest (inside(x, y) says where it is), walking at
 // its own speed; none of them does it in time then it is the one that gets nearest to being out (the last it tries).
 func (c *bctx) wayOutOf(inside func(x, y float64) bool) (float64, float64) {
+	ax, ay, _ := c.wayOutT(inside)
+	return ax, ay
+}
+
+// wayOutT is wayOutOf with the time (seconds, +Inf when there is no way out within two) the walk takes to be out of `inside`.
+func (c *bctx) wayOutT(inside func(x, y float64) bool) (float64, float64, float64) {
 	const step = 0.05
 	speed := c.g.walkSpeedOf(c.p)
 	bestT, bx, by := math.Inf(1), 0.0, 0.0
@@ -580,9 +603,10 @@ func (c *bctx) wayOutOf(inside func(x, y float64) bool) (float64, float64) {
 		}
 	}
 	if math.IsInf(bestT, 1) {
-		return unit(-c.ux, -c.uy) // walled in: away from the opponent
+		ax, ay := unit(-c.ux, -c.uy) // walled in: away from the opponent
+		return ax, ay, bestT
 	}
-	return bx, by
+	return bx, by, bestT
 }
 
 // botHorizon is how far ahead (seconds) the bot looks for things coming at it.

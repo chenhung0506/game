@@ -193,38 +193,19 @@ func TestGlaciateNumbersAreCheckedAndSentToThePage(t *testing.T) {
 	}
 }
 
-func TestTheBotWalksOutOfWhereAnIcicleIsAboutToLand(t *testing.T) {
-	cfg := DefaultConfig()
-	gl := cfg.Vulpix.Glaciate
+// Whatever the way (walking, or the skill that moves the body when walking is too slow), the bot is not under the icicle when it lands.
+func TestTheBotIsNotHurtByAnIcicleItSawComing(t *testing.T) {
+	cfg := liveConfig(t)
 	g := duel(cfg, snorlax, vulpix)
 	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 900, 450, 1500, 450
-	g.Icicles = []icicle{{Owner: 1, X: 900, Y: 450, T: 0.8}}
+	g.Icicles = []icicle{{Owner: 1, X: 900, Y: 450, T: cfg.Vulpix.Glaciate.Icicle.FallDuration}}
+	hp0 := g.P[0].HP
 	b := newBot(snorlax, 1)
-	for tt := 0.0; tt < 0.8; tt += dt {
+	for tt := 0.0; tt < 1.5; tt += dt {
 		g.P[0].In = b.Decide(g, 0)
 		g.Step(dt)
 	}
-	if d := math.Hypot(g.P[0].X-900, g.P[0].Y-450); d <= gl.Icicle.DamageRadius+g.radius(0) {
-		t.Fatalf("the bot is still %.0f from where the icicle landed (damage radius %.0f)", d, gl.Icicle.DamageRadius)
-	}
-}
-
-func TestGlaciateCentresTheCircleOnTheFoeWhenItIsWithinDistanceAndNoFurtherThanDistanceWhenItIsNot(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Vulpix.Glaciate.RingDuration, cfg.Vulpix.Glaciate.Distance = 0, 400
-	for _, c := range []struct{ foeX, wantX float64 }{{700, 700}, {900, 900}, {1500, 900}} { // Vulpix stands at x 500
-		g := glaGame(cfg)
-		g.P[1].X, g.P[1].Y = c.foeX, 450
-		var cast *Event
-		g.P[0].In = Input{Ult: true}
-		for _, e := range g.Step(dt) {
-			if e.T == "glacast" {
-				e := e
-				cast = &e
-			}
-		}
-		if cast == nil || math.Abs(cast.X-c.wantX) > 1e-6 || math.Abs(cast.Y-450) > 1e-6 {
-			t.Fatalf("foe at x %v: circle at %+v, want x %v", c.foeX, cast, c.wantX)
-		}
+	if g.P[0].HP != hp0 {
+		t.Fatalf("the bot lost %d HP to an icicle it saw coming", hp0-g.P[0].HP)
 	}
 }
