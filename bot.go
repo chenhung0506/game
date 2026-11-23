@@ -446,6 +446,24 @@ func (c *bctx) findThreat() threat {
 			consider(threat{thFire, math.Max(0.3, math.Hypot(math.Hypot(bx-bl.X, by-bl.Y), bl.Z)/in.DiveSpeed), ax, ay})
 		}
 	}
+	if f.Kind == rowlet && f.BirdDive { // Brave Bird coming down: leave the place it is aimed at (it follows the foe until it is lock_distance away, so only the way out of its burst counts)
+		bb := cfg.Rowlet.BraveBird
+		bx, by := f.BirdTX, f.BirdTY
+		if bb.Reach.hits(p) && math.Hypot(p.X-bx, p.Y-by) <= bb.ExplosionRadius+c.pr+60 {
+			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-bx, y-by) <= bb.ExplosionRadius+c.pr+60 })
+			consider(threat{thFire, math.Max(0, math.Hypot(math.Hypot(bx-f.X, by-f.Y), f.Z)/bb.DiveSpeed-lag), ax, ay})
+		}
+	}
+	for _, w := range g.Wells { // the pull Brave Bird leaves where it landed (Juggled marks it: a Shadow Ball's is not dodged): keep out of its reach
+		if !w.Juggled || g.side(w.Owner) == g.side(c.me) {
+			continue
+		}
+		if math.Hypot(p.X-w.X, p.Y-w.Y) <= w.R+c.pr+30 {
+			wx, wy, wr := w.X, w.Y, w.R+c.pr+30
+			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-wx, y-wy) <= wr })
+			consider(threat{thFire, 0.2, ax, ay})
+		}
+	}
 	for _, z := range g.Fires { // burning ground: it burns whoever stands in it every half second, so get out of it
 		fmh := cfg.Charizard.SeismicToss.FireMaxHeight
 		if z.Ult { // ground a Gigantamax Charizard lit burns by its own numbers

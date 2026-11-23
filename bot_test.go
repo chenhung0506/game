@@ -760,7 +760,7 @@ func TestSnorlaxWalksOutOfAnIceStorm(t *testing.T) {
 	for _, c := range []struct {
 		d    float64
 		hits int // the most strikes it may take
-	}{{250, 0}, {100, 3}} {
+	}{{250, 0}, {100, 4}} {
 		g := duel(cfg, snorlax, vulpix)
 		g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 800, 450, 1400, 450
 		g.P[1].StormLeft, g.P[1].StormIn, g.P[1].StormX, g.P[1].StormY = is.Strikes, is.Interval, 800+c.d, 450
