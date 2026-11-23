@@ -126,7 +126,7 @@ let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale
 let kickText = { ash: { slide: '閃身步', kick: '浪子踢球' }, machamp: { slide: '閃身步', kick: '飛膝踢' } }; // the names shown for the two parts of the High Jump Kick, from 'hi'
 let upText = { slide: '閃身步', punch: '上鉤拳' }, upWarn = 0; // the names shown for the two parts of Machamp's Uppercut, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
-let gvCfg = { hw: 50, wo: 100, wi: 100, hr: 40, len: 320, w: 80, tw: 20, rs: 0.8, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
+let gvCfg = { warn: 1, hw: 50, wo: 100, wi: 100, hr: 40, len: 320, w: 80, tw: 20, rs: 0.8, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
 let megaCfg = { fevery: 0, charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let lpCfg = { charge: 1.2, dist: 700, radius: 120, warn: 1, fscale: 1, lscale: 1, lrad: 250 }; // the Gigantamax Machamp's Lightning Punch, from 'hi'
 let gFistCfg = { radius: 26, hp: 20, life: 0.2 }; // the Gigantamax Machamp's fists, from 'hi'
@@ -2783,7 +2783,8 @@ function drawGiantVine(b) {
     for (let q = 0; q < 5; q++) { const t = q * 0.6 + 0.2 + (b.ix || 0) * 0.37, r = w * 0.62; ctx.fillStyle = '#8a8548'; ctx.beginPath(); ctx.ellipse(Math.cos(t) * r, Math.sin(t) * r * 0.5 - 2, 7, 5, t, 0, 7); ctx.fill(); }
   });
   const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
-  const warn = (k) => { // the shape it will hit, on the ground, filling with colour as the time runs out
+  const warn = (k) => { // the shape it will hit, on the ground, filling with colour as the time runs out (unless giant_vines.show_warning is off)
+    if (!gvCfg.warn) return;
     ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(base);
     ctx.fillStyle = `rgba(255,70,40,${0.12 + 0.3 * k})`; ctx.strokeStyle = `rgba(255,${120 + 80 * pulse | 0},60,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(0, -gvCfg.w / 2); ctx.lineTo(gvCfg.len, -gvCfg.tw / 2); ctx.lineTo(gvCfg.len, gvCfg.tw / 2); ctx.lineTo(0, gvCfg.w / 2); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();

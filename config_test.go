@@ -289,3 +289,24 @@ func TestTheBraveBirdPullDurationReachesThePage(t *testing.T) {
 		t.Fatalf("hi.bbird.pull = %v, want 3.5", v["pull"])
 	}
 }
+
+// giant_vines.show_warning decides whether the page draws the shape each vine will hit: on by default, and the page is told.
+func TestGiantVinesWarningIsOnByDefaultAndTheSwitchReachesThePage(t *testing.T) {
+	if !DefaultConfig().Chikorita.GiantVines.ShowWarning {
+		t.Fatal("the warning is off by default")
+	}
+	for _, on := range []bool{true, false} {
+		cfg := DefaultConfig()
+		cfg.Chikorita.GiantVines.ShowWarning = on
+		srv := httptest.NewServer(newMux(cfg))
+		hi := next(t, dialIn(t, srv, "mobile"), "hi")
+		srv.Close()
+		want := 0.0
+		if on {
+			want = 1
+		}
+		if v := hi["gvine"].(map[string]any); v["warn"] != want {
+			t.Fatalf("show_warning %v: hi.gvine.warn = %v, want %v", on, v["warn"], want)
+		}
+	}
+}

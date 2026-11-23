@@ -265,7 +265,7 @@
       "swing_duration": 0.25,
       "trunk_length": 600,
       "trunk_width": 70,
-      "tip_width": 15,
+      "tip_width": 25,
       "trunk_scale": 0.8,
       "damage": 8,
       "slow_duration": 3,
@@ -273,7 +273,8 @@
       "stun_hits": 5,
       "stun_duration": 1,
       "ring_scale": 0.8,
-      "linger": 0.7
+      "linger": 0.7,
+      "show_warning": false
     },
     "leaf_slash": {
       "min_height": 0,

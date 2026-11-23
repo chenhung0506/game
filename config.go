@@ -542,6 +542,7 @@ type Config struct {
 			StunDuration   float64 `json:"stun_duration"` // 0 = no stun
 			RingScale      float64 `json:"ring_scale"`    // looks only: the size of the rings that close in on a vine as it stands up (the Thousand Volt's ring_duration look)
 			Linger         float64 `json:"linger"`
+			ShowWarning    bool    `json:"show_warning"` // false: the shape each vine will hit is not drawn on the ground (the rings, the vine rising and the hit are; the bot still reads where it will hit)
 		} `json:"giant_vines"`
 	} `json:"chikorita"`
 	Vulpix struct {
@@ -1140,6 +1141,7 @@ func DefaultConfig() Config {
 	gv.FollowSpeed, gv.TerminalTime, gv.HeadRadius, gv.HeadWidth, gv.WormOut, gv.WormIn = 260, 4, 40, 50, 100, 100
 	gv.Count, gv.RingRadius, gv.SpreadTime, gv.Interval, gv.ChargeDuration, gv.SwingDuration = 10, 200, 0.4, 0.25, 0.5, 0.2
 	gv.TrunkLength, gv.TrunkWidth, gv.TipWidth, gv.TrunkScale, gv.Damage, gv.SlowDuration, gv.Slow, gv.Linger = 320, 80, 20, 1, 8, 3, 0.5, 0.7
+	gv.ShowWarning = true
 	gv.StunHits, gv.StunDuration, gv.RingScale = 5, 1, 0.8
 	c.Vulpix.MaxHP = 100
 	c.Vulpix.WalkSpeed = 160
