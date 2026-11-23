@@ -464,6 +464,13 @@ func (c *bctx) findThreat() threat {
 			consider(threat{thFire, 0.2, ax, ay})
 		}
 	}
+	for _, ic := range g.Icicles { // an icicle coming down: it shows where, so leave that place before it lands
+		if gl := cfg.Vulpix.Glaciate; g.side(ic.Owner) != g.side(c.me) && ic.T-lag <= botHorizon && math.Hypot(p.X-ic.X, p.Y-ic.Y) <= gl.Icicle.DamageRadius+c.pr+20 {
+			ix, iy, ir := ic.X, ic.Y, gl.Icicle.DamageRadius+c.pr+20
+			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-ix, y-iy) <= ir })
+			consider(threat{thFire, math.Max(0, ic.T-lag), ax, ay})
+		}
+	}
 	for _, z := range g.Fires { // burning ground: it burns whoever stands in it every half second, so get out of it
 		fmh := cfg.Charizard.SeismicToss.FireMaxHeight
 		if z.Ult { // ground a Gigantamax Charizard lit burns by its own numbers
@@ -1179,6 +1186,11 @@ func (b *Bot) vulpix(c *bctx) Input {
 		return c.move(th.ax, th.ay)
 	}
 	danger := f.Kind == rowlet && f.ArrowT > 0
+	if gl, u := g.cfg.Vulpix.Glaciate, g.cfg.Vulpix.Ultimate; p.Charge >= u.Max && p.UltT == 0 && !danger && gl.Reach.hits(f) && c.dist <= gl.Distance+gl.Radius*0.8 {
+		in := c.stay() // the ultimate is charged and the foe is where the icicles will come down: Glaciate
+		in.Ult = true
+		return in
+	}
 	stormReach := is.FollowSpeed*float64(is.Strikes)*is.Interval + is.Radius + c.fr
 	if p.StormCD == 0 && p.StormLeft == 0 && is.Reach.hits(f) && c.dist <= stormReach && !danger && b.rng.Float64() < 0.7 {
 		in := c.stay()

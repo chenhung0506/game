@@ -286,6 +286,8 @@ func (g *Game) blockByPillars(i int) {
 			if b.K == ballStone {
 				rt := g.brawler(b.Owner).RockTomb
 				reach, r = rt.Reach, rt.StoneRadius
+			} else if b.Rad > 0 { // one of Glaciate's icicles
+				reach, r = g.cfg.Vulpix.Glaciate.Reach, b.Rad
 			}
 			if !reach.hits(p) {
 				continue

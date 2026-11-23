@@ -103,13 +103,13 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟', '鯉魚王', '小智', '怪力', '梗鬼'];
 const FORMS = [...NAMES, '紅色暴鯉龍']; // every kind a player can be in: Magikarp becomes the last one (nobody picks it)
-const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭・大藤蔓（絕招）', '冰山滑行・冰風暴・急凍光線', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球'];
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭・大藤蔓（絕招）', '冰山滑行・冰風暴・急凍光線・冰封世界（絕招）', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球'];
 const HELP = [
   '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝千萬伏特（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能放；朝四周放出一圈閃電，之後追著敵人跑、碰到會擊退，時間到全部爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）',
   '你是噴火龍　移動 WASD　空白鍵＝飛行（一段時間在半空，移動更快，但仍會被電球和急凍拳打到）　J＝噴火（自動朝敵人噴出一串小火球，可以邊走邊噴）　K＝地球上投（全身著火朝按住的方向衝刺，撞到敵人就抓上天再摔下）　L＝極巨化（絕招，蓄能滿了才能放：變成又大又壯的極巨化噴火龍一段時間，血量、速度和體型大增，空白鍵的飛行換成「極巨地獄滅焰」（站定召喚一隻燃燒的火焰鳥，飛上天後朝敵人俯衝，落地爆炸、把敵人炸上天並留下一片火海），噴火和地球上投換成更強的數值，火球更大、顆數更少，摔下去留下的火更大片；變身時鏡頭會拉到最遠，時間到變回原形，血量依比例縮回）',
   '你是菊草葉　移動 WASD　空白鍵＝葉刃連斬（朝按住的方向跳一大步，落地不傷人，接著甩動頭上的葉子連斬數下，每一下都朝敵人前進，葉子掃到的人會受傷）　J＝飛葉快刀（在身邊灑出一堆樹葉，各自等一下後朝敵人射出）　K＝藤鞭（朝搖桿方向左右各揮出一條藤鞭在前方會合，被打中的敵人一段時間不能走路也不能用位移技能）　L＝大藤蔓（絕招，蓄能滿了才能放；一根粗藤蔓從地底追著敵人跑，碰到敵人或時間到就在那裡冒出來，周圍一圈大藤蔓依序衝出地面，各自鎖定敵人朝下拍打，打中的人受傷、變慢，被藤蔓打中好幾次還會被打暈；整個過程無法移動）',
-  '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）',
+  '你是六尾　移動 WASD　空白鍵＝冰山滑行（踩著冰山快速滑動，停不下來，WASD 控制方向；經過的地面結冰，站在自己的冰上走得更快、敵人踩上去會變慢；冰山撞到敵人或時間到就爆炸）　J＝冰風暴（風暴從身上出發追著敵人跑，定時打擊，每打中幾次就把敵人冰住）　K＝急凍光線（站定不動，WASD 或搖桿改成移動光線落點，光線不傷人，掃過的地面會長出冰柱擋住敵人）　L＝冰封世界（蓄能滿才能放：短暫集氣後，在前方的圓形範圍內不斷從天上砸下冰錐，砸中的敵人受傷並變慢，冰錐會留在場上擋住敵人的走位，可以被打碎）',
   '你是木木梟　移動 WASD　一直飛在空中，只有打得到這個高度的招式才打得到你　空白鍵＝空氣斬（朝按住的方向衝出一道半月形弧線，彎向敵人那一側，沿途朝最近的敵人射出一道道白色的空氣斬擊，打得到貼地的敵人）　J＝箭雨（朝敵人扇形射出一排綠色弓箭，射中的敵人受傷並變慢）　K＝龍捲風（蓄力後在前方放出龍捲風，自動追著敵人跑，捲到就把敵人捲上天旋轉、最後摔下來；龍捲風可以被打壞）　L＝神鳥猛攻（絕招，蓄能滿才能放：先定身集氣，飛上高空、身上的鳥形光芒愈來愈大，然後朝敵人俯衝，撞擊地面爆炸，把敵人打上天、在空中動彈不得）',
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
   '你是真新鎮小智　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人）　L＝百萬噸拳擊（絕招，蓄能滿了才能放；天色會變暗。朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），蓄力後半段畫面會閃爍，朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
@@ -212,7 +212,7 @@ const beamSlots = () => (snap ? [...snap.p.keys()].filter((i) => hasBeam(snap.p[
 const slotsOf = (k) => (snap ? [...snap.p.keys()].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; kickText = m.kicktext; gmaxCfg = m.gmax; cgmaxCfg = m.cgmax; upText = m.uptext; upWarn = m.upwarn; gengarCfg = m.gengar; fistCfgs = m.fist; gFistCfg = m.gfist; lpCfg = m.glp; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; kickText = m.kicktext; gmaxCfg = m.gmax; cgmaxCfg = m.cgmax; upText = m.uptext; upWarn = m.upwarn; gengarCfg = m.gengar; fistCfgs = m.fist; gFistCfg = m.gfist; lpCfg = m.glp; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; glaCfg = m.glaciate; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (PLAY === 'dummy' && !!m.full !== fullWant) send({ fullcharge: fullWant }); // the practice room starts without it: say what the box says
     if (m.on || (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1])) return; // a match is on: a refused pick changes nothing
@@ -245,6 +245,7 @@ ws.onmessage = (e) => {
       fx.push({ ...ev, age: 0 });
       if (ev.t === 'slam') shake = 16;
       if (ev.t === 'gslam') shake = 12;
+      if (ev.t === 'glaslam') shake = Math.max(shake, 4);
       if (ev.t === 'thunder') { shake = 10; flashT = 4 * tvoltCfg.fevery; } // a strike lands: one white and black flash
       if (ev.t === 'explode') shake = 14;
       if (ev.t === 'ult') shake = 10;
@@ -581,7 +582,7 @@ const PAD = [
   { main: ['跳躍', 'skill'], small: [['死光', 'beam'], ['冰拳', 'punch']] }, // Snorlax
   { main: ['飛行', 'skill'], small: [['噴火', 'fire'], ['上投', 'toss']], ult: ['極巨化', 'ult'] }, // Charizard: Z turns it into the Gigantamax Charizard; the three skills keep their names and buttons
   { main: ['葉刃', 'skill'], small: [['飛葉', 'razor'], ['藤鞭', 'vine', true]], ult: ['大藤蔓', 'ult'] }, // Chikorita
-  { main: ['冰山', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']] }, // Vulpix
+  { main: ['冰山', 'skill'], small: [['冰風暴', 'storm'], ['冰光線', 'freeze']], ult: ['冰封世界', 'ult'] }, // Vulpix
   { main: ['空氣斬', 'skill'], small: [['箭雨', 'arrow'], ['龍捲風', 'twister']], ult: ['神鳥猛攻', 'ult'] }, // Rowlet
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
   { main: ['飛膝踢', 'skill'], small: [['拔樹', 'tree'], ['百裂拳', 'comet']], ult: ['百萬噸', 'ult'] }, // Ash: the kick is the main skill (sent as Skill, personsInput on the server sorts out what it is), the tree and the Comet Punch the small ones, the Megaton Punch the ultimate
@@ -1601,6 +1602,7 @@ function drawTelegraph() {
   for (const si of slotsOf(7)) drawMegaCharge(snap.p[si], disp[si]);
   for (const si of slotsOf(0)) drawVoltCharge(si);
   for (const si of slotsOf(5)) drawBirdCharge(si);
+  for (const si of slotsOf(4)) drawGlaciateCharge(si);
   if (aiming && AIMED[snap.p[you].k] === aiming.name) drawAimFan(snap.p[you], disp[you]);
 }
 // The fan of an aimed skill the player is choosing, drawn for them only (the opponent's page never gets it; it is not sent) until the cast, when the
@@ -1756,7 +1758,7 @@ function drawUltRing(f) {
 function drawBall(b) {
   if (b.k === 1) { drawFireBall(b); return; }
   if (b.k === 2) { drawRazorLeaf(b); return; }
-  if (b.k === 3) { drawPillar(b); return; }
+  if (b.k === 3) { if (b.r > 0) drawIcicle(b); else drawPillar(b); return; } // an icicle of Glaciate carries its own radius
   if (b.k === 4) { drawArrow(b); return; }
   if (b.k === 10) { drawAirSlash(b); return; }
   if (b.k === 5) { drawTornado(b); return; }
@@ -2410,6 +2412,7 @@ let gvBits = [];
 // Rowlet's Brave Bird. First the rings of the Megaton Punch close in on it; then, as it climbs, a bird made of light grows out of its middle (bigger
 // as the charge goes on) with its head turned to the foe; in the dive that bird is at full size, its head along the way it dives, with a streak of light behind it.
 // The bird flashes between green and black, and the sky flickers between overcast and bright for as long as it lasts (drawBirdSky).
+let glaCfg = { ring: 0.8, dur: 4, radius: 300, rs: 1, fall: 0.8, dmgr: 100, hp: 30, irad: 30, life: 8, scale: 1 }; // Glaciate, from 'hi'
 let bbCfg = { pull: 0, ring: 0.5, charge: 1.5, rs: 1, ls: 1, lf: 1, dark: 0.5, fevery: 6, falpha: 0.3 }; // from 'hi'
 const BIRD_PAL = [
   { main: '#6ff35a', edge: '#e4ffa8', glow: '90,255,110', ray: 'rgba(110,255,100,.55)', deep: '#1c8a2b' }, // grass green with a pale edge
@@ -3603,6 +3606,114 @@ function drawPillar(b) {
   });
 }
 
+// ---- Glaciate (Vulpix's ultimate) ----
+// The outline of an icicle, x in units of its radius, y in units of its height (up is negative); the falling one is the same shape tip down.
+const ICICLE = [[-1, 0], [-0.62, -0.34], [-0.4, -0.7], [-0.14, -0.92], [0, -1], [0.16, -0.86], [0.42, -0.62], [0.66, -0.3], [1, 0]];
+function iciclePath(r, h) {
+  ctx.beginPath();
+  ICICLE.forEach(([x, y], n) => { const py = y * h; if (n) ctx.lineTo(x * r, py); else ctx.moveTo(x * r, py); });
+  ctx.closePath();
+}
+// The icicle coming down is a diamond: the standing one with its mirror image on top of it (tip down, base to base, then tip up), its sides pared
+// in to `DIAMOND_W` of the width. Each half is `hh` tall (a long, narrow spear), the bottom tip at y = 0.
+const DIAMOND_W = 0.7;
+const DIAMOND_ROUND = 0.6; // how much of the first edge on each side of the left and right corners is rounded off (0: sharp); the width itself does not change
+function diamondPath(r, hh) {
+  const w = r * DIAMOND_W, n = ICICLE.length - 1;
+  const lo = ICICLE.map(([x, y]) => [x * w, (-1 - y) * hh]); // the lower half, tip down
+  const up = ICICLE.map(([x, y]) => [x * w, -hh + y * hh]); // the upper half, tip up
+  const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  // a corner (the widest point, where the halves meet) taken round: in along the lower edge, through the corner going straight up (so it is
+  // exactly as wide as before, with no point), and out along the upper edge. `from` and `to` are on the two edges; ctx goes from `from` to `to`.
+  const around = (from, c, to, dir) => {
+    const e = Math.abs(from[1] - c[1]) * 0.9, k = 0.6;
+    ctx.bezierCurveTo(from[0] + (c[0] - from[0]) * k, from[1] + (c[1] - from[1]) * k, c[0], c[1] + dir * e, c[0], c[1]);
+    ctx.bezierCurveTo(c[0], c[1] - dir * e, to[0] + (c[0] - to[0]) * k, to[1] + (c[1] - to[1]) * k, to[0], to[1]);
+  };
+  const t = DIAMOND_ROUND, cl = lo[0], cr = lo[n]; // the left and right corners
+  const lowL = lerp(cl, lo[1], t), lowR = lerp(cr, lo[n - 1], t), upL = lerp(cl, up[1], t), upR = lerp(cr, up[n - 1], t);
+  ctx.beginPath(); ctx.moveTo(lowL[0], lowL[1]);
+  for (let i = 1; i < n; i++) ctx.lineTo(lo[i][0], lo[i][1]); // along the lower half, down to the tip and back up
+  ctx.lineTo(lowR[0], lowR[1]); around(lowR, cr, upR, 1);
+  for (let i = n - 1; i >= 1; i--) ctx.lineTo(up[i][0], up[i][1]); // along the upper half, up to the tip and back down
+  ctx.lineTo(upL[0], upL[1]); around(upL, cl, lowL, -1);
+  ctx.closePath();
+}
+// The gathering: icy blue rings closing in on Vulpix (the body, on the ground).
+const RING_ICE = ['40,110,170', '150,215,255', '60,130,190'];
+function drawGlaciateCharge(i) {
+  const p = snap.p[i], d = disp[i];
+  if (!(p.uct > 0)) return;
+  chargeRings(d.x, d.y, glaCfg.ring > 0 ? 1 - p.uct / glaCfg.ring : 1, glaCfg.rs, RING_ICE);
+}
+// The circle the icicles are called into, from the moment it is cast until the last one has landed: a dashed frosty ring on the ground.
+function drawGlaciateArea(f) {
+  const total = glaCfg.dur + glaCfg.fall + 0.3, k = Math.min(1, f.age / total), a = Math.min(1, (1 - k) * 4) * Math.min(1, f.age * 5);
+  ctx.save(); ctx.translate(f.x, f.y);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, f.r); g.addColorStop(0, `rgba(170,225,255,${0.06 * a})`); g.addColorStop(1, `rgba(120,200,255,${0.22 * a})`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, f.r, 0, 7); ctx.fill();
+  for (const [col, w] of [[`rgba(40,110,170,${0.55 * a})`, 6], [`rgba(210,240,255,${0.95 * a})`, 3]]) { // a dark underlay under the bright line, so it shows on sand
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash([18, 12]); ctx.lineDashOffset = -performance.now() / 40;
+    ctx.beginPath(); ctx.arc(0, 0, f.r, 0, 7); ctx.stroke();
+  }
+  ctx.restore();
+}
+// Icicles on their way down: where each will land (a ring that fills as it nears), and the icicle itself coming down tip first.
+function drawIcicles() {
+  for (const ic of snap.ic || []) {
+    const k = Math.min(1, Math.max(0, 1 - ic.t / Math.max(glaCfg.fall, 1e-6)));
+    const r = glaCfg.irad * glaCfg.scale, hh = r * 4.4, drop = 900 * (1 - k) * (1 - k); // each half of the diamond is 4.4 radii long: a long spear, not a gem
+    ctx.save(); ctx.translate(ic.x, ic.y);
+    ctx.fillStyle = `rgba(120,200,255,${0.1 + 0.3 * k})`; ctx.beginPath(); ctx.arc(0, 0, glaCfg.dmgr, 0, 7); ctx.fill();
+    for (const [col, w] of [[`rgba(40,110,170,${0.5 + 0.4 * k})`, 5], [`rgba(220,245,255,${0.7 + 0.3 * k})`, 2.5]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(0, 0, glaCfg.dmgr * (0.35 + 0.65 * k), 0, 7); ctx.stroke();
+    }
+    ctx.restore();
+    upright(ic.x, ic.y, () => {
+      ctx.translate(0, -drop);
+      const w = r * DIAMOND_W, g = ctx.createLinearGradient(0, -2 * hh, 0, 0); g.addColorStop(0, 'rgba(235,250,255,0.95)'); g.addColorStop(0.5, 'rgba(120,190,240,0.95)'); g.addColorStop(1, 'rgba(235,250,255,0.95)');
+      ctx.fillStyle = g; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 1.8; ctx.lineJoin = 'round';
+      diamondPath(r, hh); ctx.fill(); ctx.stroke();
+      ctx.save(); diamondPath(r, hh); ctx.clip(); // the shading stays inside the rounded outline
+      ctx.fillStyle = 'rgba(40,100,170,0.28)'; ctx.beginPath(); ctx.moveTo(0, -2 * hh); ctx.lineTo(w, -hh); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill(); // the face turned away from the light
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, -2 * hh); ctx.lineTo(0, 0); ctx.moveTo(-w, -hh); ctx.lineTo(w, -hh); ctx.stroke();
+    });
+  }
+}
+// The icicle that stays: a tall crystal on the ground, worn down by hits (cracks) and fading as it melts.
+function drawIcicle(b) {
+  const r = b.r * (b.sc || 1), h = r * 3.4, melt = Math.min(1, b.lf / 1), a = 0.4 + 0.55 * melt, hpk = Math.max(0, b.hp) / Math.max(glaCfg.hp, 1);
+  upright(b.x, b.y, () => {
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, 0, r * 1.2, r * 0.5, 0, 0, 7); ctx.fill();
+    ctx.translate(0, -(b.z || 0)); // a tornado carries it up: the shadow stays on the ground
+    const g = ctx.createLinearGradient(0, -h, 0, 0); g.addColorStop(0, `rgba(235,250,255,${a})`); g.addColorStop(1, `rgba(110,185,240,${a})`);
+    ctx.fillStyle = g; ctx.strokeStyle = `rgba(255,255,255,${Math.min(1, a + 0.2)})`; ctx.lineWidth = 1.8; ctx.lineJoin = 'round';
+    iciclePath(r, h); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = `rgba(40,100,170,${0.3 * a})`; // the face turned away from the light
+    ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0.16 * r, -0.86 * h); ctx.lineTo(0.42 * r, -0.62 * h); ctx.lineTo(r, 0); ctx.lineTo(0.1 * r, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * a})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(-0.1 * r, 0); ctx.moveTo(-0.4 * r, -0.7 * h); ctx.lineTo(-0.5 * r, 0); ctx.stroke();
+    ctx.strokeStyle = `rgba(30,70,120,${0.8 * a})`; ctx.lineWidth = 1.3; // cracks come with the damage
+    if (hpk < 0.7) { ctx.beginPath(); ctx.moveTo(-0.6 * r, -0.3 * h); ctx.lineTo(-0.2 * r, -0.45 * h); ctx.lineTo(-0.35 * r, -0.15 * h); ctx.stroke(); }
+    if (hpk < 0.35) { ctx.beginPath(); ctx.moveTo(0.5 * r, -0.35 * h); ctx.lineTo(0.05 * r, -0.5 * h); ctx.lineTo(0.3 * r, -0.2 * h); ctx.lineTo(0, -0.08 * h); ctx.stroke(); }
+  });
+}
+// Where an icicle came down: a ring of the reach of the landing, and shards flying out of it.
+function drawIcicleBurst(f) {
+  const k = f.age / 0.45, a = Math.max(0, 1 - k), R = f.r;
+  ctx.save(); ctx.translate(f.x, f.y);
+  ctx.fillStyle = `rgba(170,225,255,${0.3 * a})`; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(40,110,170,${a})`; ctx.lineWidth = 8 * a + 1; ctx.beginPath(); ctx.arc(0, 0, R * Math.min(1, k * 2.2), 0, 7); ctx.stroke();
+  ctx.strokeStyle = `rgba(235,250,255,${a})`; ctx.lineWidth = 4 * a + 1; ctx.stroke();
+  ctx.fillStyle = `rgba(235,250,255,${0.9 * a})`;
+  for (let n = 0; n < 10; n++) { // shards
+    const ang = n / 10 * 6.283 + 0.4, rr = R * (0.3 + 0.7 * Math.min(1, k * 1.8)), s = 6 + 5 * (n % 3);
+    ctx.save(); ctx.translate(Math.cos(ang) * rr, Math.sin(ang) * rr); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.5, s * 0.35); ctx.lineTo(-s * 0.5, -s * 0.35); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  ctx.restore();
+}
+
 // ---- Rowlet ----
 // An air slash: a white crescent of wind, its points trailing behind the way it flies, with a few streaks of air behind it.
 function drawAirSlash(b) {
@@ -4213,6 +4324,7 @@ function frame() {
     drawBalls();
     drawGhostFires();
     drawShadowBalls();
+    drawIcicles();
     drawSilenced();
     drawToss();
     drawInfernoSummon();
@@ -4226,7 +4338,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -4248,6 +4360,8 @@ function frame() {
       else if (f.t === 'lpunch') drawLightningFist(f);
       else if (f.t === 'lpbolt') drawLightningBolt(f);
       else if (f.t === 'gslam') drawGhostSlam(f);
+      else if (f.t === 'glacast') drawGlaciateArea(f);
+      else if (f.t === 'glaslam') drawIcicleBurst(f);
       else if (f.t === 'gwell' || f.t === 'bbwell') drawPullWell(f);
       else if (f.t === 'evolve') drawEvolve(f);
       else if (f.t === 'gvplant') drawGvRing(f);

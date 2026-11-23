@@ -365,6 +365,28 @@
       "interval": 0.5,
       "freeze_hits": 3,
       "freeze_duration": 2
+    },
+    "ultimate": {"max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_ultimate_dealt": 1, "gain_per_second": 1},
+    "glaciate": {
+      "min_height": 0,
+      "max_height": 60,
+      "ring_duration": 0.8,
+      "duration": 5,
+      "count": 30,
+      "radius": 300,
+      "distance": 400,
+      "ring_scale": 1,
+      "icicle": {
+        "fall_duration": 0.8,
+        "damage": 5,
+        "damage_radius": 150,
+        "slow": 0.4,
+        "slow_duration": 2,
+        "hp": 30,
+        "radius": 30,
+        "scale": 1,
+        "duration": 10
+      }
     }
   },
   "rowlet": {

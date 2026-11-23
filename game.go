@@ -451,12 +451,14 @@ type Game struct {
 	P       []Player // slots 0 and 1 are the duel; in a 2v2 slots 2 and 3 join them, so a slot's side is its number mod 2
 	Balls   []Ball
 	Frost   []Frost
-	Fires   []FireZone   // the ground the Seismic Toss set alight
-	Ghosts  []ghostFire  // Gengar's purple flames
-	Shadows []shadowBall // Shadow Balls in the air
-	Wells   []pullWell   // where Shadow Balls burst and are still dragging the opponent in
-	Waves   []wave       // Gyarados's waves running out over the ground (the client draws them from an event)
-	rng     *rand.Rand   // the fire's random spread; tests replace it
+	Fires   []FireZone     // the ground the Seismic Toss set alight
+	Ghosts  []ghostFire    // Gengar's purple flames
+	Shadows []shadowBall   // Shadow Balls in the air
+	Icicles []icicle       // Glaciate's icicles on their way down
+	Casts   []glaciateCast // Glaciates still calling icicles
+	Wells   []pullWell     // where Shadow Balls burst and are still dragging the opponent in
+	Waves   []wave         // Gyarados's waves running out over the ground (the client draws them from an event)
+	rng     *rand.Rand     // the fire's random spread; tests replace it
 	// Ease is each player's handicap in percent (a multiple of easeStep, at most easeMax): its HP and its
 	// walking speed are cut by that much. It survives Reset. Only slots 0 and 1 have one; a teammate has none.
 	Ease [2]int
@@ -561,7 +563,7 @@ func (g *Game) Reset() {
 		}
 		g.P[i] = Player{Kind: g.P[i].Kind, X: x, Y: y, HP: g.maxHP(i), FX: fx, AimX: float64(fx)}
 	}
-	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells = nil, nil, nil, nil, nil, nil, nil
+	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells, g.Icicles, g.Casts = nil, nil, nil, nil, nil, nil, nil, nil, nil
 	for i := range g.P {
 		if g.P[i].Kind == rowlet {
 			g.P[i].Z = g.cfg.Rowlet.FlyHigh // it is always in the air
@@ -649,6 +651,9 @@ func (g *Game) ballRadius(b *Ball) float64 {
 	case ballLeaf:
 		return g.cfg.Chikorita.RazorLeaf.Radius
 	case ballPillar:
+		if b.Rad > 0 { // one of Glaciate's icicles has its own
+			return b.Rad
+		}
 		return g.cfg.Vulpix.FreezeBeam.PillarRadius
 	case ballStone:
 		return g.brawler(b.Owner).RockTomb.StoneRadius
@@ -1182,6 +1187,7 @@ func (g *Game) Step(dt float64) []Event {
 	g.stepGhosts(dt)
 	events = append(events, g.stepShadowBalls(dt)...)
 	g.stepWells(dt)
+	events = append(events, g.stepGlaciates(dt)...)
 	g.stepWaves(dt)
 	events = append(events, g.stepBalls(dt)...)
 	events = append(events, g.stepTwirl(dt)...)

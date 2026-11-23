@@ -237,10 +237,11 @@ func (s *squad) step(now time.Time) []byte {
 		FZ []FireZone   `json:"fz,omitempty"`
 		GH []ghostFire  `json:"gh,omitempty"`
 		SB []shadowBall `json:"sb,omitempty"`
+		IC []icicle     `json:"ic,omitempty"`
 		W  int          `json:"w"`
 		EZ [2]int       `json:"ez"`
 		MX []int        `json:"mx"` // each slot's full HP, which the page draws the bars against
-	}{"s", s.g.P, events, s.g.Balls, s.g.Frost, s.g.Fires, s.g.Ghosts, s.g.Shadows, s.winner, s.g.Ease, mx})
+	}{"s", s.g.P, events, s.g.Balls, s.g.Frost, s.g.Fires, s.g.Ghosts, s.g.Shadows, s.g.Icicles, s.winner, s.g.Ease, mx})
 	return msg
 }
 

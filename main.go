@@ -734,10 +734,11 @@ func (r *room) step(now time.Time) []byte {
 		FZ []FireZone   `json:"fz,omitempty"`
 		GH []ghostFire  `json:"gh,omitempty"`
 		SB []shadowBall `json:"sb,omitempty"`
+		IC []icicle     `json:"ic,omitempty"`
 		W  int          `json:"w"`
 		TM *teamInfo    `json:"tm,omitempty"`
 		EZ [2]int       `json:"ez"`
-	}{"s", r.g.P, events, r.g.Balls, r.g.Frost, r.g.Fires, r.g.Ghosts, r.g.Shadows, r.winner, tm, r.g.Ease})
+	}{"s", r.g.P, events, r.g.Balls, r.g.Frost, r.g.Fires, r.g.Ghosts, r.g.Shadows, r.g.Icicles, r.winner, tm, r.g.Ease})
 	return msg
 }
 
@@ -774,6 +775,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 			"cd": map[string]float64{"fly": cfg.Charizard.Gigantamax.Inferno.Cooldown, "fire": cfg.Charizard.Gigantamax.FireBreath.Cooldown, "toss": cfg.Charizard.Gigantamax.SeismicToss.Cooldown}},
 		"uptext": map[string]string{"slide": cfg.Machamp.Uppercut.SlideText, "punch": cfg.Machamp.Uppercut.PunchText}, "upwarn": b2f(cfg.Machamp.Uppercut.ShowWarning),
 		"kickwarn": map[string]float64{"ash": b2f(cfg.Ash.HighJumpKick.ShowWarning), "machamp": b2f(cfg.Machamp.HighJumpKick.ShowWarning)},
+		"glaciate": map[string]float64{"ring": cfg.Vulpix.Glaciate.RingDuration, "dur": cfg.Vulpix.Glaciate.Duration, "radius": cfg.Vulpix.Glaciate.Radius, "rs": cfg.Vulpix.Glaciate.RingScale, "fall": cfg.Vulpix.Glaciate.Icicle.FallDuration, "dmgr": cfg.Vulpix.Glaciate.Icicle.DamageRadius, "hp": float64(cfg.Vulpix.Glaciate.Icicle.HP), "irad": cfg.Vulpix.Glaciate.Icicle.Radius, "life": cfg.Vulpix.Glaciate.Icicle.Duration, "scale": cfg.Vulpix.Glaciate.Icicle.Scale},
 		"bbird":    map[string]float64{"ring": cfg.Rowlet.BraveBird.RingDuration, "charge": cfg.Rowlet.BraveBird.ChargeDuration, "rs": cfg.Rowlet.BraveBird.RingScale, "ls": cfg.Rowlet.BraveBird.LightScale, "lf": cfg.Rowlet.BraveBird.LeafScale, "pull": cfg.Rowlet.BraveBird.PullDuration, "dark": cfg.Rowlet.BraveBird.SkyDark, "fevery": cfg.Rowlet.BraveBird.FlashEvery, "falpha": cfg.Rowlet.BraveBird.FlashAlpha},
 		"gvine": map[string]float64{"hw": cfg.Chikorita.GiantVines.HeadWidth, "wo": cfg.Chikorita.GiantVines.WormOut, "wi": cfg.Chikorita.GiantVines.WormIn, "hr": cfg.Chikorita.GiantVines.HeadRadius, "len": cfg.Chikorita.GiantVines.TrunkLength, "w": cfg.Chikorita.GiantVines.TrunkWidth, "rs": cfg.Chikorita.GiantVines.RingScale, "tw": cfg.Chikorita.GiantVines.TipWidth,
 			"scale": cfg.Chikorita.GiantVines.TrunkScale, "charge": cfg.Chikorita.GiantVines.ChargeDuration, "swing": cfg.Chikorita.GiantVines.SwingDuration, "linger": cfg.Chikorita.GiantVines.Linger, "ring": cfg.Chikorita.GiantVines.RingRadius},

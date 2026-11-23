@@ -607,6 +607,32 @@ type Config struct {
 			FreezeHits      int     `json:"freeze_hits"`
 			FreezeDuration  float64 `json:"freeze_duration"`
 		} `json:"freeze_beam"`
+		Ultimate Ultimate `json:"ultimate"` // the charge Glaciate (Z) needs
+		// Glaciate (Z): after `ring_duration` seconds of gathering (rooted) Vulpix calls `count` icicles down over `duration` seconds, at random
+		// places in a circle of `radius` whose middle is `distance` ahead of it, toward the nearest foe, as it was when the gathering ended. Each
+		// icicle shows where it will come down for `fall_duration` seconds, then lands: foes within `damage_radius` take `damage` and are
+		// slowed, and it stays standing like a pillar (the other player cannot walk through it) with its own `hp`, `radius` and `scale`, for
+		// `duration` seconds. min_height/max_height are the heights a landing hurts and a standing icicle blocks.
+		Glaciate struct {
+			Reach
+			RingDuration float64 `json:"ring_duration"`
+			Duration     float64 `json:"duration"`
+			Count        int     `json:"count"`
+			Radius       float64 `json:"radius"`
+			Distance     float64 `json:"distance"`
+			RingScale    float64 `json:"ring_scale"` // looks only: how big the gathering rings are drawn
+			Icicle       struct {
+				FallDuration float64 `json:"fall_duration"`
+				Damage       int     `json:"damage"`
+				DamageRadius float64 `json:"damage_radius"`
+				Slow         float64 `json:"slow"` // the share of the walking speed taken off, 0..1
+				SlowDuration float64 `json:"slow_duration"`
+				HP           int     `json:"hp"`       // what a standing icicle takes before it breaks, worn down like a pillar
+				Radius       float64 `json:"radius"`   // the body it blocks the foe with
+				Scale        float64 `json:"scale"`    // looks only: how many times bigger than its radius it is drawn
+				Duration     float64 `json:"duration"` // seconds it stands before it melts
+			} `json:"icicle"`
+		} `json:"glaciate"`
 	} `json:"vulpix"`
 	Rowlet struct {
 		MaxHP     int     `json:"max_hp"`
@@ -1148,6 +1174,12 @@ func DefaultConfig() Config {
 	c.Vulpix.FreezeBeam.PillarRadius = 24
 	c.Vulpix.FreezeBeam.PillarHP = 25
 	c.Vulpix.FreezeBeam.PillarDuration = 8
+	c.Vulpix.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
+	gl := &c.Vulpix.Glaciate
+	gl.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	gl.RingDuration, gl.Duration, gl.Count, gl.Radius, gl.Distance, gl.RingScale = 0.8, 4, 12, 300, 300, 1
+	gl.Icicle.FallDuration, gl.Icicle.Damage, gl.Icicle.DamageRadius, gl.Icicle.Slow, gl.Icicle.SlowDuration = 0.8, 10, 100, 0.4, 2
+	gl.Icicle.HP, gl.Icicle.Radius, gl.Icicle.Scale, gl.Icicle.Duration = 30, 30, 1, 8
 	c.Vulpix.FreezeBeam.Interval = 0.5 // damage, freeze_hits and width stay 0: the beam only blocks and hurts when configured
 	c.Rowlet.MaxHP = 100
 	c.Rowlet.WalkSpeed = 150
@@ -1467,6 +1499,16 @@ func (c Config) validateSkills() error {
 		{"rowlet.ultimate.max", c.Rowlet.Ultimate.Max, 0},
 		{"machamp.ultimate.max", c.Machamp.Ultimate.Max, 0},
 		{"charizard.ultimate.max", c.Charizard.Ultimate.Max, 0},
+		{"vulpix.ultimate.max", c.Vulpix.Ultimate.Max, 0},
+		{"vulpix.glaciate.duration", c.Vulpix.Glaciate.Duration, 0},
+		{"vulpix.glaciate.radius", c.Vulpix.Glaciate.Radius, 0},
+		{"vulpix.glaciate.ring_scale", c.Vulpix.Glaciate.RingScale, 0},
+		{"vulpix.glaciate.icicle.fall_duration", c.Vulpix.Glaciate.Icicle.FallDuration, 0},
+		{"vulpix.glaciate.icicle.damage_radius", c.Vulpix.Glaciate.Icicle.DamageRadius, 0},
+		{"vulpix.glaciate.icicle.hp", float64(c.Vulpix.Glaciate.Icicle.HP), 0},
+		{"vulpix.glaciate.icicle.radius", c.Vulpix.Glaciate.Icicle.Radius, 0},
+		{"vulpix.glaciate.icicle.scale", c.Vulpix.Glaciate.Icicle.Scale, 0},
+		{"vulpix.glaciate.icicle.duration", c.Vulpix.Glaciate.Icicle.Duration, 0},
 		{"chikorita.giant_vines.follow_speed", c.Chikorita.GiantVines.FollowSpeed, 0},
 		{"chikorita.giant_vines.terminal_time", c.Chikorita.GiantVines.TerminalTime, 0},
 		{"chikorita.giant_vines.head_radius", c.Chikorita.GiantVines.HeadRadius, 0},
@@ -1844,6 +1886,14 @@ func (c Config) validateSkills() error {
 		{"ash.ultimate.gain_taken", c.Ash.Ultimate.GainTaken},
 		{"ash.ultimate.gain_dealt", c.Ash.Ultimate.GainDealt},
 		{"ash.ultimate.gain_per_second", c.Ash.Ultimate.GainPerSecond},
+		{"vulpix.ultimate.gain_taken", c.Vulpix.Ultimate.GainTaken},
+		{"vulpix.ultimate.gain_dealt", c.Vulpix.Ultimate.GainDealt},
+		{"vulpix.ultimate.gain_per_second", c.Vulpix.Ultimate.GainPerSecond},
+		{"vulpix.ultimate.gain_ultimate_dealt", c.Vulpix.Ultimate.GainUltDealt},
+		{"vulpix.glaciate.ring_duration", c.Vulpix.Glaciate.RingDuration},
+		{"vulpix.glaciate.distance", c.Vulpix.Glaciate.Distance},
+		{"vulpix.glaciate.icicle.damage", float64(c.Vulpix.Glaciate.Icicle.Damage)},
+		{"vulpix.glaciate.icicle.slow_duration", c.Vulpix.Glaciate.Icicle.SlowDuration},
 		{"chikorita.ultimate.gain_taken", c.Chikorita.Ultimate.GainTaken},
 		{"chikorita.ultimate.gain_dealt", c.Chikorita.Ultimate.GainDealt},
 		{"chikorita.ultimate.gain_per_second", c.Chikorita.Ultimate.GainPerSecond},
@@ -1975,6 +2025,7 @@ func (c Config) validateSkills() error {
 		"vulpix.frost_field":                 c.Vulpix.FrostField.Reach,
 		"vulpix.ice_storm":                   c.Vulpix.IceStorm.Reach,
 		"vulpix.freeze_beam":                 c.Vulpix.FreezeBeam.Reach,
+		"vulpix.glaciate":                    c.Vulpix.Glaciate.Reach,
 		"rowlet.tailwind.slash":              c.Rowlet.Tailwind.Slash.Reach,
 		"rowlet.arrows":                      c.Rowlet.Arrows.Reach,
 		"rowlet.tornado":                     c.Rowlet.Tornado.Reach,
@@ -2017,6 +2068,12 @@ func (c Config) validateSkills() error {
 	}
 	if n := c.Rowlet.Arrows.Count; n > 100 {
 		return fmt.Errorf("rowlet.arrows.count must be at most 100, got %d", n)
+	}
+	if n := c.Vulpix.Glaciate.Count; n < 1 || n > maxIcicles {
+		return fmt.Errorf("vulpix.glaciate.count must be 1..%d, got %d", maxIcicles, n)
+	}
+	if v := c.Vulpix.Glaciate.Icicle.Slow; !(v >= 0 && v <= 1) {
+		return fmt.Errorf("vulpix.glaciate.icicle.slow must be between 0 and 1, got %v", v)
 	}
 	if v := c.Chikorita.GiantVines.Slow; !(v >= 0 && v <= 1) {
 		return fmt.Errorf("chikorita.giant_vines.slow must be between 0 and 1, got %v", v)
