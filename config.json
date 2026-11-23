@@ -4,7 +4,7 @@
     "web": { "min_width": 900, "min_length": 1600, "max_width": 1200, "max_length": 2000, "zoom_in_distance": 700, "zoom_out_distance": 1100, "zoom_speed": 0.5, "sea_margin": 300, "gigantamax_zoom_out": true }
   },
   "pikachu": {
-    "max_hp": 140,
+    "max_hp": 160,
     "walk_speed": 170,
     "radius": 8,
     "volt_tackle": {
@@ -85,14 +85,14 @@
     },
     "ultimate": {
       "max": 100,
-      "gain_taken": 1,
-      "gain_dealt": 1,
+      "gain_taken": 0.4,
+      "gain_dealt": 0.6,
       "gain_ultimate_dealt": 0.4,
       "gain_per_second": 1
     }
   },
   "snorlax": {
-    "max_hp": 230,
+    "max_hp": 240,
     "walk_speed": 120,
     "radius": 30,
     "ice_punch": {
@@ -135,7 +135,7 @@
     }
   },
   "charizard": {
-    "max_hp": 170,
+    "max_hp": 190,
     "walk_speed": 130,
     "radius": 20,
     "fly": {
@@ -176,13 +176,13 @@
       "fire_interval": 0.5,
       "fire_max_height": 12
     },
-    "ultimate": { "max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_ultimate_dealt": 0.3, "gain_per_second": 1 },
+    "ultimate": { "max": 100, "gain_taken": 0.4, "gain_dealt": 0.6, "gain_ultimate_dealt": 0.3, "gain_per_second": 1 },
     "gigantamax": {
       "charge_duration": 1.5,
       "max_hp": 510,
       "walk_speed": 200,
       "radius": 50,
-      "duration": 8,
+      "duration": 10,
       "inferno": {
         "min_height": 0,
         "max_height": 60,
@@ -238,13 +238,13 @@
     }
   },
   "chikorita": {
-    "max_hp": 180,
+    "max_hp": 200,
     "walk_speed": 150,
     "radius": 10,
     "ultimate": {
       "max": 100,
-      "gain_taken": 1,
-      "gain_dealt": 1,
+      "gain_taken": 0.4,
+      "gain_dealt": 0.6,
       "gain_ultimate_dealt": 0.4,
       "gain_per_second": 1
     },
@@ -320,7 +320,7 @@
     }
   },
   "vulpix": {
-    "max_hp": 180,
+    "max_hp": 170,
     "walk_speed": 140,
     "radius": 14,
     "frost_field": {
@@ -367,7 +367,7 @@
       "freeze_hits": 3,
       "freeze_duration": 2
     },
-    "ultimate": {"max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_ultimate_dealt": 1, "gain_per_second": 1},
+    "ultimate": {"max": 100, "gain_taken": 0.4, "gain_dealt": 0.6, "gain_ultimate_dealt": 1, "gain_per_second": 1},
     "glaciate": {
       "min_height": 0,
       "max_height": 60,
@@ -391,7 +391,7 @@
     }
   },
   "rowlet": {
-    "max_hp": 150,
+    "max_hp": 160,
     "walk_speed": 160,
     "radius": 13,
     "fly_high": 30,
@@ -447,7 +447,7 @@
       "mass": 100,
       "scale": 1.4
     },
-    "ultimate": { "max": 100, "gain_taken": 1, "gain_dealt": 1, "gain_ultimate_dealt": 0.4, "gain_per_second": 1 },
+    "ultimate": { "max": 100, "gain_taken": 0.4, "gain_dealt": 0.6, "gain_ultimate_dealt": 0.4, "gain_per_second": 1 },
     "brave_bird": {
       "min_height": 0,
       "max_height": 1000,
@@ -485,7 +485,7 @@
     }
   },
   "magikarp": {
-    "max_hp": 250,
+    "max_hp": 300,
     "walk_speed": 95,
     "radius": 10,
     "evolve_hops": 5,
@@ -499,7 +499,7 @@
     }
   },
   "gengar": {
-    "max_hp": 170,
+    "max_hp": 190,
     "walk_speed": 155,
     "radius": 18,
     "shadow_sneak": {
@@ -559,7 +559,7 @@
     }
   },
   "gyarados": {
-    "max_hp": 750,
+    "max_hp": 600,
     "walk_speed": 130,
     "radius": 75,
     "wave": {
@@ -603,13 +603,13 @@
     "radius": 28
   },
   "ash": {
-    "max_hp": 190,
+    "max_hp": 220,
     "walk_speed": 150,
     "radius": 30,
     "ultimate": {
       "max": 100,
-      "gain_taken": 1,
-      "gain_dealt": 1,
+      "gain_taken": 0.4,
+      "gain_dealt": 0.6,
       "gain_ultimate_dealt": 1,
       "gain_per_second": 1
     },
@@ -652,16 +652,16 @@
     "megaton_punch": {
       "min_height": 0,
       "max_height": 80,
-      "ring_duration": 0.6,
-      "ball_duration": 1.8,
-      "bolt_start": 1.2,
+      "ring_duration": 0.4,
+      "ball_duration": 1.6,
+      "bolt_start": 1,
       "bolt_count": 6,
       "bolt_interval": 0.2,
       "bolt_offsets": [60,-60,-120,120,60,-60],
-      "distance": 580,
+      "distance": 600,
       "radius": 45,
-      "damage": 50,
-      "stun_duration": 1.5,
+      "damage": 60,
+      "stun_duration": 3,
       "knockback": 250,
       "cooldown": 8,
       "lunge_distance": 250,
@@ -691,10 +691,10 @@
       "cooldown": 8,
       "mass": 100,
       "ball_knockback": 120,
-      "knockback": 50,
+      "knockback": 20,
       "duration": 3,
       "quantity": 120,
-      "random_offset_angle": 70,
+      "random_offset_angle": 40,
       "distance": 500,
       "scatter_min_distance": 0,
       "scatter_max_distance": 100,
@@ -717,7 +717,7 @@
     }
   },
   "machamp": {
-    "max_hp": 170,
+    "max_hp": 200,
     "walk_speed": 140,
     "radius": 30,
     "uppercut": {
@@ -808,17 +808,17 @@
     },
     "ultimate": {
       "max": 100,
-      "gain_taken": 1,
-      "gain_dealt": 1,
+      "gain_taken": 0.4,
+      "gain_dealt": 0.6,
       "gain_ultimate_dealt": 0.2,
       "gain_per_second": 1
     },
     "gigantamax": {
       "charge_duration": 1.2,
-      "max_hp":  510,
+      "max_hp":  600,
       "walk_speed": 280,
       "radius": 50,
-      "duration": 8,
+      "duration": 10,
       "uppercut": {
         "min_height": 0,
         "max_height": 60,
