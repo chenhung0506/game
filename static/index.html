@@ -1013,8 +1013,64 @@ function artRowlet(c, x, y, t, pose) {
   c.restore();
 }
 
-// Machamp: a grey-blue, four-armed brawler with a black belt, seen from the front (its back when it walks up; the side view
-// is the front one turned a little). Its two lower arms hang at its sides, the upper two are raised and swing as it runs.
+// Machamp seen from the side, facing right (a left run mirrors it): a deep chest over a narrow waist, the head thrust forward with its ridges swept back,
+// two arms on each side (the far pair darker and behind the body) bent in a guard, fists forward. Same units and palette as the front view.
+function artMachampSide(c, t, pose, gmax) {
+  const sw = Math.sin(pose.ph) * pose.mv;
+  const B = gmax ? '#4b4060' : '#8a9bb5', BD = gmax ? '#2e2540' : '#5d6e8a', BELLY = gmax ? '#7a6a92' : '#c9d3e2', BLK = '#2b2f3a', EYE = gmax ? '#ffe066' : '#e8362f';
+  const LAVA = '#ff9a1f', CRACK = '#8a2d08';
+  const LD = gmax ? 6 : 0, LL = gmax ? 8 : 0, ankle = 31 + LD + LL;
+  const limb = (a, b, w, col) => { const dx = b[0] - a[0], dy = b[1] - a[1]; ov(c, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, Math.hypot(dx, dy) / 2 + w * 0.6, w, col, Math.atan2(dy, dx)); };
+  const fist = (x, y, r, col) => {
+    if (!gmax) { ov(c, x, y, r, r * 0.92, col); return; }
+    ov(c, x, y, r, r * 0.9, LAVA); c.strokeStyle = CRACK; c.lineWidth = 1.1; c.beginPath();
+    c.moveTo(x - r * 0.6, y - r * 0.2); c.lineTo(x - r * 0.1, y + r * 0.1); c.lineTo(x + r * 0.2, y - r * 0.5); c.moveTo(x - r * 0.1, y + r * 0.1); c.lineTo(x + r * 0.1, y + r * 0.7); c.stroke();
+    ov(c, x + r * 0.35, y, r * 0.3, r * 0.7, '#d9731a', 0, null); // the knuckles, on the front of the fist
+  };
+  const leg = (m, col) => { // m: +1 the near leg, -1 the far one; they swing opposite ways, the stepping one lifts
+    const s = sw * m, lift = Math.max(0, s) * 4, fx = s * 6;
+    ov(c, fx + 4, 29 + LD + LL - lift, 9, 4.8, col === B ? BD : '#241c33'); // the foot, toes forward
+    if (!gmax) { ov(c, fx * 0.5, 21 - lift * 0.4, 8.5, 10.5, col, -s * 0.12); return; }
+    const hip = 11, knee = hip + (ankle - hip) * 0.55 - lift * 0.5;
+    limb([fx * 0.2, hip + 2], [fx * 0.6 + 2, knee], 7.6, col); limb([fx * 0.6 + 2, knee], [fx, ankle - 2 - lift], 5.8, col);
+    ov(c, fx * 0.6 + 3.5, knee, 4.6, 4, '#3b3150'); // the knee
+  };
+  const arm = (m, near) => { // the upper arm swings forward and back with the run, the fists stay up front
+    const col = near ? B : BD, s = sw * m * 3;
+    const o = near ? 0 : -5, sh = [near ? 1 : -1, -8], g = gmax ? 4 : 0, el = [-12 + o + s * 0.4, -26 - g], hand = [10 + o * 0.6 + s * 0.3, -32 - g - s * 0.4]; // the upper arms are raised over the head // upper arm: shoulder, bent elbow, fist up in a guard
+    const sh2 = [near ? 2 : -2, 1], el2 = [9.5 + o - s * 0.4, 12], hand2 = [19 + o - s * 0.3, 10 + s * 0.4]; // lower arm: held out in front of the belt
+    for (const [a, b, h, w, r] of [[sh, el, hand, gmax ? 8.6 : 6.9, gmax ? 9.5 : 6], [sh2, el2, hand2, gmax ? 8.4 : 6.8, gmax ? 9 : 5.6]]) {
+      limb(a, b, w, col); limb(b, h, w * 0.92, col); fist(h[0] + 1, h[1], r, near ? BD : '#3b3150');
+    }
+  };
+  leg(-1, gmax ? '#3a3050' : '#6f81a0'); // the far leg, darker
+  for (const m of [-1]) arm(m, false);
+  // torso: a deep chest over a narrower waist, tilted a little forward
+  { const top = gmax ? -16 : -14, bot = 19 + LD * 0.7, wf = gmax ? 14 : 12, wb = wf * 0.68; // the body is an egg: broad at the chest, narrowing down to the hips; the back (left) is slimmer than the front
+    c.fillStyle = B; c.strokeStyle = OUTLINE; c.lineWidth = 0.8; c.beginPath(); c.moveTo(1, top);
+    c.bezierCurveTo(1 + wf * 1.9, top, 1 + wf * 0.6, bot, 1, bot); c.bezierCurveTo(1 - wb * 0.6, bot, 1 - wb * 1.9, top, 1, top); c.closePath(); c.fill(); c.stroke(); }
+  ov(c, 6, 1, gmax ? 9 : 7.5, 8.5, BELLY, 0, null); ov(c, 3, 11 + LD * 0.3, 4.6, 8 + LD * 0.4, BELLY, 0, null); // the pale chest and belly, on the front
+  for (const [yy, hw] of [[3, 8], [9, 6], [15 + LD * 0.4, 4]]) { c.strokeStyle = BD; c.lineWidth = 0.9; c.beginPath(); c.moveTo(1 + hw * 0.1, yy); c.lineTo(1 + hw, yy); c.stroke(); }
+  c.lineJoin = 'round'; // the black pants, a rounded wedge, outline pass then fill
+  for (const [col, w] of [[OUTLINE, 5.8], [BLK, 5]]) { c.fillStyle = col; c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(-5, 15 + LD * 0.6); c.lineTo(6, 15 + LD * 0.6); c.lineTo(1.5, 21 + LD * 0.4); c.closePath(); c.fill(); c.stroke(); }
+  if (gmax) { // the flaming red sash and gold belt
+    for (let q = -2; q <= 2; q++) ov(c, 1 + q * 3.8, 13.5 + LD * 0.6 + Math.sin(t * 7 + q) * 1.2, 3, 3.8 + Math.abs(Math.sin(t * 5 + q * 2)) * 1.4, '#ee3a6e', 0, null);
+    ov(c, 6, 14 + LD * 0.6, 3.2, 3.6, '#d9a41f'); ov(c, 6, 14 + LD * 0.6, 1.4, 1.6, '#8a5a0a', 0, null);
+  }
+  leg(1, B);
+  // head: pushed forward, the ridges swept back from the crown, a heavy brow and a jutting jaw
+  for (const [k, hh] of [[0, 6], [1, 9], [2, gmax ? 17 : 12]]) poly(c, [[2 - k * 4.5, -17], [-2 - k * 4.5 - hh * 0.55, -21 - hh * 0.8], [-1 - k * 4.5, -13]], BD);
+  ov(c, 3.5, -13, 10.5, 10, B);
+  ov(c, 11, -9, 5, 4.6, B, 0, null); // the jaw juts forward
+  ov(c, 6.5, -15.5, 6.8, 2.8, BD, 0.18, null); // the brow
+  if (gmax) { c.globalAlpha = 0.35; ov(c, 8.2, -13, 4.2, 3.6, '#ffd23a', 0, null); c.globalAlpha = 1; }
+  ov(c, 8.2, -13, 2.4, 2.4, gmax ? '#fff6c0' : '#fff', 0, null); ov(c, 8.8, -13, 1.2, 1.6, EYE, 0, null);
+  c.strokeStyle = '#222'; c.lineWidth = 1; c.beginPath(); c.moveTo(7, -7), c.lineTo(14, -7.6); c.stroke(); // the mouth
+  ov(c, 1, -10, 2.2, 3, BD, 0, null); // the ear, behind the cheek
+  arm(1, true);
+}
+
+// Machamp: a grey-blue, four-armed brawler with a black belt, seen from the front (its back when it walks up) and from the side (artMachampSide). Its two lower arms hang at its sides, the upper two are raised and swing as it runs.
 // gmax: the Gigantamax Machamp (the ultimate of the future): the same four-armed build, bigger and blacker, with orange cracked-lava gauntlets, eyes aglow and a flaming red sash.
 function artMachamp(c, x, y, t, pose, gmax = false) {
   const { dir, mv, ph } = pose, sw = Math.sin(ph) * mv, bob = -Math.abs(Math.sin(ph)) * 2 * mv + Math.sin(t * 3) * 0.6;
@@ -1022,7 +1078,7 @@ function artMachamp(c, x, y, t, pose, gmax = false) {
   const LAVA = '#ff9a1f', CRACK = '#8a2d08'; // the gauntlets
   const back = dir === 1;
   c.save(); c.translate(x, y + bob);
-  if (dir === 2) c.scale(-1, 1);
+  if (dir >= 2) { if (dir === 2) c.scale(-1, 1); if (gmax) c.scale(1.3, 1.3); artMachampSide(c, t, pose, gmax); c.restore(); return; } // the side view is its own drawing (facing right; left is mirrored)
   if (gmax) c.scale(1.3, 1.3);
   const LD = gmax ? 6 : 0, LL = gmax ? 8 : 0; // how much longer the Gigantamax waist is, and then its legs on top of that, so it stands taller and long-legged
   const FX = gmax ? 12 : 9; // the feet are further apart on the Gigantamax one, under its slanting calves
@@ -4025,6 +4081,7 @@ function drawPlayer(i, p) {
   if (p.pz > 0) drawParalyzed(d, p);
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.
   const top = -d.z;
+  const hudTop = top - (p.k === 8 && look[i].dir >= 2 ? (isGmax(p) ? 30 : 10) * bs : 0); // Machamp's fists are over its head in side view, so its bars and labels sit higher then
   upright(d.x, d.y, () => {
     if (hasBeam(p.k) && p.bt > 0) { // glowing orb with radiating lines, growing as the charge fills
       const k = 1 - p.bt / beamCfgOf(p.k).charge, [ax, ay] = rv(p.bx, p.by), ox = ax * 26 * bs, oy = top - 4 * bs + ay * 26 * bs, r = 4 + 12 * k;
@@ -4042,7 +4099,7 @@ function drawPlayer(i, p) {
     if (hasBeam(p.k) && (p.bt > 0 || p.st > 0 || p.rt > 0)) {
       ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
       ctx.fillStyle = p.rt > 0 ? '#ff8a5c' : '#ffd27a';
-      ctx.fillText(p.rt > 0 ? 'MUST RECHARGE' : '破壞死光！', 0, top - 54 * bs);
+      ctx.fillText(p.rt > 0 ? 'MUST RECHARGE' : '破壞死光！', 0, hudTop - 54 * bs);
     }
     if (p.k === 2 && p.ht > 0) { // Fire Breath: flames at the mouth, toward the opponent
       const o = disp[foeOf(i)], [vx, vy] = rv(o.x - d.x, o.y - d.y), n = Math.hypot(vx, vy) || 1, ux = vx / n, uy = vy / n;
@@ -4051,24 +4108,24 @@ function drawPlayer(i, p) {
       gr.addColorStop(0, '#fff6c0'); gr.addColorStop(0.4, '#ffb030'); gr.addColorStop(1, 'rgba(255,70,10,0)');
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(mx, my, R, 0, 7); ctx.fill();
     }
-    if (p.k === 4 && p.yt > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#a8e0ff'; ctx.fillText(`冰山 ${p.yt.toFixed(1)}s`, 0, top - 54 * bs); }
-    if (p.sn > 0) { drawStunned(p, top, bs); ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe14d'; ctx.fillText('被擊暈！', 0, top - 54 * bs); }
-    if (p.k === 6) { ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd27a'; ctx.fillText(`進化 ${p.hn}/${evolveHops}`, 0, top - 40 * bs); }
-    if (p.k === 4 && p.zt > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#a8e0ff'; ctx.fillText(`急凍光線 ${p.zt.toFixed(1)}s`, 0, top - 54 * bs); }
-    if (p.tw > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#9be37b'; ctx.fillText(p.tw === 1 ? '被龍捲風捲走！' : '摔下來了！', 0, top - 54 * bs); }
-    else if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, top - 54 * bs); }
-    if (p.sl > 0) { ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#b6e87a'; ctx.fillText(`緩速 ${p.sl.toFixed(1)}s`, 0, top - 68 * bs); }
-    if (i === you) { ctx.fillStyle = '#fff'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 你', 0, top - 40 * bs); }
-    else if (snap.p.length > 2 && sideOf(i) === sideOf(you)) { ctx.fillStyle = '#9ff0b8'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 隊友', 0, top - 40 * bs); }
-    if (p.k === DUMMY) { const took = maxHp[DUMMY] - p.hp; ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe14d'; ctx.fillText(`已承受 ${took} 傷害`, 0, top - 56 * bs); if (dummyHit.at > performance.now() - 900) { ctx.fillStyle = '#ff7a5c'; ctx.font = `bold ${20 + Math.min(dummyHit.n, 40) * 0.4}px system-ui`; ctx.fillText(`-${dummyHit.n}`, 0, top - 74 * bs - (performance.now() - dummyHit.at) / 25); } }
+    if (p.k === 4 && p.yt > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#a8e0ff'; ctx.fillText(`冰山 ${p.yt.toFixed(1)}s`, 0, hudTop - 54 * bs); }
+    if (p.sn > 0) { drawStunned(p, top, bs); ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe14d'; ctx.fillText('被擊暈！', 0, hudTop - 54 * bs); }
+    if (p.k === 6) { ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd27a'; ctx.fillText(`進化 ${p.hn}/${evolveHops}`, 0, hudTop - 40 * bs); }
+    if (p.k === 4 && p.zt > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#a8e0ff'; ctx.fillText(`急凍光線 ${p.zt.toFixed(1)}s`, 0, hudTop - 54 * bs); }
+    if (p.tw > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#9be37b'; ctx.fillText(p.tw === 1 ? '被龍捲風捲走！' : '摔下來了！', 0, hudTop - 54 * bs); }
+    else if (p.hd) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a5c'; ctx.fillText('被抓住！', 0, hudTop - 54 * bs); }
+    if (p.sl > 0) { ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#b6e87a'; ctx.fillText(`緩速 ${p.sl.toFixed(1)}s`, 0, hudTop - 68 * bs); }
+    if (i === you) { ctx.fillStyle = '#fff'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 你', 0, hudTop - 40 * bs); }
+    else if (snap.p.length > 2 && sideOf(i) === sideOf(you)) { ctx.fillStyle = '#9ff0b8'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('▼ 隊友', 0, hudTop - 40 * bs); }
+    if (p.k === DUMMY) { const took = maxHp[DUMMY] - p.hp; ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe14d'; ctx.fillText(`已承受 ${took} 傷害`, 0, hudTop - 56 * bs); if (dummyHit.at > performance.now() - 900) { ctx.fillStyle = '#ff7a5c'; ctx.font = `bold ${20 + Math.min(dummyHit.n, 40) * 0.4}px system-ui`; ctx.fillText(`-${dummyHit.n}`, 0, hudTop - 74 * bs - (performance.now() - dummyHit.at) / 25); } }
     // HP bar follows the body.
-    ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 36 * bs, 40, 6);
+    ctx.fillStyle = '#000a'; ctx.fillRect(-20, hudTop - 36 * bs, 40, 6);
     const full = (snap.mx && snap.mx[i]) || (isGmax(p) ? gmaxOf(p.k).hp : maxHp[p.k]); // a 1v2's person may have extra HP
-    ctx.fillStyle = p.hp > 0.3 * full ? '#6fd36f' : '#e55'; ctx.fillRect(-20, top - 36 * bs, 40 * Math.min(1, p.hp / full), 6);
+    ctx.fillStyle = p.hp > 0.3 * full ? '#6fd36f' : '#e55'; ctx.fillRect(-20, hudTop - 36 * bs, 40 * Math.min(1, p.hp / full), 6);
     if (ultCfg[p.k] > 0) { // the ultimate's charge, a thin bar under the HP; it flashes once it is full
       const ch = Math.min(1, p.uc / ultCfg[p.k]);
-      ctx.fillStyle = '#000a'; ctx.fillRect(-20, top - 29 * bs, 40, 4);
-      ctx.fillStyle = ch >= 1 ? (Math.floor(performance.now() / 200) % 2 ? '#fff6a8' : '#ffd21f') : '#e0b020'; ctx.fillRect(-20, top - 29 * bs, 40 * ch, 4);
+      ctx.fillStyle = '#000a'; ctx.fillRect(-20, hudTop - 29 * bs, 40, 4);
+      ctx.fillStyle = ch >= 1 ? (Math.floor(performance.now() / 200) % 2 ? '#fff6a8' : '#ffd21f') : '#e0b020'; ctx.fillRect(-20, hudTop - 29 * bs, 40 * ch, 4);
     }
   });
 }
