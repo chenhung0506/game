@@ -1041,7 +1041,7 @@ function artMachampSide(c, t, pose, gmax) {
   const arm = (m, near) => { // the upper arm swings forward and back with the run, the fists stay up front
     const col = near ? B : BD, s = sw * m * 3;
     const o = near ? 0 : -5, sh = [near ? 1 : -1, -8], g = gmax ? 4 : 0, el = [-12 + o + s * 0.4, -26 - g], hand = [10 + o * 0.6 + s * 0.3, -32 - g - s * 0.4]; // the upper arms are raised over the head // upper arm: shoulder, bent elbow, fist up in a guard
-    const sh2 = [near ? 2 : -2, 1], el2 = [9.5 + o - s * 0.4, 12], hand2 = [19 + o - s * 0.3, 10 + s * 0.4]; // lower arm: held out in front of the belt
+    const sh2 = [near ? 2 : -2, 1], el2 = [-9 + o * 0.6 - s * 0.4, 14.6], hand2 = [15 + o - s * 0.3, 7.5 + s * 0.4]; // the elbow of the lower arm hooks back, like the upper one's // lower arm: held out in front of the belt
     for (const [a, b, h, w, r] of [[sh, el, hand, gmax ? 8.6 : 6.9, gmax ? 9.5 : 6], [sh2, el2, hand2, gmax ? 8.4 : 6.8, gmax ? 9 : 5.6]]) {
       limb(a, b, w, col); limb(b, h, w * 0.92, col); fist(h[0] + 1, h[1], r, near ? BD : '#3b3150');
     }
