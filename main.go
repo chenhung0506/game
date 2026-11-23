@@ -612,11 +612,12 @@ func (r *room) nextRound() {
 		r.cur, r.matchOver = [2]int{}, false
 		r.g.SetKinds(r.order[0][0], r.order[1][0])
 	default:
-		hp := [2]int{r.g.P[0].HP, r.g.P[1].HP}
+		hp, used := [2]int{r.g.P[0].HP, r.g.P[1].HP}, r.g.UltUsed
 		r.g.SetKinds(r.order[0][r.cur[0]], r.order[1][r.cur[1]])
 		for i, h := range hp {
 			if h > 0 {
 				r.g.P[i].HP = min(h, r.g.maxHP(i)) // a Gyarados that won comes back as a Magikarp, which cannot hold that much
+				r.g.UltUsed[i] = used[i]           // it has not left the field, so an ultimate it used is still used: only a newcomer has its own
 			}
 		}
 	}

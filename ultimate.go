@@ -73,7 +73,7 @@ func (g *Game) gainCharge(hp0 [maxSlots]int, dt float64) {
 	for i := range g.P {
 		p := &g.P[i]
 		u, ok := g.cfg.ultimateOf(p.Kind)
-		if !ok || p.HP <= 0 {
+		if !ok || p.HP <= 0 || g.UltUsed[i] { // a character that has used its ultimate has no more charge to fill
 			continue
 		}
 		gain := u.GainPerSecond * dt

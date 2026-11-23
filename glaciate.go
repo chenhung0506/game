@@ -3,8 +3,8 @@ package main
 import "math"
 
 // Glaciate (Z, Vulpix): after a short gathering (ring_duration, rooted) Vulpix calls icicles down, count of them spread evenly over duration
-// seconds, at random places in a circle of `radius` whose middle is `distance` ahead of it, toward the nearest foe, as it was when the gathering
-// ended. An icicle shows where it will land for fall_duration seconds; then foes within damage_radius take damage and are slowed, and it stays
+// seconds, at random places in a circle of `radius` whose middle is on the nearest foe, as it was when the gathering ended, or, if that is
+// further than `distance` from Vulpix, `distance` from Vulpix toward it. An icicle shows where it will land for fall_duration seconds; then foes within damage_radius take damage and are slowed, and it stays
 // standing as a pillar (a ballPillar with its own radius, hp and scale) that the other player cannot walk through, until it is broken or melts.
 
 // maxIcicles bounds the icicles of one cast, whatever the config says.
@@ -46,18 +46,19 @@ func (g *Game) stepGlaciateCast(i int, in Input, u Ultimate, dt float64) ([]Even
 	return nil, true
 }
 
-// startGlaciate fixes the circle where the nearest foe is now and begins calling icicles into it.
+// startGlaciate fixes the circle on the nearest foe as it is now (no further than `distance` from Vulpix) and begins calling icicles into it.
 func (g *Game) startGlaciate(i int) []Event {
 	p, gl := &g.P[i], g.cfg.Vulpix.Glaciate
-	ux, uy := p.AimX, p.AimY
+	ux, uy, d := p.AimX, p.AimY, gl.Distance
 	if foes := g.foes(i); len(foes) > 0 {
 		foe := &g.P[g.nearestFoe(i)]
 		if dx, dy := foe.X-p.X, foe.Y-p.Y; math.Hypot(dx, dy) > 1e-6 {
 			ux, uy = dx/math.Hypot(dx, dy), dy/math.Hypot(dx, dy)
+			d = math.Min(math.Hypot(dx, dy), gl.Distance) // on the foe if it is near enough, else as far toward it as `distance` allows
 		}
 	}
-	x := math.Min(math.Max(p.X+ux*gl.Distance, 0), g.court.Length)
-	y := math.Min(math.Max(p.Y+uy*gl.Distance, 0), g.court.Width)
+	x := math.Min(math.Max(p.X+ux*d, 0), g.court.Length)
+	y := math.Min(math.Max(p.Y+uy*d, 0), g.court.Width)
 	g.Casts = append(g.Casts, glaciateCast{Owner: i, X: x, Y: y})
 	return []Event{{T: "glacast", X: x, Y: y, R: gl.Radius, S: i}}
 }

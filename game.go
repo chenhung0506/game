@@ -454,6 +454,7 @@ type Game struct {
 	Fires   []FireZone     // the ground the Seismic Toss set alight
 	Ghosts  []ghostFire    // Gengar's purple flames
 	Shadows []shadowBall   // Shadow Balls in the air
+	UltUsed [maxSlots]bool // slots whose character has used its ultimate (a Z skill or a Gigantamax) since it came out: it has only the one, so its charge does not fill again
 	Icicles []icicle       // Glaciate's icicles on their way down
 	Casts   []glaciateCast // Glaciates still calling icicles
 	Wells   []pullWell     // where Shadow Balls burst and are still dragging the opponent in
@@ -564,6 +565,7 @@ func (g *Game) Reset() {
 		g.P[i] = Player{Kind: g.P[i].Kind, X: x, Y: y, HP: g.maxHP(i), FX: fx, AimX: float64(fx)}
 	}
 	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells, g.Icicles, g.Casts = nil, nil, nil, nil, nil, nil, nil, nil, nil
+	g.UltUsed = [maxSlots]bool{} // a new round, a new match: everyone has their ultimate again (a team match gives it back only to whoever is new, see nextRound)
 	for i := range g.P {
 		if g.P[i].Kind == rowlet {
 			g.P[i].Z = g.cfg.Rowlet.FlyHigh // it is always in the air
@@ -787,9 +789,10 @@ var (
 // Step advances the simulation by dt seconds and returns the effects to show.
 func (g *Game) Step(dt float64) []Event {
 	var events []Event
-	var hp0 [maxSlots]int // everyone's HP as the tick begins, for the ultimate's charge
+	var hp0 [maxSlots]int     // everyone's HP as the tick begins, for the ultimate's charge
+	var ch0 [maxSlots]float64 // everyone's charge as the tick begins: an ultimate that starts empties it, which is how its first use is noticed
 	for i := range g.P {
-		hp0[i] = g.P[i].HP
+		hp0[i], ch0[i] = g.P[i].HP, g.P[i].Charge
 	}
 	for i := range g.P {
 		p, other := &g.P[i], &g.P[g.nearestFoe(i)] // other: the foe the aimed skills turn to; the damage is dealt to every foe in reach (g.foes)
@@ -1192,6 +1195,11 @@ func (g *Game) Step(dt float64) []Event {
 	events = append(events, g.stepBalls(dt)...)
 	events = append(events, g.stepTwirl(dt)...)
 	g.stepJuggle(dt)
+	for i := range g.P {
+		if g.P[i].Charge < ch0[i] { // the ultimate started this tick: this character has had its one
+			g.UltUsed[i] = true
+		}
+	}
 	g.gainCharge(hp0, dt)
 	return events
 }

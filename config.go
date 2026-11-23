@@ -609,7 +609,7 @@ type Config struct {
 		} `json:"freeze_beam"`
 		Ultimate Ultimate `json:"ultimate"` // the charge Glaciate (Z) needs
 		// Glaciate (Z): after `ring_duration` seconds of gathering (rooted) Vulpix calls `count` icicles down over `duration` seconds, at random
-		// places in a circle of `radius` whose middle is `distance` ahead of it, toward the nearest foe, as it was when the gathering ended. Each
+		// places in a circle of `radius` whose middle is on the nearest foe as it was when the gathering ended, but no further than `distance` from Vulpix. Each
 		// icicle shows where it will come down for `fall_duration` seconds, then lands: foes within `damage_radius` take `damage` and are
 		// slowed, and it stays standing like a pillar (the other player cannot walk through it) with its own `hp`, `radius` and `scale`, for
 		// `duration` seconds. min_height/max_height are the heights a landing hurts and a standing icicle blocks.
@@ -619,7 +619,7 @@ type Config struct {
 			Duration     float64 `json:"duration"`
 			Count        int     `json:"count"`
 			Radius       float64 `json:"radius"`
-			Distance     float64 `json:"distance"`
+			Distance     float64 `json:"distance"`   // the furthest from Vulpix the middle of the circle may be (0: on Vulpix)
 			RingScale    float64 `json:"ring_scale"` // looks only: how big the gathering rings are drawn
 			Icicle       struct {
 				FallDuration float64 `json:"fall_duration"`

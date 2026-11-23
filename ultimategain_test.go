@@ -49,6 +49,7 @@ func TestBraveBirdsDamageCountsAsAnUltimatesAndANormalSkillsDoesNot(t *testing.T
 	gpress(g, Input{Ult: true})
 	for n := 0; n < 300 && g.P[0].Charge < 1 && g.P[1].HP == 100000; n++ {
 		g.Step(dt)
+		g.UltUsed[0] = false // this is about what kind of damage the dive does, so the one-ultimate rule (which would keep the charge empty) is off
 	}
 	if g.P[1].HP != 100000-30 {
 		t.Fatalf("the foe lost %d, want 30", 100000-g.P[1].HP)
