@@ -169,7 +169,7 @@
     "seismic_toss": {
       "min_height": 0,
       "max_height": 40,
-      "speed": 380,
+      "speed": 400,
       "radius": 80,
       "damage": 30,
       "cooldown": 7,
@@ -228,7 +228,7 @@
       "seismic_toss": {
         "min_height": 0,
         "max_height": 60,
-        "speed": 450,
+        "speed": 430,
         "radius": 160,
         "damage": 30,
         "cooldown": 7,
@@ -292,7 +292,7 @@
       "slash_interval": 0.25,
       "slash_step": 80,
       "slash_radius": 220,
-      "leaf_scale": 4,
+      "leaf_scale": 3.5,
       "damage": 8,
       "cooldown": 5
     },
