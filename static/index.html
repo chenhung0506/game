@@ -3586,9 +3586,46 @@ function drawDevour() {
       gr.addColorStop(0, `rgba(25,5,45,${0.6 * a})`); gr.addColorStop(0.7, `rgba(80,25,130,${0.2 * a})`); gr.addColorStop(1, 'rgba(80,25,130,0)');
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.fill();
       ctx.strokeStyle = `rgba(190,130,255,${0.65 * a})`; ctx.lineWidth = 2.5; ctx.setLineDash([14, 10]); ctx.lineDashOffset = now * 70; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
-      for (let n = 0; n < 44; n++) { // motes of dark running in along five arms
-        const u = (n / 44 + now * 0.7) % 1, an = (n % 5) * 1.2566 + u * 4 + now * 1.2, r = 14 + (R - 14) * (1 - u), sz = (2 + 4 * (1 - u)) * c.dscale;
-        ctx.fillStyle = `rgba(${n % 2 ? '210,150,255' : '60,10,90'},${a * (0.35 + 0.5 * (1 - u))})`; ctx.beginPath(); ctx.arc(d.x + Math.cos(an) * r, d.y + Math.sin(an) * r, sz, 0, 7); ctx.fill();
+      const age = Math.max(0, c.dgdur - p.dvt), ramp = Math.min(1, age / 0.35); // the debris starts to move as the Devour begins and settles as it ends
+      for (let n = 0; n < 150; n++) { // sand: every grain on the ground inside the reach runs in towards Gengar, faster the nearer it gets, curving as it goes
+        const s1 = seeded(n * 3.1 + 1), s2 = seeded(n * 7.7 + 2), s3 = seeded(n * 5.3 + 3);
+        const u = (now / (0.9 + 1.1 * s3) + s1) % 1, r0 = 24 + (R - 24) * Math.sqrt(s2), r = 10 + r0 * (1 - u * u), an = s1 * 6.283 + u * 2.4;
+        const x = d.x + Math.cos(an) * r, y = d.y + Math.sin(an) * r, sz = (1.8 + 2.6 * s3) * (0.5 + 0.5 * (1 - u)) * c.dscale, al = a * ramp * Math.min(1, u * 6) * (1 - 0.5 * u);
+        ctx.strokeStyle = `rgba(${150 + (s1 * 60 | 0)},${118 + (s2 * 50 | 0)},${72 + (s3 * 40 | 0)},${Math.min(1, al * 1.2)})`; ctx.lineWidth = sz; ctx.lineCap = 'round';
+        const tl = 4 + 14 * u * (0.5 + s3); // a streak behind it, the way it came from
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(an - 0.35) * tl, y + Math.sin(an - 0.35) * tl); ctx.stroke();
+      }
+      for (let n = 0; n < 26; n++) { // stones: bigger and slower, tumbling as they are dragged in, and shrinking into the dark at the end
+        const s1 = seeded(n * 4.3 + 11), s2 = seeded(n * 6.1 + 12), s3 = seeded(n * 2.9 + 13);
+        const u = (now / (1.8 + 1.4 * s3) + s1) % 1, r0 = 50 + (R - 50) * Math.sqrt(s2), r = 14 + r0 * (1 - u * u * u), an = s2 * 6.283 + u * 2.0;
+        const x = d.x + Math.cos(an) * r, y = d.y + Math.sin(an) * r, sz = (6.5 + 7 * s3) * (0.35 + 0.65 * (1 - u * u)) * c.dscale, al = a * ramp * Math.min(1, u * 5) * (1 - 0.6 * u * u);
+        ctx.save(); ctx.translate(x, y); ctx.rotate(u * (6 + 8 * s1) + s2 * 6);
+        ctx.fillStyle = `rgba(${110 + (s1 * 40 | 0)},${100 + (s2 * 35 | 0)},${92 + (s3 * 30 | 0)},${al})`; ctx.strokeStyle = `rgba(55,45,40,${al})`; ctx.lineWidth = 1;
+        ctx.beginPath(); for (let v = 0; v < 6; v++) { const rr = sz * (0.7 + 0.5 * seeded(n * 9 + v)), q = v * 1.0472; v ? ctx.lineTo(Math.cos(q) * rr, Math.sin(q) * rr) : ctx.moveTo(Math.cos(q) * rr, Math.sin(q) * rr); }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = `rgba(210,200,190,${al * 0.45})`; ctx.beginPath(); ctx.arc(-sz * 0.25, -sz * 0.25, sz * 0.25, 0, 7); ctx.fill();
+        ctx.restore();
+      }
+      for (let n = 0; n < 5; n++) { // five arms of dark turning in with the pull
+        ctx.strokeStyle = `rgba(${n % 2 ? '185,120,245' : '70,20,110'},${a * 0.5})`; ctx.lineWidth = 3 * c.dscale; ctx.beginPath();
+        for (let u = 0; u <= 1.001; u += 0.04) { const rr = 14 + (R - 14) * (1 - u), an = n * 1.2566 + u * 4 + now * 1.4; u ? ctx.lineTo(d.x + Math.cos(an) * rr, d.y + Math.sin(an) * rr) : ctx.moveTo(d.x + Math.cos(an) * rr, d.y + Math.sin(an) * rr); }
+        ctx.stroke();
+      }
+      for (const [j, q] of snap.p.entries()) { // what is being pulled: dark tendrils run from the foe to Gengar with the dashes racing towards it, and a ring of dark closes on the foe
+        if (j === si || fallen(j) || sideOf(j) === sideOf(si)) continue;
+        const fq = disp[j], dist = Math.hypot(fq.x - d.x, fq.y - d.y);
+        if (dist > R + bodyR(q) || dist < bodyR(p) + bodyR(q) + 4) continue;
+        const nx = -(d.y - fq.y) / dist, ny = (d.x - fq.x) / dist;
+        ctx.lineCap = 'round';
+        for (let t = -1; t <= 1; t++) {
+          const cx = (fq.x + d.x) / 2 + nx * t * 26 * Math.sin(now * 3 + t), cy = (fq.y + d.y) / 2 + ny * t * 26 * Math.sin(now * 3 + t);
+          for (const [w, col, dash] of [[9, `rgba(60,10,100,${0.28 * a})`, null], [3, `rgba(225,170,255,${0.85 * a})`, [18, 14]]]) {
+            ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.lineDashOffset = -now * 160;
+            ctx.beginPath(); ctx.moveTo(fq.x, fq.y); ctx.quadraticCurveTo(cx, cy, d.x, d.y); ctx.stroke();
+          }
+        }
+        ctx.setLineDash([]);
+        const pr = bodyR(q) + 10 + 16 * ((now * 1.6) % 1); ctx.strokeStyle = `rgba(200,140,255,${a * (1 - (now * 1.6) % 1) * 0.8})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(fq.x, fq.y, pr, 0, 7); ctx.stroke();
       }
     }
     if (p.dvs > 0) {
