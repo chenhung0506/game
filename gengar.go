@@ -190,6 +190,14 @@ func (g *Game) launchShadowBall(i int) {
 	g.Balls = append(g.Balls, Ball{K: ballShadow, Owner: i, X: p.X + p.AimX*off, Y: p.Y + p.AimY*off, DX: p.AimX, DY: p.AimY, HP: sb.HP})
 }
 
+// pullRadius is how far the pull a burst Shadow Ball leaves reaches: its own `gravity_radius`, or the blast's when that is 0.
+func pullRadius(slam, gravity float64) float64 {
+	if gravity > 0 {
+		return gravity
+	}
+	return slam
+}
+
 // shadowBlast is what a charged Shadow Ball does where it bursts: the blast hurts the opponent in its reach once, and then drags it
 // toward its middle for `pull_duration` seconds (see stepWells).
 func (g *Game) shadowBlast(owner int, x, y float64) []Event {
@@ -201,8 +209,9 @@ func (g *Game) shadowBlast(owner int, x, y float64) []Event {
 		}
 	}
 	if sb.PullDuration > 0 && sb.Gravity > 0 {
-		g.Wells = append(g.Wells, pullWell{Owner: owner, X: x, Y: y, T: sb.PullDuration, R: sb.SlamRadius, Gravity: sb.Gravity, Reach: sb.Reach})
-		events = append(events, Event{T: "gwell", X: x, Y: y, R: sb.SlamRadius})
+		pr := pullRadius(sb.SlamRadius, sb.GravityRadius) // the pull may reach further than the blast; the page draws the well at the pull's size
+		g.Wells = append(g.Wells, pullWell{Owner: owner, X: x, Y: y, T: sb.PullDuration, R: pr, Gravity: sb.Gravity, Reach: sb.Reach})
+		events = append(events, Event{T: "gwell", X: x, Y: y, R: pr})
 	}
 	return events
 }

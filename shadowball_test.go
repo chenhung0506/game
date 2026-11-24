@@ -280,3 +280,60 @@ func TestNightShadeIsKeptButAPersonCannotCastItAndTheShadowBallNeverLobs(t *test
 		}
 	}
 }
+
+func TestTheShadowBallsPullCanReachFurtherThanItsBlast(t *testing.T) {
+	cfg := DefaultConfig()
+	sb := &cfg.Gengar.ShadowBall
+	sb.SlamRadius, sb.GravityRadius, sb.Gravity, sb.PullDuration = 100, 300, 200, 2
+	g := chargeDuel(cfg, 500)
+	x, y := g.P[0].X, g.P[0].Y
+	g.P[1].X, g.P[1].Y = x+sb.SlamRadius+g.radius(1)+60, y // outside the blast, inside the pull
+	hp, d0 := g.P[1].HP, math.Hypot(g.P[1].X-x, g.P[1].Y-y)
+	events := g.shadowBlast(0, x, y)
+	var well, slam *Event
+	for i := range events {
+		switch events[i].T {
+		case "gwell":
+			well = &events[i]
+		case "gslam":
+			slam = &events[i]
+		}
+	}
+	if slam == nil || slam.R != sb.SlamRadius || well == nil || well.R != sb.GravityRadius {
+		t.Fatalf("events %+v: the blast should be drawn at slam_radius (%v) and the well at gravity_radius (%v)", events, sb.SlamRadius, sb.GravityRadius)
+	}
+	if g.P[1].HP != hp {
+		t.Fatal("a foe outside the blast was hurt by it")
+	}
+	g.Step(dt)
+	if d := math.Hypot(g.P[1].X-x, g.P[1].Y-y); d >= d0-1e-6 {
+		t.Fatalf("%v from the middle (was %v): a foe inside the pull but outside the blast should be dragged in", d, d0)
+	}
+	g = chargeDuel(cfg, 500) // and beyond the pull it stays
+	g.P[1].X, g.P[1].Y = x+sb.GravityRadius+g.radius(1)+40, y
+	d0 = math.Hypot(g.P[1].X-x, g.P[1].Y-y)
+	g.shadowBlast(0, x, y)
+	g.Step(dt)
+	if d := math.Hypot(g.P[1].X-x, g.P[1].Y-y); math.Abs(d-d0) > 1e-6 {
+		t.Fatalf("a foe beyond the pull moved from %v to %v", d0, d)
+	}
+}
+
+func TestTheShadowBallsPullIsAsWideAsTheBlastWhenGravityRadiusIsZeroAndTheNumberIsChecked(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Gengar.ShadowBall.GravityRadius != 0 {
+		t.Fatal("the default should follow slam_radius (0)")
+	}
+	g := chargeDuel(cfg, 500)
+	g.shadowBlast(0, g.P[0].X, g.P[0].Y)
+	if len(g.Wells) != 1 || g.Wells[0].R != cfg.Gengar.ShadowBall.SlamRadius {
+		t.Fatalf("wells %+v, want one as wide as slam_radius (%v)", g.Wells, cfg.Gengar.ShadowBall.SlamRadius)
+	}
+	for _, v := range []float64{-1, -0.5} {
+		c := DefaultConfig()
+		c.Gengar.ShadowBall.GravityRadius = v
+		if c.validate() == nil {
+			t.Fatalf("a gravity_radius of %v was accepted", v)
+		}
+	}
+}

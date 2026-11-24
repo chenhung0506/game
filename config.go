@@ -889,7 +889,7 @@ type Config struct {
 			BallScale    float64 `json:"ball_scale"`
 			Damage       int     `json:"damage"`
 			Cooldown     float64 `json:"cooldown"`
-			SlamRadius   float64 `json:"slam_radius"`
+			SlamRadius   float64 `json:"slam_radius"` // the reach of the blast that hurts
 			Speed        float64 `json:"speed"`
 			ChargeTime   float64 `json:"charge_time"`
 			Radius       float64 `json:"radius"`
@@ -897,6 +897,8 @@ type Config struct {
 			Mass         float64 `json:"mass"`
 			Gravity      float64 `json:"gravity"`
 			PullDuration float64 `json:"pull_duration"`
+			// The reach of the pull that drags the opponent in, from the middle of the burst (plus its body), on its own: it may be wider than the blast. 0: the same as slam_radius.
+			GravityRadius float64 `json:"gravity_radius"`
 		} `json:"shadow_ball"`
 		// Night Shade: the lobbed ball Shadow Ball used to be, kept for a skill to come (no key or button is bound to it yet; the
 		// server runs it when an input says `shade`, which a person's never does). A ball is lobbed `speed` x `duration` out at most,
@@ -2168,6 +2170,9 @@ func (c Config) validateSkills() error {
 	}
 	if n := c.Rowlet.Arrows.Count; n > 100 {
 		return fmt.Errorf("rowlet.arrows.count must be at most 100, got %d", n)
+	}
+	if gr := c.Gengar.ShadowBall.GravityRadius; !(gr >= 0) || math.IsInf(gr, 0) {
+		return fmt.Errorf("gengar.shadow_ball.gravity_radius must be 0 (the same as slam_radius) or more, got %v", gr)
 	}
 	if jp := c.Snorlax.Jump; jp.Damage < 0 || !(jp.EarthquakeRadius >= 0) || (jp.EarthquakeRadius > 0 &&
 		(jp.EarthquakeRadius < jp.SlamRadius || !(jp.EarthquakeDuration > 0) || !(jp.EarthquakeInterval > 0) || jp.EarthquakeDamage < 0 || !(jp.EarthquakeSlow >= 0 && jp.EarthquakeSlow < 1))) {

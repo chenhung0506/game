@@ -169,11 +169,11 @@
     "seismic_toss": {
       "min_height": 0,
       "max_height": 40,
-      "speed": 370,
+      "speed": 380,
       "radius": 80,
       "damage": 30,
       "cooldown": 7,
-      "length": 320,
+      "length": 330,
       "high": 300,
       "mass": 100,
       "fire_radius": 200,
@@ -544,8 +544,9 @@
       "radius": 60,
       "hp": 30,
       "mass": 50,
-      "gravity": 110,
-      "pull_duration": 4
+      "gravity": 130,
+      "pull_duration": 4,
+      "gravity_radius": 200
     },
     "night_shade": {
       "min_height": 0,
