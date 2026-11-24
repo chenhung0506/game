@@ -5,7 +5,7 @@
   },
   "pikachu": {
     "max_hp": 160,
-    "walk_speed": 170,
+    "walk_speed": 160,
     "radius": 8,
     "volt_tackle": {
       "min_height": 0,
@@ -245,7 +245,7 @@
   },
   "chikorita": {
     "max_hp": 200,
-    "walk_speed": 150,
+    "walk_speed": 140,
     "radius": 10,
     "ultimate": {
       "max": 100,
@@ -285,24 +285,24 @@
     "leaf_slash": {
       "min_height": 0,
       "max_height": 60,
-      "jump_distance": 350,
+      "jump_distance": 300,
       "jump_duration": 0.35,
       "jump_height": 40,
       "slashes": 8,
       "slash_interval": 0.25,
       "slash_step": 80,
-      "slash_radius": 200,
-      "leaf_scale": 3.5,
+      "slash_radius": 220,
+      "leaf_scale": 4,
       "damage": 8,
       "cooldown": 5
     },
     "razor_leaf": {
       "min_height": 0,
       "max_height": 40,
-      "count": 45,
+      "count": 50,
       "scatter_radius": 150,
-      "min_delay": 0.3,
-      "max_delay": 1.5,
+      "min_delay": 0.2,
+      "max_delay": 1.8,
       "leaf_hp": 1,
       "speed": 650,
       "radius": 8,
@@ -327,7 +327,7 @@
   },
   "vulpix": {
     "max_hp": 170,
-    "walk_speed": 140,
+    "walk_speed": 130,
     "radius": 14,
     "frost_field": {
       "min_height": 0,
@@ -380,7 +380,7 @@
       "ring_duration": 0.8,
       "duration": 5,
       "count": 30,
-      "radius": 300,
+      "radius": 280,
       "distance": 400,
       "ring_scale": 1,
       "icicle": {
@@ -411,11 +411,11 @@
         "max_height": 15,
         "count": 6,
         "speed": 600,
-        "radius": 12,
+        "radius": 14,
         "hp": 4,
-        "damage": 4,
+        "damage": 3,
         "mass": 20,
-        "scale": 0.5
+        "scale": 1
       }
     },
     "arrows": {
@@ -438,7 +438,7 @@
       "min_height": 0,
       "max_height": 1000,
       "hp": 50,
-      "speed": 150,
+      "speed": 140,
       "radius": 60,
       "duration": 8,
       "distance": 800,
@@ -490,6 +490,10 @@
       "flash_alpha": 0.3
     }
   },
+  "dummy": {
+    "max_hp": 100000,
+    "radius": 28
+  },
   "magikarp": {
     "max_hp": 300,
     "walk_speed": 95,
@@ -502,67 +506,6 @@
       "cooldown": 4,
       "air_speed_first_half": 100,
       "air_speed_second_half": 30
-    }
-  },
-  "gengar": {
-    "max_hp": 190,
-    "walk_speed": 155,
-    "radius": 18,
-    "shadow_sneak": {
-      "min_height": 0,
-      "max_height": 60,
-      "height": -10,
-      "duration": 3,
-      "cooldown": 9,
-      "shadow_speed_first_half": 400,
-      "shadow_speed_second_half": 250,
-      "shadow_radius": 130
-    },
-    "ghost_fire": {
-      "min_height": 0,
-      "max_height": 60,
-      "cooldown": 7,
-      "ring_radius": 550,
-      "spread_speed": 650,
-      "convergence_speed": 400,
-      "damage": 5,
-      "count": 20,
-      "radius": 20,
-      "rehit_interval": 1.5,
-      "hp": 10,
-      "mass": 20
-    },
-    "shadow_ball": {
-      "min_height": 0,
-      "max_height": 60,
-      "ball_scale": 1,
-      "damage": 20,
-      "cooldown": 6,
-      "slam_radius": 150,
-      "speed": 600,
-      "charge_time": 0.4,
-      "radius": 60,
-      "hp": 30,
-      "mass": 50,
-      "gravity": 130,
-      "pull_duration": 4,
-      "gravity_radius": 200
-    },
-    "night_shade": {
-      "min_height": 0,
-      "max_height": 60,
-      "ball_scale": 1.2,
-      "damage": 20,
-      "height": 150,
-      "duration": 1.4,
-      "cooldown": 6,
-      "slam_radius": 130,
-      "speed": 600,
-      "ghost_fire_spread_speed": 400,
-      "ghost_fire_radius": 20,
-      "ghost_fire_spread_distance": 220,
-      "ghost_fire_count": 0,
-      "ghost_fire_damage": 15
     }
   },
   "gyarados": {
@@ -604,10 +547,6 @@
       "length": 650,
       "width": 70
     }
-  },
-  "dummy": {
-    "max_hp": 100000,
-    "radius": 28
   },
   "ash": {
     "max_hp": 220,
@@ -885,6 +824,67 @@
         "scatter_near_bias": 2,
         "fist_duration": 0.2
       }
+    }
+  },
+  "gengar": {
+    "max_hp": 190,
+    "walk_speed": 155,
+    "radius": 18,
+    "shadow_sneak": {
+      "min_height": 0,
+      "max_height": 60,
+      "height": -10,
+      "duration": 3,
+      "cooldown": 9,
+      "shadow_speed_first_half": 400,
+      "shadow_speed_second_half": 250,
+      "shadow_radius": 130
+    },
+    "ghost_fire": {
+      "min_height": 0,
+      "max_height": 60,
+      "cooldown": 7,
+      "ring_radius": 550,
+      "spread_speed": 650,
+      "convergence_speed": 400,
+      "damage": 5,
+      "count": 20,
+      "radius": 20,
+      "rehit_interval": 1.5,
+      "hp": 10,
+      "mass": 20
+    },
+    "shadow_ball": {
+      "min_height": 0,
+      "max_height": 60,
+      "ball_scale": 0.8,
+      "damage": 20,
+      "cooldown": 6,
+      "slam_radius": 150,
+      "speed": 600,
+      "charge_time": 0.4,
+      "radius": 60,
+      "hp": 30,
+      "mass": 50,
+      "gravity": 130,
+      "pull_duration": 5,
+      "gravity_radius": 200
+    },
+    "night_shade": {
+      "min_height": 0,
+      "max_height": 60,
+      "ball_scale": 1.2,
+      "damage": 20,
+      "height": 150,
+      "duration": 1.4,
+      "cooldown": 6,
+      "slam_radius": 130,
+      "speed": 600,
+      "ghost_fire_spread_speed": 400,
+      "ghost_fire_radius": 20,
+      "ghost_fire_spread_distance": 220,
+      "ghost_fire_count": 0,
+      "ghost_fire_damage": 15
     }
   }
 }
