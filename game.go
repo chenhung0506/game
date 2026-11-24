@@ -329,6 +329,18 @@ type Player struct {
 	SBallDX, SBallDY float64 `json:"-"`    // the direction chosen at the cast
 	SBallLock        bool    `json:"-"`
 	SilentT          float64 `json:"sil"`
+	// The Gigantamax Gengar's Lick (the main button): its phase (lickNone..), the seconds the timed ones have left, the unit direction the tongue goes along (it follows the foe while it gathers), how long it is out
+	// now, the foe it holds (slot + 1) and the cooldown; and the Devour (K): the seconds of its pull and of its silence left, and the cooldown.
+	LickPhase  int     `json:"lkp"`
+	LickT      float64 `json:"lkt"`
+	LickX      float64 `json:"lkx"`
+	LickY      float64 `json:"lky"`
+	LickD      float64 `json:"lkd"`
+	LickPrey   int     `json:"-"`
+	LickCD     float64 `json:"lkcd"`
+	DevourT    float64 `json:"dvt"`
+	DevourSilT float64 `json:"dvs"`
+	DevourCD   float64 `json:"dvcd"`
 }
 
 // Leaf Slash phases.
@@ -675,7 +687,7 @@ func (g *Game) ballRadius(b *Ball) float64 {
 	case ballFist:
 		return g.brawler(b.Owner).CometPunch.Radius
 	case ballGhost:
-		return g.cfg.Gengar.GhostFire.Radius
+		return g.ghostFireOf(b.Ult).Radius
 	case ballVolt:
 		return g.cfg.Pikachu.ThousandVolt.Radius
 	case ballShadow:
@@ -703,7 +715,7 @@ func (g *Game) ballMass(b *Ball) float64 {
 	case ballFist:
 		return g.brawler(b.Owner).CometPunch.Mass
 	case ballGhost:
-		return g.cfg.Gengar.GhostFire.Mass
+		return g.ghostFireOf(b.Ult).Mass
 	case ballVolt:
 		return g.cfg.Pikachu.ThousandVolt.Mass
 	case ballShadow:
@@ -1458,7 +1470,7 @@ func (g *Game) stepBalls(dt float64) []Event {
 		}
 		if b.K == ballGhost {
 			if b.HP > 0 {
-				gf, owner := g.cfg.Gengar.GhostFire, &g.P[b.Owner]
+				gf, owner := g.ghostFireOf(b.Ult), &g.P[b.Owner]
 				x0, y0 := b.X, b.Y
 				if !b.Back {
 					step := math.Min(gf.SpreadSpeed*dt, b.Left)
@@ -1478,7 +1490,9 @@ func (g *Game) stepBalls(dt float64) []Event {
 						return gf.Reach.hits(f) && segDist(f.X, f.Y, x0, y0, b.X, b.Y) <= gf.Radius+rad
 					}); ok {
 						b.Hit, b.FoeCD = true, hitCDNext(b.FoeCD, gf.RehitInterval)
+						g.ultNow = b.Ult // a Gigantamax Gengar's flames are its ultimate's
 						g.hit(foe, gf.Damage)
+						g.ultNow = false
 					}
 				}
 				kept = append(kept, b)
@@ -1610,7 +1624,7 @@ func (g *Game) ballDamage(b *Ball) int {
 	case ballFist:
 		return g.brawler(b.Owner).CometPunch.Damage
 	case ballGhost:
-		return g.cfg.Gengar.GhostFire.Damage
+		return g.ghostFireOf(b.Ult).Damage
 	case ballVolt:
 		return g.cfg.Pikachu.ThousandVolt.ContactDamage
 	case ballShadow:

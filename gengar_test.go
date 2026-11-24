@@ -549,3 +549,27 @@ func TestNightShadeAimedNearTheOpponentStaysWhereAimedAndIsNotPulledOntoIt(t *te
 		t.Fatalf("lands at %v,%v, want %v,250 where it was aimed, not on the opponent", b.TX, b.TY, 300+reach/2)
 	}
 }
+
+func TestTheSilenceOfTheShadowRunsOnForSilenceDurationAfterTheFoeLeavesItAndThroughTheEndOfTheSneak(t *testing.T) {
+	for _, extra := range []float64{0, 1.5} {
+		cfg := DefaultConfig()
+		cfg.Gengar.ShadowSneak.SilenceDuration = extra
+		g := gen(cfg, snorlax)
+		g.P[1].X = g.P[0].X + 50 // inside the shadow
+		gpress(g, Input{Skill: true})
+		for n := 0; n < 300 && g.P[0].SneakT > 0; n++ {
+			g.Step(dt)
+		}
+		if g.P[0].SneakT != 0 {
+			t.Fatal("the sneak never ended")
+		}
+		silent := 0.0 // how long the foe stays silenced once the sneak is over
+		for n := 0; n < 300 && g.P[1].SilentT > 0; n++ {
+			g.Step(dt)
+			silent += dt
+		}
+		if want := silenceLinger + extra; math.Abs(silent-want) > 2*dt+0.03 {
+			t.Fatalf("silence_duration %v: silenced %v s after the sneak, want about %v", extra, silent, want)
+		}
+	}
+}

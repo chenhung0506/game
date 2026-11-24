@@ -462,11 +462,10 @@ func (c *bctx) findThreat() threat {
 	}
 
 	if fl := c.flames(); len(fl) > 0 { // Ghost Fire: the first moment one of them reaches where the bot stands
-		gf := cfg.Gengar.GhostFire
 	soon:
 		for t := 0.0; t <= botHorizon+1e-9; t += 0.05 {
 			for _, bl := range fl {
-				if x, y := c.flameAt(bl, t+lag); math.Hypot(p.X-x, p.Y-y) <= gf.Radius+c.pr+25 {
+				if x, y := c.flameAt(bl, t+lag); math.Hypot(p.X-x, p.Y-y) <= g.ghostFireOf(bl.Ult).Radius+c.pr+25 {
 					ax, ay := c.safeDir(hz)
 					consider(threat{thBall, t, ax, ay})
 					break soon
@@ -575,7 +574,7 @@ func (c *bctx) flames() []*Ball {
 // flameAt is where a Ghost Fire flame will be t seconds on: straight out until it has flown its distance, then straight
 // at its owner, taken to stay where it is.
 func (c *bctx) flameAt(bl *Ball, t float64) (float64, float64) {
-	gf := c.g.cfg.Gengar.GhostFire
+	gf := c.g.ghostFireOf(bl.Ult)
 	x, y := bl.X, bl.Y
 	if !bl.Back {
 		out := math.Min(gf.SpreadSpeed*t, bl.Left)
@@ -597,7 +596,6 @@ func (c *bctx) walksIntoFlames(in Input) bool {
 	if len(fl) == 0 {
 		return false
 	}
-	gf := c.g.cfg.Gengar.GhostFire
 	ux, uy := unit(float64(in.DX), float64(in.DY))
 	speed := c.g.walkSpeedOf(c.p)
 	lag := botReact * dtBot
@@ -605,7 +603,7 @@ func (c *bctx) walksIntoFlames(in Input) bool {
 		x := math.Min(math.Max(c.p.X+ux*speed*t, 0), c.g.court.Length)
 		y := math.Min(math.Max(c.p.Y+uy*speed*t, 0), c.g.court.Width)
 		for _, bl := range fl {
-			if fx, fy := c.flameAt(bl, t+lag); math.Hypot(x-fx, y-fy) <= gf.Radius+c.pr+25 {
+			if fx, fy := c.flameAt(bl, t+lag); math.Hypot(x-fx, y-fy) <= c.g.ghostFireOf(bl.Ult).Radius+c.pr+25 {
 				return true
 			}
 		}
@@ -731,7 +729,7 @@ func (c *bctx) safeDir(hz []hazard) (float64, float64) {
 				x0, y0 := c.flameAt(bl, t-step+lag)
 				x1, y1 := c.flameAt(bl, t+lag)
 				cx, cy := closestOnSegment(x, y, x0, y0, x1, y1)
-				score = math.Min(score, math.Hypot(x-cx, y-cy)-c.g.cfg.Gengar.GhostFire.Radius-c.pr)
+				score = math.Min(score, math.Hypot(x-cx, y-cy)-c.g.ghostFireOf(bl.Ult).Radius-c.pr)
 			}
 		}
 		if k < 0 {
@@ -1304,6 +1302,14 @@ func (b *Bot) gengar(c *bctx) Input {
 		return c.move(-c.uy*b.strafe, c.ux*b.strafe)
 	}
 	danger := f.Kind == rowlet && f.ArrowT > 0
+	if p.GmaxT == 0 && p.Charge >= g.cfg.Gengar.Ultimate.Max && !danger && p.Z == 0 && p.SBallT == 0 && c.dist <= 600 { // the ultimate, as soon as it is charged and the opponent is in reach
+		in := c.stay()
+		in.Ult = true
+		return in
+	}
+	if p.gigantamax() {
+		return b.gengarGmax(c, danger)
+	}
 	th := c.th
 	if th.kind != thNone && th.eta <= botHorizon {
 		in := c.move(th.ax, th.ay)
@@ -1340,6 +1346,38 @@ func (b *Bot) gengar(c *bctx) Input {
 	case c.dist < 160:
 		return c.move(-c.ux+tx*0.6, -c.uy+ty*0.6)
 	case c.dist > 400:
+		return c.move(c.ux+tx*0.3, c.uy+ty*0.3)
+	}
+	return c.move(tx, ty)
+}
+
+// gengarGmax plays the Gigantamax Gengar: it licks a foe in reach of the tongue (the tongue is aimed as it gathers and a foe that walks off the line
+// escapes it, so the bot only tries when the foe is well inside the length), devours one that is inside the pull but not yet close, breathes its fan of fire at one within the flames' ring,
+// and otherwise closes in to the length of the tongue.
+func (b *Bot) gengarGmax(c *bctx, danger bool) Input {
+	g, p, f := c.g, c.p, c.f
+	gg := g.cfg.Gengar.Gigantamax
+	gf := gg.GhostFire
+	if p.LickPhase != lickNone || p.Z != 0 {
+		return c.stay() // the lick roots it
+	}
+	if p.LickCD == 0 && gg.Lick.Reach.hits(f) && !f.Held && c.dist <= gg.Lick.Length*0.8 && !danger {
+		in := c.stay()
+		in.Skill = true
+		return in
+	}
+	if p.DevourCD == 0 && gg.Devour.Reach.hits(f) && c.dist <= gg.Devour.GravityRadius && c.dist > gg.Devour.SilenceRadius && !danger && b.rng.Float64() < 0.5 {
+		in := c.stay()
+		in.SBall = true
+		return in
+	}
+	if p.GFireCD == 0 && gf.Reach.hits(f) && c.dist <= gf.RingRadius*0.8 && !danger && b.rng.Float64() < 0.6 {
+		in := c.stay()
+		in.GFire = true
+		return in
+	}
+	tx, ty := -c.uy*b.strafe, c.ux*b.strafe
+	if c.dist > gg.Lick.Length*0.6 {
 		return c.move(c.ux+tx*0.3, c.uy+ty*0.3)
 	}
 	return c.move(tx, ty)

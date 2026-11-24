@@ -341,6 +341,79 @@ type CharizardGmaxCfg struct {
 	SeismicToss    SeismicTossCfg `json:"seismic_toss"`
 }
 
+// GhostFireCfg is Gengar's Ghost Fire (J): `count` flames out all round it fly `ring_radius` out at `spread_speed`, then back to it at `convergence_speed`, each hurting the foe it
+// touches (`radius` big, at the heights `min_height`..`max_height`) for `damage`: once (`rehit_interval` 0) or again every `rehit_interval` seconds it still overlaps. A flame is a projectile with `hp` and `mass`.
+type GhostFireCfg struct {
+	Reach
+	Cooldown         float64 `json:"cooldown"`
+	RingRadius       float64 `json:"ring_radius"`
+	SpreadSpeed      float64 `json:"spread_speed"`
+	ConvergenceSpeed float64 `json:"convergence_speed"`
+	Damage           int     `json:"damage"`
+	Count            int     `json:"count"`
+	Radius           float64 `json:"radius"`
+	RehitInterval    float64 `json:"rehit_interval"` // 0: a flame hurts the opponent once; above 0: again every that many seconds it still overlaps
+	HP               int     `json:"hp"`             // a flame is a projectile: the opponent's balls and skills wear it down
+	Mass             float64 `json:"mass"`           // what a beam or a fist has to beat to push it
+}
+
+// GmaxGhostFireCfg is the Gigantamax Gengar's Ghost Fire (J): the whole set of GhostFireCfg numbers, its own and apart from gengar.ghost_fire's, and `angle`, the width in degrees of the fan the flames
+// are breathed in (they spread evenly over it, centred on the foe) instead of going out all round.
+type GmaxGhostFireCfg struct {
+	GhostFireCfg
+	Angle float64 `json:"angle"`
+}
+
+// LickCfg is the Gigantamax Gengar's Lick (the main button, in place of Shadow Sneak): it stands rooted `charge_duration` seconds (the tongue aimed at the foe all the while), then the
+// tongue goes out at `speed` along that line, up to `length` long and `width` wide, and the first foe it touches (inside `min_height`..`max_height`) takes `damage` and is stunned,
+// and is dragged back at `pull_speed` until it is at Gengar's body. There Gengar bites it: `bite_damage` and a stun of `bite_stun_duration` seconds, the bite lasting `bite_duration`. A tongue that
+// touches nobody comes back at `speed`. Gengar is then rooted `recharge_duration` more seconds. `cooldown` counts from the press. `tongue_scale` and `bite_scale` only make the drawing bigger.
+type LickCfg struct {
+	Reach
+	ChargeDuration   float64 `json:"charge_duration"`
+	RechargeDuration float64 `json:"recharge_duration"`
+	Speed            float64 `json:"speed"`
+	Length           float64 `json:"length"`
+	Width            float64 `json:"width"`
+	Damage           int     `json:"damage"`
+	PullSpeed        float64 `json:"pull_speed"`
+	BiteDuration     float64 `json:"bite_duration"`
+	BiteDamage       int     `json:"bite_damage"`
+	BiteStunDuration float64 `json:"bite_stun_duration"`
+	Cooldown         float64 `json:"cooldown"`
+	TongueScale      float64 `json:"tongue_scale"`
+	BiteScale        float64 `json:"bite_scale"`
+}
+
+// DevourCfg is the Gigantamax Gengar's Devour (K, in place of Shadow Ball): for `gravity_duration` seconds every foe (inside `min_height`..`max_height`) within `gravity_radius` of Gengar (plus its
+// body) is dragged toward it at `gravity` pixels a second, never past its body; and for `silence_duration` seconds every foe within `silence_radius` cannot start a skill. The two radii and the
+// two durations are separate, both run from the press, and the centre follows Gengar. `scale` only makes the drawing bigger.
+type DevourCfg struct {
+	Reach
+	GravityRadius   float64 `json:"gravity_radius"`
+	SilenceRadius   float64 `json:"silence_radius"`
+	Gravity         float64 `json:"gravity"`
+	GravityDuration float64 `json:"gravity_duration"`
+	SilenceDuration float64 `json:"silence_duration"`
+	Cooldown        float64 `json:"cooldown"`
+	Scale           float64 `json:"scale"`
+}
+
+// GengarGmaxCfg is Gengar's ultimate (Z, once the charge is full): for `duration` seconds it is the Gigantamax Gengar, with its own `max_hp` (the HP it has is scaled to it, and back when it is over),
+// `walk_speed` and body `radius`. Its main button is the Lick (in place of Shadow Sneak), K the Devour (in place of Shadow Ball) and J its own Ghost Fire (`ghost_fire`, a full set of numbers apart from
+// gengar.ghost_fire's), breathed only in front of it, `ghost_fire.angle` degrees wide.
+type GengarGmaxCfg struct {
+	ChargeDuration float64   `json:"charge_duration"` // seconds it stands rooted gathering before it changes (0: at once); a stun, a freeze or a catch ends it and the charge is not given back
+	MaxHP          int       `json:"max_hp"`
+	WalkSpeed      float64   `json:"walk_speed"`
+	Radius         float64   `json:"radius"`
+	Duration       float64   `json:"duration"`
+	Lick           LickCfg   `json:"lick"`
+	Devour         DevourCfg `json:"devour"`
+	// Its Ghost Fire flames keep these numbers while they are out, after it has changed back.
+	GhostFire GmaxGhostFireCfg `json:"ghost_fire"`
+}
+
 // Config holds the tuning values. Distances are in game units and times are in seconds.
 type Config struct {
 	// Length runs between the two players (left-right on the web page, up-down on a phone), width
@@ -866,20 +939,10 @@ type Config struct {
 			ShadowSpeedFirstHalf  float64 `json:"shadow_speed_first_half"`
 			ShadowSpeedSecondHalf float64 `json:"shadow_speed_second_half"`
 			ShadowRadius          float64 `json:"shadow_radius"`
+			// Seconds the silence the shadow gives lasts beyond the moment the foe last touched it (on top of the brief linger every touch has), so that a foe it caught is still silenced after the sneak is over. 0: only the linger.
+			SilenceDuration float64 `json:"silence_duration"`
 		} `json:"shadow_sneak"`
-		GhostFire struct {
-			Reach
-			Cooldown         float64 `json:"cooldown"`
-			RingRadius       float64 `json:"ring_radius"`
-			SpreadSpeed      float64 `json:"spread_speed"`
-			ConvergenceSpeed float64 `json:"convergence_speed"`
-			Damage           int     `json:"damage"`
-			Count            int     `json:"count"`
-			Radius           float64 `json:"radius"`
-			RehitInterval    float64 `json:"rehit_interval"` // 0: a flame hurts the opponent once; above 0: again every that many seconds it still overlaps
-			HP               int     `json:"hp"`             // a flame is a projectile: the opponent's balls and skills wear it down
-			Mass             float64 `json:"mass"`           // what a beam or a fist has to beat to push it
-		} `json:"ghost_fire"`
+		GhostFire GhostFireCfg `json:"ghost_fire"`
 		// Shadow Ball (K): rooted for `charge_time` seconds, then a ball flies straight along the aim (the way the Electro Ball does) at
 		// `speed`, `radius` big, with `hp` and `mass` (the opponent's skills and projectiles wear it down; at 0 it bursts where it
 		// is). It bursts on the opponent, a wall or when shot down: `slam_radius` round it the opponent takes `damage` once and is then
@@ -920,6 +983,9 @@ type Config struct {
 			GhostFireCount          int     `json:"ghost_fire_count"`
 			GhostFireDamage         int     `json:"ghost_fire_damage"`
 		} `json:"night_shade"`
+		// Ultimate (Z) is the charge for the Gigantamax Gengar below; Gigantamax is what it turns into (see GengarGmaxCfg).
+		Ultimate   Ultimate      `json:"ultimate"`
+		Gigantamax GengarGmaxCfg `json:"gigantamax"`
 	} `json:"gengar"`
 	// The practice dummy (the mode "打木樁"): a stump that stands still and never hits back (a blow can still knock it back, and it stays where it lands), with `max_hp` so high that a practice
 	// session does not end it, `radius` wide. It is only ever the computer's, in a room opened for practice.
@@ -1345,6 +1411,13 @@ func DefaultConfig() Config {
 	ns.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	ns.BallScale, ns.Damage, ns.Height, ns.Duration, ns.Cooldown, ns.SlamRadius, ns.Speed = 1, 25, 150, 0.9, 6, 110, 500
 	ns.GhostFireSpreadSpeed, ns.GhostFireRadius, ns.GhostFireSpreadDistance, ns.GhostFireCount, ns.GhostFireDamage = 260, 20, 220, 10, 5
+	g.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
+	gg := &g.Gigantamax // the ultimate: a great shadow-sunk body that licks its prey in, devours what is near and breathes its fire forward
+	gg.ChargeDuration, gg.MaxHP, gg.WalkSpeed, gg.Radius, gg.Duration = 1.2, 330, 140, 40, 15
+	gg.GhostFire = GmaxGhostFireCfg{GhostFireCfg: *gf, Angle: 90} // the same flames as Gengar's own to begin with
+	gg.Lick = LickCfg{Reach: Reach{MinHeight: 0, MaxHeight: 80}, ChargeDuration: 0.5, RechargeDuration: 0.4, Speed: 1400, Length: 520, Width: 44, Damage: 20, PullSpeed: 900,
+		BiteDuration: 0.35, BiteDamage: 35, BiteStunDuration: 1, Cooldown: 9, TongueScale: 1, BiteScale: 1}
+	gg.Devour = DevourCfg{Reach: Reach{MinHeight: 0, MaxHeight: 80}, GravityRadius: 420, SilenceRadius: 160, Gravity: 380, GravityDuration: 2, SilenceDuration: 3.5, Cooldown: 12, Scale: 1}
 	c.Machamp = c.Ash // the same moves a notch weaker: less health and reach, fewer and frailer fists and stones, longer waits
 	c.Machamp.MaxHP, c.Machamp.WalkSpeed = 125, 130
 	c.Machamp.TreeSlam.TrunkLength, c.Machamp.TreeSlam.LeafRadius, c.Machamp.TreeSlam.Damage, c.Machamp.TreeSlam.Cooldown = 270, 160, 30, 9
@@ -1470,6 +1543,14 @@ func (c Config) validate() error {
 	if err := gm.BurstPunch.validate(); err != nil {
 		return fmt.Errorf("machamp.gigantamax.burst_punch: %w", err)
 	}
+	if err := c.Gengar.Gigantamax.validate(); err != nil {
+		return fmt.Errorf("gengar.gigantamax: %w", err)
+	}
+	tmp = c
+	tmp.Gengar.GhostFire = c.Gengar.Gigantamax.GhostFire.GhostFireCfg
+	if err := tmp.validateSkills(); err != nil {
+		return fmt.Errorf("gengar.gigantamax.ghost_fire is checked like gengar.ghost_fire, and: %w", err)
+	}
 	cg := c.Charizard.Gigantamax
 	if cg.MaxHP <= 0 || !(cg.WalkSpeed > 0) || !(cg.Radius > 0) || !(cg.Duration > 0) {
 		return fmt.Errorf("charizard.gigantamax: max_hp (%d), walk_speed (%v), radius (%v) and duration (%v) must be above 0", cg.MaxHP, cg.WalkSpeed, cg.Radius, cg.Duration)
@@ -1482,6 +1563,39 @@ func (c Config) validate() error {
 	return nil
 }
 
+// validate checks the Gigantamax Gengar's body and its Lick, Devour and Ghost Fire fan.
+func (gg GengarGmaxCfg) validate() error {
+	for _, f := range []struct {
+		name string
+		v    float64
+		min  float64 // exclusive lower bound
+	}{
+		{"max_hp", float64(gg.MaxHP), 0}, {"walk_speed", gg.WalkSpeed, 0}, {"radius", gg.Radius, 0}, {"duration", gg.Duration, 0},
+		{"lick.speed", gg.Lick.Speed, 0}, {"lick.length", gg.Lick.Length, 0}, {"lick.width", gg.Lick.Width, 0}, {"lick.pull_speed", gg.Lick.PullSpeed, 0},
+		{"lick.tongue_scale", gg.Lick.TongueScale, 0}, {"lick.bite_scale", gg.Lick.BiteScale, 0},
+		{"devour.gravity_radius", gg.Devour.GravityRadius, 0}, {"devour.gravity", gg.Devour.Gravity, 0}, {"devour.scale", gg.Devour.Scale, 0},
+	} {
+		if !(f.v > f.min) || math.IsInf(f.v, 0) {
+			return fmt.Errorf("%s must be above %v, got %v", f.name, f.min, f.v)
+		}
+	}
+	for _, f := range []struct {
+		name string
+		v    float64
+	}{
+		{"lick.charge_duration", gg.Lick.ChargeDuration}, {"lick.recharge_duration", gg.Lick.RechargeDuration}, {"lick.damage", float64(gg.Lick.Damage)},
+		{"lick.bite_duration", gg.Lick.BiteDuration}, {"lick.bite_damage", float64(gg.Lick.BiteDamage)}, {"lick.bite_stun_duration", gg.Lick.BiteStunDuration}, {"lick.cooldown", gg.Lick.Cooldown},
+		{"devour.silence_radius", gg.Devour.SilenceRadius}, {"devour.gravity_duration", gg.Devour.GravityDuration}, {"devour.silence_duration", gg.Devour.SilenceDuration}, {"devour.cooldown", gg.Devour.Cooldown},
+	} {
+		if !(f.v >= 0) || math.IsInf(f.v, 0) {
+			return fmt.Errorf("%s must be 0 or more, got %v", f.name, f.v)
+		}
+	}
+	if !(gg.GhostFire.Angle > 0 && gg.GhostFire.Angle <= 360) {
+		return fmt.Errorf("ghost_fire.angle must be between 0 (exclusive) and 360, got %v", gg.GhostFire.Angle)
+	}
+	return nil
+}
 func (c Config) validateSkills() error {
 	for _, f := range []struct {
 		name string
@@ -1602,6 +1716,7 @@ func (c Config) validateSkills() error {
 		{"machamp.ultimate.max", c.Machamp.Ultimate.Max, 0},
 		{"charizard.ultimate.max", c.Charizard.Ultimate.Max, 0},
 		{"vulpix.ultimate.max", c.Vulpix.Ultimate.Max, 0},
+		{"gengar.ultimate.max", c.Gengar.Ultimate.Max, 0},
 		{"vulpix.glaciate.duration", c.Vulpix.Glaciate.Duration, 0},
 		{"vulpix.glaciate.radius", c.Vulpix.Glaciate.Radius, 0},
 		{"vulpix.glaciate.ring_scale", c.Vulpix.Glaciate.RingScale, 0},
@@ -1964,6 +2079,7 @@ func (c Config) validateSkills() error {
 		{"ash.comet_punch.cooldown", c.Ash.CometPunch.Cooldown},
 		{"machamp.comet_punch.mass", c.Machamp.CometPunch.Mass},
 		{"gengar.shadow_sneak.cooldown", c.Gengar.ShadowSneak.Cooldown},
+		{"gengar.shadow_sneak.silence_duration", c.Gengar.ShadowSneak.SilenceDuration},
 		{"gengar.shadow_sneak.shadow_speed_first_half", c.Gengar.ShadowSneak.ShadowSpeedFirstHalf},
 		{"gengar.shadow_sneak.shadow_speed_second_half", c.Gengar.ShadowSneak.ShadowSpeedSecondHalf},
 		{"pikachu.thousand_volt.ring_duration", c.Pikachu.ThousandVolt.RingDuration},
@@ -1992,6 +2108,11 @@ func (c Config) validateSkills() error {
 		{"vulpix.ultimate.gain_dealt", c.Vulpix.Ultimate.GainDealt},
 		{"vulpix.ultimate.gain_per_second", c.Vulpix.Ultimate.GainPerSecond},
 		{"vulpix.ultimate.gain_ultimate_dealt", c.Vulpix.Ultimate.GainUltDealt},
+		{"gengar.ultimate.gain_taken", c.Gengar.Ultimate.GainTaken},
+		{"gengar.ultimate.gain_dealt", c.Gengar.Ultimate.GainDealt},
+		{"gengar.ultimate.gain_per_second", c.Gengar.Ultimate.GainPerSecond},
+		{"gengar.ultimate.gain_ultimate_dealt", c.Gengar.Ultimate.GainUltDealt},
+		{"gengar.gigantamax.charge_duration", c.Gengar.Gigantamax.ChargeDuration},
 		{"vulpix.glaciate.ring_duration", c.Vulpix.Glaciate.RingDuration},
 		{"vulpix.glaciate.distance", c.Vulpix.Glaciate.Distance},
 		{"vulpix.glaciate.icicle.damage", float64(c.Vulpix.Glaciate.Icicle.Damage)},
@@ -2146,6 +2267,8 @@ func (c Config) validateSkills() error {
 		"gengar.ghost_fire":                  c.Gengar.GhostFire.Reach,
 		"gengar.shadow_ball":                 c.Gengar.ShadowBall.Reach,
 		"gengar.night_shade":                 c.Gengar.NightShade.Reach,
+		"gengar.gigantamax.lick":             c.Gengar.Gigantamax.Lick.Reach,
+		"gengar.gigantamax.devour":           c.Gengar.Gigantamax.Devour.Reach,
 		"ash.rock_tomb":                      c.Ash.RockTomb.Reach,
 	} {
 		if !(r.MinHeight >= -minHeightFloor && r.MaxHeight >= r.MinHeight) { // also rejects NaN

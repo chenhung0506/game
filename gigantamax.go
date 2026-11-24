@@ -25,6 +25,9 @@ func (c Config) gigantamaxOf(kind int) (gmaxStats, bool) {
 	case charizard:
 		gm := c.Charizard.Gigantamax
 		return gmaxStats{gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration, gm.ChargeDuration}, true
+	case gengar:
+		gm := c.Gengar.Gigantamax
+		return gmaxStats{gm.MaxHP, gm.WalkSpeed, gm.Radius, gm.Duration, gm.ChargeDuration}, true
 	}
 	return gmaxStats{}, false
 }
@@ -71,6 +74,9 @@ func (g *Game) stepGigantamax(i int, in Input, u Ultimate, dt float64) ([]Event,
 		if p.GmaxT -= dt; p.GmaxT < 1e-9 {
 			p.GmaxT = 0
 			g.rescaleHP(i, before)
+			if p.Kind == gengar {
+				g.endGengarGmax(p) // the tongue and the devouring stop with it
+			}
 			return []Event{{T: "gmaxend", X: p.X, Y: p.Y, R: g.radius(i), K: p.Kind}}, false
 		}
 		return nil, false
@@ -85,7 +91,8 @@ func (g *Game) stepGigantamax(i int, in Input, u Ultimate, dt float64) ([]Event,
 	}
 	busy := p.TreePhase != treeNone || p.CometT > 0 || p.RockT > 0 || p.MegaT > 0 || p.MegaJT > 0 || p.KickPhase != kickNone || p.UpPhase != upNone || p.LpT > 0 ||
 		p.Z != 0 || p.Held || p.FrozenT > 0 || p.StunT > 0 ||
-		p.TossPhase != tossNone || p.FlyT > 0 || p.BreathT > 0 || p.InfT > 0 // Charizard: in a toss, a flight, a breath or calling its bird
+		p.TossPhase != tossNone || p.FlyT > 0 || p.BreathT > 0 || p.InfT > 0 || // Charizard: in a toss, a flight, a breath or calling its bird
+		p.SneakT > 0 || p.SBallT > 0 || p.LickPhase != lickNone // Gengar: under the ground, charging a Shadow Ball or licking
 	if !in.Ult || p.Charge < u.Max || busy {
 		return nil, false
 	}

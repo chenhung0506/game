@@ -37,7 +37,9 @@ func isBrawler(kind int) bool { return kind == ash || kind == machamp }
 func (g *Game) brawler(i int) *BrawlerCfg { return g.brawlerP(&g.P[i]) }
 
 // gigantamax is whether p is a Gigantamax Machamp or a Gigantamax Charizard now (GmaxT is only ever set for those two).
-func (p *Player) gigantamax() bool { return (p.Kind == machamp || p.Kind == charizard) && p.GmaxT > 0 }
+func (p *Player) gigantamax() bool {
+	return (p.Kind == machamp || p.Kind == charizard || p.Kind == gengar) && p.GmaxT > 0
+}
 
 // brawlerP is the numbers p plays by. The Gigantamax Machamp has Machamp's, with its own Comet Punch (its Burst Punch and Lightning Punch are read from the config directly).
 func (g *Game) brawlerP(p *Player) *BrawlerCfg {

@@ -76,7 +76,8 @@ func (g *Game) dropGengar(i int) {
 			p.Z = 0
 		}
 	}
-	p.SBallT = 0 // a charge is lost
+	p.SBallT = 0  // a charge is lost
+	g.dropLick(p) // a tongue is pulled in, and what it held is let go
 }
 
 // sneakSpeed is how fast Gengar is steered under the ground: the first speed until the middle of the sneak, the second after.
@@ -93,7 +94,7 @@ func (g *Game) stepGengar(i int, in Input, dt float64) ([]Event, bool) {
 	p, other := &g.P[i], &g.P[g.nearestFoe(i)] // other: the foe it aims at
 	gs := g.cfg.Gengar
 	ss, gf, sb, ns := gs.ShadowSneak, gs.GhostFire, gs.ShadowBall, gs.NightShade
-	for _, cd := range []*float64{&p.SneakCD, &p.GFireCD, &p.SBallCD, &p.ShadeCD} {
+	for _, cd := range []*float64{&p.SneakCD, &p.GFireCD, &p.SBallCD, &p.ShadeCD, &p.LickCD, &p.DevourCD} {
 		if *cd > 0 {
 			if *cd -= dt; *cd < 1e-9 {
 				*cd = 0
@@ -101,6 +102,10 @@ func (g *Game) stepGengar(i int, in Input, dt float64) ([]Event, bool) {
 		}
 	}
 
+	if p.gigantamax() { // the Gigantamax Gengar: the Lick, the Devour and a Ghost Fire breathed forward, in place of these three; all of it is its ultimate's
+		defer g.ultimateDamage()()
+		return g.stepGengarGmax(i, in, dt)
+	}
 	// ---- Shadow Ball, charging: rooted, and no other skill meanwhile ----
 	if p.SBallT > 0 {
 		if p.SBallLock { // the aim chosen at the cast, whatever the stick says meanwhile
@@ -128,7 +133,7 @@ func (g *Game) stepGengar(i int, in Input, dt float64) ([]Event, bool) {
 		}
 		for _, j := range g.foes(i) {
 			if foe := &g.P[j]; ss.Reach.hits(foe) && math.Hypot(foe.X-p.X, foe.Y-p.Y) <= ss.ShadowRadius+g.radius(j) {
-				foe.SilentT = silenceLinger
+				foe.SilentT = math.Max(foe.SilentT, silenceLinger+ss.SilenceDuration) // while it is in the shadow it is held at the full time, and it runs out after it has left
 			}
 		}
 		return nil, false

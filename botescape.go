@@ -70,7 +70,7 @@ func (b *Bot) escapeBySkill(c *bctx) (Input, bool) {
 			return in, true
 		}
 	case gengar:
-		if p.SneakCD == 0 && p.SneakT == 0 {
+		if p.SneakCD == 0 && p.SneakT == 0 && !p.gigantamax() { // the Gigantamax Gengar's main button is the Lick, not a way out
 			in.Skill = true
 			return in, true
 		}

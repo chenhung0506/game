@@ -1325,3 +1325,42 @@ func TestVulpixBotKeepsTheBeamOnAnOpponentThatStrafes(t *testing.T) {
 		}
 	}
 }
+
+func TestGengarBecomesGigantamaxWhenChargedAndTheOpponentIsInReach(t *testing.T) {
+	g := gengarDuel()
+	g.P[0].Charge = g.cfg.Gengar.Ultimate.Max
+	if in, ok := firstAct(newBot(gengar, 1), g, 0, 200); !ok || !in.Ult {
+		t.Fatalf("decision %+v (pressed %v), want the ultimate", in, ok)
+	}
+	g.P[0].Charge = 0
+	if in, ok := firstAct(newBot(gengar, 1), g, 0, 200); ok && in.Ult {
+		t.Fatal("it used the ultimate without the charge")
+	}
+}
+func TestTheGigantamaxGengarLicksADistantFoeAndNeverSneaksWithTheMainButton(t *testing.T) {
+	g := gengarDuel()
+	g.P[0].GmaxT = 50
+	g.P[1].X = g.P[0].X + 300
+	g.P[0].GFireCD, g.P[0].DevourCD = 99, 99
+	in, ok := firstAct(newBot(gengar, 1), g, 0, 200)
+	if !ok || !in.Skill || in.SBall || in.Ult {
+		t.Fatalf("decision %+v (pressed %v), want the Lick on the main button", in, ok)
+	}
+	g.P[0].LickCD = 99
+	g.P[0].SneakCD = 0
+	b := newBot(gengar, 1)
+	for n := 0; n < 100; n++ {
+		if in := b.Decide(g, 0); in.Skill && g.P[0].LickCD > 0 {
+			t.Fatal("with the Lick cooling down it pressed the main button as if it would sneak")
+		}
+	}
+}
+func TestTheGigantamaxGengarDevoursAFoeInsideThePullButOutsideTheSilence(t *testing.T) {
+	g := gengarDuel()
+	g.P[0].GmaxT = 50
+	g.P[0].LickCD, g.P[0].GFireCD = 99, 99
+	g.P[1].X = g.P[0].X + (g.cfg.Gengar.Gigantamax.Devour.GravityRadius+g.cfg.Gengar.Gigantamax.Devour.SilenceRadius)/2
+	if in, ok := firstAct(newBot(gengar, 1), g, 0, 300); !ok || !in.SBall {
+		t.Fatalf("decision %+v (pressed %v), want the Devour", in, ok)
+	}
+}

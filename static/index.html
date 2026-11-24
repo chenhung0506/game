@@ -103,7 +103,7 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟', '鯉魚王', '小智', '怪力', '梗鬼'];
 const FORMS = [...NAMES, '紅色暴鯉龍']; // every kind a player can be in: Magikarp becomes the last one (nobody picks it)
-const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭・大藤蔓（絕招）', '冰山滑行・冰風暴・急凍光線・冰封世界（絕招）', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球'];
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭・大藤蔓（絕招）', '冰山滑行・冰風暴・急凍光線・冰封世界（絕招）', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球・極巨化（絕招）'];
 const HELP = [
   '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝千萬伏特（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能放；朝四周放出一圈閃電，之後追著敵人跑、碰到會擊退，時間到全部爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）',
@@ -114,7 +114,7 @@ const HELP = [
   '你是鯉魚王　移動 WASD　空白鍵＝彈跳（跳到半空並在最高點停一會兒再落下，打不到那麼高的招式都打不到你，落地不傷人；每落地一次算一次，累計彈跳 5 次就會進化成紅色暴鯉龍）　沒有其他技能',
   '你是真新鎮小智　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人）　L＝百萬噸拳擊（絕招，蓄能滿了才能放；天色會變暗。朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），蓄力後半段畫面會閃爍，朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
   '你是怪力　移動 WASD　空白鍵＝上鉤拳（朝按住的方向滑一步，接著朝敵人衝過去給他一記上鉤拳，打中的敵人受傷、不會被推開，而是被打飛到空中動彈不得）　J＝子彈拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝飛膝踢（直接朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　L＝極巨化（絕招，蓄能滿了才能放：變成又大又壯的極巨化怪力一段時間，血量、速度和招式的數值都換成極巨化的；這段時間空白鍵變成爆裂拳（先朝方向鍵滑一步，再定身蓄力，朝敵人揮出拳頭，拳頭周圍的空中和地面接連出現黑白爆炸，炸中的敵人被炸上天，被炸中越多次飛越高）、K 變成閃電拳：定身蓄力，朝敵人揮出巨大的拳頭，打中的同時一道巨大的閃電從天而降）',
-  '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才發射；輕點就朝敵人；定身蓄力一下後，球筆直飛出去，碰到敵人、牆或被打爆就爆炸，會把範圍內的敵人往中心吸過去一陣子，並向外炸出一圈不會回頭的紫色火焰；球有血量，敵人的招式和飛行物可以提早打爆它）',
+  '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才發射；輕點就朝敵人；定身蓄力一下後，球筆直飛出去，碰到敵人、牆或被打爆就爆炸，會把範圍內的敵人往中心吸過去一陣子，並向外炸出一圈不會回頭的紫色火焰；球有血量，敵人的招式和飛行物可以提早打爆它）　L＝極巨化（絕招，蓄能滿了才能用；變成又大又厚的極巨化梗鬼一陣子：空白鍵＝舔舌（定身蓄力一下，舌頭朝敵人伸出去，碰到的敵人受傷、被擊暈、被拉回你身邊，再被你啃一口並再次擊暈；沒碰到舌頭就縮回來）　K＝吞噬（以自己為中心把範圍內的敵人拉過來，更近的範圍內的敵人還不能出招，拉人和沈默的時間各自計算）　J＝鬼火（只朝正前方扇形噴出）；鬼火、潛行與影子球在變身期間換成這三招）',
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
 const ghosts = []; // dash afterimages
@@ -141,8 +141,10 @@ let radius = [16, 24, 26, 18, 14, 13]; // indexed by character
 const REF = [16, 24, 26, 18, 14, 13, 10, 30, 30, 20, 36, 28];
 let gmaxCfg = { hp: 190, radius: 40, dur: 15, charge: 1.5 }; // the Gigantamax Machamp's HP, body size and time, from 'hi'
 let cgmaxCfg = { hp: 600, radius: 60, dur: 8, fire: 28, firehp: 12, toss: 160, scale: 1, sky: 300, boom: 220, bhp: 60, charge: 1.5, cd: { fly: 14, fire: 8, toss: 7 } }; // the Gigantamax Charizard's: HP, body size, time, fire ball size and HP, the toss's glow, and the cooldowns of its three skills, from 'hi'
-const isGmax = (p) => (p.k === 8 || p.k === 2) && p.gmt > 0; // p is a Gigantamax Machamp or Charizard now
-const gmaxOf = (k) => (k === 2 ? cgmaxCfg : gmaxCfg);
+let ggmaxCfg = { hp: 330, radius: 40, dur: 15, charge: 1.2, llen: 520, lwidth: 44, lcharge: 0.5, lbite: 0.35, tscale: 1, bscale: 1, dgrav: 420, dsil: 160, dgdur: 2, dsdur: 3.5, dscale: 1, angle: 90, fire: 22 }; // the Gigantamax Gengar's: body, Lick, Devour and fan of fire, from 'hi'
+const GENGAR_GMAX_REF = 40; // the Gigantamax Gengar's art is drawn about this wide (its body radius is 1 : 1 with it)
+const isGmax = (p) => (p.k === 8 || p.k === 2 || p.k === 9) && p.gmt > 0; // p is a Gigantamax Machamp, Charizard or Gengar now
+const gmaxOf = (k) => (k === 2 ? cgmaxCfg : k === 9 ? ggmaxCfg : gmaxCfg);
 const bodyR = (p) => (isGmax(p) ? gmaxOf(p.k).radius : radius[p.k]); // how big p's body is now
 const dummyHit = { n: 0, at: 0, hp: null }; // the last blow the dummy took: how much, and when
 const DUMMY = 11; // the practice dummy (only the computer's)
@@ -213,7 +215,7 @@ const beamSlots = () => (snap ? [...snap.p.keys()].filter((i) => hasBeam(snap.p[
 const slotsOf = (k) => (snap ? [...snap.p.keys()].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; kickText = m.kicktext; gmaxCfg = m.gmax; cgmaxCfg = m.cgmax; upText = m.uptext; upWarn = m.upwarn; gengarCfg = m.gengar; fistCfgs = m.fist; gFistCfg = m.gfist; lpCfg = m.glp; bpCfg = m.gbp; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; glaCfg = m.glaciate; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; kickText = m.kicktext; gmaxCfg = m.gmax; cgmaxCfg = m.cgmax; ggmaxCfg = m.ggmax; upText = m.uptext; upWarn = m.upwarn; gengarCfg = m.gengar; fistCfgs = m.fist; gFistCfg = m.gfist; lpCfg = m.glp; bpCfg = m.gbp; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; glaCfg = m.glaciate; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (PLAY === 'dummy' && !!m.full !== fullWant) send({ fullcharge: fullWant }); // the practice room starts without it: say what the box says
     if (m.on || (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1])) return; // a match is on: a refused pick changes nothing
@@ -263,6 +265,9 @@ ws.onmessage = (e) => {
       if (ev.t === 'kickhit') shake = 24;
       if (ev.t === 'uphit') shake = 20;
       if (ev.t === 'gmax') shake = 30;
+      if (ev.t === 'bite') shake = 20;
+      if (ev.t === 'lickhit') shake = Math.max(shake, 6);
+      if (ev.t === 'devour') shake = Math.max(shake, 8);
       if (ev.t === 'bpunch') shake = 22;
       if (ev.t === 'bpboom') shake = Math.max(shake, 5);
       if (ev.t === 'lpbolt') { shake = 40; flashT = 4 * Math.max(1, tvoltCfg.fevery); }
@@ -590,7 +595,7 @@ const PAD = [
   { main: ['彈跳', 'skill'], small: [] }, // Magikarp
   { main: ['飛膝踢', 'skill'], small: [['拔樹', 'tree'], ['百裂拳', 'comet']], ult: ['百萬噸', 'ult'] }, // Ash: the kick is the main skill (sent as Skill, personsInput on the server sorts out what it is), the tree and the Comet Punch the small ones, the Megaton Punch the ultimate
   { main: ['上鉤拳', 'skill'], small: [['子彈拳', 'comet'], ['飛膝踢', 'rock']], ult: ['極巨化', 'ult'] }, // Machamp: Z turns it into the Gigantamax Machamp; the Uppercut is the main skill, the High Jump Kick (the page sends K as `rock`, the server turns it into the kick) a small one; the Rock Tomb is not used
-  { main: ['暗影潛行', 'skill'], small: [['鬼火', 'gfire'], ['影子球', 'sball', true]] }, // Gengar
+  { main: ['暗影潛行', 'skill'], small: [['鬼火', 'gfire'], ['影子球', 'sball', true]], ult: ['極巨化', 'ult'] }, // Gengar: Z turns it into the Gigantamax Gengar, whose three buttons are the Lick, the Devour and the fan of fire
   { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
 ];
 function buildPad() {
@@ -623,7 +628,7 @@ function buildPad() {
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
     if (name === 'ult') { // no cooldown: the dark pie is the charge still missing, and the button lights up when it is full
       const pct = document.createElement('div'); pct.className = 'pct'; b.append(pct); b.classList.add('ult'); ultBtn = { b, span, pct };
-    } else cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1], b, label, gmLabel: padKind === 8 && name === 'rock' ? '閃電拳' : padKind === 8 && name === 'skill' ? '爆裂拳' : padKind === 2 && name === 'skill' ? '地獄滅焰' : null }); // gmLabel: what the button says while Machamp is Gigantamax
+    } else cdBtns.push({ span, field: CD[padKind][name][0], total: CD[padKind][name][1], b, label, gmLabel: padKind === 9 && name === 'skill' ? '舔舌' : padKind === 9 && name === 'sball' ? '吞噬' : padKind === 8 && name === 'rock' ? '閃電拳' : padKind === 8 && name === 'skill' ? '爆裂拳' : padKind === 2 && name === 'skill' ? '地獄滅焰' : null }); // gmLabel: what the button says while Machamp is Gigantamax
     if (padKind === 0 && name === 'skill') { usesBadge = document.createElement('div'); usesBadge.className = 'uses'; b.append(usesBadge); }
     if (aimed) { // the button turns into a stick while it is held: the way it is dragged is the way the skill goes
       const ring = document.createElement('div'), dot = document.createElement('div'); ring.className = 'aimring'; dot.className = 'aimdot'; b.append(ring, dot);
@@ -1638,7 +1643,7 @@ function artCharizard(c, x, y, t, flap, pose = IDLE) {
 
 // (x, y) is a ground point in the world and lift is the height above it, which is up on screen.
 function drawBody(kind, X, Y, alpha, lift = 0, flap = 0, pose = IDLE, spin = 0, tumble = 0) {
-  const bs = (pose.gmax ? gmaxOf(kind).radius : radius[kind]) / REF[kind];
+  const bs = (pose.gmax ? gmaxOf(kind).radius : radius[kind]) / (pose.gmax && kind === 9 ? GENGAR_GMAX_REF : REF[kind]);
   ctx.save(); ctx.translate(X, Y); ctx.rotate(-ROT); // upright whatever the view
   ctx.scale(bs, bs);
   ctx.globalAlpha = alpha;
@@ -1662,7 +1667,7 @@ function drawTelegraph() {
   for (const si of slotsOf(0)) drawVoltCharge(si);
   for (const si of slotsOf(5)) drawBirdCharge(si);
   for (const si of slotsOf(4)) drawGlaciateCharge(si);
-  if (aiming && AIMED[snap.p[you].k] === aiming.name) drawAimFan(snap.p[you], disp[you]);
+  if (aiming && AIMED[snap.p[you].k] === aiming.name && !(snap.p[you].k === 9 && snap.p[you].gmt > 0)) drawAimFan(snap.p[you], disp[you]); // the Gigantamax Gengar's K is the Devour, a plain press
 }
 // The fan of an aimed skill the player is choosing, drawn for them only (the opponent's page never gets it; it is not sent) until the cast, when the
 // real warning takes over. Without a direction it points at the opponent, which is where a tap would send it.
@@ -1823,7 +1828,7 @@ function drawBall(b) {
   if (b.k === 5) { drawTornado(b); return; }
   if (b.k === 6) { drawStone(b); return; }
   if (b.k === 7) { drawCometFist(b); return; }
-  if (b.k === 8) { drawGhostFlame(b.x, b.y, gengarCfg.fire); return; }
+  if (b.k === 8) { drawGhostFlame(b.x, b.y, b.ug ? ggmaxCfg.fire : gengarCfg.fire); return; } // a Gigantamax Gengar's flame has its own size
   if (b.k === 9) { drawShadowOrb(b); return; }
   if (b.k === 11) { drawVoltBolt(b); return; }
   if (b.k === 12) { drawGiantHead(b); return; }
@@ -1960,8 +1965,8 @@ function drawFirebirdBody(b) {
 function drawGmaxCharge() {
   const now = performance.now() / 1000;
   for (const [i, p] of snap.p.entries()) {
-    if ((p.k !== 2 && p.k !== 8) || !(p.uct > 0)) continue;
-    const d = disp[i], total = Math.max(0.2, (p.k === 2 ? cgmaxCfg : gmaxCfg).charge), k = Math.min(1, Math.max(0, 1 - p.uct / total)), r0 = Math.max(radius[p.k], 18), col = p.k === 2 ? '255,150,30' : '190,110,255', hot = p.k === 2 ? '255,235,150' : '235,210,255';
+    if ((p.k !== 2 && p.k !== 8 && p.k !== 9) || !(p.uct > 0)) continue;
+    const d = disp[i], total = Math.max(0.2, gmaxOf(p.k).charge), k = Math.min(1, Math.max(0, 1 - p.uct / total)), r0 = Math.max(radius[p.k], 18), col = p.k === 2 ? '255,150,30' : p.k === 9 ? '150,60,220' : '190,110,255', hot = p.k === 2 ? '255,235,150' : p.k === 9 ? '225,185,255' : '235,210,255';
     const G = r0 * (3 + 5 * k), gr = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, G); // a big glow that swells to fill the screen round it
     gr.addColorStop(0, `rgba(255,255,240,${0.55 * k + 0.1})`); gr.addColorStop(0.35, `rgba(${col},${0.5 * k + 0.1})`); gr.addColorStop(1, `rgba(${col},0)`);
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(d.x, d.y, G, 0, 7); ctx.fill();
@@ -3287,13 +3292,13 @@ function drawEarthquake(f) {
 }
 // The change into (or out of) the Gigantamax Machamp: a ring of red-hot light opening out over the ground and streaks of it shooting up.
 function drawGmaxBurst(f) {
-  const k = f.age / 0.9, a = 1 - k, R = (f.r || 40) * 2;
+  const k = f.age / 0.9, a = 1 - k, R = (f.r || 40) * 2, gp = f.k === 9; // a Gigantamax Gengar's is violet
   ctx.save(); ctx.lineCap = 'round'; ctx.globalCompositeOperation = 'lighter';
-  for (const [w, col] of [[10, `rgba(255,90,40,${0.55 * a})`], [4, `rgba(255,230,160,${a})`]]) { ctx.strokeStyle = col; ctx.lineWidth = w * a + 1; ctx.beginPath(); ctx.ellipse(f.x, f.y, R * (0.3 + 3 * k), R * (0.3 + 3 * k) * 0.5, 0, 0, 7); ctx.stroke(); }
+  for (const [w, col] of [[10, gp ? `rgba(150,60,230,${0.55 * a})` : `rgba(255,90,40,${0.55 * a})`], [4, gp ? `rgba(235,200,255,${a})` : `rgba(255,230,160,${a})`]]) { ctx.strokeStyle = col; ctx.lineWidth = w * a + 1; ctx.beginPath(); ctx.ellipse(f.x, f.y, R * (0.3 + 3 * k), R * (0.3 + 3 * k) * 0.5, 0, 0, 7); ctx.stroke(); }
   upright(f.x, f.y, () => {
     for (let i = 0; i < 14; i++) {
       const x = (i - 6.5) * R * 0.28, r0 = 8 + 40 * k, r1 = r0 + (60 + 160 * Math.min(1, k * 2)) * (0.5 + 0.5 * Math.abs(Math.sin(i * 3.1)));
-      ctx.strokeStyle = i % 2 ? `rgba(255,150,60,${a})` : `rgba(255,255,255,${a})`; ctx.lineWidth = 5 * a + 1;
+      ctx.strokeStyle = i % 2 ? (gp ? `rgba(190,110,255,${a})` : `rgba(255,150,60,${a})`) : `rgba(255,255,255,${a})`; ctx.lineWidth = 5 * a + 1;
       ctx.beginPath(); ctx.moveTo(x, -r0); ctx.lineTo(x, -r1); ctx.stroke();
     }
   });
@@ -3517,6 +3522,84 @@ function drawGhostFlame(x, y, r, a = 1) {
     flameDrawing(w, up, down); ctx.fillStyle = 'rgba(150,70,225,0.95)'; ctx.fill(); ctx.strokeStyle = 'rgba(70,20,130,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
     flameDrawing(w * 0.55, up * 0.62, down * 0.6); ctx.fillStyle = 'rgba(235,200,255,0.95)'; ctx.fill();
   });
+}
+// ---- The Gigantamax Gengar's Lick, Devour and bite ----
+// The Lick: while it gathers (p.lkp 1) a pale strip on the ground shows how far and how wide the tongue will go, along the way it is aimed (it follows the foe); then the tongue itself
+// (2 out, 3 dragging the foe in, 4 coming back) is a thick pink-violet band from Gengar's middle to its tip, p.lkd long.
+function drawLick(p, d) {
+  const c = ggmaxCfg, ux = p.lkx, uy = p.lky, now = performance.now() / 1000;
+  const W = c.lwidth * c.tscale;
+  ctx.save(); ctx.lineCap = 'round';
+  if (p.lkp === 1) {
+    const k = Math.min(1, Math.max(0, 1 - p.lkt / Math.max(c.lcharge, 1e-6)));
+    ctx.fillStyle = `rgba(170,80,230,${0.12 + 0.12 * k})`; ctx.strokeStyle = `rgba(210,150,255,${0.5 + 0.4 * k})`; ctx.lineWidth = 2; ctx.setLineDash([12, 8]);
+    ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(Math.atan2(uy, ux)); ctx.beginPath(); ctx.rect(0, -c.lwidth / 2, c.llen, c.lwidth); ctx.fill(); ctx.stroke(); ctx.restore();
+    ctx.setLineDash([]);
+    const L = 14 + 26 * k; // the tip of the tongue pokes out of the mouth as it gathers
+    ctx.strokeStyle = '#5a2a78'; ctx.lineWidth = W * 0.7 + 4; ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + ux * L, d.y + uy * L); ctx.stroke();
+    ctx.strokeStyle = '#9b57b8'; ctx.lineWidth = W * 0.7; ctx.stroke();
+  } else if (p.lkp >= 2 && p.lkp <= 4 && p.lkd > 0) {
+    const L = p.lkd, tx = d.x + ux * L, ty = d.y + uy * L, wob = Math.sin(now * 30) * 1.5;
+    for (const [w, col] of [[W + 6, '#4a1f68'], [W, '#8c4fa8'], [W * 0.38, 'rgba(225,170,240,0.75)']]) { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(tx - uy * wob, ty + ux * wob); ctx.stroke(); }
+    ctx.fillStyle = '#8c4fa8'; ctx.strokeStyle = '#4a1f68'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(tx, ty, W * 0.62, 0, 7); ctx.fill(); ctx.stroke(); // the tip is a little broader than the rest
+    ctx.fillStyle = 'rgba(235,190,250,0.7)'; ctx.beginPath(); ctx.arc(tx - ux * W * 0.12, ty - uy * W * 0.12 - W * 0.14, W * 0.2, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+// The tongue touching the foe: a ring and a few spikes where it lands.
+function drawLickHit(f) {
+  const k = f.age / 0.35, a = 1 - k, R = Math.max(30, f.r || 40) * (0.5 + k);
+  ctx.save(); ctx.strokeStyle = `rgba(235,190,255,${a})`; ctx.lineWidth = 4 * a + 1; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.stroke();
+  for (let i = 0; i < 8; i++) { const an = i * 0.785 + 0.3; ctx.beginPath(); ctx.moveTo(f.x + Math.cos(an) * R * 0.6, f.y + Math.sin(an) * R * 0.6); ctx.lineTo(f.x + Math.cos(an) * R * 1.15, f.y + Math.sin(an) * R * 1.15); ctx.stroke(); }
+  ctx.restore();
+}
+// The bite on the foe it dragged in: jaws full of pointed teeth open over it and snap shut, with a flash where they meet.
+function drawBiteFx(f) {
+  const dur = Math.max(0.4, ggmaxCfg.lbite + 0.25), k = Math.min(1, f.age / dur), a = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+  const s = Math.max(30, (f.r || 40) * 1.3) * ggmaxCfg.bscale, close = Math.min(1, k / 0.35), gap = s * 0.95 * (1 - close * close);
+  upright(f.x, f.y, () => {
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(45,10,55,0.8)'; ctx.beginPath(); ctx.ellipse(0, -s * 0.2, s * 1.05, s * 0.3 + gap * 0.5, 0, 0, 7); ctx.fill();
+    for (const up of [-1, 1]) { // the upper jaw (-1) hangs its teeth down, the lower (1) stands them up
+      const y0 = up * (gap * 0.5 + s * 0.08) - s * 0.2;
+      ctx.fillStyle = '#7a3a98'; ctx.fillRect(-s * 1.05, up < 0 ? y0 - s * 0.2 : y0, s * 2.1, s * 0.2);
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#cfc4dc'; ctx.lineWidth = 1;
+      for (let q = 0; q < 8; q++) { const x = (q - 3.5) * s * 0.27; ctx.beginPath(); ctx.moveTo(x - s * 0.13, y0); ctx.lineTo(x + s * 0.13, y0); ctx.lineTo(x, y0 - up * s * 0.42); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    }
+    if (k > 0.3 && k < 0.65) { // the snap
+      const fl = 1 - Math.abs(k - 0.42) / 0.23; ctx.strokeStyle = `rgba(255,255,255,${fl})`; ctx.lineWidth = 3;
+      for (let i = 0; i < 10; i++) { const an = i * 0.628; ctx.beginPath(); ctx.moveTo(Math.cos(an) * s * 0.3, -s * 0.2 + Math.sin(an) * s * 0.2); ctx.lineTo(Math.cos(an) * s * (0.7 + 0.5 * fl), -s * 0.2 + Math.sin(an) * s * (0.5 + 0.4 * fl)); ctx.stroke(); }
+    }
+    ctx.restore();
+  });
+}
+// The Devour: a dark well over the whole reach of the pull with the dark drawn in along curving arms while it pulls (p.dvt), and a ring round what is close enough to be silenced while that lasts (p.dvs).
+function drawDevour() {
+  const now = performance.now() / 1000, c = ggmaxCfg;
+  for (const si of slotsOf(9)) {
+    const p = snap.p[si], d = disp[si];
+    if (!(p.gmt > 0) || !(p.dvt > 0 || p.dvs > 0)) continue;
+    ctx.save();
+    if (p.dvt > 0) {
+      const a = Math.min(1, p.dvt / 0.4), R = c.dgrav;
+      const gr = ctx.createRadialGradient(d.x, d.y, 10, d.x, d.y, R);
+      gr.addColorStop(0, `rgba(25,5,45,${0.6 * a})`); gr.addColorStop(0.7, `rgba(80,25,130,${0.2 * a})`); gr.addColorStop(1, 'rgba(80,25,130,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.fill();
+      ctx.strokeStyle = `rgba(190,130,255,${0.65 * a})`; ctx.lineWidth = 2.5; ctx.setLineDash([14, 10]); ctx.lineDashOffset = now * 70; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      for (let n = 0; n < 44; n++) { // motes of dark running in along five arms
+        const u = (n / 44 + now * 0.7) % 1, an = (n % 5) * 1.2566 + u * 4 + now * 1.2, r = 14 + (R - 14) * (1 - u), sz = (2 + 4 * (1 - u)) * c.dscale;
+        ctx.fillStyle = `rgba(${n % 2 ? '210,150,255' : '60,10,90'},${a * (0.35 + 0.5 * (1 - u))})`; ctx.beginPath(); ctx.arc(d.x + Math.cos(an) * r, d.y + Math.sin(an) * r, sz, 0, 7); ctx.fill();
+      }
+    }
+    if (p.dvs > 0) {
+      const a = Math.min(1, p.dvs / 0.4), R = c.dsil;
+      ctx.fillStyle = `rgba(60,10,90,${0.16 * a})`; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.fill();
+      ctx.strokeStyle = `rgba(235,170,255,${0.9 * a})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(d.x, d.y, R, 0, 7); ctx.stroke();
+      ctx.lineWidth = 2;
+      for (let n = 0; n < 12; n++) { const an = n * 0.5236 + now * 0.8; ctx.beginPath(); ctx.moveTo(d.x + Math.cos(an) * R * 0.86, d.y + Math.sin(an) * R * 0.86); ctx.lineTo(d.x + Math.cos(an) * R * 1.0, d.y + Math.sin(an) * R * 1.0); ctx.stroke(); }
+    }
+    ctx.restore();
+  }
 }
 function drawGhostFires() {
   for (const f of snap.gh || []) drawGhostFlame(f.x, f.y, gengarCfg.sfire);
@@ -3758,16 +3841,18 @@ function artGengarGmax(c, x, y, t, pose) {
   glow(0.9 * pulse, 0.75);
   c.restore();
   if (side) { // the tongue lies in the mouth and lolls out over the chin; the lower jaw, the second incisor and the upper teeth are drawn over it
-    c.fillStyle = '#8c4fa8'; c.strokeStyle = '#5a2a78'; c.lineWidth = 1; c.beginPath();
-    c.moveTo(2, 5); c.quadraticCurveTo(14, 3, 32, 10); c.bezierCurveTo(42, 15.5, 43.5, 26, 35, 26.5); c.bezierCurveTo(29, 23.5, 25, 15.5, 10, 10.5); c.lineTo(2, 6.6); c.closePath(); c.fill(); c.stroke(); // the root runs back into the throat
-    ov(c, 38, 23, 2.4, 3.6, 'rgba(190,140,215,0.45)', 0.5, null);
+    if (!pose.lick) { // (while the Lick's tongue is out, this one is not drawn)
+      c.fillStyle = '#8c4fa8'; c.strokeStyle = '#5a2a78'; c.lineWidth = 1; c.beginPath();
+      c.moveTo(2, 5); c.quadraticCurveTo(14, 3, 32, 10); c.bezierCurveTo(42, 15.5, 43.5, 26, 35, 26.5); c.bezierCurveTo(29, 23.5, 25, 15.5, 10, 10.5); c.lineTo(2, 6.6); c.closePath(); c.fill(); c.stroke(); // the root runs back into the throat
+      ov(c, 38, 23, 2.4, 3.6, 'rgba(190,140,215,0.45)', 0.5, null);
+    }
     c.fillStyle = P; c.beginPath(); c.moveTo(0, 6); c.lineTo(27, 17); c.quadraticCurveTo(29, 18, 28, G); c.lineTo(0, G); c.closePath(); c.fill(); // the lower jaw
     c.save(); c.clip(); c.beginPath(); c.rect(-60, G - 1, 120, 30); c.clip(); glow(0.9 * pulse, 0.75); c.restore(); // under the same shading as the rest of the body's foot, so the two do not show as separate shapes
     c.strokeStyle = OUTLINE; c.lineWidth = 0.8; c.lineJoin = 'round'; c.beginPath(); c.moveTo(0, 6); c.lineTo(27, 17); c.quadraticCurveTo(29, 18, 28, G); c.stroke(); // outlined along the top and round the front
     c.fillStyle = '#fff'; c.strokeStyle = '#cfc4dc'; c.lineWidth = 0.6;
     { const tx = 22, ty = 6 + tx * 0.407; c.beginPath(); c.moveTo(tx - 2.6, ty - 0.8); c.lineTo(tx + 2.6, ty + 0.9); c.lineTo(tx + 0.4, ty - 7); c.closePath(); c.fill(); c.stroke(); } // the second lower incisor, in front of the tongue
     for (let k = 2; k < 6; k++) { const tx = 2.5 + k * 4.6, ty = 6 - tx * 0.516; c.beginPath(); c.moveTo(tx, ty + 0.4); c.lineTo(tx + 4.8, ty - 2.3); c.lineTo(tx + 1.8, ty + 8); c.closePath(); c.fill(); c.stroke(); } // upper teeth, the two nearest the throat taken out
-  } else if (!back) {
+  } else if (!back && !pose.lick) {
   // the tongue lolling out and down over the shadow: 20% narrower at the root, 10% wider at the bottom
   const tw = 11 + Math.sin(t * 2.4) * 0.6, tt = tw * 0.8, tb = 1.1;
   c.fillStyle = '#8c4fa8'; c.strokeStyle = '#5a2a78'; c.lineWidth = 1; c.beginPath();
@@ -4307,7 +4392,7 @@ function drawPlayer(i, p) {
   const running = sp > 0.35;
   if (running && Math.hypot(lk.vx, lk.vy) > 0.3) lk.dir = faceOf(lk.vx, lk.vy);
   lk.mv += ((running ? 1 : 0) - lk.mv) * 0.25; lk.ph += 0.2 * lk.mv;
-  const pose = { dir: lk.dir, mv: lk.mv, ph: lk.ph, gmax: isGmax(p), sneak: p.k === 9 && p.gnt > 0, whip: p.k === 10 && (p.tlt > 0 || (p.tlcd <= cdCfg.tail - tailCfg.charge && p.tlcd > cdCfg.tail - tailCfg.charge - TAIL_SWING)) }; // whip: its tail is out (cocked, or lashing), so the body is drawn without it
+  const pose = { dir: lk.dir, mv: lk.mv, ph: lk.ph, gmax: isGmax(p), sneak: p.k === 9 && p.gnt > 0, lick: p.k === 9 && p.lkp >= 2 && p.lkp <= 4, whip: p.k === 10 && (p.tlt > 0 || (p.tlcd <= cdCfg.tail - tailCfg.charge && p.tlcd > cdCfg.tail - tailCfg.charge - TAIL_SWING)) }; // whip: its tail is out (cocked, or lashing), so the body is drawn without it
   if (p.k === 3) { // the leaf grows for the Leaf Slash and is swung by it, upper left to lower right on the first, the other way on the next
     const sgn = p.ln % 2 === 0 ? 1 : -1, e = p.lk * p.lk * (3 - 2 * p.lk); // eased: the swing gathers speed and slows at the end
     lk.ls += ((p.lp > 0 ? leafCfg.scale : 1) - lk.ls) * 0.3;
@@ -4321,13 +4406,14 @@ function drawPlayer(i, p) {
   upright(d.x, d.y, () => {
     ctx.fillStyle = `rgba(0,0,0,${0.35 - 0.2 * lift})`;
     const fy = (p.k === 2 && p.gmt > 0 ? 38 : 14) * bs; // the Gigantamax Charizard's feet are lower
-    ctx.beginPath(); ctx.ellipse(0, fy, 18 * bs * (1 - 0.4 * lift), 7 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.fill();
+    if (!(p.k === 9 && p.gmt > 0)) { ctx.beginPath(); ctx.ellipse(0, fy, 18 * bs * (1 - 0.4 * lift), 7 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.fill(); } // the Gigantamax Gengar stands in a shadow of its own
     if (snap.p.length > 2) { // a 2v2: a ring in the colour of the side, green for mine and red for theirs
       ctx.strokeStyle = sideOf(i) === sideOf(you) ? '#5fe08a' : '#ff6b6b'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(0, fy, 24 * bs * (1 - 0.4 * lift), 10 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.stroke();
     }
   });
   if (p.k === 4 && p.yt > 0) drawIceberg(d, p);
+  if (p.k === 9 && p.lkp > 0) drawLick(p, d); // under the body: the tongue comes out from behind it, at the mouth
   let spin = p.tw === 1 ? performance.now() / 1000 * 14 : 0, tumble = 0;
   if (p.k === 0 && tvoltCfg.jump > 0) { // Thousand Volt's front flip: one turn over the rise, then upright for the stay and the way down
     d.fl = p.z < 1 ? 0 : Math.min(1, Math.max(d.fl || 0, p.z / tvoltCfg.jump));
@@ -4406,7 +4492,8 @@ function drawCooldowns() {
   for (const c of cdBtns) {
     if (c.gmLabel && c.b.firstChild && c.b.firstChild.nodeType === 3) { const want = isGmax(snap.p[you]) ? c.gmLabel : c.label; if (c.b.firstChild.nodeValue !== want) c.b.firstChild.nodeValue = want; }
     const cgm = snap.p[you].k === 2 && snap.p[you].gmt > 0 && cgmaxCfg.cd[c.total] != null; // the Gigantamax Charizard's skills have cooldowns of their own
-    const total = cgm ? cgmaxCfg.cd[c.total] : cdCfg[gm && c.total === 'mkick' ? 'glp' : gm && c.total === 'upper' ? 'gbp' : c.total], left = snap.p[you][gm && c.field === 'kkcd' ? 'lpcd' : gm && c.field === 'ucd' ? 'bpcd' : c.field];
+    const gg = snap.p[you].k === 9 && snap.p[you].gmt > 0; // the Gigantamax Gengar's Lick and Devour have cooldowns of their own
+    const total = cgm ? cgmaxCfg.cd[c.total] : cdCfg[gm && c.total === 'mkick' ? 'glp' : gm && c.total === 'upper' ? 'gbp' : gg && c.total === 'gsneak' ? 'glick' : gg && c.total === 'sball' ? 'gdevour' : gg && c.total === 'gfire' ? 'ggfire' : c.total], left = snap.p[you][gm && c.field === 'kkcd' ? 'lpcd' : gm && c.field === 'ucd' ? 'bpcd' : gg && c.field === 'gncd' ? 'lkcd' : gg && c.field === 'sbcd' ? 'dvcd' : c.field];
     c.span.style.setProperty('--cd', (total > 0 ? Math.min(Math.max(left / total, 0), 1) * 360 : 0) + 'deg');
   }
   if (ultBtn) {
@@ -4643,6 +4730,7 @@ function frame() {
     drawFrost();
     drawFireZones();
     drawSneakShadows();
+    drawDevour();
     drawShadow();
     drawStorms();
     drawBalls();
@@ -4662,7 +4750,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'lickhit' ? 0.35 : f.t === 'bite' ? Math.max(0.4, ggmaxCfg.lbite + 0.25) : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -4687,6 +4775,8 @@ function frame() {
       else if (f.t === 'lpunch') drawLightningFist(f);
       else if (f.t === 'lpbolt') drawLightningBolt(f);
       else if (f.t === 'gslam') drawGhostSlam(f);
+      else if (f.t === 'lickhit') drawLickHit(f);
+      else if (f.t === 'bite') drawBiteFx(f);
       else if (f.t === 'glacast') drawGlaciateArea(f);
       else if (f.t === 'glaslam') drawIcicleBurst(f);
       else if (f.t === 'gwell' || f.t === 'bbwell') drawPullWell(f);
@@ -4698,6 +4788,7 @@ function frame() {
       else if (f.t === 'storm') drawStormStrike(f);
       else if (f.t === 'paralyze') drawParalyzeBurst(f);
       else if (f.t === 'leaf') drawLeafSpark(f);
+      else if (f.t === 'lick' || f.t === 'devour') { /* drawn from the player's own state (drawLick, drawDevour), not from the event */ }
       else drawQuake(f); // 'slam'
     }
     ctx.restore();
