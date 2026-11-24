@@ -453,7 +453,16 @@ type Config struct {
 			Height     float64 `json:"height"`
 			Duration   float64 `json:"duration"`
 			Cooldown   float64 `json:"cooldown"`    // before the next jump; counted from take-off
-			SlamRadius float64 `json:"slam_radius"` // reach of the landing shock; the earthquake effect is drawn at this size
+			SlamRadius float64 `json:"slam_radius"` // reach of the landing shock; the shock effect is drawn at this size
+			Damage     int     `json:"damage"`      // what the landing shock does to whoever it reaches (and to the projectiles it reaches)
+			// The earthquake the landing leaves round the spot: `earthquake_radius` wide (0: none; it must not be smaller than slam_radius), for `earthquake_duration` seconds. Every
+			// `earthquake_interval` seconds it does `earthquake_damage` to every foe in it (by the jump's min/max height), and all the while a foe is in it, it is slowed:
+			// `earthquake_slow` is the share of its walking speed it loses (0..1).
+			EarthquakeRadius   float64 `json:"earthquake_radius"`
+			EarthquakeDuration float64 `json:"earthquake_duration"`
+			EarthquakeDamage   int     `json:"earthquake_damage"`
+			EarthquakeInterval float64 `json:"earthquake_interval"`
+			EarthquakeSlow     float64 `json:"earthquake_slow"`
 			// Steering speed in the air (walking is walk_speed); 0 = no steering. The first half of
 			// the jump is the rise, the second half the fall.
 			AirSpeedFirstHalf  float64 `json:"air_speed_first_half"`
@@ -1088,7 +1097,9 @@ func DefaultConfig() Config {
 	c.Snorlax.Jump.Duration = 0.8
 	c.Snorlax.Jump.Cooldown = 1.5
 	c.Snorlax.Jump.SlamRadius = slamRadius
-	c.Snorlax.Jump.AirSpeedFirstHalf = speed // the same as walking, i.e. no change until it is tuned
+	c.Snorlax.Jump.Damage = slamDamage
+	c.Snorlax.Jump.EarthquakeDuration, c.Snorlax.Jump.EarthquakeDamage, c.Snorlax.Jump.EarthquakeInterval, c.Snorlax.Jump.EarthquakeSlow = 3, 5, 0.5, 0.3 // no earthquake (radius 0) unless the file asks for one
+	c.Snorlax.Jump.AirSpeedFirstHalf = speed                                                                                                              // the same as walking, i.e. no change until it is tuned
 	c.Snorlax.Jump.AirSpeedSecondHalf = speed
 	c.Snorlax.IcePunch.ChargeDuration = 0.4
 	c.Snorlax.IcePunch.RechargeDuration = 0.6
@@ -2154,6 +2165,10 @@ func (c Config) validateSkills() error {
 	}
 	if n := c.Rowlet.Arrows.Count; n > 100 {
 		return fmt.Errorf("rowlet.arrows.count must be at most 100, got %d", n)
+	}
+	if jp := c.Snorlax.Jump; jp.Damage < 0 || !(jp.EarthquakeRadius >= 0) || (jp.EarthquakeRadius > 0 &&
+		(jp.EarthquakeRadius < jp.SlamRadius || !(jp.EarthquakeDuration > 0) || !(jp.EarthquakeInterval > 0) || jp.EarthquakeDamage < 0 || !(jp.EarthquakeSlow >= 0 && jp.EarthquakeSlow < 1))) {
+		return fmt.Errorf("snorlax.jump: damage (%d) must not be negative; an earthquake_radius (%v) above 0 needs to be at least slam_radius (%v), earthquake_duration (%v) and earthquake_interval (%v) above 0, earthquake_damage (%d) not negative and earthquake_slow (%v) from 0 up to (not including) 1", jp.Damage, jp.EarthquakeRadius, jp.SlamRadius, jp.EarthquakeDuration, jp.EarthquakeInterval, jp.EarthquakeDamage, jp.EarthquakeSlow)
 	}
 	if n := c.Vulpix.Glaciate.Count; n < 1 || n > maxIcicles {
 		return fmt.Errorf("vulpix.glaciate.count must be 1..%d, got %d", maxIcicles, n)

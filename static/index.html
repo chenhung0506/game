@@ -3146,12 +3146,12 @@ function drawLightningBolt(f) {
   });
   ctx.restore();
 }
-// The Gigantamax Machamp's Burst Punch. While it gathers, the ground shows the cylinder it will burst in (round the point `dist` ahead of it, on the foe; the footprint flickers black and
+// The Gigantamax Machamp's Burst Punch. While it gathers, the ground shows the cylinder it will burst in (round the point where the fist will come out, on the foe, or `dist` ahead if it is further; the footprint flickers black and
 // white), and a black and white ball swells at its fist with rings closing in on it.
 function drawBurstCharge(p, d, bs) {
   const u = 1 - p.bpt / Math.max(bpCfg.charge, 1e-6), [ax, ay] = [p.bpx, p.bpy], s = Math.max(0.5, bs);
   if (bpCfg.warn) {
-    const cx = d.x + ax * bpCfg.dist, cy = d.y + ay * bpCfg.dist, black = megaBlack(80);
+    const cx = d.x + ax * p.bpd, cy = d.y + ay * p.bpd, black = megaBlack(80);
     ctx.save(); ctx.fillStyle = black ? `rgba(10,10,18,${0.1 + 0.3 * u})` : `rgba(255,255,255,${0.1 + 0.3 * u})`; ctx.strokeStyle = black ? '#fff' : '#000'; ctx.lineWidth = 3; ctx.setLineDash([12, 9]); ctx.lineDashOffset = -performance.now() / 25;
     ctx.beginPath(); ctx.arc(cx, cy, bpCfg.radius, 0, 7); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
     ctx.strokeStyle = `rgba(255,255,255,${0.3 + 0.4 * u})`; ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(cx, cy); ctx.stroke(); ctx.restore();
@@ -3177,7 +3177,7 @@ const RING_MONO = ['30,30,40', '255,255,255', '10,10,20'];
 // The fist of the Burst Punch comes out at its point (a flash, a ring spreading out to the cylinder's edge) and stays a moment, a black and white fist that flickers; the cylinder's footprint
 // stays marked, flickering, for as long as the explosions go on.
 function drawBurstFist(f) {
-  const att = snap.p[f.s || 0], s = (att ? Math.max(0.5, bodyR(att) / REF[8]) : 1) * bpCfg.fscale, dur = f.l || 0, ang = Math.atan2(f.dy || 0, f.dx || 1);
+  const att = snap.p[f.s || 0], s = (att ? Math.max(0.5, bodyR(att) / REF[8]) : 1) * bpCfg.fscale, dur = f.l || 0;
   if (bpCfg.warn && f.age < dur) { // the footprint, until the last explosion
     const black = megaBlack(90), a = Math.min(1, (dur - f.age) * 3);
     ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = black ? 'rgba(10,10,18,.18)' : 'rgba(255,255,255,.2)'; ctx.strokeStyle = black ? '#fff' : '#000'; ctx.lineWidth = 3; ctx.setLineDash([12, 9]); ctx.lineDashOffset = performance.now() / 25;
@@ -3185,20 +3185,30 @@ function drawBurstFist(f) {
   }
   const k = f.age / 0.55;
   if (k >= 1) return;
-  const grow = Math.min(1, f.age / 0.07), fade = k < 0.5 ? 1 : 1 - (k - 0.5) * 2, R = 80 * s * (0.4 + 0.6 * grow), black = megaBlack(45);
-  ctx.save(); ctx.translate(f.x, f.y);
-  ctx.strokeStyle = `rgba(255,255,255,${0.9 * (1 - k)})`; ctx.lineWidth = 6 * (1 - k) + 1; ctx.beginPath(); ctx.arc(0, 0, (f.r || bpCfg.radius) * Math.min(1, k * 3), 0, 7); ctx.stroke(); // the ring that spreads out to the edge
-  ctx.rotate(ang); ctx.globalAlpha = fade; ctx.lineJoin = 'round';
-  for (let n = 3; n >= 0; n--) { // afterimages, then the fist
-    const head = n === 0, blk = black !== (n % 2 === 1);
-    ctx.save(); ctx.translate(-n * R * 0.35 * (1 - k), 0); ctx.globalAlpha = (head ? 1 : 0.4 - n * 0.08) * fade;
-    ctx.fillStyle = blk ? '#0b0b10' : '#fafafa'; ctx.strokeStyle = blk ? '#fff' : '#000'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.roundRect(-R * 0.8, -R * 0.85, R * 1.7, R * 1.7, R * 0.45); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); for (const g of [-0.45, 0, 0.45]) { ctx.moveTo(R * 0.55, R * g); ctx.lineTo(R * 0.9, R * g); } ctx.stroke(); // the knuckles
-    if (head) { ctx.save(); ctx.beginPath(); ctx.roundRect(-R * 0.8, -R * 0.85, R * 1.7, R * 1.7, R * 0.45); ctx.clip(); discLightning(R * 1.2, blk, 4); ctx.restore(); }
-    ctx.restore();
-  }
-  ctx.restore();
+  const a = 1 - k, black = megaBlack(45);
+  ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.9 * a})`; ctx.lineWidth = 6 * a + 1; ctx.beginPath(); ctx.arc(f.x, f.y, (f.r || bpCfg.radius) * Math.min(1, k * 3), 0, 7); ctx.stroke(); ctx.restore(); // the ring that spreads out to the edge
+  upright(f.x, f.y, () => { // an uppercut: the fist comes up out of the ground, knuckles up, straight up on the screen whatever way the court is turned
+    const H = 170 * s, r = 46 * s, u = Math.min(1, k / 0.4), ease = 1 - (1 - u) * (1 - u), fa = k < 0.4 ? 1 : Math.max(0, 1 - (k - 0.4) / 0.4); // up fast, then it hangs and fades
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.fillStyle = black ? `rgba(10,10,18,${0.5 * a})` : `rgba(255,255,255,${0.7 * a})`; ctx.beginPath(); ctx.ellipse(0, 0, r * 1.5 * (0.4 + 0.6 * Math.min(1, k * 4)), r * 0.6 * (0.4 + 0.6 * Math.min(1, k * 4)), 0, 0, 7); ctx.fill(); // the flash where it leaves the ground
+    for (let n = 0; n < 9; n++) { // lines shooting up
+      const x = (n - 4) * 0.4 * r + Math.sin(n * 5.1) * 0.15 * r, r0 = (0.3 + 0.9 * k) * r, r1 = r0 + (r + H * 0.5 * Math.min(1, k * 2.5)) * (0.55 + 0.45 * Math.abs(Math.sin(n * 3.1)));
+      ctx.strokeStyle = (n % 2 === 0) === black ? `rgba(255,255,255,${a})` : `rgba(10,10,18,${a})`; ctx.lineWidth = (3 * a + 1) * s;
+      ctx.beginPath(); ctx.moveTo(x, -r0); ctx.lineTo(x, -r1); ctx.stroke();
+    }
+    if (fa <= 0) return;
+    const fy = -H * ease;
+    for (let n = 3; n >= 0; n--) { // afterimages below it, then the fist
+      const head = n === 0, blk = black !== (n % 2 === 1), y = fy + n * H * 0.16 * ease;
+      ctx.globalAlpha = (head ? 1 : 0.4 - n * 0.08) * fa;
+      ctx.fillStyle = blk ? '#0b0b10' : '#fafafa'; ctx.strokeStyle = blk ? '#fff' : '#000'; ctx.lineWidth = Math.max(3, 3.5 * s);
+      ctx.beginPath(); ctx.roundRect(-r * 0.85, y - r, r * 1.7, r * 2, r * 0.45); ctx.fill(); ctx.stroke(); // the fist, seen from the front, knuckles up
+      ctx.beginPath(); for (const q of [-0.45, 0, 0.45]) { ctx.moveTo(r * q, y - r); ctx.lineTo(r * q, y - r * 0.45); } ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, y + r * 0.5, r * 0.55, r * 0.3, 0, 0, 7); ctx.stroke(); // the thumb
+      if (head) { ctx.save(); ctx.beginPath(); ctx.roundRect(-r * 0.85, y - r, r * 1.7, r * 2, r * 0.45); ctx.clip(); ctx.translate(0, y); discLightning(r * 1.2, blk, 4); ctx.restore(); }
+    }
+    ctx.globalAlpha = 1;
+  });
 }
 // Whether a CSS colour is a dark one (so what is drawn on it is light): read back from a pixel painted with it.
 const darkColors = {};
@@ -3228,6 +3238,42 @@ function drawBurstBoom(f) {
     ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.globalAlpha = 1; discLightning(R * 0.75, black, 3);
   });
+}
+// The earthquake Snorlax's landing leaves: for as long as it lasts the ground shakes. The disc is dusty and its edge trembles; cracks run out from the middle and flicker; a ring spreads out
+// from the middle on every shock (the config's interval); stones hop about on it and dust drifts up; the whole screen shudders a little.
+function drawEarthquake(f) {
+  const total = f.l || 3, t = performance.now() / 1000, life = Math.min(1, f.age / 0.25, Math.max(0, (total + 0.4 - f.age) / 0.5)), R = f.r || 300, every = f.i || 0.5;
+  if (life <= 0) return;
+  if (f.age < total) shake = Math.max(shake, 3 * life);
+  const seed = (n) => { const v = Math.sin((f.x + 7) * 12.9898 + (f.y + 3) * 78.233 + n * 43758.5453) * 43758.5453; return v - Math.floor(v); }; // the same pseudo-random number for the same quake and n
+  ctx.save(); ctx.globalAlpha = life;
+  const gr = ctx.createRadialGradient(f.x, f.y, R * 0.1, f.x, f.y, R);
+  gr.addColorStop(0, 'rgba(120,85,45,.38)'); gr.addColorStop(0.8, 'rgba(120,85,45,.22)'); gr.addColorStop(1, 'rgba(120,85,45,.04)');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(85,55,25,.85)'; ctx.lineWidth = 4; ctx.setLineDash([14, 9]); ctx.lineDashOffset = t * 60; // the edge, shaking
+  ctx.beginPath(); ctx.arc(f.x + Math.sin(t * 47) * 2, f.y + Math.cos(t * 53) * 2, R + Math.sin(t * 31) * 3, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  const ph = (f.age % every) / every; // a ring from the middle on every shock
+  ctx.strokeStyle = `rgba(230,200,150,${0.6 * (1 - ph)})`; ctx.lineWidth = 6 * (1 - ph) + 1; ctx.beginPath(); ctx.arc(f.x, f.y, R * ph, 0, 7); ctx.stroke();
+  for (let c = 0; c < 9; c++) { // cracks out from the middle, wide where they start and thinning out, a little different every frame
+    const a = (c / 9 + (seed(c) - 0.5) * 0.25) * Math.PI * 2, len = R * (0.5 + 0.45 * seed(c + 40)), segs = 6, pts = [];
+    for (let n = 0; n <= segs; n++) { const u = 0.12 + 0.88 * n / segs, w = (seed(c * 9 + n) - 0.5) * R * 0.06 + Math.sin(t * 40 + c * 3 + n) * 1.5; pts.push([f.x + Math.cos(a) * len * u - Math.sin(a) * w, f.y + Math.sin(a) * len * u + Math.cos(a) * w, 1 - n / segs]); }
+    for (const [col, wd] of [['rgba(40,25,10,.9)', 7], ['rgba(255,225,170,.4)', 2]]) {
+      ctx.strokeStyle = col;
+      for (let n = 1; n < pts.length; n++) { ctx.lineWidth = Math.max(1, wd * pts[n][2]); ctx.beginPath(); ctx.moveTo(pts[n - 1][0], pts[n - 1][1]); ctx.lineTo(pts[n][0], pts[n][1]); ctx.stroke(); }
+    }
+  }
+  ctx.restore();
+  const rocks = Math.max(14, Math.min(50, R / 7 | 0));
+  for (let n = 0; n < rocks; n++) { // stones hopping on the ground, and a puff of dust where they land
+    const a = seed(n + 100) * Math.PI * 2, r = R * Math.sqrt(seed(n + 200)) * 0.95, hop = Math.abs(Math.sin(t * (7 + seed(n + 300) * 5) + n * 1.7));
+    upright(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r, () => {
+      ctx.globalAlpha = life; ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, 0, 5, 2, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = n % 2 ? '#8b6b43' : '#5d4527'; ctx.strokeStyle = 'rgba(30,20,8,.8)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-6, -hop * 20); ctx.lineTo(0, -hop * 20 - 8); ctx.lineTo(6, -hop * 20 - 2); ctx.lineTo(3, -hop * 20 + 4); ctx.lineTo(-5, -hop * 20 + 4); ctx.closePath(); ctx.fill(); ctx.stroke();
+      if (hop < 0.12) { ctx.fillStyle = `rgba(200,170,120,${0.3 * (1 - hop / 0.12)})`; ctx.beginPath(); ctx.arc(0, -4, 9, 0, 7); ctx.fill(); }
+    });
+  }
 }
 // The change into (or out of) the Gigantamax Machamp: a ring of red-hot light opening out over the ground and streaks of it shooting up.
 function drawGmaxBurst(f) {
@@ -4484,7 +4530,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -4503,6 +4549,7 @@ function frame() {
       else if (f.t === 'kickhit') drawKickImpact(f);
       else if (f.t === 'uphit') drawUpperHit(f);
       else if (f.t === 'gmax' || f.t === 'gmaxend') drawGmaxBurst(f);
+      else if (f.t === 'quake') drawEarthquake(f);
       else if (f.t === 'bpunch') drawBurstFist(f);
       else if (f.t === 'bpboom') drawBurstBoom(f);
       else if (f.t === 'lpunch') drawLightningFist(f);

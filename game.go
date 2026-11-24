@@ -315,6 +315,7 @@ type Player struct {
 	BpSY float64 `json:"bsy"`
 	BpT  float64 `json:"bpt"`
 	BpX  float64 `json:"bpx"`
+	BpD  float64 `json:"bpd"` // how far ahead the fist will come out: on the foe, or `distance` if it is further
 	BpY  float64 `json:"bpy"`
 	BpCD float64 `json:"bpcd"`
 	// Gengar: seconds left under the ground (the shadow shows), the three cooldowns, and how much longer it cannot start a skill
@@ -435,6 +436,7 @@ type Event struct {
 	X  float64 `json:"x"`
 	Y  float64 `json:"y"`
 	Z  float64 `json:"z,omitempty"`  // how high above the ground, where that matters (a Burst Punch's explosions are in the air)
+	I  float64 `json:"i,omitempty"`  // a time between things, in seconds (an earthquake's shocks)
 	R  float64 `json:"r,omitempty"`  // slam reach, so the effect can match it
 	DX float64 `json:"dx,omitempty"` // a direction (the tail whip's)
 	DY float64 `json:"dy,omitempty"`
@@ -466,6 +468,7 @@ type Game struct {
 	UltUsed [maxSlots]bool // slots whose character has used its ultimate (a Z skill or a Gigantamax) since it came out: it has only the one, so its charge does not fill again
 	Icicles []icicle       // Glaciate's icicles on their way down
 	Casts   []glaciateCast // Glaciates still calling icicles
+	Quakes  []quake        // the earthquakes Snorlax's landings left, still shaking
 	Bursts  []burstCast    // the Burst Punches that have come out and are still letting off explosions
 	Wells   []pullWell     // where Shadow Balls burst and are still dragging the opponent in
 	Waves   []wave         // Gyarados's waves running out over the ground (the client draws them from an event)
@@ -574,7 +577,7 @@ func (g *Game) Reset() {
 		}
 		g.P[i] = Player{Kind: g.P[i].Kind, X: x, Y: y, HP: g.maxHP(i), FX: fx, AimX: float64(fx)}
 	}
-	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells, g.Icicles, g.Casts, g.Bursts = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells, g.Icicles, g.Casts, g.Bursts, g.Quakes = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	g.UltUsed = [maxSlots]bool{} // a new round, a new match: everyone has their ultimate again (a team match gives it back only to whoever is new, see nextRound)
 	for i := range g.P {
 		if g.P[i].Kind == rowlet {
@@ -1184,19 +1187,27 @@ func (g *Game) Step(dt float64) []Event {
 			events = append(events, Event{T: "slam", X: p.X, Y: p.Y, R: g.cfg.Snorlax.Jump.SlamRadius}) // the client draws the real reach
 			for _, j := range g.foes(i) {
 				if foe := &g.P[j]; dist(p, foe) < g.cfg.Snorlax.Jump.SlamRadius+g.radius(j) && g.cfg.Snorlax.Jump.Reach.hits(foe) {
-					g.hit(foe, slamDamage)
+					g.hit(foe, g.cfg.Snorlax.Jump.Damage)
 				}
 			}
 			for j := range g.Balls { // the shock wave is a ground attack: it hits balls too
 				b := &g.Balls[j]
 				if math.Hypot(b.X-p.X, b.Y-p.Y) < g.cfg.Snorlax.Jump.SlamRadius+g.ballRadius(b) {
-					b.HP -= slamDamage
+					b.HP -= g.cfg.Snorlax.Jump.Damage
 				}
+			}
+			if jp := g.cfg.Snorlax.Jump; jp.EarthquakeRadius > 0 { // and the ground goes on shaking round the spot
+				if len(g.Quakes) >= maxQuakes {
+					g.Quakes = g.Quakes[1:]
+				}
+				g.Quakes = append(g.Quakes, quake{Owner: i, X: p.X, Y: p.Y, Left: jp.EarthquakeDuration, Next: jp.EarthquakeInterval})
+				events = append(events, Event{T: "quake", S: i, X: p.X, Y: p.Y, R: jp.EarthquakeRadius, L: jp.EarthquakeDuration, I: jp.EarthquakeInterval})
 			}
 		}
 	}
 	g.tickFrost(dt)
 	g.tickFires(dt)
+	g.tickQuakes(dt)
 	g.stepGhosts(dt)
 	events = append(events, g.stepShadowBalls(dt)...)
 	g.stepWells(dt)

@@ -422,7 +422,7 @@ func (c *bctx) findThreat() threat {
 		bp := cfg.Machamp.Gigantamax.BurstPunch
 		reach := bp.Radius + bp.ExplosionRadius + c.pr + 15
 		if f.BpT > 0 {
-			if hx, hy := f.X+f.BpX*bp.Distance, f.Y+f.BpY*bp.Distance; math.Hypot(p.X-hx, p.Y-hy) < reach {
+			if hx, hy := f.X+f.BpX*f.BpD, f.Y+f.BpY*f.BpD; math.Hypot(p.X-hx, p.Y-hy) < reach {
 				ax, ay := unit(p.X-hx, p.Y-hy)
 				if ax == 0 && ay == 0 { // dead on the middle: away from whoever throws it
 					ax, ay = unit(p.X-f.X, p.Y-f.Y)
@@ -512,6 +512,13 @@ func (c *bctx) findThreat() threat {
 			ax, ay, out := c.wayOutT(func(x, y float64) bool { return math.Hypot(x-ix, y-iy) <= ir })
 			eta := math.Max(0, ic.T-lag)
 			considerBig(threat{thFire, eta, ax, ay}, out > eta)
+		}
+	}
+	for _, q := range g.Quakes { // ground that is shaking: it hurts and slows whoever stands in it, so get out of it
+		if jp := cfg.Snorlax.Jump; g.side(q.Owner) != g.side(c.me) && jp.Reach.hits(p) && math.Hypot(p.X-q.X, p.Y-q.Y) <= jp.EarthquakeRadius+c.pr+10 {
+			qq := q
+			ax, ay := c.wayOutOf(func(x, y float64) bool { return math.Hypot(x-qq.X, y-qq.Y) <= jp.EarthquakeRadius+c.pr+10 })
+			consider(threat{thFire, 0.2, ax, ay})
 		}
 	}
 	for _, z := range g.Fires { // burning ground: it burns whoever stands in it every half second, so get out of it
@@ -1073,7 +1080,7 @@ func (b *Bot) ash(c *bctx) Input {
 		in.Kick = true
 		return in
 	}
-	if bp := g.cfg.Machamp.Gigantamax.BurstPunch; p.gigantamax() && p.BpCD == 0 && p.Z == 0 && !danger && math.Abs(c.dist-bp.Distance) <= bp.Radius*0.7 && b.rng.Float64() < 0.6 { // the Burst Punch: the foe is inside the cylinder it will burst in
+	if bp := g.cfg.Machamp.Gigantamax.BurstPunch; p.gigantamax() && p.BpCD == 0 && p.Z == 0 && !danger && c.dist <= bp.Distance+bp.Radius*0.7 && b.rng.Float64() < 0.6 { // the Burst Punch: the foe is inside the cylinder it will burst in
 		in := c.stay()
 		in.Skill = true
 		return in

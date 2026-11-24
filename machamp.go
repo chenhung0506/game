@@ -252,6 +252,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 		if ux, uy := unit(other.X-p.X, other.Y-p.Y); ux != 0 || uy != 0 {
 			p.BpX, p.BpY = ux, uy // the fist follows the foe while it gathers
 		}
+		p.BpD = g.burstReach(i)
 		if p.BpT -= dt; p.BpT < 1e-9 {
 			p.BpT = 0
 			events = append(events, g.burstPunch(i)...)

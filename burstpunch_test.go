@@ -372,3 +372,52 @@ func TestTheExplosionColoursAreChecked(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTheFistComesOutOnTheFoeIfItIsNearAndAtMostDistanceAheadIfItIsFar(t *testing.T) {
+	for _, tc := range []struct{ foe, want float64 }{{150, 150}, {300, 300}, {900, 300}} {
+		bp := bpEverywhere() // distance 300
+		bp.ChargeDuration = 0.2
+		g := bpGame(bp, tc.foe)
+		var out *Event
+		press(g, 0, Input{Skill: true})
+		for n := 0; n < 20 && out == nil; n++ {
+			for _, e := range g.Step(dt) {
+				if e.T == "bpunch" {
+					e := e
+					out = &e
+				}
+			}
+			if out == nil && g.P[0].BpT > 0 {
+				if want := math.Min(tc.foe, bp.Distance); math.Abs(g.P[0].BpD-want) > 1e-6 {
+					t.Fatalf("foe at %v: the snapshot says the fist will be %v ahead, want %v", tc.foe, g.P[0].BpD, want)
+				}
+			}
+		}
+		if out == nil {
+			t.Fatalf("foe at %v: no fist", tc.foe)
+		}
+		if got := out.X - g.P[0].X; math.Abs(got-tc.want) > 1e-6 {
+			t.Fatalf("foe at %v: the fist is %v ahead, want %v", tc.foe, got, tc.want)
+		}
+	}
+}
+
+func TestTheFistFollowsAFoeThatWalksCloserWhileItGathers(t *testing.T) {
+	bp := bpEverywhere()
+	bp.ChargeDuration = 0.5
+	g := bpGame(bp, 900)
+	press(g, 0, Input{Skill: true})
+	g.P[1].X = g.P[0].X + 120 // it walks right up
+	var out *Event
+	for n := 0; n < 30 && out == nil; n++ {
+		for _, e := range g.Step(dt) {
+			if e.T == "bpunch" {
+				e := e
+				out = &e
+			}
+		}
+	}
+	if out == nil || math.Abs(out.X-(g.P[0].X+120)) > 1e-6 {
+		t.Fatalf("fist %+v: it should come out on the foe where it stands as the gathering ends", out)
+	}
+}

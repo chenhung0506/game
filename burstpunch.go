@@ -12,11 +12,18 @@ type burstCast struct {
 	Hits  [maxSlots]int
 }
 
-// burstPunch brings the fist out `distance` ahead of the player along the direction it was aimed: the explosions go off round that point from now on (stepBursts).
+// burstReach is how far ahead of player i the Burst Punch's fist comes out: on the nearest foe, so the cylinder has it in the middle, but never further than `distance`.
+func (g *Game) burstReach(i int) float64 {
+	return math.Min(g.cfg.Machamp.Gigantamax.BurstPunch.Distance, dist(&g.P[i], &g.P[g.nearestFoe(i)]))
+}
+
+// burstPunch brings the fist out along the direction it was aimed (at the nearest foe), as far as that foe stands but no further than `distance`: the explosions go off round that point
+// from now on (stepBursts).
 func (g *Game) burstPunch(i int) []Event {
 	p, bp := &g.P[i], g.cfg.Machamp.Gigantamax.BurstPunch
-	x := math.Min(math.Max(p.X+p.BpX*bp.Distance, 0), g.court.Length)
-	y := math.Min(math.Max(p.Y+p.BpY*bp.Distance, 0), g.court.Width)
+	reach := g.burstReach(i)
+	x := math.Min(math.Max(p.X+p.BpX*reach, 0), g.court.Length)
+	y := math.Min(math.Max(p.Y+p.BpY*reach, 0), g.court.Width)
 	g.Bursts = append(g.Bursts, burstCast{Owner: i, X: x, Y: y})
 	return []Event{{T: "bpunch", S: i, X: x, Y: y, R: bp.Radius, DX: p.BpX, DY: p.BpY, L: bp.Duration}}
 }
