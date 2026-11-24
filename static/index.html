@@ -3629,6 +3629,7 @@ function drawSilenced() {
 // Gengar: a round purple ghost with a wide white grin and red eyes, spikes on its head and back. It hovers and wobbles. Under the ground
 // (the Shadow Sneak) only its eyes show, with a ripple round them; the big shadow is drawn separately, on the ground.
 function artGengar(c, x, y, t, pose) {
+  if (pose.gmax) { artGengarGmax(c, x, y, t, pose); return; }
   const { dir, mv, ph } = pose, sw = Math.sin(ph) * mv, bob = Math.sin(t * 3.4) * 1.2 - mv;
   const P = '#6d4ca3', PD = '#4b3277', PL = '#9373c9', EYE = '#e8362f';
   c.save(); c.translate(x, y + bob);
@@ -3652,6 +3653,127 @@ function artGengar(c, x, y, t, pose) {
     c.fillStyle = '#2b1442'; c.strokeStyle = '#1a0a2b'; c.lineWidth = 1.2; c.beginPath();
     c.moveTo(-10, 6); c.quadraticCurveTo(0, 20, 10, 6); c.quadraticCurveTo(0, 9, -10, 6); c.closePath(); c.fill(); c.stroke(); // the grin
     c.fillStyle = '#fff'; for (const tx of [-6, -2, 2, 6]) { c.beginPath(); c.moveTo(tx - 1.5, 7.2); c.lineTo(tx + 1.5, 7.2); c.lineTo(tx, 11); c.closePath(); c.fill(); }
+  }
+  c.restore();
+}
+
+// Gigantamax Gengar: a tall purple dome half sunk into its own glowing pink shadow, with big pointed ears, narrow orange eyes and a huge
+// mouth that fills the face (a row of square teeth along the top, a dark red throat of rings, a long tongue hanging out over the shadow).
+// Two small hands and puffs of smoke by its sides, red wisps over its head. The ground line is y = 22; same frame as artGengar.
+function artGengarGmax(c, x, y, t, pose) {
+  const { dir, mv, ph } = pose, bob = Math.sin(t * 2.2) * 1.0 - mv * 0.8, sw = Math.sin(ph) * mv;
+  const P = '#7a4bb0', PD = '#573487', PL = '#9a6fd0', EYE = '#f2962c', G = 22;
+  c.save(); c.translate(x, y + bob);
+  if (dir === 2) c.scale(-1, 1);
+  c.scale(1.4, 1.4);
+  if (dir === 2 || dir === 3) c.scale(0.94, 1);
+  const back = dir === 1, side = dir === 2 || dir === 3, pulse = 0.85 + 0.15 * Math.sin(t * 3), mb = G - 2;
+  const glow = (a, k) => { // the shadow on the ground: a magenta pool that the body sinks into
+    const g = c.createRadialGradient(0, G, 4, 0, G, 44 * k); g.addColorStop(0, `rgba(26,8,52,${0.95 * a})`); g.addColorStop(0.55, `rgba(46,18,86,${0.7 * a})`); g.addColorStop(1, 'rgba(52,22,96,0)');
+    c.fillStyle = g; c.beginPath(); c.ellipse(0, G, 44 * k, 13 * k, 0, 0, 7); c.fill();
+  };
+  glow(pulse, 1.3);
+  for (const m of [-1, 1]) { // smoke puffs beside the head
+    for (const [dx, dy, r] of [[0, 0, 7], [m * 5, -3, 5.5], [-m * 3, 4, 5]]) { ov(c, (side ? (m < 0 ? -33 : 46) : m * 33) + dx, -2 + dy - Math.sin(t * 1.5 + m) * 1.5, r, r * 0.85, 'rgba(120,105,125,0.8)', 0, null); }
+  }
+  for (const m of [-1, 1]) { // hands rising out of the shadow, three little fingers each
+    if (side) continue; // in profile only the near hand shows, hanging in front of the body (below); the far one is behind it
+    const hx = m * 31, hy = 15 + sw * m * 1.5;
+    ov(c, hx, hy, 6, 8, P, m * 0.15);
+    for (const f of [-1, 0, 1]) poly(c, [[hx + f * 3.2 - 1.6, hy - 5], [hx + f * 3.4, hy - 13 + Math.abs(f) * 2], [hx + f * 3.2 + 1.6, hy - 5]], P);
+  }
+  c.save(); // the body, cut off at the ground so that it stands in the shadow
+  c.beginPath(); c.rect(-60, -80, 120, 80 + G); c.clip();
+  const dome = new Path2D();
+  if (side) { // a true profile: the back, the crown, the brow bulging forward over the mouth, then the gape cut into the front, and the chin below it
+    dome.moveTo(-26, G + 4); dome.bezierCurveTo(-32, 10, -24, -31, 2, -31); dome.bezierCurveTo(16, -31, 28, -28, 28, -16);
+    dome.bezierCurveTo(28, -12, 31, -14, 31, -10); dome.lineTo(0, 6); dome.lineTo(27, 17); dome.quadraticCurveTo(29, 18, 28, G + 4); // the muzzle sticks out a little
+  }
+  else { dome.moveTo(-28, G + 4); dome.bezierCurveTo(-34, 10, -26, -31, 0, -31); dome.bezierCurveTo(26, -31, 34, 10, 28, G + 4); }
+  dome.closePath();
+  c.fillStyle = P; c.strokeStyle = OUTLINE; c.lineWidth = 0.8; c.fill(dome); c.stroke(dome); // the dome
+  const outside = new Path2D(); outside.rect(-100, -100, 200, 200); outside.addPath(dome);
+  const horn = (pts, fill) => { // a spike or ear that grows out of the dome: filled over the dome's outline, outlined only outside the dome, so no seam
+    c.fillStyle = fill; c.beginPath(); pts.forEach(([px, py], i) => (i ? c.lineTo(px, py) : c.moveTo(px, py))); c.closePath(); c.fill();
+    c.save(); c.clip(outside, 'evenodd'); c.strokeStyle = OUTLINE; c.lineWidth = 0.8; c.lineJoin = 'round'; c.stroke(); c.restore();
+  };
+  if (side) { // two ears leaning back, the far one darker
+    horn([[-16, -23], [-24, -45], [2, -30]], PD); horn([[-4, -30], [-9, -50], [17, -27]], P);
+    c.save(); c.clip(outside, 'evenodd'); c.fillStyle = 'rgba(40,18,72,0.7)'; c.beginPath(); c.moveTo(-9, -50); c.lineTo(-4, -30); c.lineTo(5, -29); c.closePath(); c.fill(); c.restore();
+  } else {
+    horn([[-12, -26], [-8, -45], [0, -30]], PD); horn([[12, -26], [8, -45], [0, -30]], PD); horn([[-5, -28], [0, -40], [5, -28]], P); // small spikes on top
+  for (const m of [-1, 1]) { // the big ears: a wide base on the dome, the inner half in a deeper shade
+    horn([[m * 24.5, -12.1], [m * 30, -38], [m * 10.5, -28.5]], P);
+    c.save(); c.clip(outside, 'evenodd'); c.fillStyle = 'rgba(40,18,72,0.7)'; c.beginPath(); c.moveTo(m * 30, -38); c.lineTo(m * 10.5, -28.5); c.lineTo(m * 15.2, -21.7); c.closePath(); c.fill(); c.restore();
+  }
+  }
+  if (side) { // the side view: a row of spikes down its back, one narrow eye, and the gape cut into the front with the throat showing in it
+    for (const [bt, k] of [[0.36, 0.95], [0.5, 1.05], [0.64, 0.95]]) { // spikes standing on the curve of the back, along its normal
+      const u = 1 - bt, X = [-26, -32, -24, 2], Y = [26, 10, -31, -31];
+      const B = (v) => u * u * u * v[0] + 3 * u * u * bt * v[1] + 3 * u * bt * bt * v[2] + bt * bt * bt * v[3];
+      const D = (v) => 3 * u * u * (v[1] - v[0]) + 6 * u * bt * (v[2] - v[1]) + 3 * bt * bt * (v[3] - v[2]);
+      const px = B(X), py = B(Y), dl = Math.hypot(D(X), D(Y)), tx = D(X) / dl, ty = D(Y) / dl, nx = ty, ny = -tx;
+      horn([[px - tx * 6 * k - nx * 2, py - ty * 6 * k - ny * 2], [px + nx * 12 * k, py + ny * 12 * k], [px + tx * 6 * k - nx * 2, py + ty * 6 * k - ny * 2]], PD);
+    }
+    c.fillStyle = EYE; c.beginPath(); c.moveTo(7, -22.5); c.lineTo(22, -17); c.quadraticCurveTo(14, -12, 7, -13); c.closePath(); c.fill(); // wide at the back, pointed at the front
+    ov(c, 16.5, -15.8, 1.84, 2, '#6a2fb0', 0, null); ov(c, 16.5, -15.8, 1.84, 2, 'rgba(0,0,0,0)', 0, '#2a0f46'); ov(c, 16.5, -15.8, 0.66, 0.66, '#fff', 0, null);
+    c.strokeStyle = '#2a0f46'; c.lineWidth = 1.1; c.lineCap = 'round'; c.beginPath(); c.moveTo(6, -23.2); c.lineTo(23, -16.8); c.stroke();
+    c.strokeStyle = 'rgba(42,15,70,0.7)'; c.lineWidth = 1; c.beginPath(); c.moveTo(17, -26); c.lineTo(21, -20); c.stroke();
+    const gape = new Path2D(); gape.moveTo(0, 6); gape.lineTo(24.8, -6.8); gape.lineTo(21.6, 14.8); // the red shows only the inner 80% of the opening gape.closePath(); // the hole in the head, seen into
+    c.save(); c.clip(gape);
+    c.fillStyle = '#5a1730'; c.fillRect(0, -12, 30, 34);
+    for (let k = 0; k < 5; k++) { c.strokeStyle = `rgba(${150 - k * 22},${35 - k * 5},${60 - k * 9},0.9)`; c.lineWidth = 2.2; c.beginPath(); c.ellipse(6, 5, 26 - k * 4.8, 17 - k * 3, 0, 0, 7); c.stroke(); }
+    c.fillStyle = '#1a0612'; c.beginPath(); c.ellipse(10, 5, 5.5, 3.8, 0, 0, 7); c.fill();
+    c.restore();
+    c.fillStyle = '#fff'; c.strokeStyle = '#cfc4dc'; c.lineWidth = 0.6; // the first lower incisor: the tongue lies over it
+    { const tx = 15, ty = 6 + tx * 0.407; c.beginPath(); c.moveTo(tx - 2.6, ty - 0.8); c.lineTo(tx + 2.6, ty + 0.9); c.lineTo(tx + 0.4, ty - 7); c.closePath(); c.fill(); c.stroke(); }
+    ov(c, -8, 12, 6.5, 9.5, P, 0.1); for (const f of [-1, 0, 1]) poly(c, [[-8 + f * 3.4 - 1.7, 7], [-8 + f * 3.6 + 1, -1 + Math.abs(f) * 2], [-8 + f * 3.4 + 1.7, 7]], P); // the near hand, hanging at its side
+  } else if (!back) {
+    for (const m of [-1, 1]) { // narrow slanting eyes
+      c.fillStyle = EYE; c.beginPath(); c.moveTo(m * 7, -15); c.lineTo(m * 18, -19.5); c.lineTo(m * 16.5, -13); c.quadraticCurveTo(m * 11, -10.5, m * 7, -15); c.closePath(); c.fill();
+      ov(c, m * 12.5, -13.8, 1.84, 2, '#6a2fb0', 0, null); ov(c, m * 12.5, -13.8, 1.84, 2, 'rgba(0,0,0,0)', 0, '#2a0f46'); ov(c, m * 12.5, -13.8, 0.66, 0.66, '#fff', 0, null); // purple eyeball, white dot in its centre
+      c.strokeStyle = '#2a0f46'; c.lineWidth = 1.1; c.lineCap = 'round'; c.beginPath(); c.moveTo(m * 5.5, -15); c.lineTo(m * 19, -20.6); c.stroke(); // the heavy upper lid, slanting down to the middle
+      c.strokeStyle = 'rgba(42,15,70,0.7)'; c.lineWidth = 1; c.beginPath(); c.moveTo(m * 8.43, -24.08); c.lineTo(m * 5.07, -19.22); c.stroke(); // a frown crease between the eyes
+    }
+    // the mouth: nearly the whole face, a dark red throat of rings
+    const mt = -6;
+    c.save(); c.beginPath(); c.moveTo(-20, mt); c.quadraticCurveTo(0, mt - 4, 20, mt); c.bezierCurveTo(24, 6, 22, mb - 6, 14, mb); c.lineTo(-14, mb); c.bezierCurveTo(-22, mb - 6, -24, 6, -20, mt); c.closePath(); c.clip();
+    c.fillStyle = '#5a1730'; c.fillRect(-26, mt - 5, 52, 40);
+    for (let k = 0; k < 5; k++) { c.strokeStyle = `rgba(${150 - k * 22},${35 - k * 5},${60 - k * 9},0.9)`; c.lineWidth = 2.2; c.beginPath(); c.ellipse(0, 9, 19 - k * 3.6, 14 - k * 2.6, 0, 0, 7); c.stroke(); }
+    c.fillStyle = '#1a0612'; c.beginPath(); c.ellipse(0, 9, 5 + Math.sin(t * 2) * 0.5, 3.8, 0, 0, 7); c.fill();
+    c.restore();
+    c.strokeStyle = '#2a0f46'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-20, mt); c.quadraticCurveTo(0, mt - 4, 20, mt); c.bezierCurveTo(24, 6, 22, mb - 6, 14, mb); c.stroke(); c.beginPath(); c.moveTo(-20, mt); c.bezierCurveTo(-24, 6, -22, mb - 6, -14, mb); c.stroke();
+    c.fillStyle = '#fff'; c.strokeStyle = '#cfc4dc'; c.lineWidth = 0.6; // square teeth along the top, little ones at the bottom corners
+    for (let k = 0; k < 6; k++) { const tx = -17 + k * 5.7; c.beginPath(); c.moveTo(tx, mt - 1.2); c.lineTo(tx + 5.2, mt - 1.2); c.lineTo(tx + 2.6, mt + 7); c.closePath(); c.fill(); c.stroke(); }
+    for (const m of [-1, 1]) for (let k = 0; k < 2; k++) { const bx = m * 14 - k * m * 5; c.beginPath(); c.moveTo(bx - 2.5, mb); c.lineTo(bx + 2.5, mb); c.lineTo(bx, mb - 7); c.closePath(); c.fill(); c.stroke(); }
+  } else {
+    for (const [dy, tall, xs, k] of [[-14, 18, [-9.5, 0, 9.5], 0.8], [3, 15, [-13, 0, 13], 1.17], [16, 13, [-11, 0, 11], 1]]) // three rows of back spikes: high (x0.8, close together), middle (x1.17), low (closer together)
+      for (const m of xs) poly(c, [[m - 5 * k, dy], [m + k, dy - (tall + (m === 0 ? 3 : 0)) * k], [m + 6 * k, dy]], PD);
+  }
+  c.restore();
+  // the front rim of the shadow over the foot of the body, so that it really stands in it
+  c.save(); c.beginPath(); c.rect(-60, G - 1, 120, 30); c.clip();
+  c.strokeStyle = `rgba(14,4,32,${0.98 * pulse})`; c.lineWidth = 3.6; c.beginPath(); c.ellipse(0, G, 30, 8, 0, 0, Math.PI); c.stroke();
+  c.strokeStyle = `rgba(36,14,70,${0.8 * pulse})`; c.lineWidth = 1.2; c.beginPath(); c.ellipse(0, G, 28, 6.6, 0, 0, Math.PI); c.stroke();
+  glow(0.9 * pulse, 0.75);
+  c.restore();
+  if (side) { // the tongue lies in the mouth and lolls out over the chin; the lower jaw, the second incisor and the upper teeth are drawn over it
+    c.fillStyle = '#8c4fa8'; c.strokeStyle = '#5a2a78'; c.lineWidth = 1; c.beginPath();
+    c.moveTo(2, 5); c.quadraticCurveTo(14, 3, 32, 10); c.bezierCurveTo(42, 15.5, 43.5, 26, 35, 26.5); c.bezierCurveTo(29, 23.5, 25, 15.5, 10, 10.5); c.lineTo(2, 6.6); c.closePath(); c.fill(); c.stroke(); // the root runs back into the throat
+    ov(c, 38, 23, 2.4, 3.6, 'rgba(190,140,215,0.45)', 0.5, null);
+    c.fillStyle = P; c.beginPath(); c.moveTo(0, 6); c.lineTo(27, 17); c.quadraticCurveTo(29, 18, 28, G); c.lineTo(0, G); c.closePath(); c.fill(); // the lower jaw
+    c.save(); c.clip(); c.beginPath(); c.rect(-60, G - 1, 120, 30); c.clip(); glow(0.9 * pulse, 0.75); c.restore(); // under the same shading as the rest of the body's foot, so the two do not show as separate shapes
+    c.strokeStyle = OUTLINE; c.lineWidth = 0.8; c.lineJoin = 'round'; c.beginPath(); c.moveTo(0, 6); c.lineTo(27, 17); c.quadraticCurveTo(29, 18, 28, G); c.stroke(); // outlined along the top and round the front
+    c.fillStyle = '#fff'; c.strokeStyle = '#cfc4dc'; c.lineWidth = 0.6;
+    { const tx = 22, ty = 6 + tx * 0.407; c.beginPath(); c.moveTo(tx - 2.6, ty - 0.8); c.lineTo(tx + 2.6, ty + 0.9); c.lineTo(tx + 0.4, ty - 7); c.closePath(); c.fill(); c.stroke(); } // the second lower incisor, in front of the tongue
+    for (let k = 2; k < 6; k++) { const tx = 2.5 + k * 4.6, ty = 6 - tx * 0.516; c.beginPath(); c.moveTo(tx, ty + 0.4); c.lineTo(tx + 4.8, ty - 2.3); c.lineTo(tx + 1.8, ty + 8); c.closePath(); c.fill(); c.stroke(); } // upper teeth, the two nearest the throat taken out
+  } else if (!back) {
+  // the tongue lolling out and down over the shadow: 20% narrower at the root, 10% wider at the bottom
+  const tw = 11 + Math.sin(t * 2.4) * 0.6, tt = tw * 0.8, tb = 1.1;
+  c.fillStyle = '#8c4fa8'; c.strokeStyle = '#5a2a78'; c.lineWidth = 1; c.beginPath();
+  c.moveTo(-tt, mb - 9); c.bezierCurveTo((-tw - 3) * tb, mb + 8, -tw * tb, mb + 16, 0, mb + 17); c.bezierCurveTo(tw * tb, mb + 16, (tw + 3) * tb, mb + 8, tt, mb - 9); c.closePath(); c.fill(); c.stroke();
+  c.strokeStyle = 'rgba(70,25,95,0.55)'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, mb - 7); c.lineTo(0, mb + 13); c.stroke();
+  ov(c, -3, mb + 6, 3, 5, 'rgba(190,140,215,0.45)', 0, null);
   }
   c.restore();
 }
