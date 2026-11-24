@@ -837,11 +837,11 @@
       "max_height": 60,
       "height": -10,
       "duration": 2,
-      "cooldown": 9,
-      "shadow_speed_first_half": 400,
-      "shadow_speed_second_half": 250,
+      "cooldown": 10,
+      "shadow_speed_first_half": 420,
+      "shadow_speed_second_half": 300,
       "shadow_radius": 130,
-      "silence_duration": 0.8
+      "silence_duration": 1
     },
     "ghost_fire": {
       "min_height": 0,
@@ -851,8 +851,8 @@
       "spread_speed": 650,
       "convergence_speed": 400,
       "damage": 4,
-      "count": 20,
-      "radius": 21,
+      "count": 18,
+      "radius": 22,
       "rehit_interval": 1.5,
       "hp": 10,
       "mass": 20
@@ -860,8 +860,8 @@
     "shadow_ball": {
       "min_height": 0,
       "max_height": 60,
-      "ball_scale": 0.8,
-      "damage": 20,
+      "ball_scale": 0.7,
+      "damage": 15,
       "cooldown": 6,
       "slam_radius": 150,
       "speed": 600,
@@ -869,9 +869,9 @@
       "radius": 60,
       "hp": 30,
       "mass": 50,
-      "gravity": 130,
+      "gravity": 135,
       "pull_duration": 5,
-      "gravity_radius": 200
+      "gravity_radius": 230
     },
     "night_shade": {
       "min_height": 0,
@@ -918,7 +918,7 @@
         "recharge_duration": 0.4,
         "speed": 1400,
         "length": 520,
-        "width": 75,
+        "width": 85,
         "damage": 10,
         "pull_speed": 900,
         "bite_duration": 0.35,
@@ -931,10 +931,10 @@
       "devour": {
         "min_height": 0,
         "max_height": 80,
-        "gravity_radius": 420,
-        "silence_radius": 160,
+        "gravity_radius": 430,
+        "silence_radius": 150,
         "gravity": 380,
-        "gravity_duration": 5,
+        "gravity_duration": 6,
         "silence_duration": 7,
         "cooldown": 12,
         "scale": 1
