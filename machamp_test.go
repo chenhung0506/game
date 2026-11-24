@@ -840,3 +840,52 @@ func TestACometPunchWhileBoundOrParalyzedIsThrownInPlace(t *testing.T) {
 		t.Fatalf("a free Comet Punch moved only %v", g.P[0].X-x0)
 	}
 }
+
+// scatterMean is the mean distance, from the middle of a Machamp that cannot move, of the fists its Comet Punch throws (and the nearest and the furthest).
+func scatterMean(t *testing.T, bias float64) (mean, lo, hi float64) {
+	t.Helper()
+	cfg := DefaultConfig()
+	cp := &cfg.Machamp.CometPunch
+	cp.Quantity, cp.Duration, cp.ScatterMinDistance, cp.ScatterMaxDistance, cp.ScatterNearBias, cp.FistDuration, cp.RandomOffsetAngle = 200, 1, 10, 210, bias, 5, 0
+	g := kickDuel(cfg, 1500)
+	g.P[0].BoundT = 100 // held on the spot: the fists come out round where it stands
+	press(g, 0, Input{Comet: true})
+	steps(g, 40)
+	var sum float64
+	lo, hi = 1e9, 0
+	var n int
+	for _, b := range g.Balls {
+		if b.K != ballFist {
+			continue
+		}
+		d := math.Hypot(b.X-g.P[0].X, b.Y-g.P[0].Y) - g.radius(0)
+		sum += d
+		lo, hi = math.Min(lo, d), math.Max(hi, d)
+		n++
+	}
+	if n < 150 {
+		t.Fatalf("%d fists, want about 200", n)
+	}
+	return sum / float64(n), lo, hi
+}
+
+func TestTheFistsOfTheCometPunchCrowdTowardsTheBodyTheMoreTheBiasIs(t *testing.T) {
+	even, lo, hi := scatterMean(t, 1)
+	if even < 95 || even > 125 || lo < 10-1e-6 || hi > 210+1e-6 {
+		t.Fatalf("bias 1: mean %v range %v..%v, want an even spread over 10..210 (mean about 110)", even, lo, hi)
+	}
+	near, lo, hi := scatterMean(t, 3)
+	if near > 0.6*even || lo < 10-1e-6 || hi > 210+1e-6 {
+		t.Fatalf("bias 3: mean %v (even was %v) range %v..%v, want them crowded towards the body, inside the same range", near, even, lo, hi)
+	}
+}
+
+func TestTheCometPunchBiasIsChecked(t *testing.T) {
+	for _, v := range []float64{0, 0.5, 11} {
+		c := DefaultConfig()
+		c.Machamp.CometPunch.ScatterNearBias = v
+		if c.validate() == nil {
+			t.Fatalf("a bias of %v was accepted", v)
+		}
+	}
+}

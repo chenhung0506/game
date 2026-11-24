@@ -155,7 +155,10 @@ type CometPunchCfg struct {
 	Distance           float64 `json:"distance"`
 	ScatterMinDistance float64 `json:"scatter_min_distance"`
 	ScatterMaxDistance float64 `json:"scatter_max_distance"`
-	FistDuration       float64 `json:"fist_duration"`
+	// How much the fists crowd towards the near end of that range: a fist's distance is min + (max - min) * u^bias, u an even random number from 0 to 1. 1 is even all along; 2 puts
+	// half of them in the nearest quarter, so a foe close up is in front of more of them than behind them.
+	ScatterNearBias float64 `json:"scatter_near_bias"`
+	FistDuration    float64 `json:"fist_duration"`
 }
 
 // LightningPunchCfg is the Gigantamax Machamp's Lightning Punch (the K button in place of the High Jump Kick): it stands rooted for `charge_duration` seconds gathering
@@ -1316,7 +1319,7 @@ func DefaultConfig() Config {
 	cp.Radius, cp.HP, cp.Damage, cp.Cooldown, cp.Mass = 22, 20, 2, 8, 10
 	cp.BallKnockback, cp.Knockback = 120, 10
 	cp.Duration, cp.Quantity, cp.RandomOffsetAngle, cp.Distance = 1.5, 24, 40, 300
-	cp.ScatterMinDistance, cp.ScatterMaxDistance, cp.FistDuration = 20, 90, 0.2
+	cp.ScatterMinDistance, cp.ScatterMaxDistance, cp.FistDuration, cp.ScatterNearBias = 20, 90, 0.2, 1
 	rt := &c.Ash.RockTomb
 	rt.Enabled = true
 	rt.Reach = Reach{MinHeight: 0, MaxHeight: 60}
@@ -2332,6 +2335,8 @@ func (b *BrawlerCfg) validate(name string) error {
 		return fmt.Errorf("%s.comet_punch.quantity must be at most 200, got %d", name, cp.Quantity)
 	} else if !(cp.ScatterMaxDistance >= cp.ScatterMinDistance) {
 		return fmt.Errorf("%s.comet_punch.scatter_max_distance must be >= scatter_min_distance, got %v and %v", name, cp.ScatterMaxDistance, cp.ScatterMinDistance)
+	} else if !(cp.ScatterNearBias >= 1 && cp.ScatterNearBias <= 10) {
+		return fmt.Errorf("%s.comet_punch.scatter_near_bias must be between 1 and 10, got %v", name, cp.ScatterNearBias)
 	} else if !(cp.RandomOffsetAngle >= 0 && cp.RandomOffsetAngle <= 90) {
 		return fmt.Errorf("%s.comet_punch.random_offset_angle must be between 0 and 90, got %v", name, cp.RandomOffsetAngle)
 	}

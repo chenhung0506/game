@@ -3255,12 +3255,14 @@ function drawEarthquake(f) {
   ctx.beginPath(); ctx.arc(f.x + Math.sin(t * 47) * 2, f.y + Math.cos(t * 53) * 2, R + Math.sin(t * 31) * 3, 0, 7); ctx.stroke(); ctx.setLineDash([]);
   const ph = (f.age % every) / every; // a ring from the middle on every shock
   ctx.strokeStyle = `rgba(230,200,150,${0.6 * (1 - ph)})`; ctx.lineWidth = 6 * (1 - ph) + 1; ctx.beginPath(); ctx.arc(f.x, f.y, R * ph, 0, 7); ctx.stroke();
-  for (let c = 0; c < 9; c++) { // cracks out from the middle, wide where they start and thinning out, a little different every frame
-    const a = (c / 9 + (seed(c) - 0.5) * 0.25) * Math.PI * 2, len = R * (0.5 + 0.45 * seed(c + 40)), segs = 6, pts = [];
-    for (let n = 0; n <= segs; n++) { const u = 0.12 + 0.88 * n / segs, w = (seed(c * 9 + n) - 0.5) * R * 0.06 + Math.sin(t * 40 + c * 3 + n) * 1.5; pts.push([f.x + Math.cos(a) * len * u - Math.sin(a) * w, f.y + Math.sin(a) * len * u + Math.cos(a) * w, 1 - n / segs]); }
-    for (const [col, wd] of [['rgba(40,25,10,.9)', 7], ['rgba(255,225,170,.4)', 2]]) {
+  for (let c = 0; c < 12; c++) { // cracks out from the middle, wide where they start and thinning out, with a fork or two, a little different every frame
+    const a = (c / 12 + (seed(c) - 0.5) * 0.2) * Math.PI * 2, len = R * (0.6 + 0.38 * seed(c + 40)), segs = 7, pts = [];
+    for (let n = 0; n <= segs; n++) { const u = 0.1 + 0.9 * n / segs, w = (seed(c * 9 + n) - 0.5) * R * 0.07 + Math.sin(t * 40 + c * 3 + n) * 1.5; pts.push([f.x + Math.cos(a) * len * u - Math.sin(a) * w, f.y + Math.sin(a) * len * u + Math.cos(a) * w, 1 - n / segs]); }
+    const forks = []; // a branch off the middle of every other crack
+    if (c % 2 === 0) { const [bx, by] = pts[3], fa = a + (seed(c + 70) > 0.5 ? 0.6 : -0.6); for (let n = 0; n <= 3; n++) forks.push([bx + Math.cos(fa) * len * 0.12 * n + Math.sin(t * 40 + n) * 1.2, by + Math.sin(fa) * len * 0.12 * n, 0.6 * (1 - n / 3)]); }
+    for (const line of [pts, forks]) for (const [col, wd] of [['rgba(25,14,4,.95)', 12], ['rgba(255,230,170,.7)', 3.5]]) {
       ctx.strokeStyle = col;
-      for (let n = 1; n < pts.length; n++) { ctx.lineWidth = Math.max(1, wd * pts[n][2]); ctx.beginPath(); ctx.moveTo(pts[n - 1][0], pts[n - 1][1]); ctx.lineTo(pts[n][0], pts[n][1]); ctx.stroke(); }
+      for (let n = 1; n < line.length; n++) { ctx.lineWidth = Math.max(1.5, wd * line[n][2]); ctx.beginPath(); ctx.moveTo(line[n - 1][0], line[n - 1][1]); ctx.lineTo(line[n][0], line[n][1]); ctx.stroke(); }
     }
   }
   ctx.restore();

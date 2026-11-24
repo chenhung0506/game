@@ -112,15 +112,15 @@
       "min_height": 0,
       "max_height": 12,
       "height": 100,
-      "duration": 1,
+      "duration": 1.2,
       "cooldown": 3,
       "slam_radius": 150,
-      "damage": 20,
-      "earthquake_radius": 260,
-      "earthquake_duration": 4,
-      "earthquake_damage": 4,
+      "damage": 15,
+      "earthquake_radius": 250,
+      "earthquake_duration": 5,
+      "earthquake_damage": 2,
       "earthquake_interval": 0.5,
-      "earthquake_slow": 0.35,
+      "earthquake_slow": 0.25,
       "air_speed_first_half": 300,
       "air_speed_second_half": 190
     },
@@ -132,7 +132,7 @@
       "sweep_duration": 1.2,
       "recharge_duration": 1.8,
       "cooldown": 5,
-      "damage": 8,
+      "damage": 7,
       "knockback": 20,
       "hit_interval": 0.05,
       "mass": 130,
@@ -704,6 +704,7 @@
       "distance": 500,
       "scatter_min_distance": 0,
       "scatter_max_distance": 100,
+      "scatter_near_bias": 2,
       "fist_duration": 0.2
     },
     "rock_tomb": {
@@ -795,6 +796,7 @@
       "distance": 350,
       "scatter_min_distance": 0,
       "scatter_max_distance": 100,
+      "scatter_near_bias": 2,
       "fist_duration": 0.2
     },
     "rock_tomb": {
@@ -879,6 +881,7 @@
         "distance": 80,
         "scatter_min_distance": 0,
         "scatter_max_distance": 200,
+        "scatter_near_bias": 2,
         "fist_duration": 0.2
       }
     }

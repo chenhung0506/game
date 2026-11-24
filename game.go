@@ -1747,8 +1747,10 @@ func (g *Game) stepCharizard(i int, in Input, dt float64) []Event {
 			if p.FlyT -= dt; p.FlyT < 1e-9 {
 				p.FlyT = 0
 			}
-			p.Z = math.Min(p.Z+rise*dt, cz.Fly.Height)
-		} else if p.Z > 0 {
+			if !p.Held { // thrown up (or caught) by a foe: the height is theirs to set, not the flight's
+				p.Z = math.Min(p.Z+rise*dt, cz.Fly.Height)
+			}
+		} else if p.Z > 0 && !p.Held { // coming down from a flight, and only that: a body thrown up by a foe comes down by the foe's skill, with no ring of fire balls
 			if p.Z -= rise * dt; p.Z <= 1e-9 {
 				p.Z, p.FlyCD = 0, cz.Fly.Cooldown
 				g.flyRing(i)

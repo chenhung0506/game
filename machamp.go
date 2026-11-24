@@ -329,7 +329,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 			a := (g.rng.Float64()*2 - 1) * cp.RandomOffsetAngle * math.Pi / 180
 			ca, sa := math.Cos(a), math.Sin(a)
 			dx, dy := fx*ca-fy*sa, fx*sa+fy*ca
-			d := g.radius(i) + cp.ScatterMinDistance + g.rng.Float64()*(cp.ScatterMaxDistance-cp.ScatterMinDistance)
+			d := g.radius(i) + cp.ScatterMinDistance + math.Pow(g.rng.Float64(), cp.ScatterNearBias)*(cp.ScatterMaxDistance-cp.ScatterMinDistance)
 			g.Balls = append(g.Balls, Ball{
 				K: ballFist, Owner: i, Side: i + 1, DX: dx, DY: dy, HP: cp.HP, Life: cp.FistDuration,
 				X: math.Min(math.Max(p.X+dx*d, 0), g.court.Length), Y: math.Min(math.Max(p.Y+dy*d, 0), g.court.Width),
