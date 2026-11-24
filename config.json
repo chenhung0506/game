@@ -134,12 +134,12 @@
       "sweep_duration": 1.2,
       "recharge_duration": 1.8,
       "cooldown": 5,
-      "damage": 7,
+      "damage": 6,
       "knockback": 20,
       "hit_interval": 0.05,
       "mass": 130,
       "length": 650,
-      "width": 80
+      "width": 85
     }
   },
   "charizard": {
