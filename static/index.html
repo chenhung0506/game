@@ -232,7 +232,7 @@ ws.onmessage = (e) => {
   else if (m.t === 's') {
     if (!snap) { ghosts.length = iceTrail.length = voltTrail.length = smoke.length = flames.length = 0; fx = []; for (const b of beamLook) b.ang = b.tail = null; for (const sh of shadow) sh.x = null; for (const l of stormLook) l.x = null; for (const l of fbLook) l.x = null; for (const d of disp) d.x = null; for (const l of look) l.dir = null; } // a new match starts clean
     const old = snap;
-    waiting = false; snap = m;
+    waiting = false; snap = m; snapAt = performance.now();
     document.getElementById('pick').style.display = 'none';
     if (padKind !== m.p[you].k) { padKind = m.p[you].k; document.getElementById('bar2').textContent = HELP[padKind]; if (PORTRAIT) buildPad(); }
     for (const i of beamSlots()) {
@@ -2561,6 +2561,8 @@ function bbLeaves(ev) { // the landing of Brave Bird: a burst of big leaves (and
   gvAdd(110, () => { const a = gvRand(0, 6.28), v = ev.r * gvRand(0.5, 1.7); return { ...at, z: 8, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: gvRand(350, 720), age: 0, life: gvRand(1.4, 2.4), kind: 'bigleaf', col: cols[(Math.random() * cols.length) | 0], sz: gvRand(11, 22) * bbCfg.lf, rot: gvRand(0, 6.28), spin: gvRand(-16, 16) }; });
   gvAdd(24, () => { const a = gvRand(0, 6.28), v = ev.r * gvRand(0.2, 0.9); return { ...at, z: 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: gvRand(120, 320), age: 0, life: gvRand(0.6, 1), kind: 'dirt', sz: gvRand(3, 7) }; });
 }
+let snapAt = 0; // when the latest snapshot came
+const gvU = {}; // per vine of a cast: how far its earth has got (it only goes forward)
 const gvPlant = {}; // per owner (its slot + 1): where the head last surfaced, and when
 const GV_MAX_BITS = 400;
 function gvAdd(n, make) { for (let i = 0; i < n && gvBits.length < GV_MAX_BITS; i++) gvBits.push(make(i)); }
@@ -2570,6 +2572,7 @@ function gvBurst(ev) { // the dirt of each moment of the skill, as it happens
   if (ev.t === 'gvcast') {
     gvAdd(8, () => ({ ...at(ev.x, ev.y), z: 4, vx: gvRand(-60, 60), vy: gvRand(-60, 60), vz: gvRand(60, 140), age: 0, life: gvRand(0.4, 0.7), kind: 'dirt', sz: gvRand(3, 6) }));
   } else if (ev.t === 'gvplant') {
+    for (const k in gvU) if (k.startsWith(ev.k + ':')) delete gvU[k]; // a new cast: its earth starts from nothing
     gvPlant[ev.k] = { x: ev.x, y: ev.y, t0: performance.now() }; // where and when the head surfaced: the vines spread out from there (drawGvSpread)
     shake = Math.max(shake, 8);
     gvAdd(14, () => ({ ...at(ev.x, ev.y), z: 4, vx: gvRand(-120, 120), vy: gvRand(-120, 120), vz: gvRand(120, 280), age: 0, life: gvRand(0.6, 1), kind: 'dirt', sz: gvRand(4, 9) }));
@@ -2748,7 +2751,12 @@ function drawGvPath(tr) {
 function drawGvSpread(b) {
   const pl = gvPlant[b.sd];
   if (!pl) return;
-  const T = Math.max(b.lf || 0, 0.05), u = Math.min(1, (performance.now() - pl.t0) / 1000 / T), hx = pl.x + (b.x - pl.x) * u, hy = pl.y + (b.y - pl.y) * u;
+  // How far it has got is read off the server's clock (`dl`, the seconds it still has to wait, as of the snapshot, run on by the time since the snapshot came): by the page's own clock from
+  // when the news of the head came, a snapshot that is late makes the earth lag behind the vine that has already come out, and the shorter spread_time is and the further the ring, the more that shows.
+  const T = Math.max(b.lf || 0, 0.05), now = performance.now(), key = b.sd + ':' + b.ix + ':' + pl.t0;
+  let u = typeof b.dl === 'number' ? 1 - (b.dl - (now - snapAt) / 1000) / T : (now - pl.t0) / 1000 / T;
+  u = Math.min(1, Math.max(u, gvU[key] || 0)); gvU[key] = u; // and never back
+  const hx = pl.x + (b.x - pl.x) * u, hy = pl.y + (b.y - pl.y) * u;
   const w = gvCfg.hw * 0.55;
   ctx.save(); ctx.lineCap = 'round';
   ctx.strokeStyle = 'rgba(60,38,18,.55)'; ctx.lineWidth = w * 1.2; ctx.beginPath(); ctx.moveTo(pl.x, pl.y); ctx.lineTo(hx, hy); ctx.stroke();

@@ -377,8 +377,8 @@ type Ball struct {
 	Y         float64         `json:"y"`
 	DX        float64         `json:"dx,omitempty"` // unit direction
 	DY        float64         `json:"dy,omitempty"`
-	Delay     float64         `json:"-"`           // leaf: seconds before it shoots
-	Wait      bool            `json:"w,omitempty"` // leaf: still hanging around Chikorita
+	Delay     float64         `json:"dl,omitempty"` // leaf: seconds before it shoots; giant vine: seconds before it comes out (the page spreads the earth out to its place by this, not by its own clock)
+	Wait      bool            `json:"w,omitempty"`  // leaf: still hanging around Chikorita
 	HP        int             `json:"hp"`
 	LastSweep int             `json:"-"`            // the Hyper Beam sweep that last hit it
 	HitCD     float64         `json:"-"`            // until the beam may hit it again (hyper_beam.hit_interval)

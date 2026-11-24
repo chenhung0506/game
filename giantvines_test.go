@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"testing"
 )
 
@@ -433,5 +435,17 @@ func TestEachCastCountsItsHitsAgain(t *testing.T) {
 	}
 	if g.P[1].HP != 100000-4*cfg.Chikorita.GiantVines.Damage {
 		t.Fatalf("HP %d: the four hits did not all land, the test shows nothing", g.P[1].HP)
+	}
+}
+
+// The page spreads the earth a vine pushes up by the seconds the vine still has to wait (`dl`), not by its own clock from when the news of the head came: a late snapshot would
+// otherwise leave the earth behind a vine that has come out.
+func TestAGiantVineWaitingUnderTheGroundSendsHowLongItStillHasToWait(t *testing.T) {
+	raw, err := json.Marshal(Ball{K: ballGiantVine, Phase: vineWait, Delay: 0.5, Life: 0.9})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"dl":0.5`) || !strings.Contains(string(raw), `"lf":0.9`) {
+		t.Fatalf("%s: want the seconds left to wait (dl) and the whole wait (lf)", raw)
 	}
 }
