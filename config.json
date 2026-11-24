@@ -5,7 +5,7 @@
   },
   "pikachu": {
     "max_hp": 160,
-    "walk_speed": 160,
+    "walk_speed": 165,
     "radius": 8,
     "volt_tackle": {
       "min_height": 0,
@@ -421,7 +421,7 @@
     "arrows": {
       "min_height": 0,
       "max_height": 60,
-      "speed": 400,
+      "speed": 390,
       "radius": 8,
       "hp": 4,
       "damage": 10,
