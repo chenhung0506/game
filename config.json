@@ -92,6 +92,8 @@
     }
   },
   "snorlax": {
+    "ultimate": { "max": 100, "gain_taken": 0.4, "gain_dealt": 0.6, "gain_ultimate_dealt": 0.4, "gain_per_second": 1 },
+    "sleep": { "ring_duration": 0.6, "sleep_duration": 5, "delay": 1, "health_hp": 240 },
     "max_hp": 240,
     "walk_speed": 120,
     "radius": 30,

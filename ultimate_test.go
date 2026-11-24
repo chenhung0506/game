@@ -92,11 +92,11 @@ func TestUltimateChargeCountsDamageFromAnySkillAndStopsAtMax(t *testing.T) {
 
 func TestUltimateChargeIgnoresACharacterWithoutOneAndEmptiesWithTheRound(t *testing.T) {
 	cfg := DefaultConfig()
-	g := duel(cfg, snorlax, pikachu)
+	g := duel(cfg, magikarp, pikachu)
 	g.hit(&g.P[0], 10)
 	g.Step(dt)
 	if g.P[0].Charge != 0 {
-		t.Fatalf("snorlax has no ultimate but holds %v", g.P[0].Charge)
+		t.Fatalf("magikarp has no ultimate but holds %v", g.P[0].Charge)
 	}
 	g = pika(cfg, snorlax, true)
 	g.Reset()

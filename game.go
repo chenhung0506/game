@@ -341,6 +341,9 @@ type Player struct {
 	DevourT    float64 `json:"dvt"`
 	DevourSilT float64 `json:"dvs"`
 	DevourCD   float64 `json:"dvcd"`
+	// Snorlax's Sleep: the seconds of sleep left (0: awake), and the part of an HP the healing has not yet given.
+	SleepT   float64 `json:"slp"`
+	SleepAcc float64 `json:"-"`
 }
 
 // Leaf Slash phases.
@@ -857,6 +860,9 @@ func (g *Game) Step(dt float64) []Event {
 		}
 		if p.SilentT > 0 { // under a Gengar's shadow: it can walk, but no skill starts
 			in = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY, CastX: in.CastX, CastY: in.CastY}
+		}
+		if p.SleepT > 0 { // asleep: no walking and no skill, whatever the keys say; the sleep itself goes on whatever is done to it (stepSleep)
+			in = Input{}
 		}
 		if p.UltT > 0 || p.BirdDive { // gathering the ultimate (or diving): no other skill starts
 			in = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY, CastX: in.CastX, CastY: in.CastY}

@@ -931,11 +931,16 @@ func (b *Bot) snorlax(c *bctx) Input {
 	b.wasAir = air
 	b.comboT = math.Max(0, b.comboT-botEvery*dtBot)
 
-	if p.FrozenT > 0 || p.Held || p.ParalyzeT > 0 || busy { // paralyzed it can neither walk, jump nor punch, and a beam would only root it
+	if p.SleepT > 0 || p.FrozenT > 0 || p.Held || p.ParalyzeT > 0 || busy { // paralyzed it can neither walk, jump nor punch, and a beam would only root it; asleep it can do nothing
 		return c.stay()
 	}
 	if air {
 		return c.move(c.ux, c.uy) // steer the landing onto the opponent
+	}
+	if p.Charge >= g.cfg.Snorlax.Ultimate.Max && float64(p.HP) <= 0.5*float64(g.maxHP(c.me)) && c.dist > 350 && c.th.kind == thNone { // hurt, charged, and nothing close or on its way: sleep it off
+		in := c.stay()
+		in.Ult = true
+		return in
 	}
 	canJump := p.JumpCD == 0
 	th := c.th

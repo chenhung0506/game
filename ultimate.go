@@ -62,6 +62,8 @@ func (c Config) ultimateOf(kind int) (Ultimate, bool) {
 		return c.Vulpix.Ultimate, true
 	case gengar:
 		return c.Gengar.Ultimate, true
+	case snorlax:
+		return c.Snorlax.Ultimate, true
 	}
 	return Ultimate{}, false
 }
@@ -106,6 +108,9 @@ func (g *Game) stepUltimate(i int, in Input, dt float64) ([]Event, bool) {
 	}
 	if ok && p.Kind == vulpix {
 		return g.stepGlaciateCast(i, in, u, dt)
+	}
+	if ok && p.Kind == snorlax {
+		return g.stepSleep(i, in, u, dt)
 	}
 	if ok && (p.Kind == machamp || p.Kind == charizard || p.Kind == gengar) {
 		return g.stepGigantamax(i, in, u, dt)

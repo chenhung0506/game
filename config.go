@@ -341,6 +341,17 @@ type CharizardGmaxCfg struct {
 	SeismicToss    SeismicTossCfg `json:"seismic_toss"`
 }
 
+// SleepCfg is Snorlax's ultimate (Z, once the charge is full): it first stands rooted gathering for `ring_duration` seconds (rings close in on it; a stun, a freeze or a catch ends the gathering and the charge is not
+// given back), then sleeps for `sleep_duration` seconds, rooted and without a skill, and gets back `health_hp` HP over the part of the sleep that follows the first `delay` seconds (a steady share a tick, never past
+// its maximum, exactly `health_hp` in all): the healing does not begin the moment it falls asleep. Being stunned, knocked back, thrown up in the air, frozen, bound or caught during the sleep does not end it, and the
+// healing goes on through all of it.
+type SleepCfg struct {
+	RingDuration  float64 `json:"ring_duration"`
+	SleepDuration float64 `json:"sleep_duration"`
+	Delay         float64 `json:"delay"` // seconds into the sleep before the healing starts; below sleep_duration
+	HealthHP      int     `json:"health_hp"`
+}
+
 // GhostFireCfg is Gengar's Ghost Fire (J): `count` flames out all round it fly `ring_radius` out at `spread_speed`, then back to it at `convergence_speed`, each hurting the foe it
 // touches (`radius` big, at the heights `min_height`..`max_height`) for `damage`: once (`rehit_interval` 0) or again every `rehit_interval` seconds it still overlaps. A flame is a projectile with `hp` and `mass`.
 type GhostFireCfg struct {
@@ -559,6 +570,9 @@ type Config struct {
 			Mass             float64 `json:"mass"`            // against an Electro Ball: it is pushed mass - electro_ball.mass along the dash (nothing if lighter)
 		} `json:"ice_punch"`
 		HyperBeam HyperBeamCfg `json:"hyper_beam"`
+		// Ultimate (Z) is the charge for Sleep, which is what it uses it on (see SleepCfg).
+		Ultimate Ultimate `json:"ultimate"`
+		Sleep    SleepCfg `json:"sleep"`
 	} `json:"snorlax"`
 	Charizard struct {
 		MaxHP       int            `json:"max_hp"`
@@ -1161,6 +1175,8 @@ func DefaultConfig() Config {
 	tv.RehitInterval, tv.HP, tv.Mass, tv.Knockback, tv.TerminalTime, tv.ExplosionDamage, tv.ExplosionRadius = 0.5, 10, 20, 40, 5, 20, 110
 	c.Pikachu.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
 	c.Ash.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
+	c.Snorlax.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
+	c.Snorlax.Sleep = SleepCfg{RingDuration: 0.6, SleepDuration: 5, Delay: 1, HealthHP: 100}
 	c.Snorlax.MaxHP = maxHP
 	c.Snorlax.WalkSpeed = speed
 	c.Snorlax.Radius = snorlaxRadius
@@ -1717,6 +1733,8 @@ func (c Config) validateSkills() error {
 		{"charizard.ultimate.max", c.Charizard.Ultimate.Max, 0},
 		{"vulpix.ultimate.max", c.Vulpix.Ultimate.Max, 0},
 		{"gengar.ultimate.max", c.Gengar.Ultimate.Max, 0},
+		{"snorlax.ultimate.max", c.Snorlax.Ultimate.Max, 0},
+		{"snorlax.sleep.sleep_duration", c.Snorlax.Sleep.SleepDuration, 0},
 		{"vulpix.glaciate.duration", c.Vulpix.Glaciate.Duration, 0},
 		{"vulpix.glaciate.radius", c.Vulpix.Glaciate.Radius, 0},
 		{"vulpix.glaciate.ring_scale", c.Vulpix.Glaciate.RingScale, 0},
@@ -2108,6 +2126,13 @@ func (c Config) validateSkills() error {
 		{"vulpix.ultimate.gain_dealt", c.Vulpix.Ultimate.GainDealt},
 		{"vulpix.ultimate.gain_per_second", c.Vulpix.Ultimate.GainPerSecond},
 		{"vulpix.ultimate.gain_ultimate_dealt", c.Vulpix.Ultimate.GainUltDealt},
+		{"snorlax.ultimate.gain_taken", c.Snorlax.Ultimate.GainTaken},
+		{"snorlax.ultimate.gain_dealt", c.Snorlax.Ultimate.GainDealt},
+		{"snorlax.ultimate.gain_per_second", c.Snorlax.Ultimate.GainPerSecond},
+		{"snorlax.ultimate.gain_ultimate_dealt", c.Snorlax.Ultimate.GainUltDealt},
+		{"snorlax.sleep.health_hp", float64(c.Snorlax.Sleep.HealthHP)},
+		{"snorlax.sleep.ring_duration", c.Snorlax.Sleep.RingDuration},
+		{"snorlax.sleep.delay", c.Snorlax.Sleep.Delay},
 		{"gengar.ultimate.gain_taken", c.Gengar.Ultimate.GainTaken},
 		{"gengar.ultimate.gain_dealt", c.Gengar.Ultimate.GainDealt},
 		{"gengar.ultimate.gain_per_second", c.Gengar.Ultimate.GainPerSecond},
@@ -2287,6 +2312,9 @@ func (c Config) validateSkills() error {
 	}
 	if a := c.Chikorita.VineWhip.SweepAngle; !(a > 0 && a <= 180) {
 		return fmt.Errorf("chikorita.vine_whip.sweep_angle must be between 0 (exclusive) and 180, got %v", a)
+	}
+	if sl := c.Snorlax.Sleep; !(sl.Delay < sl.SleepDuration) { // the healing needs some of the sleep left to happen in
+		return fmt.Errorf("snorlax.sleep.delay (%v) must be less than sleep_duration (%v)", sl.Delay, sl.SleepDuration)
 	}
 	if n := c.Rowlet.Tailwind.Slash.Count; n > 100 {
 		return fmt.Errorf("rowlet.tailwind.slash.count must be at most 100, got %d", n)

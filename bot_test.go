@@ -1364,3 +1364,22 @@ func TestTheGigantamaxGengarDevoursAFoeInsideThePullButOutsideTheSilence(t *test
 		t.Fatalf("decision %+v (pressed %v), want the Devour", in, ok)
 	}
 }
+
+func TestSnorlaxSleepsWhenHurtChargedAndNothingIsNear(t *testing.T) {
+	g := duel(DefaultConfig(), snorlax, pikachu)
+	g.P[1].X = g.P[0].X + 700
+	g.P[0].HP = g.maxHP(0) / 3
+	g.P[0].Charge = g.cfg.Snorlax.Ultimate.Max
+	if in, ok := firstAct(newBot(snorlax, 1), g, 0, 200); !ok || !in.Ult {
+		t.Fatalf("decision %+v (pressed %v), want Sleep", in, ok)
+	}
+	g.P[0].HP = g.maxHP(0)
+	if in, ok := firstAct(newBot(snorlax, 1), g, 0, 200); ok && in.Ult {
+		t.Fatal("it slept at full health")
+	}
+	g.P[0].HP = g.maxHP(0) / 3
+	g.P[1].X = g.P[0].X + 150
+	if in, ok := firstAct(newBot(snorlax, 1), g, 0, 200); ok && in.Ult {
+		t.Fatal("it slept with the opponent right on top of it")
+	}
+}
