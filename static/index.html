@@ -159,7 +159,7 @@ let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp:
 let voltCfg = { radius: 16, uses: 3, window: 2, scale: 1 }; // Volt Tackle, from 'hi'
 let ultCfg = [], tvoltCfg = { jump: 0, dark: 0, fevery: 0, falpha: 0, colors: ['#ffd21e'], radius: 20, hp: 10, rrad: 220, boom: 120, time: 5, link: 9, tip: 0.6, charge: 2.4, ring: 0.6, bstart: 1.2, bcount: 6, bint: 0.2, boffs: [0], rscale: 1, bscale: 1 }; // per kind, the charge its ultimate (Z) needs (0 = it has none); Thousand Volt's, from 'hi'
 let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
-let slapCfg = { angle: 110, length: 110, dur: [0.25], aradius: 110 }; // Jigglypuff's Slap, from 'hi'
+let slapCfg = { angle: 110, length: 110, dur: [0.25], aradius: 110, rdur: 0.5 }; // Jigglypuff's Slap, from 'hi'
 let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8, width: 0 }; // Vulpix's, from 'hi'
 let slashCfg = { radius: 8, scale: 0.5, hp: 1 }; // Rowlet's air slash, from 'hi'
 let arrowCfg = { radius: 8, hp: 2, slow: 2, count: 5, angle: 12, charge: 0.5, scale: 1 }, tornadoCfg = { radius: 50, hp: 40, charge: 0.4, lift: 200, scale: 1 }; // Rowlet's, from 'hi'
@@ -1650,7 +1650,137 @@ function artCharizard(c, x, y, t, flap, pose = IDLE) {
 // Jigglypuff: one round ball with ears, a curl, feet and hands stuck to it. pose.slap: 0 none, 1 the hand raised (the wind-up), 2 the hand coming down.
 function jpStar(c,x,y,r1,r2,n,fill){const pts=[];for(let i=0;i<n*2;i++){const a=i*Math.PI/n,r=i%2?r1:r2;pts.push([x+Math.cos(a)*r,y+Math.sin(a)*r]);}poly(c,pts,fill,'rgba(120,70,0,.7)');}
 function jpSwoosh(c,pts){c.lineCap='round';for(const [w,al,off] of [[1.6,.9,0],[1,.55,2.2]]){c.strokeStyle='rgba(255,255,255,'+al+')';c.lineWidth=w;c.beginPath();c.moveTo(pts[0][0]+off,pts[0][1]);c.quadraticCurveTo(pts[1][0]+off,pts[1][1],pts[2][0]+off*0.4,pts[2][1]+off);c.stroke();}}
+function jpCurl(c,cx,cy,s){c.lineCap='round';const P='#f8b4c8';
+  const path=()=>{c.beginPath();c.moveTo(cx,cy+2*s);c.bezierCurveTo(cx+6*s,cy+1*s,cx+8*s,cy-7*s,cx+2*s,cy-9*s);c.bezierCurveTo(cx-3*s,cy-10*s,cx-4*s,cy-4*s,cx+0.5*s,cy-4.5*s);};
+  c.strokeStyle=OUTLINE;c.lineWidth=5.2*s;path();c.stroke();c.strokeStyle=P;c.lineWidth=4*s;path();c.stroke();}
+function jpEye(c,ex,ey,r,sy){c.save();c.translate(ex,ey);c.scale(1,sy);const EYE='#27a9b8',EYED='#0f5d6a';
+  ov(c,0,0,r,r*1.28,'#fff');ov(c,0,0.2,r*0.86,r*1.12,EYE,0,null);ov(c,0,0.6,r*0.5,r*0.72,EYED,0,null);ov(c,r*0.3,-r*0.5,r*0.34,r*0.34,'#fff',0,null);ov(c,-r*0.3,r*0.3,r*0.16,r*0.16,'#fff',0,null);c.restore();}
+// Rolling along the ground to the right (side view): the whole ball turns by `ang` radians, feet and hands tucked in; streaks and dust behind it.
+function artJigglypuffRollSide(c,x,y,ang){
+  const P='#f8b4c8',PD='#e48aa6',EAR='#f4a0b9';
+  c.save();c.translate(x,y);
+  c.lineCap='round';c.strokeStyle='rgba(255,255,255,.85)';                                  // speed streaks behind it
+  for(const [dy,l,w] of [[-8,16,1.6],[2,22,1.8],[12,14,1.4]]){c.lineWidth=w;c.beginPath();c.moveTo(-19-l,dy);c.lineTo(-19,dy);c.stroke();}
+  for(const [dx,r,a] of [[-22,3.2,.55],[-30,2.2,.4],[-37,1.6,.3]]){c.fillStyle='rgba(160,125,70,'+a+')';c.beginPath();c.arc(dx,17-r,r,0,7);c.fill();}  // dust
+  c.translate(0,2);c.rotate(ang);c.translate(0,-2);                                        // the ball turns about its centre
+  poly(c,[[-11,-4],[-9,-13],[-2,-9]],PD);                                                   // far ear
+  ov(c,0,2,16,15.2,P);
+  poly(c,[[-2,-9],[0,-16],[7,-9]],P);poly(c,[[1,-9.5],[1.4,-13.5],[4.5,-10]],EAR,null);     // near ear
+  jpCurl(c,8,-8.8,0.7);
+  c.save();c.translate(9.5,0);jpEye(c,0,0,3.9,1);c.restore();
+  c.strokeStyle='#8a3a52';c.lineWidth=1;c.beginPath();c.moveTo(13,8);c.quadraticCurveTo(14.4,9,15.4,7.8);c.stroke();
+  ov(c,7,7,2,1.4,'#f58aa6',0,null);
+  ov(c,-4,12.5,4.6,3.2,PD);ov(c,5,13.5,4.6,3.2,P);                                         // feet, tucked up against the ball
+  ov(c,2,5.5,3.2,4.4,P,0.5);                                                               // the hand, folded in
+  c.restore();
+}
+// Rolling towards us (front view): the features sit on a ball that turns about its horizontal axis by `th` (0 = facing us, 180 = its back).
+function artJigglypuffRollFront(c,x,y,th){
+  const P='#f8b4c8',PD='#e48aa6',PL='#fdd5e1',EAR='#f4a0b9',R=15.6,CY=2,cT=Math.cos(th),sT=Math.sin(th);
+  const on=(px,py,zmin=0)=>{const dy=py-CY;return [px,dy,Math.max(zmin,Math.sqrt(Math.max(0,R*R-px*px-dy*dy)))];};
+  const rot=([px,py,pz])=>[px,py*cT+pz*sT,-py*sT+pz*cT];                                     // [x, y below the centre, z towards us]
+  const items=[];
+  const add=(p3,draw)=>{const [rx,ry,rz]=rot(p3);items.push({z:rz,draw:()=>draw(rx,CY+ry,rz/R)});};
+  const poly3=(pts,fill,line)=>{const q=pts.map(([px,py])=>rot(on(px,py,3)));const z=q.reduce((a,b)=>a+b[2],0)/q.length;
+    items.push({z:z,draw:()=>poly(c,q.map(([a,b])=>[a,CY+b]),fill,line)});};
+  c.save();c.translate(x,y);
+  ov(c,0,19,14,3,'rgba(0,0,0,.16)',0,null);                                                  // shadow
+  poly3([[-14,-5],[-12.5,-15],[-5,-10.5]],P,OUTLINE);poly3([[14,-5],[12.5,-15],[5,-10.5]],P,OUTLINE);   // ears
+  poly3([[-12,-7],[-11.6,-12.5],[-7.5,-10]],EAR,null);poly3([[12,-7],[11.6,-12.5],[7.5,-10]],EAR,null);
+  for(const sx of [-1,1]){
+    add(on(sx*7,15.5,3),(a,b)=>ov(c,a,b,5.52,3.84,PD));                                     // feet
+    add(on(sx*16.5,3),(a,b)=>ov(c,a,b,3.6,5.04,P,sx*0.25));                                  // hands: on the axis, so they hardly move
+    add(on(sx*6.2,0),(a,b,n)=>{if(n>0.05)jpEye(c,a,b,4.2,n);});                              // eyes, squashed as they turn away
+    add(on(sx*11,6.5),(a,b,n)=>{if(n>0.05)ov(c,a,b,2.2,1.5*n,'#f58aa6',0,null);});
+  }
+  add(on(0,8),(a,b,n)=>{if(n>0.05){c.save();c.translate(a,b);c.scale(1,n);c.strokeStyle='#8a3a52';c.lineWidth=1;c.lineCap='round';c.beginPath();c.moveTo(-1.8,0);c.quadraticCurveTo(0,1.6,1.8,0);c.stroke();c.restore();}});
+  add(on(0,-8),(a,b,n)=>{if(n>-0.1){c.save();c.translate(a,b);c.scale(1,Math.max(n,0.25));jpCurl(c,0,0,0.72);c.restore();}});
+  const back=items.filter(it=>it.z<0).sort((p,q)=>p.z-q.z), front=items.filter(it=>it.z>=0).sort((p,q)=>p.z-q.z);
+  back.forEach(it=>it.draw());
+  ov(c,0,CY,16,15.2,P);                                                                      // the ball itself, between what is behind it and what is in front
+  front.forEach(it=>it.draw());
+  c.restore();
+}
+// Jigglypuff kicking up and forward at 45 degrees (side view, the kick goes right): its feet are only stubs on the ball, so the whole ball is turned over, nearly a handstand:
+// the feet (the ball's underside) point up and right along the diagonal and the head hangs down; it is in the air.
+function artJigglypuffKick(c,x,y){
+  const P='#f8b4c8',PD='#e48aa6',EAR='#f4a0b9',CX=0,CY=-6;
+  c.save();c.translate(x,y);
+  ov(c,-2,19.5,13,2.6,'rgba(0,0,0,.15)',0,null);                                         // a small shadow far below: it is in the air
+  // the kick's path: a curve rising from low in front, past the feet
+  c.lineCap='round';
+  for(const [w,al,off] of [[2.2,.9,0],[1.2,.5,-2.8]]){c.strokeStyle='rgba(255,255,255,'+al+')';c.lineWidth=w;c.beginPath();c.moveTo(19+off,14+off*0.3);c.quadraticCurveTo(40+off,2+off,36+off,-30+off*0.4);c.stroke();}
+  c.save();c.translate(CX,CY);c.rotate(-Math.PI*0.75);c.scale(-1,1);c.translate(0,-2);       // the ball upside down: its feet to the upper right, its face to the lower right
+  poly(c,[[-11,-4],[-9,-13],[-2,-9]],PD);                                                   // far ear
+  ov(c,4.5,17.5,5.52,3.84,PD,0.1);                                                          // the other foot, bent flat, behind the ball
+  ov(c,0,2,16,15.2,P);
+  poly(c,[[-2,-9],[0,-16],[7,-9]],P);poly(c,[[1,-9.5],[1.4,-13.5],[4.5,-10]],EAR,null);     // near ear
+  jpCurl(c,8,-8.8,0.7);
+  c.save();c.translate(9.5,0);c.scale(1,0.8);jpEye(c,0,0,3.9,1);c.restore();                // eyes narrowed with effort
+  c.strokeStyle='#8a3a52';c.lineWidth=1.1;c.lineCap='round';c.beginPath();c.moveTo(12,8);c.quadraticCurveTo(14,10.6,15.6,8);c.stroke();
+  ov(c,7,7,2,1.4,'#f58aa6',0,null);
+  ov(c,-1,3,3.2,4.4,P,0.3);                                                              // the one hand that shows (the other is hidden behind the body)
+  ov(c,-3.2,19.3,3.5,8.2,P,0);                                                               // near foot, the one that hits: the instep pressed, the foot turned straight along the leg
+  c.restore();
+  // the impact: a star in front of the feet and lines flying off
+  const ux=Math.SQRT1_2,uy=-Math.SQRT1_2,sx=CX+ux*33,sy=CY+uy*33;
+  jpStar(c,sx,sy,3.8,7.2,8,'#ffe45c');
+  c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=1.4;
+  for(const a of [-1.15,-0.8,-0.45]){c.beginPath();c.moveTo(sx+Math.cos(a)*9,sy+Math.sin(a)*9);c.lineTo(sx+Math.cos(a)*14,sy+Math.sin(a)*14);c.stroke();}
+  c.restore();
+}
+
+// The same kick seen from the front or from behind: the ball is turned over just the same (its underside, with the feet, to the upper right), one foot pointed straight, the other bent flat.
+function artJigglypuffKickFB(c,x,y,back){
+  const P='#f8b4c8',PD='#e48aa6',EAR='#f4a0b9',CX=0,CY=-6;
+  c.save();c.translate(x,y);
+  ov(c,-2,19.5,13,2.6,'rgba(0,0,0,.15)',0,null);                                           // a small shadow far below
+  c.lineCap='round';
+  for(const [w,al,off] of [[2.2,.9,0],[1.2,.5,-2.8]]){c.strokeStyle='rgba(255,255,255,'+al+')';c.lineWidth=w;c.beginPath();c.moveTo(21+off,14+off*0.3);c.quadraticCurveTo(36+off,-2+off,22+off,-34+off*0.4);c.stroke();}
+  c.save();c.translate(CX,CY);c.rotate(Math.PI);c.translate(0,-2);
+  ov(c,-7,17,5.52,3.84,PD,0.1);                                                              // the foot bent flat, behind the ball
+  poly(c,[[-14,-5],[-12.5,-15],[-5,-10.5]],P);poly(c,[[14,-5],[12.5,-15],[5,-10.5]],P);      // ears
+  poly(c,[[-12,-7],[-11.6,-12.5],[-7.5,-10]],back?PD:EAR,null);poly(c,[[12,-7],[11.6,-12.5],[7.5,-10]],back?PD:EAR,null);
+  ov(c,-16.5,3,3.6,5.04,P,0.25);ov(c,16.5,3,3.6,5.04,P,-0.25);                              // both hands, behind the body so it covers their roots
+  ov(c,0,2,16,15.2,P);
+  if(!back){
+    jpEye(c,-6.2,0,4.2,0.85);jpEye(c,6.2,0,4.2,0.85);
+    c.fillStyle='#8a3a52';c.beginPath();c.ellipse(0,8.3,1.8,1.4,0,0,7);c.fill();                // mouth open with effort
+    ov(c,-11,6.5,2.2,1.5,'#f58aa6',0,null);ov(c,11,6.5,2.2,1.5,'#f58aa6',0,null);
+    jpCurl(c,0,-8,0.72);
+  }
+  ov(c,back?3:5,19.3,3.5,8.2,P,0);                                                                  // the kicking foot: pointed straight, longer
+  c.restore();
+  const ux=0,uy=-1,sx=CX+ux*34,sy=CY+uy*34;
+  jpStar(c,sx,sy,3.8,7.2,8,'#ffe45c');
+  c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=1.4;
+  for(const a of [-1.95,-1.57,-1.19]){c.beginPath();c.moveTo(sx+Math.cos(a)*9,sy+Math.sin(a)*9);c.lineTo(sx+Math.cos(a)*14,sy+Math.sin(a)*14);c.stroke();}
+  c.restore();
+}
+function drawKickFB(id,back){const c=document.getElementById(id).getContext('2d');c.fillStyle='#e9d9a8';c.fillRect(0,0,380,300);c.save();c.translate(140,215);c.scale(4,4);artJigglypuffKickFB(c,0,0,back);c.restore();}
+
+// Jigglypuff stomping (in the air, the foot drives down): the usual body with the feet pushed out underneath, and the impact below them.
+function artJigglypuffStomp(c,x,y,t,pose){
+  artJigglypuff(c,x,y,t,{dir:pose.dir,mv:0,ph:0,slap:0});
+  const P='#f8b4c8',PD='#e48aa6';
+  c.save();c.translate(x,y);
+  ov(c,-7,19.5,4.2,6.4,PD,0.08);ov(c,7,19.5,4.2,6.4,P,-0.08);                                // the feet, pushed down
+  c.lineCap='round';c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=1.4;
+  for(const dx of [-12,0,12]){c.beginPath();c.moveTo(dx,-22);c.lineTo(dx,-32);c.stroke();}  // speed lines above: it is coming down
+  jpStar(c,0,32,3.8,7.2,8,'#ffe45c');
+  for(const a of [0.35,1.57,2.8]){c.beginPath();c.moveTo(Math.cos(a)*9,32+Math.sin(a)*9);c.lineTo(Math.cos(a)*14,32+Math.sin(a)*14);c.stroke();}
+  c.restore();
+}
 function artJigglypuff(c,x,y,t,pose){
+  if (pose.stomp) return artJigglypuffStomp(c, x, y, t, pose);
+  if (pose.kick || pose.roll >= 0) { // the roll (pose.roll = how far the ball has turned, radians) and the kick: side views face right and are mirrored for left
+    const d = pose.dir, side = d === 2 || d === 3;
+    c.save(); c.translate(x, y); if (d === 2) c.scale(-1, 1);
+    if (pose.kick) { if (side) artJigglypuffKick(c, 0, 0); else artJigglypuffKickFB(c, 0, 0, d === 1); }
+    else if (side) artJigglypuffRollSide(c, 0, 0, pose.roll);
+    else artJigglypuffRollFront(c, 0, 0, d === 1 ? Math.PI - pose.roll : pose.roll);
+    c.restore(); return;
+  }
   const {dir,mv,ph}=pose,sw=Math.sin(ph)*mv,bob=-Math.abs(Math.sin(ph))*2*mv,br=Math.sin(t*2.2)*0.35,sl=pose.slap||0;
   const P='#f8b4c8',PD='#e48aa6',PL='#fdd5e1',EAR='#f4a0b9',EYE='#27a9b8',EYED='#0f5d6a';
   const curl=(cx,cy,s,flip=1)=>{c.lineCap='round';
@@ -4527,8 +4657,9 @@ function drawPlayer(i, p) {
   const running = sp > 0.35;
   if (running && Math.hypot(lk.vx, lk.vy) > 0.3) lk.dir = faceOf(lk.vx, lk.vy);
   lk.mv += ((running ? 1 : 0) - lk.mv) * 0.25; lk.ph += 0.2 * lk.mv;
-  if (p.k === 10 && (p.slt > 0 || p.slr > 0) && !p.jpa) lk.dir = faceOf(...rv(p.slx, p.sly)); // slapping: it faces the way the slap goes
-  const pose = { dir: lk.dir, slap: p.k === 10 ? (p.slt > 0 ? 1 : p.slr > 0 ? 2 : 0) : 0, mv: lk.mv, ph: lk.ph, gmax: isGmax(p), sneak: p.k === 9 && p.gnt > 0, sleep: p.k === 1 && p.slp > 0, lick: p.k === 9 && p.lkp >= 2 && p.lkp <= 4, whip: p.k === 11 && (p.tlt > 0 || (p.tlcd <= cdCfg.tail - tailCfg.charge && p.tlcd > cdCfg.tail - tailCfg.charge - TAIL_SWING)) }; // whip: its tail is out (cocked, or lashing), so the body is drawn without it
+  if (p.k === 10 && p.rlt > 0) lk.dir = faceOf(...rv(p.rlx, p.rly)); // rolling: it faces the way it rolls
+  else if (p.k === 10 && (p.slt > 0 || p.slr > 0)) lk.dir = faceOf(...rv(p.slx, p.sly)); // swinging: it faces the way the blow goes // slapping: it faces the way the slap goes
+  const pose = { dir: lk.dir, slap: p.k === 10 && !p.jpa ? (p.slt > 0 ? 1 : p.slr > 0 ? 2 : 0) : 0, roll: p.k === 10 && p.rlt > 0 ? Math.PI * 2 * (1 - p.rlt / Math.max(slapCfg.rdur, 1e-6)) : -1, stomp: p.k === 10 && p.z > 0 && ((p.jpa && p.slt > 0 && p.jpn < 2) || (p.slr > 0 && p.jpp === 1)), kick: p.k === 10 && ((p.jpa && p.slt > 0 && p.jpn === 2) || (p.slr > 0 && p.jpp === 2)), mv: lk.mv, ph: lk.ph, gmax: isGmax(p), sneak: p.k === 9 && p.gnt > 0, sleep: p.k === 1 && p.slp > 0, lick: p.k === 9 && p.lkp >= 2 && p.lkp <= 4, whip: p.k === 11 && (p.tlt > 0 || (p.tlcd <= cdCfg.tail - tailCfg.charge && p.tlcd > cdCfg.tail - tailCfg.charge - TAIL_SWING)) }; // whip: its tail is out (cocked, or lashing), so the body is drawn without it
   if (p.k === 3) { // the leaf grows for the Leaf Slash and is swung by it, upper left to lower right on the first, the other way on the next
     const sgn = p.ln % 2 === 0 ? 1 : -1, e = p.lk * p.lk * (3 - 2 * p.lk); // eased: the swing gathers speed and slows at the end
     lk.ls += ((p.lp > 0 ? leafCfg.scale : 1) - lk.ls) * 0.3;

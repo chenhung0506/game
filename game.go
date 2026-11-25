@@ -272,6 +272,7 @@ type Player struct {
 	SlapX     float64 `json:"slx"`
 	SlapY     float64 `json:"sly"`
 	SlapN     int     `json:"jpn"`
+	JpPose    int     `json:"jpp"` // for the page, while SlapRecT runs: what it just did (1 a stomp, 2 a kick)
 	SlapChain bool    `json:"-"`
 	SlapAir   bool    `json:"jpa"`
 	SlapWin   float64 `json:"-"`

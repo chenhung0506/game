@@ -766,7 +766,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 		"radius":   []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Jigglypuff.Radius, cfg.Gyarados.Radius, cfg.Dummy.Radius},
 		"maxhp":    []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gengar.MaxHP, cfg.Jigglypuff.MaxHP, cfg.Gyarados.MaxHP, cfg.Dummy.MaxHP},
 		"evolve":   cfg.Magikarp.EvolveHops,
-		"slap":     map[string]any{"angle": cfg.Jigglypuff.Combo.Ground.Angle, "length": cfg.Jigglypuff.Combo.Ground.Length, "dur": cfg.Jigglypuff.Combo.Ground.Duration, "aradius": cfg.Jigglypuff.Combo.Air.Radius},
+		"slap":     map[string]any{"angle": cfg.Jigglypuff.Combo.Ground.Angle, "length": cfg.Jigglypuff.Combo.Ground.Length, "dur": cfg.Jigglypuff.Combo.Ground.Duration, "aradius": cfg.Jigglypuff.Combo.Air.Radius, "rdur": cfg.Jigglypuff.RollKick.rollTime()},
 		"tree":     []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
 		"fist":     []map[string]float64{aFist, mFist},
 		"gfist":    gFist, // the fists of the Gigantamax Machamp

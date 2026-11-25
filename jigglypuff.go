@@ -153,7 +153,7 @@ func (g *Game) comboStrike(i int) []Event {
 func (g *Game) slap(i, n int) []Event {
 	p := &g.P[i]
 	gr := g.cfg.Jigglypuff.Combo.Ground
-	p.SlapRecT = 0.2 // for the page: the hand is down
+	p.SlapRecT, p.JpPose = 0.2, 0 // for the page: the hand is down
 	ux, uy := p.SlapX, p.SlapY
 	for _, j := range g.foes(i) {
 		other := &g.P[j]
@@ -173,7 +173,7 @@ func (g *Game) stomp(i, n int) (bool, []Event) {
 	p := &g.P[i]
 	jp := g.cfg.Jigglypuff
 	air := jp.Combo.Air
-	p.SlapRecT = 0.2
+	p.SlapRecT, p.JpPose = 0.2, 1+n/2
 	var hit bool
 	var events []Event
 	for _, j := range g.foes(i) {
@@ -227,6 +227,7 @@ func (g *Game) rollKick(i int) []Event {
 	}
 	events := []Event{{T: "rollkick", X: p.X, Y: p.Y, R: rk.KickRadius, DX: p.RollX, DY: p.RollY}}
 	if hit {
+		p.SlapRecT, p.JpPose, p.SlapX, p.SlapY = 0.4, 2, p.RollX, p.RollY // for the page: the kick
 		p.VZ, p.JpFly = math.Sqrt(2*jp.Gravity*rk.SelfHeight), true
 		t := 2 * p.VZ / jp.Gravity
 		p.JpVX, p.JpVY = p.RollX*rk.SelfDistance/t, p.RollY*rk.SelfDistance/t
