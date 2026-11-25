@@ -275,20 +275,14 @@ func (g *Game) tickFrost(dt float64) {
 // but its owner, at the heights of its own skill's band. Two passes, so being pushed out of one into the next is
 // settled; a body walled in by a ring of them is simply held until one melts or breaks.
 func (g *Game) blockByPillars(i int) {
-	p, fb := &g.P[i], g.cfg.Vulpix.FreezeBeam
+	p := &g.P[i]
 	for pass := 0; pass < 2; pass++ {
 		for j := range g.Balls {
 			b := &g.Balls[j]
 			if !solid(b.K) || g.side(b.Owner) == g.side(i) || b.HP <= 0 || b.Z > 0 { // one in the air (a tornado has it) blocks nothing
 				continue
 			}
-			reach, r := fb.Reach, fb.PillarRadius
-			if b.K == ballStone {
-				rt := g.brawler(b.Owner).RockTomb
-				reach, r = rt.Reach, rt.StoneRadius
-			} else if b.Rad > 0 { // one of Glaciate's icicles
-				reach, r = g.cfg.Vulpix.Glaciate.Reach, b.Rad
-			}
+			reach, r := g.solidBody(b)
 			if !reach.hits(p) {
 				continue
 			}
@@ -297,4 +291,17 @@ func (g *Game) blockByPillars(i int) {
 			}
 		}
 	}
+}
+
+// solidBody is the heights a pillar, an icicle or a stone blocks at, and its radius.
+func (g *Game) solidBody(b *Ball) (Reach, float64) {
+	fb := g.cfg.Vulpix.FreezeBeam
+	switch {
+	case b.K == ballStone:
+		rt := g.brawler(b.Owner).RockTomb
+		return rt.Reach, rt.StoneRadius
+	case b.Rad > 0: // one of Glaciate's icicles
+		return g.cfg.Vulpix.Glaciate.Reach, b.Rad
+	}
+	return fb.Reach, fb.PillarRadius
 }

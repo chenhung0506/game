@@ -590,7 +590,8 @@ func (g *Game) Reset() {
 		if len(g.P) > 2 {
 			y += []float64{-1, 1}[i/2%2] * c.Width / 6
 		}
-		g.P[i] = Player{Kind: g.P[i].Kind, X: x, Y: y, HP: g.maxHP(i), FX: fx, AimX: float64(fx)}
+		g.P[i] = Player{Kind: g.P[i].Kind, X: x, Y: y, FX: fx, AimX: float64(fx)}
+		g.P[i].HP = g.maxHP(i) // after the swap: a Gigantamax form of the round before (GmaxT) must not set the maximum
 	}
 	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells, g.Icicles, g.Casts, g.Bursts, g.Quakes = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	g.UltUsed = [maxSlots]bool{} // a new round, a new match: everyone has their ultimate again (a team match gives it back only to whoever is new, see nextRound)

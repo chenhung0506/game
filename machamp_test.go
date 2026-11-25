@@ -664,7 +664,9 @@ func TestEachBrawlerPlaysByItsOwnNumbers(t *testing.T) {
 			g.Step(dt)
 			g.P[0].In = Input{}
 		}
-		if got := stoneCount(g); got < 1 || got > 6 {
+		if got := stoneCount(g); kind == machamp && got != 0 { // Machamp has no Rock Tomb
+			t.Fatalf("kind %d: %d stones, want none", kind, got)
+		} else if kind == ash && (got < 1 || got > 6) {
 			t.Fatalf("kind %d: %d stones, want at most its own 6", kind, got)
 		}
 		// the fists

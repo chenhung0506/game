@@ -134,7 +134,7 @@ func TestAMachampPersonsKeysAreTheUppercutOnTheMainButtonAndTheKickOnK(t *testin
 	}
 }
 
-func TestAMachampThatKicksDoesNotStartTheUppercutAndTheRockTombCanBeSwitchedOff(t *testing.T) {
+func TestAMachampThatKicksDoesNotStartTheUppercutAndTheRockTombIsNeverStarted(t *testing.T) {
 	cfg := DefaultConfig()
 	g := kickDuel(cfg, 1500)
 	g.P[1].Y = 900
@@ -151,8 +151,8 @@ func TestAMachampThatKicksDoesNotStartTheUppercutAndTheRockTombCanBeSwitchedOff(
 	cfg.Machamp.RockTomb.Enabled = true
 	r = kickDuel(cfg, 1500)
 	press(r, 0, Input{Rock: true})
-	if r.P[0].RockT == 0 {
-		t.Fatal("the Rock Tomb would not start although it is on")
+	if r.P[0].RockT != 0 {
+		t.Fatal("Machamp started a Rock Tomb: it has none, whatever the config says")
 	}
 }
 

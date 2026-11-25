@@ -340,7 +340,7 @@ func (g *Game) stepMachamp(i int, in Input, dt float64) ([]Event, bool) {
 	}
 
 	// ---- Rock Tomb: a jump (steered like a walk), and the landing raises a ring of stones ----
-	if in.Rock && rt.Enabled && idle && p.RockCD == 0 {
+	if in.Rock && rt.Enabled && p.Kind != machamp && idle && p.RockCD == 0 { // Machamp has no Rock Tomb (its K is the kick), whatever the config says
 		p.RockT, p.RockCD = rt.Duration, rt.Cooldown
 	}
 	if p.RockT > 0 {

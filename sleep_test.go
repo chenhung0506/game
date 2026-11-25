@@ -216,3 +216,55 @@ func TestTheHealingWaitsForDelayThenGivesBackExactlyHealthHPOverTheRestOfTheSlee
 		t.Fatalf("SleepT %v HP %d, want it over and exactly 60 back", g.P[0].SleepT, g.P[0].HP)
 	}
 }
+
+// Only the ring_duration gathering can be broken. Once Snorlax is asleep the skill has started, delay included: a stun, a freeze, a catch, a launch or a knock back
+// leave the sleep alone, and the healing still begins after the delay and gives back exactly health_hp.
+func TestOnlyTheGatheringCanBeBrokenTheDelayPhaseOfTheSleepCannot(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		do   func(g *Game)
+	}{
+		{"stun", func(g *Game) { g.stun(&g.P[0], 5) }},
+		{"freeze", func(g *Game) { g.freeze(&g.P[0], 5) }},
+		{"thrown up", func(g *Game) { g.launch(&g.P[0], 200, 3) }},
+		{"knocked back", func(g *Game) { g.knockBack(g.P[0].X-50, g.P[0].Y, &g.P[0], 150, 1, 0) }},
+	} {
+		// during the gathering: it ends, the charge is gone and Snorlax never sleeps
+		g := slGame(100, 2, 60)
+		g.cfg.Snorlax.Sleep.RingDuration, g.cfg.Snorlax.Sleep.Delay = 0.5, 0.5
+		gpress(g, Input{Ult: true})
+		if g.P[0].UltT <= 0 {
+			t.Fatalf("%s: not gathering", c.name)
+		}
+		c.do(g)
+		steps(g, 60)
+		if c.name == "knocked back" { // a knock back only moves the body: it is not a stun, a freeze or a catch, so the gathering goes on (as every ultimate's does)
+			if g.P[0].SleepT == 0 {
+				t.Fatalf("%s: the gathering was broken by a plain knock back", c.name)
+			}
+		} else if g.P[0].SleepT != 0 || g.P[0].HP != 100 {
+			t.Fatalf("%s: SleepT %v HP %d: a hit during the gathering should have ended it", c.name, g.P[0].SleepT, g.P[0].HP)
+		}
+
+		// during the delay: the sleep goes on and the healing begins when the delay is over
+		g = slGame(100, 2, 60)
+		g.cfg.Snorlax.Sleep.RingDuration, g.cfg.Snorlax.Sleep.Delay = 0.5, 0.5
+		gpress(g, Input{Ult: true})
+		for n := 0; n < 100 && g.P[0].SleepT == 0; n++ {
+			g.Step(dt)
+		}
+		if g.P[0].SleepT <= 0 || g.P[0].HP != 100 {
+			t.Fatalf("%s: not asleep in the delay (SleepT %v HP %d)", c.name, g.P[0].SleepT, g.P[0].HP)
+		}
+		c.do(g)
+		steps(g, 5)
+		if g.P[0].SleepT <= 0 {
+			t.Fatalf("%s: the sleep ended in the delay", c.name)
+		}
+		g.P[0].Held, g.P[0].Juggle = false, false
+		steps(g, 150)
+		if g.P[0].SleepT != 0 || g.P[0].HP != 160 {
+			t.Fatalf("%s: SleepT %v HP %d at the end, want it over and exactly 60 back", c.name, g.P[0].SleepT, g.P[0].HP)
+		}
+	}
+}

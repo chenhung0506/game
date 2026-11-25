@@ -77,6 +77,11 @@ func (b *Bot) Decide(g *Game, me int) Input {
 		b.held = Input{DX: esc.DX, DY: esc.DY, AimX: esc.AimX, AimY: esc.AimY}
 		return esc
 	}
+	if blk, ok := c.walledIn(); ok { // every way out is shut by a foe's pillars or stones: they have HP, so break them
+		in := b.breakOut(c, blk)
+		b.held = Input{DX: in.DX, DY: in.DY, AimX: in.AimX, AimY: in.AimY}
+		return in
+	}
 	var in Input
 	switch b.kind {
 	case pikachu:
@@ -297,6 +302,22 @@ func (c *bctx) findThreat() threat {
 			safe = &[2]float64{ax, ay}
 		}
 		consider(threat{h.kind, t, safe[0], safe[1]})
+	}
+
+	if isBrawler(f.Kind) && f.CometT > 0 { // a Comet Punch: it runs at the bot throwing fists ahead of it. Dodging fist by fist is no use; get out of its reach, away from it
+		cp := g.brawlerP(f).CometPunch
+		if cp.Duration > 0 {
+			sp := cp.Distance / cp.Duration // how fast it closes in
+			reach := c.fr + cp.ScatterMaxDistance + cp.Radius + c.pr + 15
+			if c.dist-sp*f.CometT < reach { // by the end it can be near enough to have a fist land on the bot
+				ax, ay := unit(p.X-f.X, p.Y-f.Y)
+				if ax == 0 && ay == 0 {
+					ax, ay = -c.ux, -c.uy
+				}
+				// walking straight away for as long as it lasts: it gets away only if the gap is still wider than its reach by then
+				considerBig(threat{thChase, 0.3, ax, ay}, c.dist+(g.walkSpeedOf(p)-sp)*f.CometT < reach)
+			}
+		}
 	}
 
 	if (f.Kind == snorlax || f.Kind == gyarados) && (f.BeamT > 0 || f.SweepT > 0) {
@@ -669,6 +690,7 @@ func (c *bctx) hazards() []hazard {
 		}
 		switch bl.K {
 		case ballPillar, ballGhost: // a ghost flame turns round, so a straight line is wrong for it: see flames
+		case ballFist: // a fist hangs where it appeared: it flies nowhere, and the thing to avoid is the one throwing them (see findThreat)
 		case ballFirebird: // its landing is a threat of its own (see the bird of fire's)
 		case ballVolt: // a bolt flies out and then chases, like a tornado
 			chase(bl.X, bl.Y, cfg.Pikachu.ThousandVolt.FollowSpeed, cfg.Pikachu.ThousandVolt.Radius)
@@ -1151,7 +1173,7 @@ func (b *Bot) ash(c *bctx) Input {
 		}
 		return c.stay()
 	}
-	if rt.Enabled && p.RockCD == 0 && !danger && rt.Reach.hits(f) && c.dist <= rt.RingRadius*0.5 && b.rng.Float64() < 0.7 {
+	if rt.Enabled && p.Kind != machamp && p.RockCD == 0 && !danger && rt.Reach.hits(f) && c.dist <= rt.RingRadius*0.5 && b.rng.Float64() < 0.7 {
 		in := c.move(c.ux, c.uy)
 		in.Rock = true
 		return in
