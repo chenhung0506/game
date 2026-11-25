@@ -712,11 +712,14 @@ func TestSeismicTossStopsTheBreath(t *testing.T) {
 func TestMirrorMatchesRunEverySkillWithoutHurtingTheUser(t *testing.T) {
 	for kind := 0; kind < kinds; kind++ {
 		g := duel(DefaultConfig(), kind, kind)
-		g.P[1].X = 500                                                                                                                                                                                                                      // close enough for every skill to reach
-		all := Input{Skill: true, Beam: true, Thunder: true, Ball: true, Punch: true, Fire: true, Toss: kind != charizard, Storm: true, Freeze: true, Arrow: true, Twister: true, Comet: true, Rock: true, GFire: true, SBall: true, DX: 1} // a toss pre-empts Charizard's breath and flight, so it has its own tests
+		g.P[1].X = 500                                                                                                                                                                                                                                  // close enough for every skill to reach
+		all := Input{Skill: true, Beam: true, Thunder: true, Ball: true, Punch: true, Fire: true, Toss: kind != charizard, Storm: true, Freeze: true, Arrow: true, Twister: true, Comet: true, Rock: true, GFire: true, SBall: true, Roll: true, DX: 1} // a toss pre-empts Charizard's breath and flight, so it has its own tests
 		for tick := 0; tick < 20*tickRate; tick++ {
 			g.P[0].In, g.P[1].In = all, all
-			g.P[tick%2].In.DX = -1 // they do not stand still
+			g.P[tick%2].In.DX = -1  // they do not stand still
+			if kind == jigglypuff { // its skills start on a press, not on a held key: press and let go, toward each other
+				g.P[0].In.Skill, g.P[1].In.Skill, g.P[0].In.Roll, g.P[1].In.Roll = tick%2 == 1, tick%2 == 1, tick%2 == 1, tick%2 == 1
+			}
 			g.Step(dt)
 			for i := range g.P {
 				p := g.P[i]

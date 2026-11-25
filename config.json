@@ -270,12 +270,12 @@
       "spread_time": 0.1,
       "interval": 0.3,
       "charge_duration": 0.5,
-      "swing_duration": 0.32,
+      "swing_duration": 0.35,
       "trunk_length": 800,
       "trunk_width": 90,
       "tip_width": 30,
       "trunk_scale": 0.8,
-      "damage": 8,
+      "damage": 7,
       "slow_duration": 3,
       "slow": 0.65,
       "stun_hits": 5,
@@ -492,6 +492,52 @@
       "flash_alpha": 0.3
     }
   },
+  "jigglypuff": {
+    "max_hp": 130,
+    "walk_speed": 135,
+    "radius": 22,
+    "gravity": 1500,
+    "combo": {
+      "use_window": 3,
+      "cooldown": 4,
+      "ground": {
+        "min_height": 0,
+        "max_height": 60,
+        "duration": [0.25, 0.25, 0.3, 0.3, 0.45],
+        "damage": [8, 8, 10, 10, 20],
+        "knockback": [10, 10, 10, 10, 260],
+        "angle": 110,
+        "length": 110,
+        "stun_duration": 0.5
+      },
+      "air": {
+        "min_height": 0,
+        "max_height": 1000,
+        "duration": [0.2, 0.2, 0.25],
+        "damage": [12, 12, 20],
+        "knockback": [0, 0, 300],
+        "radius": 110,
+        "slam_speed": 1200,
+        "self_bounce_height": [180, 220],
+        "foe_bounce_height": [90, 110],
+        "bounce_distance": [40, 40]
+      }
+    },
+    "roll_kick": {
+      "min_height": 0,
+      "max_height": 60,
+      "roll_distance": 160,
+      "roll_speed": 320,
+      "stun_duration": 1,
+      "kick_radius": 70,
+      "damage": 18,
+      "kick_distance": 300,
+      "kick_height": 75,
+      "self_height": 140,
+      "self_distance": 220,
+      "cooldown": 6
+    }
+  },
   "dummy": {
     "max_hp": 100000,
     "radius": 28
@@ -641,7 +687,7 @@
       "ball_knockback": 120,
       "knockback": 20,
       "duration": 2,
-      "quantity": 100,
+      "quantity": 90,
       "random_offset_angle": 40,
       "distance": 450,
       "scatter_min_distance": 0,

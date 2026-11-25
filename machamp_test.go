@@ -434,7 +434,7 @@ func TestOnlyOneMachampSkillRunsAtATime(t *testing.T) {
 // ---- config, snapshot, picking ----
 
 func TestMachampIsPickableAndGyaradosIsStillOnlyAForm(t *testing.T) {
-	if kinds != 10 || ash != 7 || machamp != 8 || gengar != 9 || gyarados != 10 || forms != 11 {
+	if kinds != 11 || ash != 7 || machamp != 8 || gengar != 9 || jigglypuff != 10 || gyarados != 11 || forms != 12 {
 		t.Fatalf("kinds %d ash %d gyarados %d forms %d", kinds, ash, gyarados, forms)
 	}
 	r := teamRoom()

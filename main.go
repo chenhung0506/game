@@ -762,10 +762,11 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": court.Length, "h": court.Width}, // the x and y extents
 		"cam": map[string]float64{"minw": cc.MinLength, "minh": cc.MinWidth, "maxw": cc.MaxLength, "maxh": cc.MaxWidth, "zin": cc.ZoomInDistance, "zout": cc.ZoomOutDistance, "zspeed": cc.ZoomSpeed, "margin": cc.SeaMargin, "gz": b2f(cc.GigantamaxZoomOut)}, // the camera window and its zoom
-		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp, gengar and the gyarados magikarp becomes
-		"radius":   []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Gyarados.Radius, cfg.Dummy.Radius},
-		"maxhp":    []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gengar.MaxHP, cfg.Gyarados.MaxHP, cfg.Dummy.MaxHP},
+		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp, gengar, jigglypuff and the gyarados magikarp becomes
+		"radius":   []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Jigglypuff.Radius, cfg.Gyarados.Radius, cfg.Dummy.Radius},
+		"maxhp":    []int{cfg.Pikachu.MaxHP, cfg.Snorlax.MaxHP, cfg.Charizard.MaxHP, cfg.Chikorita.MaxHP, cfg.Vulpix.MaxHP, cfg.Rowlet.MaxHP, cfg.Magikarp.MaxHP, cfg.Ash.MaxHP, cfg.Machamp.MaxHP, cfg.Gengar.MaxHP, cfg.Jigglypuff.MaxHP, cfg.Gyarados.MaxHP, cfg.Dummy.MaxHP},
 		"evolve":   cfg.Magikarp.EvolveHops,
+		"slap":     map[string]any{"angle": cfg.Jigglypuff.Combo.Ground.Angle, "length": cfg.Jigglypuff.Combo.Ground.Length, "dur": cfg.Jigglypuff.Combo.Ground.Duration, "aradius": cfg.Jigglypuff.Combo.Air.Radius},
 		"tree":     []map[string]float64{aTree, mTree}, // per brawler: Ash, Machamp (the same for "fist" and "stone")
 		"fist":     []map[string]float64{aFist, mFist},
 		"gfist":    gFist, // the fists of the Gigantamax Machamp
@@ -826,7 +827,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 			"fly": cfg.Charizard.Fly.Cooldown, "fire": fb.Cooldown, "toss": ts.Cooldown, "leaf": cfg.Chikorita.LeafSlash.Cooldown, "razor": cfg.Chikorita.RazorLeaf.Cooldown, "vine": cfg.Chikorita.VineWhip.Cooldown,
 			"frost": cfg.Vulpix.FrostField.Cooldown, "storm": cfg.Vulpix.IceStorm.Cooldown, "fbeam": cfg.Vulpix.FreezeBeam.Cooldown,
 			"drift": cfg.Rowlet.Tailwind.Cooldown, "arrow": cfg.Rowlet.Arrows.Cooldown, "twister": cfg.Rowlet.Tornado.Cooldown,
-			"mega": cfg.Ash.MegatonPunch.Cooldown, "tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "glick": cfg.Gengar.Gigantamax.Lick.Cooldown, "gdevour": cfg.Gengar.Gigantamax.Devour.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "ggfire": cfg.Gengar.Gigantamax.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "kick": cfg.Machamp.HighJumpKick.Cooldown, "akick": cfg.Ash.HighJumpKick.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "upper": cfg.Machamp.Uppercut.Cooldown, "glp": cfg.Machamp.Gigantamax.LightningPunch.Cooldown, "gbp": cfg.Machamp.Gigantamax.BurstPunch.Cooldown, "mkick": cfg.Machamp.HighJumpKick.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
+			"mega": cfg.Ash.MegatonPunch.Cooldown, "tree": tree.Cooldown, "comet": comet.Cooldown, "rock": rock.Cooldown, "slap": cfg.Jigglypuff.Combo.Cooldown, "roll": cfg.Jigglypuff.RollKick.Cooldown, "gsneak": cfg.Gengar.ShadowSneak.Cooldown, "glick": cfg.Gengar.Gigantamax.Lick.Cooldown, "gdevour": cfg.Gengar.Gigantamax.Devour.Cooldown, "gfire": cfg.Gengar.GhostFire.Cooldown, "ggfire": cfg.Gengar.Gigantamax.GhostFire.Cooldown, "sball": cfg.Gengar.ShadowBall.Cooldown, "kick": cfg.Machamp.HighJumpKick.Cooldown, "akick": cfg.Ash.HighJumpKick.Cooldown, "mcomet": cfg.Machamp.CometPunch.Cooldown, "mrock": cfg.Machamp.RockTomb.Cooldown, "upper": cfg.Machamp.Uppercut.Cooldown, "glp": cfg.Machamp.Gigantamax.LightningPunch.Cooldown, "gbp": cfg.Machamp.Gigantamax.BurstPunch.Cooldown, "mkick": cfg.Machamp.HighJumpKick.Cooldown, "hop": cfg.Magikarp.Jump.Cooldown, "wave": cfg.Gyarados.Wave.Cooldown, "tail": cfg.Gyarados.TailWhip.Cooldown},
 	})
 	return hi
 }

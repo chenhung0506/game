@@ -1001,6 +1001,15 @@ type Config struct {
 		Ultimate   Ultimate      `json:"ultimate"`
 		Gigantamax GengarGmaxCfg `json:"gigantamax"`
 	} `json:"gengar"`
+	// Jigglypuff: a ball of a body. Its main skill is a chain of blows used one press after the other (like Volt Tackle: `use_window` seconds from the first press to finish the chain, then `cooldown`).
+	// On the ground (`ground`) it is five hand blows: right, left, right-left, right-left, then one big right hand that sends the foe flying; each swing takes `duration[n]` seconds (rooted, the fan it hits
+	// drawn on the ground) and then hits whoever is in the fan (`angle` wide, `length` long, at a height inside min_height..max_height): `damage[n]`, `knockback[n]`, stunned `stun_duration`.
+	// In the air (`air`) it stomps: the first press (after `duration[0]`) stomps a foe within `radius` below it, and that foe is driven into the ground, bounces up like a ball `foe_bounce_height[0]`
+	// high, drifting `bounce_distance[0]` away, while Jigglypuff itself bounces up to `self_bounce_height[0]`. A second press needs the first to have connected and stomps the ball again (index 1); a
+	// third needs the second to have connected and kicks the foe away (`damage[2]`, `knockback[2]`). `slam_speed` is how fast a stomped foe is driven down. `gravity` pulls every ball-like flight.
+	// The second skill (`roll_kick`) rolls `roll_distance` the way the stick points at `roll_speed` per second, then kicks whoever is within `kick_radius` of it (plus both bodies) and stuns them `stun_duration` seconds. (It used to say: then kicks whoever is within `kick_radius` of it (plus both bodies): `damage`, and the
+	// foe flies off at 45 degrees `kick_distance` away, up to `kick_height`, while Jigglypuff itself flies up to `self_height`, following `self_distance` along.
+	Jigglypuff jigglypuffCfg `json:"jigglypuff"`
 	// The practice dummy (the mode "打木樁"): a stump that stands still and never hits back (a blow can still knock it back, and it stays where it lands), with `max_hp` so high that a practice
 	// session does not end it, `radius` wide. It is only ever the computer's, in a room opened for practice.
 	Dummy struct {
@@ -1381,6 +1390,23 @@ func DefaultConfig() Config {
 	c.Gyarados.TailWhip.Angle, c.Gyarados.TailWhip.Length, c.Gyarados.TailWhip.Knockback = 90, 180, 200
 	c.Gyarados.TailWhip.StunDuration, c.Gyarados.TailWhip.Cooldown = 1.2, 6
 	c.Gyarados.TailWhip.ChargeDuration = 0.5
+	c.Jigglypuff.MaxHP, c.Jigglypuff.WalkSpeed, c.Jigglypuff.Radius = 130, 135, 22
+	jp := &c.Jigglypuff
+	jp.Gravity = 1500
+	jp.Combo.UseWindow, jp.Combo.Cooldown = 3, 4
+	gr := &jp.Combo.Ground
+	gr.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	gr.Duration, gr.Damage, gr.Knockback = []float64{0.25, 0.25, 0.3, 0.3, 0.45}, []int{8, 8, 10, 10, 20}, []float64{10, 10, 10, 10, 260}
+	gr.Angle, gr.Length, gr.StunDuration = 110, 110, 0.5
+	ar := &jp.Combo.Air
+	ar.Reach = Reach{MinHeight: 0, MaxHeight: 1000}
+	ar.Duration, ar.Damage, ar.Knockback = []float64{0.2, 0.2, 0.25}, []int{12, 12, 20}, []float64{0, 0, 300}
+	ar.Radius, ar.SlamSpeed = 110, 1200
+	ar.SelfBounceHeight, ar.FoeBounceHeight, ar.BounceDistance = []float64{180, 220}, []float64{90, 110}, []float64{40, 40}
+	rk := &jp.RollKick
+	rk.Reach = Reach{MinHeight: 0, MaxHeight: 60}
+	rk.RollDistance, rk.RollSpeed, rk.StunDuration, rk.KickRadius, rk.Damage = 160, 320, 1, 70, 18
+	rk.KickDistance, rk.KickHeight, rk.SelfHeight, rk.SelfDistance, rk.Cooldown = 300, 75, 140, 220, 6
 	c.Ash.MaxHP, c.Ash.WalkSpeed, c.Ash.Radius = 140, 140, 30
 	ts := &c.Ash.TreeSlam
 	ts.Reach = Reach{MinHeight: 0, MaxHeight: 60}
@@ -1766,6 +1792,9 @@ func (c Config) validateSkills() error {
 		{"ash.walk_speed", c.Ash.WalkSpeed, 0},
 		{"machamp.radius", c.Machamp.Radius, 0},
 		{"gengar.max_hp", float64(c.Gengar.MaxHP), 0},
+		{"jigglypuff.max_hp", float64(c.Jigglypuff.MaxHP), 0},
+		{"jigglypuff.walk_speed", c.Jigglypuff.WalkSpeed, 0},
+		{"jigglypuff.radius", c.Jigglypuff.Radius, 0},
 		{"gengar.walk_speed", c.Gengar.WalkSpeed, 0},
 		{"gengar.radius", c.Gengar.Radius, 0},
 		{"gengar.shadow_sneak.duration", c.Gengar.ShadowSneak.Duration, 0},
@@ -2353,6 +2382,9 @@ func (c Config) validateSkills() error {
 	if j := c.Magikarp.Jump; !(j.HighestPointDuration < j.Duration) { // the rise and the fall need time of their own
 		return fmt.Errorf("magikarp.jump.highest_point_duration must be less than duration, got %v and %v", j.HighestPointDuration, j.Duration)
 	}
+	if err := c.validateJigglypuff(); err != nil {
+		return err
+	}
 	if a := c.Gyarados.TailWhip.Angle; !(a > 0 && a <= 360) {
 		return fmt.Errorf("gyarados.tail_whip.angle must be between 0 (exclusive) and 360, got %v", a)
 	}
@@ -2400,6 +2432,8 @@ func (c Config) maxHPOf(kind int) int {
 		return c.Machamp.MaxHP
 	case gengar:
 		return c.Gengar.MaxHP
+	case jigglypuff:
+		return c.Jigglypuff.MaxHP
 	case gyarados:
 		return c.Gyarados.MaxHP
 	case dummy:
@@ -2428,6 +2462,8 @@ func (c Config) walkSpeedOf(kind int) float64 {
 		return c.Machamp.WalkSpeed
 	case gengar:
 		return c.Gengar.WalkSpeed
+	case jigglypuff:
+		return c.Jigglypuff.WalkSpeed
 	case gyarados:
 		return c.Gyarados.WalkSpeed
 	case dummy:
@@ -2456,6 +2492,8 @@ func (c Config) radiusOf(kind int) float64 {
 		return c.Machamp.Radius
 	case gengar:
 		return c.Gengar.Radius
+	case jigglypuff:
+		return c.Jigglypuff.Radius
 	case gyarados:
 		return c.Gyarados.Radius
 	case dummy:
@@ -2508,4 +2546,51 @@ func (c *Config) brawlerOf(kind int) *BrawlerCfg {
 		return &c.Machamp
 	}
 	return &c.Ash
+}
+
+// jigglypuffCfg and rollKickCfg are Config.Jigglypuff and its roll kick (see there).
+type jigglypuffCfg struct {
+	MaxHP     int     `json:"max_hp"`
+	WalkSpeed float64 `json:"walk_speed"`
+	Radius    float64 `json:"radius"`
+	Gravity   float64 `json:"gravity"`
+	Combo     struct {
+		UseWindow float64 `json:"use_window"`
+		Cooldown  float64 `json:"cooldown"`
+		Ground    struct {
+			Reach
+			Duration     []float64 `json:"duration"`
+			Damage       []int     `json:"damage"`
+			Knockback    []float64 `json:"knockback"`
+			Angle        float64   `json:"angle"`
+			Length       float64   `json:"length"`
+			StunDuration float64   `json:"stun_duration"`
+		} `json:"ground"`
+		Air struct {
+			Reach
+			Duration         []float64 `json:"duration"`
+			Damage           []int     `json:"damage"`
+			Knockback        []float64 `json:"knockback"`
+			Radius           float64   `json:"radius"`
+			SlamSpeed        float64   `json:"slam_speed"`
+			SelfBounceHeight []float64 `json:"self_bounce_height"`
+			FoeBounceHeight  []float64 `json:"foe_bounce_height"`
+			BounceDistance   []float64 `json:"bounce_distance"`
+		} `json:"air"`
+	} `json:"combo"`
+	RollKick rollKickCfg `json:"roll_kick"`
+}
+
+type rollKickCfg struct {
+	Reach
+	RollDistance float64 `json:"roll_distance"`
+	RollSpeed    float64 `json:"roll_speed"`
+	StunDuration float64 `json:"stun_duration"`
+	KickRadius   float64 `json:"kick_radius"`
+	Damage       int     `json:"damage"`
+	KickDistance float64 `json:"kick_distance"`
+	KickHeight   float64 `json:"kick_height"`
+	SelfHeight   float64 `json:"self_height"`
+	SelfDistance float64 `json:"self_distance"`
+	Cooldown     float64 `json:"cooldown"`
 }

@@ -24,19 +24,20 @@ const (
 // Characters ("kinds"). A player slot (0 or 1, the order of joining) holds whichever one its player picked;
 // with the default NewGame, slot 0 is Pikachu and slot 1 is Snorlax.
 const (
-	pikachu   = 0
-	snorlax   = 1
-	charizard = 2
-	chikorita = 3
-	vulpix    = 4
-	rowlet    = 5
-	magikarp  = 6
-	ash       = 7
-	machamp   = 8
-	gengar    = 9
+	pikachu    = 0
+	snorlax    = 1
+	charizard  = 2
+	chikorita  = 3
+	vulpix     = 4
+	rowlet     = 5
+	magikarp   = 6
+	ash        = 7
+	machamp    = 8
+	gengar     = 9
+	jigglypuff = 10
 	// kinds is how many characters a player can pick. Gyarados is not one of them: it is what Magikarp becomes, so it
 	// is a kind a player can be in (Player.Kind, and everything indexed by kind) but never chooses.
-	kinds    = 10
+	kinds    = 11
 	gyarados = kinds
 	forms    = kinds + 1 // every kind a player can be in
 	dummy    = kinds + 1 // the practice dummy: only ever the computer's, in the room that practises on it
@@ -67,6 +68,7 @@ type Input struct {
 	Mega    bool `json:"mega"`    // Ash only: Megaton Punch (his ultimate: a person's comes from Ult, see personsInput; it needs the charge full)
 	Tree    bool `json:"tree"`    // Ash only, and only a person's: Tree Slam (the page's second button; personsInput turns it into Skill)
 	Kick    bool `json:"kick"`    // Ash only, and only the computer's (a person's is dropped on the way in): High Jump Kick, which is Machamp's Skill
+	Roll    bool `json:"roll"`    // Jigglypuff only: Roll Kick
 	GFire   bool `json:"gfire"`   // Gengar only: Ghost Fire
 	Ult     bool `json:"ult"`     // the third skill (Z, the ultimate): it works once the character's charge is full
 	SBall   bool `json:"sball"`   // Gengar only: Shadow Ball (aimed like the Vine Whip, see CastX)
@@ -262,6 +264,36 @@ type Player struct {
 	TailT float64 `json:"tlt"`
 	TailX float64 `json:"tlx"`
 	TailY float64 `json:"tly"`
+	// Jigglypuff's combo (main skill): seconds until the swing in progress lands (rooted), how long the hand stays down for the page, the cooldown, the aim fixed when the swing started (unit vector, where the
+	// warning fan is drawn), the swing's index in the chain, whether a chain is running and whether it is the air one, the seconds of its window left, a press waiting for the swing to land, and the key as of last tick.
+	SlapT     float64 `json:"slt"`
+	SlapRecT  float64 `json:"slr"`
+	SlapCD    float64 `json:"slcd"`
+	SlapX     float64 `json:"slx"`
+	SlapY     float64 `json:"sly"`
+	SlapN     int     `json:"jpn"`
+	SlapChain bool    `json:"-"`
+	SlapAir   bool    `json:"jpa"`
+	SlapWin   float64 `json:"-"`
+	SlapQ     bool    `json:"-"`
+	SlapHeld  bool    `json:"-"`
+	// Its roll kick (second skill): seconds of the roll left, the cooldown, the unit direction, the key as of last tick; and its own flight in the air (JpFly, with its drift) after a kick or a stomp.
+	RollT    float64 `json:"rlt"`
+	RollCD   float64 `json:"rlcd"`
+	RollX    float64 `json:"rlx"`
+	RollY    float64 `json:"rly"`
+	RollHeld bool    `json:"-"`
+	JpFly    bool    `json:"-"`
+	JpVX     float64 `json:"-"`
+	JpVY     float64 `json:"-"`
+	// A body Jigglypuff stomped or kicked is a ball while ArcOn (Held, flown by stepArcs): its drift, the height it will bounce to when it lands (0 = none) and how far it drifts then, along (ArcDX, ArcDY).
+	ArcOn     bool    `json:"arc"`
+	ArcVX     float64 `json:"-"`
+	ArcVY     float64 `json:"-"`
+	ArcBounce float64 `json:"-"`
+	ArcDist   float64 `json:"-"`
+	ArcDX     float64 `json:"-"`
+	ArcDY     float64 `json:"-"`
 	// StunT is seconds left stunned (by the tail whip): like being frozen, it can neither move nor act.
 	StunT float64 `json:"sn"`
 
@@ -854,6 +886,7 @@ func (g *Game) Step(dt float64) []Event {
 			p.FrostT, p.FBeamT = 0, 0                              // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
 			p.DriftT, p.TwistT, p.TwistRecT, p.ArrowT = 0, 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
 			p.WaveT, p.TailT = 0, 0                                // Gyarados's hop and wind-up stop
+			g.dropJigglypuff(i)                                    // Jigglypuff's swing or roll is cut short
 		}
 		// Bound by a vine or paralyzed by a Volt Tackle: no walking and no movement skill (the others still work).
 		if p.BoundT > 0 || p.ParalyzeT > 0 {
@@ -1039,6 +1072,12 @@ func (g *Game) Step(dt float64) []Event {
 		if isBrawler(p.Kind) {
 			var ev []Event
 			ev, casting = g.stepMachamp(i, in, dt) // the tree jump and the flurry move it themselves; the smash roots it
+			events = append(events, ev...)
+		}
+
+		if p.Kind == jigglypuff {
+			var ev []Event
+			ev, casting = g.stepJigglypuff(i, in, dt) // the wind-up and the follow-through root it
 			events = append(events, ev...)
 		}
 
@@ -1236,6 +1275,7 @@ func (g *Game) Step(dt float64) []Event {
 	events = append(events, g.stepTwirl(dt)...)
 	events = append(events, g.stepBursts(dt)...)
 	g.stepJuggle(dt)
+	events = append(events, g.stepArcs(dt)...)
 	for i := range g.P {
 		if g.P[i].Charge < ch0[i] { // the ultimate started this tick: this character has had its one
 			g.UltUsed[i] = true
