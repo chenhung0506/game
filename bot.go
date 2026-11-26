@@ -21,7 +21,7 @@ const (
 )
 
 // botKinds are the characters a Bot can play so far.
-var botKinds = []int{pikachu, snorlax, chikorita, ash, machamp, charizard, vulpix, gengar, rowlet}
+var botKinds = []int{pikachu, snorlax, chikorita, ash, machamp, charizard, vulpix, gengar, rowlet, jigglypuff}
 
 func botCanPlay(kind int) bool {
 	for _, k := range botKinds {
@@ -100,6 +100,8 @@ func (b *Bot) Decide(g *Game, me int) Input {
 		in = b.gengar(c)
 	case rowlet:
 		in = b.rowlet(c)
+	case jigglypuff:
+		in = b.jigglypuff(c)
 	}
 	if (in.DX != 0 || in.DY != 0) && !in.Skill && !in.Kick && c.th.kind == thNone && c.walksIntoFlames(in) {
 		in.DX, in.DY = 0, 0 // no threat where it stands, but where it is going there is: let the flames pass

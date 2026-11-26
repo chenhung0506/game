@@ -565,7 +565,7 @@
       "max_height": 12,
       "height": 120,
       "duration": 0.8,
-      "cooldown": 4,
+      "cooldown": 5,
       "slam_radius": 110,
       "damage": 15,
       "air_speed_first_half": 500,

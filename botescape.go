@@ -8,6 +8,7 @@ package main
 //	Chikorita  the Leaf Slash's hop         Ash       the Tree Slam's jump          Machamp   the Uppercut's slide
 //	Charizard  Fly (the Seismic Toss as the Gigantamax one, which cannot fly)
 //	Vulpix     the Frost Field's slide      Gengar    Shadow Sneak (under the ground)     Rowlet   the Tailwind's drift
+//	Jigglypuff the Roll Kick's roll
 func (b *Bot) escapeBySkill(c *bctx) (Input, bool) {
 	th, p, g := c.th, c.p, c.g
 	if th.kind == thNone || !c.cant || th.eta > botHorizon {
@@ -72,6 +73,11 @@ func (b *Bot) escapeBySkill(c *bctx) (Input, bool) {
 	case gengar:
 		if p.SneakCD == 0 && p.SneakT == 0 && !p.gigantamax() { // the Gigantamax Gengar's main button is the Lick, not a way out
 			in.Skill = true
+			return in, true
+		}
+	case jigglypuff:
+		if p.RollCD == 0 && p.Z == 0 && !p.JpFly && p.SlapT == 0 && p.RollT == 0 {
+			in.Roll = true // along the aim (the way out), the exact angle
 			return in, true
 		}
 	case rowlet:

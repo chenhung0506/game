@@ -83,6 +83,9 @@ func TestABotShutInByPillarsBreaksOutOfThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, kind := range botKinds {
+		if kind == jigglypuff {
+			continue // nothing it has hurts a projectile from the ground (its Jump's shock only does once it was cast in the air), so it cannot break pillars
+		}
 		g := duel(cfg, kind, vulpix)
 		g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 900, 500, 1400, 500
 		g.P[0].Charge, g.P[1].Charge = 0, 0

@@ -10,7 +10,7 @@ import (
 // ---- the computer player ----
 
 func hasAct(in Input) bool {
-	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Mega || in.Kick || in.Toss || in.GFire || in.SBall || in.Storm || in.Freeze || in.Arrow || in.Twister || in.Ult
+	return in.Skill || in.Beam || in.Thunder || in.Ball || in.Punch || in.Razor || in.Vine || in.Comet || in.Rock || in.Mega || in.Kick || in.Toss || in.GFire || in.SBall || in.Storm || in.Freeze || in.Arrow || in.Twister || in.Ult || in.Roll || in.Jump
 }
 
 // firstAct runs the bot for n ticks on a scene that does not change and returns the first decision that presses a
@@ -428,7 +428,7 @@ func TestTheBotNoticesAThreatOnlyAfterItsReactionTime(t *testing.T) {
 
 func TestOnlyTheCharactersWithABotCanBePlayedByTheComputer(t *testing.T) {
 	for k := 0; k < kinds; k++ {
-		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash || k == machamp || k == charizard || k == vulpix || k == gengar || k == rowlet; got != want {
+		if got, want := botCanPlay(k), k == pikachu || k == snorlax || k == chikorita || k == ash || k == machamp || k == charizard || k == vulpix || k == gengar || k == rowlet || k == jigglypuff; got != want {
 			t.Errorf("botCanPlay(%d) = %v, want %v", k, got, want)
 		}
 	}
@@ -463,7 +463,8 @@ func TestBotsFightToAFinishWithoutGettingStuck(t *testing.T) {
 		{chikorita, snorlax}, {snorlax, chikorita}, {chikorita, pikachu}, {ash, pikachu}, {pikachu, ash}, {ash, snorlax}, {ash, chikorita}, {chikorita, ash}, {ash, ash}, {chikorita, chikorita},
 		{charizard, pikachu}, {pikachu, charizard}, {charizard, snorlax}, {snorlax, charizard}, {charizard, chikorita}, {ash, charizard}, {charizard, charizard},
 		{gengar, pikachu}, {pikachu, gengar}, {gengar, snorlax}, {snorlax, gengar}, {gengar, chikorita}, {gengar, ash}, {gengar, charizard}, {gengar, gengar},
-		{chikorita, rowlet}, {rowlet, pikachu}, {pikachu, rowlet}, {rowlet, snorlax}, {snorlax, rowlet}, {rowlet, chikorita}, {rowlet, ash}, {ash, rowlet}, {rowlet, charizard}, {rowlet, gengar}, {rowlet, rowlet}}
+		{chikorita, rowlet}, {rowlet, pikachu}, {pikachu, rowlet}, {rowlet, snorlax}, {snorlax, rowlet}, {rowlet, chikorita}, {rowlet, ash}, {ash, rowlet}, {rowlet, charizard}, {rowlet, gengar}, {rowlet, rowlet},
+		{jigglypuff, pikachu}, {pikachu, jigglypuff}, {jigglypuff, snorlax}, {snorlax, jigglypuff}, {jigglypuff, gengar}, {rowlet, jigglypuff}, {jigglypuff, jigglypuff}}
 	for _, pr := range pairs {
 		wins, timeouts, total := [2]int{}, 0, 0.0
 		const n = 20
@@ -483,7 +484,7 @@ func TestBotsFightToAFinishWithoutGettingStuck(t *testing.T) {
 	}
 }
 
-var NAMEOF = [...]string{"Pikachu", "Snorlax", "Charizard", "Chikorita", "Vulpix", "Rowlet", "Magikarp", "Ash", "Machamp", "Gengar"}
+var NAMEOF = [...]string{"Pikachu", "Snorlax", "Charizard", "Chikorita", "Vulpix", "Rowlet", "Magikarp", "Ash", "Machamp", "Gengar", "Jigglypuff"}
 
 // ---- in a room ----
 
