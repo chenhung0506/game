@@ -251,6 +251,7 @@ ws.onmessage = (e) => {
     for (const ev of m.e || []) {
       fx.push({ ...ev, age: 0 });
       if (ev.t === 'slam') shake = 16;
+      if (ev.t === 'jslam') shake = Math.max(shake, 26);
       if (ev.t === 'gslam') shake = 12;
       if (ev.t === 'glaslam') shake = Math.max(shake, 4);
       if (ev.t === 'thunder') { shake = 10; flashT = 4 * tvoltCfg.fevery; } // a strike lands: one white and black flash
@@ -498,7 +499,7 @@ function drawCards() {
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { stomp: false, tree: false, skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false, roll: false, ult: false }; // the pad's buttons
+const touch = { jump: false, tree: false, skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false, roll: false, ult: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -542,7 +543,7 @@ function sendInput() {
     razor: k('j') || touch.razor, vine: touch.vine,
     storm: k('j') || touch.storm, freeze: k('k') || touch.freeze,
     arrow: k('j') || touch.arrow, twister: k('k') || touch.twister,
-    comet: (padKind === 7 ? k('k') : k('j')) || touch.comet, tree: k('j') || touch.tree, rock: k('k') || touch.rock, mega: touch.mega, gfire: k('j') || touch.gfire, roll: k('j') || touch.roll, stomp: k('k') || touch.stomp, sball: touch.sball, ult: k('l') || touch.ult, // the third skill, the ultimate (called Z, its key is L): a character without one ignores it
+    comet: (padKind === 7 ? k('k') : k('j')) || touch.comet, tree: k('j') || touch.tree, rock: k('k') || touch.rock, mega: touch.mega, gfire: k('j') || touch.gfire, roll: k('j') || touch.roll, jump: k('k') || touch.jump, sball: touch.sball, ult: k('l') || touch.ult, // the third skill, the ultimate (called Z, its key is L): a character without one ignores it
     tail: touch.tail, tx: Math.round(cast.x * 100) / 100 || 0, ty: Math.round(cast.y * 100) / 100 || 0, // the tail and the vines are cast when the button is let go (see endAim), not while it is held
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
@@ -600,7 +601,7 @@ const PAD = [
   { main: ['飛膝踢', 'skill'], small: [['拔樹', 'tree'], ['百裂拳', 'comet']], ult: ['百萬噸', 'ult'] }, // Ash: the kick is the main skill (sent as Skill, personsInput on the server sorts out what it is), the tree and the Comet Punch the small ones, the Megaton Punch the ultimate
   { main: ['上鉤拳', 'skill'], small: [['子彈拳', 'comet'], ['飛膝踢', 'rock']], ult: ['極巨化', 'ult'] }, // Machamp: Z turns it into the Gigantamax Machamp; the Uppercut is the main skill, the High Jump Kick (the page sends K as `rock`, the server turns it into the kick) a small one; the Rock Tomb is not used
   { main: ['暗影潛行', 'skill'], small: [['鬼火', 'gfire'], ['影子球', 'sball', true]], ult: ['極巨化', 'ult'] }, // Gengar: Z turns it into the Gigantamax Gengar, whose three buttons are the Lick, the Devour and the fan of fire
-  { main: ['連環巴掌', 'skill'], small: [['翻滾飛踢', 'roll'], ['踩踏', 'stomp']], ult: ['唱歌', 'ult'] }, // Jigglypuff: the main button is the chain of blows (ground: five hand blows, in the air: stomps), the small one the roll kick
+  { main: ['連環巴掌', 'skill'], small: [['翻滾飛踢', 'roll'], ['踩踏', 'jump']], ult: ['唱歌', 'ult'] }, // Jigglypuff: the main button is the chain of blows (ground: five hand blows, in the air: stomps), the small one the roll kick
   { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
 ];
 function buildPad() {
@@ -627,7 +628,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['kkcd', 'akick'], tree: ['trcd', 'tree'], comet: ['cpcd', 'comet'] }, { skill: ['ucd', 'upper'], comet: ['cpcd', 'mcomet'], rock: ['kkcd', 'mkick'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['slcd', 'slap'], roll: ['rlcd', 'roll'], stomp: ['jscd', 'jstomp'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['kkcd', 'akick'], tree: ['trcd', 'tree'], comet: ['cpcd', 'comet'] }, { skill: ['ucd', 'upper'], comet: ['cpcd', 'mcomet'], rock: ['kkcd', 'mkick'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['slcd', 'slap'], roll: ['rlcd', 'roll'], jump: ['jscd', 'jjump'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
   const hold = (b, label, name, aimed) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -2797,6 +2798,48 @@ function drawMarkSpark(f) {
   ctx.restore();
 }
 
+// ---- Jigglypuff's Jump cast in the air: a glittering take-off, a trail, a big stomp on the foe, and a bang when the stomped foe hits the floor ----
+const JFX_COLORS = ['#ffe45c', '#ffa53a', '#8fe8ff', '#ffffff'];
+const jr = (seed, n) => { const s = Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453; return s - Math.floor(s); }; // a repeatable "random" in 0..1, so an effect looks the same every frame
+function fxStar(x, y, r1, r2, n, rot, fill, line) { // a spiky star, `n` points
+  const pts = [];
+  for (let i = 0; i < n * 2; i++) { const a = rot + i * Math.PI / n, r = i % 2 ? r1 : r2; pts.push([x + Math.cos(a) * r, y + Math.sin(a) * r]); }
+  poly(ctx, pts, fill, line || 'rgba(120,70,0,.8)');
+}
+// the take-off in the air: two rings and a handful of stars flung out under its feet
+function drawJumpAir(f) {
+  const k = Math.min(f.age / 0.5, 1), cy = f.y - (f.z || 0) + 10;
+  ctx.save(); ctx.translate(f.x, cy); ctx.globalAlpha = 1 - k;
+  for (const [mul, col, w] of [[1, 'rgba(255,255,255,.95)', 3], [0.72, 'rgba(255,200,80,.85)', 6]]) {
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.ellipse(0, 0, (14 + 52 * k) * mul, (5 + 17 * k) * mul, 0, 0, 7); ctx.stroke();
+  }
+  for (let n = 0; n < 8; n++) { const a = n * Math.PI / 4 + jr(f.x, n) * 0.5, rr = 12 + 56 * k; fxStar(Math.cos(a) * rr, Math.sin(a) * rr * 0.45 + 8 * k, 2, 5.5 * (1 - k * 0.5), 4, a + k * 5, JFX_COLORS[n % 4]); }
+  ctx.restore();
+}
+// the burst where the stomped foe hits the floor: a white-hot flash, a huge spiky burst with speed lines, a streak coming down from above, thick shock rings and sparks
+function drawJumpStomp(f) {
+  const D = 1.0, k = Math.min(f.age / D, 1), R = Math.max(f.r || 70, 40) * 1.5, cy = f.y - (f.z || 0), ease = 1 - Math.pow(1 - k, 3), seed = f.x * 0.37 + f.y, pop = Math.min(1, k * 7);
+  ctx.save(); ctx.translate(f.x, cy);
+  if (k < 0.3) { const a = 1 - k / 0.3, g = ctx.createRadialGradient(0, 0, 0, 0, 0, R * (1.4 + k * 6)); g.addColorStop(0, `rgba(255,255,255,${0.95 * a})`); g.addColorStop(0.5, `rgba(255,240,170,${0.6 * a})`); g.addColorStop(1, 'rgba(255,200,60,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * (1.4 + k * 6), 0, 7); ctx.fill(); } // the flash
+  if (k < 0.4) { const a = 1 - k / 0.4; ctx.strokeStyle = `rgba(255,255,255,${0.9 * a})`; ctx.lineCap = 'round'; for (const dx of [-26, -9, 9, 26]) { ctx.lineWidth = 7 * a + 1; ctx.beginPath(); ctx.moveTo(dx, -R * 2.6 * (1 - k * 2)); ctx.lineTo(dx * 0.4, -6); ctx.stroke(); } } // what came down on it
+  ctx.globalAlpha = Math.min(1, (1 - k) * 2.2);
+  ctx.strokeStyle = '#fff'; ctx.lineCap = 'round'; // speed lines
+  for (let n = 0; n < 34; n++) {
+    const a = n * Math.PI * 2 / 34 + jr(seed, n) * 0.2, r0 = R * (0.3 + 0.95 * ease), r1 = r0 + R * (0.7 + 0.9 * jr(seed, n + 40)) * (1 - k * 0.5);
+    ctx.lineWidth = 2 + 6 * (1 - k) * jr(seed, n + 80); ctx.strokeStyle = n % 3 ? '#fff' : '#ffd23f'; ctx.beginPath(); ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); ctx.stroke();
+  }
+  fxStar(0, 0, R * (0.7 + 0.8 * ease), R * (1.3 + 1.1 * ease), 14, k * 0.7, '#ff9a2e', 'rgba(130,40,0,.95)');
+  fxStar(0, 0, R * (0.5 + 0.55 * ease), R * (1.0 + 0.8 * ease), 14, -k * 1.0, '#ffe45c', 'rgba(170,80,0,.9)');
+  fxStar(0, 0, R * (0.25 + 0.3 * ease), R * (0.6 + 0.45 * ease), 12, k * 1.3, '#fff', 'rgba(255,170,40,.9)');
+  for (const [mul, col, w] of [[1.9, 'rgba(255,150,40,.9)', 9], [1.35, 'rgba(255,255,255,.95)', 5], [0.85, 'rgba(255,228,92,.9)', 4]]) { ctx.strokeStyle = col; ctx.lineWidth = w * (1 - k * 0.6); ctx.beginPath(); ctx.arc(0, 0, R * mul * ease, 0, 7); ctx.stroke(); }
+  for (let n = 0; n < 22; n++) { // sparks thrown out, falling as they go
+    const a = jr(seed, n) * Math.PI * 2, v = R * (1.3 + 2.0 * jr(seed, n + 20)), x = Math.cos(a) * v * ease, y = Math.sin(a) * v * ease + 160 * k * k * jr(seed, n + 60);
+    ctx.strokeStyle = n % 2 ? '#ffe45c' : '#ffa53a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(a) * 14 * (1 - k), y - Math.sin(a) * 14 * (1 - k)); ctx.stroke();
+    fxStar(x, y, 2, 4 + 4 * jr(seed, n + 90), 4, a + k * 8, JFX_COLORS[n % 4]);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
 function drawTailWarning(p, d) {
   if (!(p.tlt > 0)) return;
   const k = 1 - p.tlt / Math.max(tailCfg.charge, 1e-6), half = tailCfg.angle / 2 * Math.PI / 180, base = Math.atan2(p.tly, p.tlx), L = tailCfg.length;
@@ -5225,7 +5268,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'lickhit' ? 0.35 : f.t === 'bite' ? Math.max(0.4, ggmaxCfg.lbite + 0.25) : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : f.t === 'sing' ? 0.7 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'lickhit' ? 0.35 : f.t === 'bite' ? Math.max(0.4, ggmaxCfg.lbite + 0.25) : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : f.t === 'sing' ? 0.7 : f.t === 'jumpair' ? 0.55 : f.t === 'jslam' ? 1.0 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -5264,6 +5307,9 @@ function frame() {
       else if (f.t === 'paralyze') drawParalyzeBurst(f);
       else if (f.t === 'leaf') drawLeafSpark(f);
       else if (f.t === 'sing') drawSingRing(f);
+      else if (f.t === 'jumpair') drawJumpAir(f);
+      else if (f.t === 'jstomp') { /* the moment of the stomp itself has no picture: the burst is for when the foe hits the floor (jslam) */ }
+      else if (f.t === 'jslam') drawJumpStomp({ ...f, z: 0 }); // the big yellow burst, where the stomped foe hits the floor
       else if (f.t === 'mark') drawMarkSpark(f);
       else if (f.t === 'doze') { /* drawn from the player's own state (drawDoze) */ }
       else if (f.t === 'sleep' || f.t === 'wake') { /* drawn from the player's own state (drawSleepFx) */ }

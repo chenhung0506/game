@@ -1393,7 +1393,7 @@ func DefaultConfig() Config {
 	c.Jigglypuff.MaxHP, c.Jigglypuff.WalkSpeed, c.Jigglypuff.Radius = 130, 135, 22
 	jp := &c.Jigglypuff
 	jp.Gravity, jp.SelfGravity = 1500, 1500
-	jp.Stomp = stompCfg{Reach: Reach{MinHeight: 0, MaxHeight: 12}, Height: 120, Duration: 0.8, Cooldown: 4, SlamRadius: 110, Damage: 12, AirSpeedFirstHalf: 160, AirSpeedSecondHalf: 160, CatchRadius: 70, FoeDamage: 15, SlamSpeed: 900, FoeBounceHeight: 100, FoeBounceDistance: 60}
+	jp.Jump = jumpCfg{Reach: Reach{MinHeight: 0, MaxHeight: 12}, Height: 120, Duration: 0.8, Cooldown: 4, SlamRadius: 110, Damage: 12, AirSpeedFirstHalf: 160, AirSpeedSecondHalf: 160, CatchRadius: 70, FoeDamage: 15, FoeStunDuration: 1, SlamSpeed: 900, FoeBounceHeight: 100, FoeBounceDistance: 60}
 	jp.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
 	jp.Sing = singCfg{Reach: Reach{MinHeight: 0, MaxHeight: 1000}, Count: 8, RingRadius: 160, SpreadSpeed: 300, ConvergenceSpeed: 140, Radius: 16, HP: 20, Mass: 20, Duration: 8, MarksToSleep: 3, SleepDuration: 3, MarkDuration: 6, SwayWidth: 0, SwayLength: 140, Scale: 1}
 	jp.Combo.UseWindow, jp.Combo.Cooldown = 3, 4
@@ -2597,15 +2597,15 @@ type jigglypuffCfg struct {
 	} `json:"combo"`
 	RollKick rollKickCfg `json:"roll_kick"`
 	Sing     singCfg     `json:"sing"`
-	Stomp    stompCfg    `json:"stomp"`
+	Jump     jumpCfg     `json:"jump"`
 	Ultimate Ultimate    `json:"ultimate"` // the charge Sing (Z) needs
 }
 
-// stompCfg is Jigglypuff's Stomp (its second small skill, K): a jump that steers like Snorlax's (a parabola `height` high and `duration` seconds long, `air_speed_*` to steer by) and whose landing
-// shock hurts the foes within `slam_radius` (by min/max_height) and the projectiles it reaches, `damage` each (no earthquake). Cast on the ground it is only a jump (no shock, no stomp, no damage); only a Stomp cast in the air (a fresh jump from where it is) has them. Coming down on
-// a foe that is in the air (`catch_radius` across, and within 25 of its height) it stomps it down to the floor instead: `foe_damage`, at `slam_speed`, and the foe bounces up
+// jumpCfg is Jigglypuff's Jump (its second small skill, K): a jump that steers like Snorlax's (a parabola `height` high and `duration` seconds long, `air_speed_*` to steer by) and whose landing
+// shock hurts the foes within `slam_radius` (by min/max_height) and the projectiles it reaches, `damage` each (no earthquake). Cast on the ground it is only a jump (no shock, no stomp, no damage); only a Jump cast in the air (a fresh jump from where it is) has them. Coming down on
+// a foe that is in the air (`catch_radius` across, and within 25 of its height) it stomps it down to the floor instead: `foe_damage`, stunned `foe_stun_duration` seconds, at `slam_speed`, and the foe bounces up
 // `foe_bounce_height` high, drifting `foe_bounce_distance` away. One foe is stomped per jump.
-type stompCfg struct {
+type jumpCfg struct {
 	Reach
 	Height             float64 `json:"height"`
 	Duration           float64 `json:"duration"`
@@ -2616,6 +2616,7 @@ type stompCfg struct {
 	AirSpeedSecondHalf float64 `json:"air_speed_second_half"`
 	CatchRadius        float64 `json:"catch_radius"`
 	FoeDamage          int     `json:"foe_damage"`
+	FoeStunDuration    float64 `json:"foe_stun_duration"` // the foe it stomps is stunned this long (it can neither move nor act); 0 = not
 	SlamSpeed          float64 `json:"slam_speed"`
 	FoeBounceHeight    float64 `json:"foe_bounce_height"`
 	FoeBounceDistance  float64 `json:"foe_bounce_distance"`

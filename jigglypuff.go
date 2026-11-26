@@ -32,7 +32,7 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
 	p := &g.P[i]
 	jp := g.cfg.Jigglypuff
-	for _, t := range []*float64{&p.SlapCD, &p.RollCD, &p.SlapRecT, &p.StompCD} {
+	for _, t := range []*float64{&p.SlapCD, &p.RollCD, &p.SlapRecT, &p.JumpSkillCD} {
 		if *t > 0 {
 			if *t -= dt; *t < 1e-9 {
 				*t = 0
@@ -52,18 +52,21 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 		p.Charge = 0
 		events = append(events, g.sing(i)...)
 	}
-	// Stomp (K): a jump, from the ground or from the air; coming down on a foe in the air stomps it to the floor
-	stompPress := in.Stomp && !p.StompHeld
-	p.StompHeld = in.Stomp
-	if hs := jp.Stomp; stompPress && p.StompCD == 0 && p.SlapT == 0 && p.RollT == 0 && !p.Held {
+	// Jump (K): a jump, from the ground or from the air; coming down on a foe in the air stomps it to the floor
+	jumpPress := in.Jump && !p.JumpHeld
+	p.JumpHeld = in.Jump
+	if hs := jp.Jump; jumpPress && p.JumpSkillCD == 0 && p.SlapT == 0 && p.RollT == 0 && !p.Held {
 		if p.SlapChain { // jumping out of a chain ends it, with no cooldown, like the roll
 			p.endChain(0)
 		}
 		p.SlapQ = false
-		p.StompCD = hs.Cooldown // counted from the take-off
+		p.JumpSkillCD = hs.Cooldown // counted from the take-off
 		p.VZ, p.JpG = 4*hs.Height/hs.Duration, 8*hs.Height/(hs.Duration*hs.Duration)
-		p.JpArmed = p.Z > 0 || p.JpFly // only a Stomp cast in the air stomps (and hurts); from the ground it is only a jump
+		p.JpArmed = p.Z > 0 || p.JpFly // only a Jump cast in the air stomps (and hurts); from the ground it is only a jump
 		p.JpFly, p.JpJump, p.JpStomped, p.JpVX, p.JpVY = true, true, false, 0, 0
+		if p.JpArmed {
+			events = append(events, Event{T: "jumpair", X: p.X, Y: p.Y, Z: p.Z, S: i})
+		}
 	}
 
 	// the roll: along the stick (or where it faces), then the kick
@@ -320,6 +323,10 @@ func (g *Game) stepArcs(dt float64) []Event {
 			p.Y = math.Min(math.Max(p.Y+p.ArcVY*dt, 0), g.court.Width)
 			if p.Z <= 0 {
 				p.Z = 0
+				if p.ArcFx { // driven down by a Jump: it hits the floor with a bang
+					events = append(events, Event{T: "jslam", X: p.X, Y: p.Y, R: p.ArcFxR})
+					p.ArcFx = false
+				}
 				if p.ArcBounce > 0 {
 					p.VZ = math.Sqrt(2 * gr * p.ArcBounce)
 					t := 2 * p.VZ / gr
@@ -338,7 +345,7 @@ func (g *Game) stepArcs(dt float64) []Event {
 			}
 			sgi := sg
 			if p.JpG > 0 {
-				sgi = p.JpG // a jump of its own (Stomp) has its own parabola
+				sgi = p.JpG // a jump of its own (Jump) has its own parabola
 			}
 			p.Z += p.VZ*dt - 0.5*sgi*dt*dt
 			p.VZ -= sgi * dt
@@ -405,11 +412,11 @@ func (c Config) validateJigglypuff() error {
 	if !(jp.Gravity > 0) || !(jp.SelfGravity > 0) || !(ar.SlamSpeed > 0) || !(gr.Length > 0) || !(ar.Radius > 0) || !(rk.RollSpeed > 0) {
 		return fmt.Errorf("jigglypuff: gravity, combo.air.slam_speed, combo.ground.length and combo.air.radius must be positive, roll_kick.roll_speed positive")
 	}
-	hs := jp.Stomp
+	hs := jp.Jump
 	if !(hs.Height > 0) || !(hs.Duration > 0) || hs.MinHeight > hs.MaxHeight || !(hs.SlamRadius > 0) || !(hs.SlamSpeed > 0) || hs.Damage < 0 || hs.FoeDamage < 0 {
-		return fmt.Errorf("jigglypuff.stomp: height, duration, slam_radius and slam_speed must be above 0, damages not negative, min_height not above max_height")
+		return fmt.Errorf("jigglypuff.jump: height, duration, slam_radius and slam_speed must be above 0, damages not negative, min_height not above max_height")
 	}
-	for name, v := range map[string]float64{"stomp.cooldown": hs.Cooldown, "stomp.air_speed_first_half": hs.AirSpeedFirstHalf, "stomp.air_speed_second_half": hs.AirSpeedSecondHalf, "stomp.catch_radius": hs.CatchRadius, "stomp.foe_bounce_height": hs.FoeBounceHeight, "stomp.foe_bounce_distance": hs.FoeBounceDistance} {
+	for name, v := range map[string]float64{"jump.cooldown": hs.Cooldown, "jump.air_speed_first_half": hs.AirSpeedFirstHalf, "jump.air_speed_second_half": hs.AirSpeedSecondHalf, "jump.catch_radius": hs.CatchRadius, "jump.foe_bounce_height": hs.FoeBounceHeight, "jump.foe_bounce_distance": hs.FoeBounceDistance, "jump.foe_stun_duration": hs.FoeStunDuration} {
 		if !(v >= 0) || math.IsInf(v, 0) {
 			return fmt.Errorf("jigglypuff.%s must not be negative, got %v", name, v)
 		}
@@ -449,9 +456,9 @@ func (c Config) validateJigglypuff() error {
 	return nil
 }
 
-// stompInAir is Jigglypuff coming down in its jump: a foe in the air within reach of its feet is stomped down to the floor, and bounces up from it (one a jump).
+// stompInAir is Jigglypuff coming down in its Jump: a foe in the air within reach of its feet is stomped down to the floor, and bounces up from it (one a jump).
 func (g *Game) stompInAir(i int) []Event {
-	p, hs := &g.P[i], g.cfg.Jigglypuff.Stomp
+	p, hs := &g.P[i], g.cfg.Jigglypuff.Jump
 	for _, j := range g.foes(i) {
 		f := &g.P[j]
 		dx, dy := f.X-p.X, f.Y-p.Y
@@ -465,16 +472,20 @@ func (g *Game) stompInAir(i int) []Event {
 		}
 		p.JpStomped = true
 		g.hit(f, hs.FoeDamage)
+		if hs.FoeStunDuration > 0 {
+			g.stun(f, hs.FoeStunDuration)
+		}
 		f.ArcOn, f.Held, f.VZ, f.ArcVX, f.ArcVY, f.ArcG = true, true, -hs.SlamSpeed, 0, 0, 0
 		f.ArcBounce, f.ArcDist, f.ArcDX, f.ArcDY = hs.FoeBounceHeight, hs.FoeBounceDistance, ux, uy
-		return []Event{{T: "stomp", X: f.X, Y: f.Y, Z: f.Z, R: hs.CatchRadius, K: 3}}
+		f.ArcFx, f.ArcFxR = true, hs.CatchRadius
+		return []Event{{T: "jstomp", X: f.X, Y: f.Y, Z: f.Z, R: hs.CatchRadius, S: i, DX: ux, DY: uy}}
 	}
 	return nil
 }
 
-// stompLanding is the shock of a Stomp jump cast in the air coming down: the foes within slam_radius (by height) and the projectiles it reaches are hurt `damage`.
+// stompLanding is the shock of a Jump cast in the air coming down: the foes within slam_radius (by height) and the projectiles it reaches are hurt `damage`.
 func (g *Game) stompLanding(i int) []Event {
-	p, hs := &g.P[i], g.cfg.Jigglypuff.Stomp
+	p, hs := &g.P[i], g.cfg.Jigglypuff.Jump
 	for _, j := range g.foes(i) {
 		if f := &g.P[j]; dist(p, f) < hs.SlamRadius+g.radius(j) && hs.Reach.hits(f) {
 			g.hit(f, hs.Damage)

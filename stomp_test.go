@@ -14,9 +14,9 @@ func hopTo(gap float64) *Game {
 
 func TestStompFromTheGroundIsOnlyAJump(t *testing.T) {
 	g := hopTo(60)
-	hs := g.cfg.Jigglypuff.Stomp
+	hs := g.cfg.Jigglypuff.Jump
 	hp := g.P[1].HP
-	press(g, 0, Input{Stomp: true})
+	press(g, 0, Input{Jump: true})
 	top, ticks := 0.0, 0
 	for ; ticks < int(3*tickRate) && (g.P[0].JpFly || ticks < 2); ticks++ {
 		g.Step(dt)
@@ -31,17 +31,17 @@ func TestStompFromTheGroundIsOnlyAJump(t *testing.T) {
 	if g.P[1].HP != hp {
 		t.Fatalf("a jump from the ground must not hurt: HP %d, was %d", g.P[1].HP, hp)
 	}
-	if g.P[0].StompCD <= 0 {
+	if g.P[0].JumpSkillCD <= 0 {
 		t.Fatal("the cooldown should be running")
 	}
 }
 
 func TestStompCastInTheAirLandsWithAShock(t *testing.T) {
 	g := hopTo(60)
-	hs := g.cfg.Jigglypuff.Stomp
+	hs := g.cfg.Jigglypuff.Jump
 	g.P[0].Z, g.P[0].JpFly, g.P[0].VZ = 30, true, 0
 	hp := g.P[1].HP
-	press(g, 0, Input{Stomp: true})
+	press(g, 0, Input{Jump: true})
 	steps(g, int(3*tickRate))
 	if g.P[1].HP != hp-hs.Damage {
 		t.Fatalf("the landing of a jump cast in the air should hurt the foe beside it: HP %d, want %d", g.P[1].HP, hp-hs.Damage)
@@ -52,7 +52,7 @@ func TestStompShockMissesAFoeOutOfReach(t *testing.T) {
 	g := hopTo(600)
 	hp := g.P[1].HP
 	g.P[0].Z, g.P[0].JpFly = 30, true
-	press(g, 0, Input{Stomp: true})
+	press(g, 0, Input{Jump: true})
 	steps(g, int(2*tickRate))
 	if g.P[1].HP != hp {
 		t.Fatalf("the shock reached a foe 600 away: HP %d", g.P[1].HP)
@@ -61,11 +61,11 @@ func TestStompShockMissesAFoeOutOfReach(t *testing.T) {
 
 func TestStompInTheAirDrivesAFoeInTheAirDownAndItBouncesUp(t *testing.T) {
 	g := hopTo(30)
-	hs := g.cfg.Jigglypuff.Stomp
+	hs := g.cfg.Jigglypuff.Jump
 	g.P[1].Z = 70                     // in the air, held there (a Pikachu does not fall by itself in this test)
 	g.P[0].Z, g.P[0].JpFly = 30, true // the Stomp is cast in the air
 	hp := g.P[1].HP
-	press(g, 0, Input{Stomp: true})
+	press(g, 0, Input{Jump: true})
 	stomped := false
 	for i := 0; i < int(2*tickRate) && !stomped; i++ {
 		g.Step(dt)
@@ -76,6 +76,9 @@ func TestStompInTheAirDrivesAFoeInTheAirDownAndItBouncesUp(t *testing.T) {
 	}
 	if g.P[1].HP != hp-hs.FoeDamage {
 		t.Fatalf("foe HP %d, want %d", g.P[1].HP, hp-hs.FoeDamage)
+	}
+	if g.P[1].StunT < hs.FoeStunDuration-0.2 {
+		t.Fatalf("the stomped foe should be stunned about %v s, StunT %v", hs.FoeStunDuration, g.P[1].StunT)
 	}
 	landed, top := false, 0.0
 	for i := 0; i < int(4*tickRate); i++ {
@@ -95,7 +98,7 @@ func TestStompInTheAirDrivesAFoeInTheAirDownAndItBouncesUp(t *testing.T) {
 func TestStompFromTheGroundDoesNotStompAFoeInTheAir(t *testing.T) {
 	g := hopTo(30)
 	g.P[1].Z = 70
-	press(g, 0, Input{Stomp: true})
+	press(g, 0, Input{Jump: true})
 	steps(g, int(2*tickRate))
 	if g.P[1].ArcOn {
 		t.Fatal("a jump from the ground only jumps: it must not stomp")
@@ -105,7 +108,7 @@ func TestStompFromTheGroundDoesNotStompAFoeInTheAir(t *testing.T) {
 func TestStompNeedsTheFoeToBeInTheAir(t *testing.T) {
 	g := hopTo(30) // the foe stands on the ground: nothing to stomp down
 	g.P[0].Z, g.P[0].JpFly = 30, true
-	press(g, 0, Input{Stomp: true})
+	press(g, 0, Input{Jump: true})
 	steps(g, int(2*tickRate))
 	if g.P[1].ArcOn {
 		t.Fatal("a foe on the ground is not stomped down")
@@ -115,7 +118,7 @@ func TestStompNeedsTheFoeToBeInTheAir(t *testing.T) {
 func TestStompCanBeUsedInTheAirAsAFreshJump(t *testing.T) {
 	g := hopTo(900)
 	g.P[0].Z, g.P[0].JpFly, g.P[0].VZ = 100, true, -50
-	press(g, 0, Input{Stomp: true})
+	press(g, 0, Input{Jump: true})
 	if g.P[0].VZ <= 0 {
 		t.Fatalf("the jump in the air should push it up: VZ %v", g.P[0].VZ)
 	}
@@ -124,22 +127,22 @@ func TestStompCanBeUsedInTheAirAsAFreshJump(t *testing.T) {
 		g.Step(dt)
 		top = math.Max(top, g.P[0].Z)
 	}
-	if top < 100+g.cfg.Jigglypuff.Stomp.Height*0.8 {
-		t.Fatalf("it should rise about %v above where it was, topped at %v", g.cfg.Jigglypuff.Stomp.Height, top)
+	if top < 100+g.cfg.Jigglypuff.Jump.Height*0.8 {
+		t.Fatalf("it should rise about %v above where it was, topped at %v", g.cfg.Jigglypuff.Jump.Height, top)
 	}
 }
 
 func TestStompEndsAChainAndCannotStartMidSwing(t *testing.T) {
 	g := jig(300)
 	swing(g, 0)
-	press(g, 0, Input{Stomp: true})
+	press(g, 0, Input{Jump: true})
 	if g.P[0].SlapChain || !g.P[0].JpFly {
 		t.Fatalf("jumping out of a chain should end it: chain %v, flying %v", g.P[0].SlapChain, g.P[0].JpFly)
 	}
 	g2 := jig(300)
 	press(g2, 0, Input{Skill: true})
 	g2.Step(dt)
-	press(g2, 0, Input{Stomp: true})
+	press(g2, 0, Input{Jump: true})
 	if g2.P[0].JpFly {
 		t.Fatal("a swing in progress is rooted: no jump")
 	}
@@ -147,12 +150,12 @@ func TestStompEndsAChainAndCannotStartMidSwing(t *testing.T) {
 
 func TestStompConfigIsChecked(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Jigglypuff.Stomp.Duration = 0
+	cfg.Jigglypuff.Jump.Duration = 0
 	if cfg.validate() == nil {
 		t.Fatal("a jump of no duration should be refused")
 	}
 	cfg = DefaultConfig()
-	cfg.Jigglypuff.Stomp.FoeBounceHeight = -1
+	cfg.Jigglypuff.Jump.FoeBounceHeight = -1
 	if cfg.validate() == nil {
 		t.Fatal("a negative bounce height should be refused")
 	}

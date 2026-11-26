@@ -69,7 +69,7 @@ type Input struct {
 	Tree    bool `json:"tree"`    // Ash only, and only a person's: Tree Slam (the page's second button; personsInput turns it into Skill)
 	Kick    bool `json:"kick"`    // Ash only, and only the computer's (a person's is dropped on the way in): High Jump Kick, which is Machamp's Skill
 	Roll    bool `json:"roll"`    // Jigglypuff only: Roll Kick
-	Stomp   bool `json:"stomp"`   // Jigglypuff only: Stomp (a jump that stomps a foe in the air down); its Sing is its ultimate, on Ult
+	Jump    bool `json:"jump"`    // Jigglypuff only: Jump (cast in the air it stomps a foe there down); its Sing is its ultimate, on Ult
 	GFire   bool `json:"gfire"`   // Gengar only: Ghost Fire
 	Ult     bool `json:"ult"`     // the third skill (Z, the ultimate): it works once the character's charge is full
 	SBall   bool `json:"sball"`   // Gengar only: Shadow Ball (aimed like the Vine Whip, see CastX)
@@ -285,17 +285,19 @@ type Player struct {
 	RollX    float64 `json:"rlx"`
 	RollY    float64 `json:"rly"`
 	RollHeld bool    `json:"-"`
-	// Stomp: the cooldown, the key as of last tick; whether it is in the jump of it (and the gravity of that jump), and whether it has stomped a foe on the way down. And what Sing's notes did to this player: marks over its head (they run out MarkT seconds after the last), and how long it has left asleep.
-	StompCD   float64 `json:"jscd"`
-	StompHeld bool    `json:"-"`
-	JpJump    bool    `json:"-"`
-	JpArmed   bool    `json:"-"` // the jump was cast in the air: only that one stomps and hurts
-	JpG       float64 `json:"-"`
-	JpStomped bool    `json:"-"`
-	Marks     int     `json:"smk,omitempty"`
-	MarkT     float64 `json:"-"`
-	DozeT     float64 `json:"doz,omitempty"`
-	JpFly     bool    `json:"-"`
+	// Jump: the cooldown, the key as of last tick; whether it is in the jump of it (and the gravity of that jump), and whether it has stomped a foe on the way down. And what Sing's notes did to this player: marks over its head (they run out MarkT seconds after the last), and how long it has left asleep.
+	JumpSkillCD float64 `json:"jscd"`
+	JumpHeld    bool    `json:"-"`
+	JpJump      bool    `json:"-"`
+	JpArmed     bool    `json:"jpj,omitempty"` // the jump was cast in the air: only that one stomps and hurts (the page glitters round it)
+	ArcFx       bool    `json:"-"`             // this ball was driven down by a Jump: when it hits the floor the page makes a fuss (event jslam, R = ArcFxR: jump.catch_radius, which sizes the burst)
+	ArcFxR      float64 `json:"-"`
+	JpG         float64 `json:"-"`
+	JpStomped   bool    `json:"-"`
+	Marks       int     `json:"smk,omitempty"`
+	MarkT       float64 `json:"-"`
+	DozeT       float64 `json:"doz,omitempty"`
+	JpFly       bool    `json:"-"`
 	// the step forward after a ground blow: the distance still to go, along (StepDX, StepDY), at StepV per second.
 	StepLeft, StepV, StepDX, StepDY float64 `json:"-"`
 	JpVX                            float64 `json:"-"`
@@ -1231,9 +1233,9 @@ func (g *Game) Step(dt float64) []Event {
 				v = g.sneakSpeed(p)
 			}
 			if p.Kind == jigglypuff && p.JpJump {
-				v = g.cfg.Jigglypuff.Stomp.AirSpeedSecondHalf
+				v = g.cfg.Jigglypuff.Jump.AirSpeedSecondHalf
 				if p.VZ > 0 {
-					v = g.cfg.Jigglypuff.Stomp.AirSpeedFirstHalf
+					v = g.cfg.Jigglypuff.Jump.AirSpeedFirstHalf
 				}
 			}
 			if p.Kind == snorlax && p.Z > 0 {
