@@ -541,6 +541,25 @@
       "self_height": 160,
       "self_distance": 280,
       "cooldown": 2
+    },
+    "sing": {
+      "min_height": 0,
+      "max_height": 1000,
+      "cooldown": 8,
+      "count": 8,
+      "ring_radius": 560,
+      "spread_speed": 300,
+      "convergence_speed": 220,
+      "radius": 16,
+      "hp": 20,
+      "mass": 20,
+      "duration": 8,
+      "marks_to_sleep": 3,
+      "sleep_duration": 7,
+      "mark_duration": 6,
+      "sway_width": 30,
+      "sway_length": 140,
+      "scale": 1
     }
   },
   "dummy": {

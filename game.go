@@ -69,6 +69,7 @@ type Input struct {
 	Tree    bool `json:"tree"`    // Ash only, and only a person's: Tree Slam (the page's second button; personsInput turns it into Skill)
 	Kick    bool `json:"kick"`    // Ash only, and only the computer's (a person's is dropped on the way in): High Jump Kick, which is Machamp's Skill
 	Roll    bool `json:"roll"`    // Jigglypuff only: Roll Kick
+	Sing    bool `json:"sing"`    // Jigglypuff only: Sing
 	GFire   bool `json:"gfire"`   // Gengar only: Ghost Fire
 	Ult     bool `json:"ult"`     // the third skill (Z, the ultimate): it works once the character's charge is full
 	SBall   bool `json:"sball"`   // Gengar only: Shadow Ball (aimed like the Vine Whip, see CastX)
@@ -284,6 +285,12 @@ type Player struct {
 	RollX    float64 `json:"rlx"`
 	RollY    float64 `json:"rly"`
 	RollHeld bool    `json:"-"`
+	// Sing: the cooldown, the key as of last tick; and what its notes did to this player: marks over its head (they run out MarkT seconds after the last), and how long it has left asleep.
+	SingCD   float64 `json:"sgcd"`
+	SingHeld bool    `json:"-"`
+	Marks    int     `json:"smk,omitempty"`
+	MarkT    float64 `json:"-"`
+	DozeT    float64 `json:"doz,omitempty"`
 	JpFly    bool    `json:"-"`
 	// the step forward after a ground blow: the distance still to go, along (StepDX, StepDY), at StepV per second.
 	StepLeft, StepV, StepDX, StepDY float64 `json:"-"`
@@ -414,6 +421,7 @@ const (
 	ballGiantVine = 13 // one of the giant vines of that skill (waiting underground, standing up, coming down, or lying there); HP 0, so no projectile meets it
 	ballVolt      = 11 // one of Pikachu's Thousand Volt bolts: it flies out, chases the foe, pushes it back and explodes when its time is up; it has HP like a fire ball
 	ballFirebird  = 14 // the Gigantamax Charizard's bird of fire (Inferno): it grows in the sky above it, then dives at the foe and bursts where it lands; HP 0, so no projectile meets it
+	ballNote      = 15 // one of Jigglypuff's music notes (Sing): it flies out, then chases the nearest foe; touching it only puts a mark over its head; it has HP like a fire ball
 	ballShadow    = 9  // Gengar's Shadow Ball in charge mode: it flies straight like the Electro Ball, bursts where it is stopped and drags the opponent in; it has HP
 )
 
@@ -455,6 +463,9 @@ type Ball struct {
 	Spin      *spinParams     `json:"-"`            // tornado: what it does to whoever it holds, where that is not rowlet.tornado (Brave Bird's)
 	Rad       float64         `json:"r,omitempty"`  // tornado: its own reach where it is not rowlet.tornado.radius (Brave Bird's)
 	Scale     float64         `json:"sc,omitempty"` // tornado: how many times bigger than its reach it is drawn (with Rad)
+	BaseX     float64         `json:"-"`            // music note: where its straight path has got to (it weaves about that, see sing.sway_width), and how far it has gone along it
+	BaseY     float64         `json:"-"`
+	Travel    float64         `json:"-"`
 	Ult       bool            `json:"ug,omitempty"` // fire ball: a Gigantamax Charizard breathed it, so it keeps charizard.gigantamax.fire_breath's numbers and its damage is the ultimate's even after the change back
 }
 
@@ -728,6 +739,8 @@ func (g *Game) ballRadius(b *Ball) float64 {
 		return g.brawler(b.Owner).CometPunch.Radius
 	case ballGhost:
 		return g.ghostFireOf(b.Ult).Radius
+	case ballNote:
+		return g.cfg.Jigglypuff.Sing.Radius
 	case ballVolt:
 		return g.cfg.Pikachu.ThousandVolt.Radius
 	case ballShadow:
@@ -756,6 +769,8 @@ func (g *Game) ballMass(b *Ball) float64 {
 		return g.brawler(b.Owner).CometPunch.Mass
 	case ballGhost:
 		return g.ghostFireOf(b.Ult).Mass
+	case ballNote:
+		return g.cfg.Jigglypuff.Sing.Mass
 	case ballVolt:
 		return g.cfg.Pikachu.ThousandVolt.Mass
 	case ballShadow:
@@ -1279,6 +1294,7 @@ func (g *Game) Step(dt float64) []Event {
 	events = append(events, g.stepTwirl(dt)...)
 	events = append(events, g.stepBursts(dt)...)
 	g.stepJuggle(dt)
+	g.stepMarks(dt)
 	events = append(events, g.stepArcs(dt)...)
 	for i := range g.P {
 		if g.P[i].Charge < ch0[i] { // the ultimate started this tick: this character has had its one
@@ -1519,6 +1535,14 @@ func (g *Game) stepBalls(dt float64) []Event {
 			}
 			continue
 		}
+		if b.K == ballNote {
+			alive, ev := g.stepNote(&b, dt)
+			events = append(events, ev...)
+			if alive {
+				kept = append(kept, b)
+			}
+			continue
+		}
 		if b.K == ballGhost {
 			if b.HP > 0 {
 				gf, owner := g.ghostFireOf(b.Ult), &g.P[b.Owner]
@@ -1676,6 +1700,8 @@ func (g *Game) ballDamage(b *Ball) int {
 		return g.brawler(b.Owner).CometPunch.Damage
 	case ballGhost:
 		return g.ghostFireOf(b.Ult).Damage
+	case ballNote:
+		return 0 // a note hurts nothing, not even another projectile
 	case ballVolt:
 		return g.cfg.Pikachu.ThousandVolt.ContactDamage
 	case ballShadow:

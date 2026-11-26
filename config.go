@@ -1393,6 +1393,7 @@ func DefaultConfig() Config {
 	c.Jigglypuff.MaxHP, c.Jigglypuff.WalkSpeed, c.Jigglypuff.Radius = 130, 135, 22
 	jp := &c.Jigglypuff
 	jp.Gravity, jp.SelfGravity = 1500, 1500
+	jp.Sing = singCfg{Reach: Reach{MinHeight: 0, MaxHeight: 1000}, Cooldown: 8, Count: 8, RingRadius: 160, SpreadSpeed: 300, ConvergenceSpeed: 140, Radius: 16, HP: 20, Mass: 20, Duration: 8, MarksToSleep: 3, SleepDuration: 3, MarkDuration: 6, SwayWidth: 0, SwayLength: 140, Scale: 1}
 	jp.Combo.UseWindow, jp.Combo.Cooldown = 3, 4
 	gr := &jp.Combo.Ground
 	gr.Reach = Reach{MinHeight: 0, MaxHeight: 60}
@@ -2588,6 +2589,31 @@ type jigglypuffCfg struct {
 		} `json:"air"`
 	} `json:"combo"`
 	RollKick rollKickCfg `json:"roll_kick"`
+	Sing     singCfg     `json:"sing"`
+}
+
+// singCfg is Jigglypuff's Sing (its second small skill): `count` music notes fly out round it (ring_radius at spread_speed), then each turns on the nearest foe and chases it at
+// convergence_speed. A note does no damage: touching a foe (radius, at a height inside min_height..max_height) spends it and puts a mark over the foe's head; every mark lasts
+// mark_duration seconds from the last one (0 = until it sleeps), and `marks_to_sleep` marks put the foe to sleep for `sleep_duration` seconds (it can neither move nor act, like a stun;
+// notes that touch a sleeping foe are spent for nothing). A note has hp and mass like a fire ball, so the foe's skills and projectiles can shoot it down; it fades after `duration` seconds
+// (0 = it chases until it is shot down). `scale` only sizes the picture.
+type singCfg struct {
+	Reach
+	Cooldown         float64 `json:"cooldown"`
+	Count            int     `json:"count"`
+	RingRadius       float64 `json:"ring_radius"`
+	SpreadSpeed      float64 `json:"spread_speed"`
+	ConvergenceSpeed float64 `json:"convergence_speed"`
+	Radius           float64 `json:"radius"`
+	HP               int     `json:"hp"`
+	Mass             float64 `json:"mass"`
+	Duration         float64 `json:"duration"`
+	MarksToSleep     int     `json:"marks_to_sleep"`
+	SleepDuration    float64 `json:"sleep_duration"`
+	MarkDuration     float64 `json:"mark_duration"`
+	SwayWidth        float64 `json:"sway_width"`  // a note weaves left and right of its path in an S: this far to each side at most (0 = it flies straight)
+	SwayLength       float64 `json:"sway_length"` // and one full S takes this much of its way
+	Scale            float64 `json:"scale"`
 }
 
 type rollKickCfg struct {

@@ -103,7 +103,7 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟', '鯉魚王', '小智', '怪力', '梗鬼', '胖丁'];
 const FORMS = [...NAMES, '紅色暴鯉龍']; // every kind a player can be in: Magikarp becomes the last one (nobody picks it)
-const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳・睡覺（絕招）', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭・大藤蔓（絕招）', '冰山滑行・冰風暴・急凍光線・冰封世界（絕招）', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球・極巨化（絕招）', '連環巴掌・翻滾飛踢'];
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳・睡覺（絕招）', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭・大藤蔓（絕招）', '冰山滑行・冰風暴・急凍光線・冰封世界（絕招）', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球・極巨化（絕招）', '連環巴掌・翻滾飛踢・唱歌'];
 const HELP = [
   '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝千萬伏特（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能放；朝四周放出一圈閃電，之後追著敵人跑、碰到會擊退，時間到全部爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）　L＝睡覺（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能用；睡著的這段時間不能動也不能出招，但會持續回血；被暈眩、擊退、打上空中、冰凍、定身都不會中斷睡眠）',
@@ -115,7 +115,7 @@ const HELP = [
   '你是真新鎮小智　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人）　L＝百萬噸拳擊（絕招，蓄能滿了才能放；天色會變暗。朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），蓄力後半段畫面會閃爍，朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
   '你是怪力　移動 WASD　空白鍵＝上鉤拳（朝按住的方向滑一步，接著朝敵人衝過去給他一記上鉤拳，打中的敵人受傷、不會被推開，而是被打飛到空中動彈不得）　J＝子彈拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝飛膝踢（直接朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　L＝極巨化（絕招，蓄能滿了才能放：變成又大又壯的極巨化怪力一段時間，血量、速度和招式的數值都換成極巨化的；這段時間空白鍵變成爆裂拳（先朝方向鍵滑一步，再定身蓄力，朝敵人揮出拳頭，拳頭周圍的空中和地面接連出現黑白爆炸，炸中的敵人被炸上天，被炸中越多次飛越高）、K 變成閃電拳：定身蓄力，朝敵人揮出巨大的拳頭，打中的同時一道巨大的閃電從天而降）',
   '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才發射；輕點就朝敵人；定身蓄力一下後，球筆直飛出去，碰到敵人、牆或被打爆就爆炸，會把範圍內的敵人往中心吸過去一陣子，並向外炸出一圈不會回頭的紫色火焰；球有血量，敵人的招式和飛行物可以提早打爆它）　L＝極巨化（絕招，蓄能滿了才能用；變成又大又厚的極巨化梗鬼一陣子：空白鍵＝舔舌（定身蓄力一下，舌頭朝敵人伸出去，碰到的敵人受傷、被擊暈、被拉回你身邊，再被你啃一口並再次擊暈；沒碰到舌頭就縮回來）　K＝吞噬（以自己為中心把範圍內的敵人拉過來，更近的範圍內的敵人還不能出招，拉人和沈默的時間各自計算）　J＝鬼火（只朝正前方扇形噴出）；鬼火、潛行與影子球在變身期間換成這三招）',
-  '你是胖丁　移動 WASD　空白鍵＝連環巴掌（可以連續按：在地上是五下巴掌，前四下一下一下打、第五下大力把人拍飛；在空中是踩人：把人踩進地上像球一樣彈起來，再踩一次、第三下把人踢飛，每一下都要前一下有踩到才接得上）　J＝翻滾飛踢（朝方向鍵滾一段，滾完把身邊的人以 45 度角踢飛、暈住，你也跟著飛到空中，可以接空中的連打）',
+  '你是胖丁　移動 WASD　空白鍵＝連環巴掌（可以連續按：在地上是五下巴掌，前四下一下一下打、第五下大力把人拍飛；在空中是踩人：把人踩進地上像球一樣彈起來，再踩一次、第三下把人踢飛，每一下都要前一下有踩到才接得上）　J＝翻滾飛踢（朝方向鍵滾一段，滾完把身邊的人以 45 度角踢飛、暈住，你也跟著飛到空中，可以接空中的連打）　K＝唱歌（放出一圈音符追著對手，音符碰到對手不會傷人，會在它頭上作記號，記號夠多對手就睡著，睡著時動不了；音符會被對手的招式打掉）',
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
 const ghosts = []; // dash afterimages
@@ -159,6 +159,7 @@ let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp:
 let voltCfg = { radius: 16, uses: 3, window: 2, scale: 1 }; // Volt Tackle, from 'hi'
 let ultCfg = [], tvoltCfg = { jump: 0, dark: 0, fevery: 0, falpha: 0, colors: ['#ffd21e'], radius: 20, hp: 10, rrad: 220, boom: 120, time: 5, link: 9, tip: 0.6, charge: 2.4, ring: 0.6, bstart: 1.2, bcount: 6, bint: 0.2, boffs: [0], rscale: 1, bscale: 1 }; // per kind, the charge its ultimate (Z) needs (0 = it has none); Thousand Volt's, from 'hi'
 let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
+let singCfg = { scale: 1, radius: 16, marks: 3, sleep: 3, ring: 160 }; // Jigglypuff's Sing, from 'hi'
 let slapCfg = { adur: [0.2, 0.2, 0.25], pscale: 1, angle: 110, length: 110, dur: [0.25], aradius: 110, rdur: 0.5 }; // Jigglypuff's Slap, from 'hi'
 let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8, width: 0 }; // Vulpix's, from 'hi'
 let slashCfg = { radius: 8, scale: 0.5, hp: 1 }; // Rowlet's air slash, from 'hi'
@@ -218,7 +219,7 @@ const beamSlots = () => (snap ? [...snap.p.keys()].filter((i) => hasBeam(snap.p[
 const slotsOf = (k) => (snap ? [...snap.p.keys()].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; slapCfg = m.slap; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; kickText = m.kicktext; gmaxCfg = m.gmax; cgmaxCfg = m.cgmax; ggmaxCfg = m.ggmax; sleepCfg = m.sleep; upText = m.uptext; upWarn = m.upwarn; gengarCfg = m.gengar; fistCfgs = m.fist; gFistCfg = m.gfist; lpCfg = m.glp; bpCfg = m.gbp; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; glaCfg = m.glaciate; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; slapCfg = m.slap; singCfg = m.sing; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; kickText = m.kicktext; gmaxCfg = m.gmax; cgmaxCfg = m.cgmax; ggmaxCfg = m.ggmax; sleepCfg = m.sleep; upText = m.uptext; upWarn = m.upwarn; gengarCfg = m.gengar; fistCfgs = m.fist; gFistCfg = m.gfist; lpCfg = m.glp; bpCfg = m.gbp; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; glaCfg = m.glaciate; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (PLAY === 'dummy' && !!m.full !== fullWant) send({ fullcharge: fullWant }); // the practice room starts without it: say what the box says
     if (m.on || (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1])) return; // a match is on: a refused pick changes nothing
@@ -497,7 +498,7 @@ function drawCards() {
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { tree: false, skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false, roll: false, ult: false }; // the pad's buttons
+const touch = { sing: false, tree: false, skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false, roll: false, ult: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -541,7 +542,7 @@ function sendInput() {
     razor: k('j') || touch.razor, vine: touch.vine,
     storm: k('j') || touch.storm, freeze: k('k') || touch.freeze,
     arrow: k('j') || touch.arrow, twister: k('k') || touch.twister,
-    comet: (padKind === 7 ? k('k') : k('j')) || touch.comet, tree: k('j') || touch.tree, rock: k('k') || touch.rock, mega: touch.mega, gfire: k('j') || touch.gfire, roll: k('j') || touch.roll, sball: touch.sball, ult: k('l') || touch.ult, // the third skill, the ultimate (called Z, its key is L): a character without one ignores it
+    comet: (padKind === 7 ? k('k') : k('j')) || touch.comet, tree: k('j') || touch.tree, rock: k('k') || touch.rock, mega: touch.mega, gfire: k('j') || touch.gfire, roll: k('j') || touch.roll, sing: k('k') || touch.sing, sball: touch.sball, ult: k('l') || touch.ult, // the third skill, the ultimate (called Z, its key is L): a character without one ignores it
     tail: touch.tail, tx: Math.round(cast.x * 100) / 100 || 0, ty: Math.round(cast.y * 100) / 100 || 0, // the tail and the vines are cast when the button is let go (see endAim), not while it is held
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
@@ -599,7 +600,7 @@ const PAD = [
   { main: ['飛膝踢', 'skill'], small: [['拔樹', 'tree'], ['百裂拳', 'comet']], ult: ['百萬噸', 'ult'] }, // Ash: the kick is the main skill (sent as Skill, personsInput on the server sorts out what it is), the tree and the Comet Punch the small ones, the Megaton Punch the ultimate
   { main: ['上鉤拳', 'skill'], small: [['子彈拳', 'comet'], ['飛膝踢', 'rock']], ult: ['極巨化', 'ult'] }, // Machamp: Z turns it into the Gigantamax Machamp; the Uppercut is the main skill, the High Jump Kick (the page sends K as `rock`, the server turns it into the kick) a small one; the Rock Tomb is not used
   { main: ['暗影潛行', 'skill'], small: [['鬼火', 'gfire'], ['影子球', 'sball', true]], ult: ['極巨化', 'ult'] }, // Gengar: Z turns it into the Gigantamax Gengar, whose three buttons are the Lick, the Devour and the fan of fire
-  { main: ['連環巴掌', 'skill'], small: [['翻滾飛踢', 'roll']] }, // Jigglypuff: the main button is the chain of blows (ground: five hand blows, in the air: stomps), the small one the roll kick
+  { main: ['連環巴掌', 'skill'], small: [['翻滾飛踢', 'roll'], ['唱歌', 'sing']] }, // Jigglypuff: the main button is the chain of blows (ground: five hand blows, in the air: stomps), the small one the roll kick
   { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
 ];
 function buildPad() {
@@ -626,7 +627,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['kkcd', 'akick'], tree: ['trcd', 'tree'], comet: ['cpcd', 'comet'] }, { skill: ['ucd', 'upper'], comet: ['cpcd', 'mcomet'], rock: ['kkcd', 'mkick'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['slcd', 'slap'], roll: ['rlcd', 'roll'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['kkcd', 'akick'], tree: ['trcd', 'tree'], comet: ['cpcd', 'comet'] }, { skill: ['ucd', 'upper'], comet: ['cpcd', 'mcomet'], rock: ['kkcd', 'mkick'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['slcd', 'slap'], roll: ['rlcd', 'roll'], sing: ['sgcd', 'sing'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
   const hold = (b, label, name, aimed) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);
@@ -2124,6 +2125,7 @@ function drawBall(b) {
   if (b.k === 12) { drawGiantHead(b); return; }
   if (b.k === 13) { drawGiantVine(b); return; }
   if (b.k === 14) { drawFirebird(b); return; }
+  if (b.k === 15) { drawNote(b); return; }
   {
     const r = ballCfg.radius * ballCfg.scale, gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.8);
     gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#ffe14a'); gr.addColorStop(1, 'rgba(255,170,20,0)');
@@ -2723,6 +2725,75 @@ function drawSlapPalm(p, d) {
     ctx.beginPath(); ctx.ellipse(-R * 0.15, R * (right ? -0.95 : 0.95), R * 0.32, R * 0.2, 0, 0, 7); ctx.fill(); ctx.stroke(); // the thumb
     ctx.restore();
   }
+  ctx.restore();
+}
+
+// ---- Jigglypuff's Sing: three kinds of note (the cast sends them out in turn), the marks they leave over a foe's head, and the sleep ----
+const NOTE_COLORS = ['#ff6fa8', '#43c6ee', '#ffc531'];
+// one music note drawn about (0, 0) in units of `r`: kind 0 a quaver with its flag, 1 a pair joined by a beam, 2 a heart-headed note with a spark
+function noteGlyph(kind, r, col) {
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const pass = (c, w) => { // the whole note once, in colour `c` with strokes `w` wide (first a dark wide one for the outline, then the colour)
+    ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = w;
+    const head = (x, y, heart) => {
+      ctx.beginPath();
+      if (heart) { const s = r * 0.62; ctx.moveTo(x, y + s * 0.9); ctx.bezierCurveTo(x - s * 1.5, y - s * 0.1, x - s * 0.6, y - s * 1.1, x, y - s * 0.35); ctx.bezierCurveTo(x + s * 0.6, y - s * 1.1, x + s * 1.5, y - s * 0.1, x, y + s * 0.9); }
+      else ctx.ellipse(x, y, r * 0.62, r * 0.46, -0.45, 0, 7);
+      ctx.fill(); ctx.stroke();
+    };
+    ctx.beginPath();
+    if (kind === 0) { ctx.moveTo(r * 0.45, r * 0.55); ctx.lineTo(r * 0.45, -r * 1.2); ctx.quadraticCurveTo(r * 1.5, -r * 0.8, r * 1.0, r * 0.1); ctx.stroke(); head(-r * 0.1, r * 0.75, false); }
+    else if (kind === 1) { ctx.moveTo(-r * 0.7, r * 0.5); ctx.lineTo(-r * 0.7, -r * 1.1); ctx.lineTo(r * 0.95, -r * 1.35); ctx.lineTo(r * 0.95, r * 0.35); ctx.moveTo(-r * 0.7, -r * 0.55); ctx.lineTo(r * 0.95, -r * 0.8); ctx.stroke(); head(-r * 1.25, r * 0.7, false); head(r * 0.4, r * 0.55, false); }
+    else { ctx.moveTo(r * 0.55, r * 0.4); ctx.lineTo(r * 0.55, -r * 1.25); ctx.stroke(); head(0, r * 0.65, true); }
+  };
+  pass('rgba(40,20,40,.92)', r * 0.62);
+  pass(col, r * 0.3);
+  ctx.fillStyle = '#fff'; // a shine on the head
+  if (kind === 1) { ctx.beginPath(); ctx.ellipse(-r * 1.4, r * 0.55, r * 0.14, r * 0.1, -0.45, 0, 7); ctx.fill(); }
+  else { ctx.beginPath(); ctx.ellipse(kind === 2 ? -r * 0.25 : -r * 0.3, r * 0.6, r * 0.14, r * 0.1, -0.45, 0, 7); ctx.fill(); }
+  if (kind === 2) { ctx.beginPath(); ctx.arc(r * 1.05, -r * 1.2, r * 0.22, 0, 7); ctx.fill(); }
+}
+function drawNote(b) {
+  const t = performance.now() / 1000, r = singCfg.radius * singCfg.scale * 1.15, kind = (b.ix || 0) % 3, col = NOTE_COLORS[kind];
+  upright(b.x, b.y, () => {
+    ctx.translate(0, Math.sin(t * 6 + b.x * 0.05) * 3); ctx.rotate(Math.sin(t * 4 + (b.ix || 0)) * 0.28);
+    ctx.globalAlpha = 0.35; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, r * 1.6, 0, 7); ctx.fill(); ctx.globalAlpha = 1; // a soft glow so a note shows on the sand
+    noteGlyph(kind, r, col);
+  });
+}
+// the marks over a foe's head: one small note for each, in the colours of the three kinds, and a faint outline for the ones still to come
+function drawMarks(p, hudTop, bs) {
+  const n = Math.max(singCfg.marks, p.smk), gap = 22, x0 = -(n - 1) * gap / 2, y = hudTop - 30 * bs, t = performance.now() / 1000;
+  for (let k = 0; k < n; k++) {
+    ctx.save(); ctx.translate(x0 + k * gap, y + Math.sin(t * 5 + k) * 1.5);
+    if (k < p.smk) noteGlyph(k % 3, 9, NOTE_COLORS[k % 3]); else { ctx.globalAlpha = 0.3; noteGlyph(k % 3, 9, '#ffffff'); }
+    ctx.restore();
+  }
+}
+function drawDoze(p, top, hudTop, bs) {
+  const now = performance.now() / 1000;
+  ctx.save(); ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+  for (let n = 0; n < 3; n++) {
+    const ph = (now * 0.7 + n / 3) % 1, x = 14 * bs + ph * 22 * bs + Math.sin(ph * 6 + n) * 3, y = top - 14 * bs - ph * 40 * bs, fs = (10 + 12 * ph) * Math.max(1, bs * 0.8);
+    ctx.font = `bold ${fs}px system-ui`; ctx.lineWidth = 3; ctx.strokeStyle = `rgba(60,20,70,${1 - ph})`; ctx.fillStyle = `rgba(255,205,235,${1 - ph * 0.8})`;
+    ctx.strokeText('Z', x, y); ctx.fillText('Z', x, y);
+  }
+  ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#ffc6e6'; ctx.fillText(`睡著了 ${p.doz.toFixed(1)}s`, 0, hudTop - 54 * bs);
+  ctx.restore();
+}
+// the song going out: a ring of the pink glow with notes riding on it, out to the ring the notes fly to
+function drawSingRing(f) {
+  const k = Math.min(f.age / 0.6, 1), R = (f.r || singCfg.ring) * (0.2 + 0.8 * k), t = f.age;
+  ctx.save(); ctx.globalAlpha = 1 - k;
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,111,168,.7)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(f.x, f.y, R * 0.94, 0, 7); ctx.stroke();
+  for (let n = 0; n < 6; n++) { const a = n * 1.047 + t * 2; ctx.save(); ctx.translate(f.x + Math.cos(a) * R, f.y + Math.sin(a) * R); noteGlyph(n % 3, 7, NOTE_COLORS[n % 3]); ctx.restore(); }
+  ctx.restore();
+}
+function drawMarkSpark(f) {
+  const k = f.age / 0.35;
+  ctx.save(); ctx.globalAlpha = 1 - k; ctx.translate(f.x, f.y); ctx.scale(1 + k, 1 + k);
+  jpStar(ctx, 0, -14, 2.6, 6, 6, NOTE_COLORS[(f.k || 0) % 3]);
   ctx.restore();
 }
 
@@ -4862,7 +4933,9 @@ function drawPlayer(i, p) {
     }
     if (p.k === 4 && p.yt > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#a8e0ff'; ctx.fillText(`冰山 ${p.yt.toFixed(1)}s`, 0, hudTop - 54 * bs); }
     if (p.k === 1 && p.slp > 0) drawSleepFx(p, top, hudTop, bs);
-    if (p.sn > 0) { drawStunned(p, top, bs); ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe14d'; ctx.fillText('被擊暈！', 0, hudTop - 54 * bs); }
+    if (p.smk > 0) drawMarks(p, hudTop, bs);
+    if (p.doz > 0) drawDoze(p, top, hudTop, bs);
+    if (p.sn > 0 && !(p.doz > 0)) { drawStunned(p, top, bs); ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe14d'; ctx.fillText('被擊暈！', 0, hudTop - 54 * bs); }
     if (p.k === 6) { ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd27a'; ctx.fillText(`進化 ${p.hn}/${evolveHops}`, 0, hudTop - 40 * bs); }
     if (p.k === 4 && p.zt > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#a8e0ff'; ctx.fillText(`急凍光線 ${p.zt.toFixed(1)}s`, 0, hudTop - 54 * bs); }
     if (p.tw > 0) { ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#9be37b'; ctx.fillText(p.tw === 1 ? '被龍捲風捲走！' : '摔下來了！', 0, hudTop - 54 * bs); }
@@ -5152,7 +5225,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'lickhit' ? 0.35 : f.t === 'bite' ? Math.max(0.4, ggmaxCfg.lbite + 0.25) : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'lickhit' ? 0.35 : f.t === 'bite' ? Math.max(0.4, ggmaxCfg.lbite + 0.25) : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : f.t === 'sing' ? 0.7 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -5190,6 +5263,9 @@ function frame() {
       else if (f.t === 'storm') drawStormStrike(f);
       else if (f.t === 'paralyze') drawParalyzeBurst(f);
       else if (f.t === 'leaf') drawLeafSpark(f);
+      else if (f.t === 'sing') drawSingRing(f);
+      else if (f.t === 'mark') drawMarkSpark(f);
+      else if (f.t === 'doze') { /* drawn from the player's own state (drawDoze) */ }
       else if (f.t === 'sleep' || f.t === 'wake') { /* drawn from the player's own state (drawSleepFx) */ }
       else if (f.t === 'lick' || f.t === 'devour') { /* drawn from the player's own state (drawLick, drawDevour), not from the event */ }
       else if (f.t === 'slam' || f.t === 'stomp' || f.t === 'rollkick') drawQuake(f); // 'slam' (events with no picture and no reach, such as Jigglypuff's 'bounce', must not fall in here: no radius makes the gradient throw)

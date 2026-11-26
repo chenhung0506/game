@@ -32,7 +32,7 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
 	p := &g.P[i]
 	jp := g.cfg.Jigglypuff
-	for _, t := range []*float64{&p.SlapCD, &p.RollCD, &p.SlapRecT} {
+	for _, t := range []*float64{&p.SlapCD, &p.RollCD, &p.SlapRecT, &p.SingCD} {
 		if *t > 0 {
 			if *t -= dt; *t < 1e-9 {
 				*t = 0
@@ -46,6 +46,14 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 	}
 	rollPress := in.Roll && !p.RollHeld
 	p.RollHeld = in.Roll
+
+	// Sing: the notes go out (between the blows of a chain too, but not in the middle of a swing or a roll)
+	singPress := in.Sing && !p.SingHeld
+	p.SingHeld = in.Sing
+	if singPress && p.SingCD == 0 && p.SlapT == 0 && p.RollT == 0 && !p.Held {
+		p.SingCD = jp.Sing.Cooldown
+		events = append(events, g.sing(i)...)
+	}
 
 	// the roll: along the stick (or where it faces), then the kick
 	if rollPress && p.RollT == 0 && p.RollCD == 0 && p.SlapT == 0 && !p.Held && p.Z == 0 && !p.JpFly { // (between the blows of a chain too: use_window does not lock the roll out)
@@ -371,6 +379,18 @@ func (c Config) validateJigglypuff() error {
 	}
 	if !(jp.Gravity > 0) || !(jp.SelfGravity > 0) || !(ar.SlamSpeed > 0) || !(gr.Length > 0) || !(ar.Radius > 0) || !(rk.RollSpeed > 0) {
 		return fmt.Errorf("jigglypuff: gravity, combo.air.slam_speed, combo.ground.length and combo.air.radius must be positive, roll_kick.roll_speed positive")
+	}
+	sg := jp.Sing
+	if sg.Count < 1 || sg.Count > maxNotes || sg.MarksToSleep < 1 || !(sg.HP > 0) || sg.MinHeight > sg.MaxHeight || !(sg.Radius > 0) || !(sg.SpreadSpeed > 0) || !(sg.ConvergenceSpeed > 0) || !(sg.SleepDuration > 0) || !(sg.Scale >= 0) {
+		return fmt.Errorf("jigglypuff.sing: count must be 1..%d, marks_to_sleep and hp at least 1, radius, spread_speed, convergence_speed and sleep_duration above 0, min_height not above max_height", maxNotes)
+	}
+	if sg.SwayWidth > 0 && !(sg.SwayLength > 0) {
+		return fmt.Errorf("jigglypuff.sing.sway_length must be above 0 while sway_width is")
+	}
+	for name, v := range map[string]float64{"sing.cooldown": sg.Cooldown, "sing.ring_radius": sg.RingRadius, "sing.mass": sg.Mass, "sing.duration": sg.Duration, "sing.mark_duration": sg.MarkDuration, "sing.sway_width": sg.SwayWidth, "sing.sway_length": sg.SwayLength} {
+		if !(v >= 0) || math.IsInf(v, 0) {
+			return fmt.Errorf("jigglypuff.%s must not be negative, got %v", name, v)
+		}
 	}
 	if !(gr.PalmScale >= 0 && gr.PalmScale <= 10) {
 		return fmt.Errorf("jigglypuff.combo.ground.palm_scale must be between 0 and 10, got %v", gr.PalmScale)
