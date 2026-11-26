@@ -1759,16 +1759,112 @@ function artJigglypuffKickFB(c,x,y,back){
 }
 function drawKickFB(id,back){const c=document.getElementById(id).getContext('2d');c.fillStyle='#e9d9a8';c.fillRect(0,0,380,300);c.save();c.translate(140,215);c.scale(4,4);artJigglypuffKickFB(c,0,0,back);c.restore();}
 
-// Jigglypuff stomping (in the air, the foot drives down): the usual body with the feet pushed out underneath, and the impact below them.
-function artJigglypuffStomp(c,x,y,t,pose){
-  artJigglypuff(c,x,y,t,{dir:pose.dir,mv:0,ph:0,slap:0});
-  const P='#f8b4c8',PD='#e48aa6';
+function jp45Tools(c){
+  const P='#f8b4c8',EYE='#27a9b8',EYED='#0f5d6a';
+  const curl=(cx,cy,s,flip=1)=>{c.lineCap='round';
+    const path=()=>{c.beginPath();c.moveTo(cx,cy+2*s);c.bezierCurveTo(cx+flip*6*s,cy+1*s,cx+flip*8*s,cy-7*s,cx+flip*2*s,cy-9*s);c.bezierCurveTo(cx-flip*3*s,cy-10*s,cx-flip*4*s,cy-4*s,cx+flip*0.5*s,cy-4.5*s);};
+    c.strokeStyle=OUTLINE;c.lineWidth=5.2*s;path();c.stroke();c.strokeStyle=P;c.lineWidth=4*s;path();c.stroke();};
+  const eye=(ex,ey,r,sx)=>{c.save();c.translate(ex,ey);c.scale(sx,1);ov(c,0,0,r,r*1.28,'#fff');ov(c,0,0.2,r*0.86,r*1.12,EYE,0,null);ov(c,0,0.6,r*0.5,r*0.72,EYED,0,null);ov(c,r*0.3,-r*0.5,r*0.34,r*0.34,'#fff',0,null);ov(c,-r*0.3,r*0.3,r*0.16,r*0.16,'#fff',0,null);c.restore();};
+  const arm=(sx,sy,ang,len,rx,ry,fill)=>{c.save();c.translate(sx,sy);c.rotate(ang);ov(c,0,len,rx,ry,fill);c.restore();};
+  return {curl,eye,arm};
+}
+// Jigglypuff turned 45 degrees at the moment the slap comes down. It slaps with its left hand (the one on the right of the page, from the front), whose shoulder
+// swings forward, so the body turns the other way. Seen from the front the face swings round to the LEFT of the page: the right side is the near one (bigger, lower,
+// its ear taller, its foot in front) and the left side the far one (smaller, tucked in behind). The slapping hand is the palm across the belly, as in the straight slap.
+// Seen from the back it is the other way round: the left side is near (its hand sticks out from behind the body) and the slapping right hand is hidden by the body.
+function artJigglypuff45(c,x,y,back,k=1){   // k = how far it has turned: 1 = the full 45 degrees, 0.5 = the slight 22.5 of the swing coming down, 0 = standing straight
+  const P='#f8b4c8',PD='#e48aa6',PL='#fdd5e1',EAR='#f4a0b9';
+  const {curl,eye}=jp45Tools(c);
+  const L=(a,b)=>a+(b-a)*k, pt=(p,q)=>[L(p[0],q[0]),L(p[1],q[1])], tri=(a,b)=>a.map((p,i)=>pt(p,b[i]));
   c.save();c.translate(x,y);
-  ov(c,-7,19.5,4.2,6.4,PD,0.08);ov(c,7,19.5,4.2,6.4,P,-0.08);                                // the feet, pushed down
-  c.lineCap='round';c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=1.4;
-  for(const dx of [-12,0,12]){c.beginPath();c.moveTo(dx,-22);c.lineTo(dx,-32);c.stroke();}  // speed lines above: it is coming down
-  jpStar(c,0,32,3.8,7.2,8,'#ffe45c');
-  for(const a of [0.35,1.57,2.8]){c.beginPath();c.moveTo(Math.cos(a)*9,32+Math.sin(a)*9);c.lineTo(Math.cos(a)*14,32+Math.sin(a)*14);c.stroke();}
+  if(back){                                                                  // the right hand swings behind the body and goes out of sight as it turns; the left one leaks out the other side
+    if(k<0.95){c.save();c.translate(L(15,9),L(2,4));c.rotate(-1.87);ov(c,0,L(7,1),3.6*(1-k*0.3),L(5.6,3),P);c.restore();}
+    ov(c,L(-16.5,-18),L(3,5),3.6-0.2*k,L(5.04,5),P,L(0.25,0.3));
+  }
+  c.save();if(!back)c.scale(-1,1);                                           // front: the body and the face turned to the left (a local frame whose near side is the left)
+  ov(c,L(7,6.8),L(15.5,14.6),L(5.5,4.5),L(3.8,3.2),k<0.4?PD:'#d97b99');      // the far foot: smaller, higher, in the shade
+  ov(c,L(-7,-5.6),L(15.5,16.4),L(5.5,5.7),L(3.8,4.1),PD);                    // the near foot: bigger, lower, in front
+  if(back)ov(c,L(0,3.4),L(14,14.6),3.4-0.3*k,3.4-0.3*k,P);
+  const fe=tri([[14,-5],[12.5,-15],[5,-10.5]],[[7,-10.5],[9.6,-13.8],[13.2,-6.5]]);          // the far ear: small, low, tucked against the head
+  const ne=tri([[-14,-5],[-12.5,-15],[-5,-10.5]],[[-13.8,-4.5],[-11.2,-17],[-3,-11.8]]);      // the near ear: tall, out at the edge
+  poly(c,fe,P);poly(c,ne,P);
+  const fi=tri([[12,-7],[11.6,-12.5],[7.5,-10]],[[8.4,-10],[9.7,-12.2],[11.5,-8]]),ni=tri([[-12,-7],[-11.6,-12.5],[-7.5,-10]],[[-11.9,-7.2],[-10.8,-13.6],[-6,-10.6]]);
+  poly(c,fi,back?PD:EAR,null);poly(c,ni,back?PD:EAR,null);
+  ov(c,0,2,16,15.2,P);
+  if(!back){
+    eye(L(-6.2,6),0,4.2,L(1,0.93));eye(L(6.2,13.6),0,4.2,L(1,0.42));          // the near eye full, the far one squeezed against the edge
+    const mx=L(0,10.2);
+    c.strokeStyle='#8a3a52';c.lineWidth=1;c.lineCap='round';c.beginPath();c.moveTo(mx-1.8,L(8,7.6));c.quadraticCurveTo(mx,L(9.6,8.9),mx+1.8,L(8,7.6));c.stroke();
+    ov(c,L(-11,1),6.5,2.2,1.5,'#f58aa6',0,null);if(k<0.8)ov(c,L(11,12),6.5,2.2,1.5,'#f58aa6',0,null);
+    curl(L(0,5),-8,0.72);
+  }
+  c.restore();
+  if(!back){
+    c.save();c.translate(L(15,13.5),L(6,6.5));c.rotate(0.95);ov(c,0,6,4.6,6.8,P);ov(c,0,8,2.6,3.6,PL,0,null);c.restore();   // the palm swinging across, big because it comes at us
+    jpSwoosh(c,[[23,-9],[26,6],[9,16]]);
+  } else jpSwoosh(c,[[22,-12],[28,2],[22,14]]);
+  c.restore();
+}
+// The slap seen from the side, turned 45 degrees away from us (the face is already round to the right, the back of the head comes into view): two ears and two feet,
+// one of each nearer and bigger, one further and tucked in; the far eye is a sliver at the edge; the near hand swings out to the front, the other peeks out behind.
+function artJigglypuff45Side(c,x,y){
+  const P='#f8b4c8',PD='#e48aa6',EAR='#f4a0b9';
+  const {curl,eye,arm}=jp45Tools(c);
+  c.save();c.translate(x,y);
+  ov(c,-17,5,3.4,5,P,0.3);                                                   // the other hand, leaking out behind
+  curl(10.5,-8,0.62,1);                                                       // the curl is on the far side of the head now
+  ov(c,-5.2,14.6,4.5,3.2,'#d97b99');                                         // the left foot: behind, higher, in the shade
+  ov(c,6.4,16.4,5.7,4.1,PD);                                                  // the right foot: in front, bigger, lower
+  poly(c,[[3.2,-10.6],[8.2,-14.6],[12.6,-6.6]],P);poly(c,[[5.6,-10],[8.2,-12.4],[10.8,-8]],EAR,null);
+  poly(c,[[-12.8,-4.6],[-9.6,-16.4],[-1.6,-11.6]],P);poly(c,[[-10.6,-7.2],[-9.4,-13.2],[-5.2,-10.4]],EAR,null);
+  ov(c,0,2,16,15.2,P);
+  eye(13.4,0,3.9,0.38);                                                      // the far eye, a sliver at the edge
+  c.strokeStyle='#8a3a52';c.lineWidth=1;c.lineCap='round';c.beginPath();c.moveTo(14.6,8);c.quadraticCurveTo(15.4,8.8,15.9,7.8);c.stroke();
+  ov(c,11.2,7,1.6,1.3,'#f58aa6',0,null);
+  arm(6,9,-1.5,11.5,3.6,6.4,P);                                              // the slap, straight out to the front
+  jpSwoosh(c,[[4,-14],[27,-4],[26,16]]);jpStar(c,28,11,3.4,6.4,7,'#ffe45c');
+  c.restore();
+}
+// ---- stomp (front): wind-up = the rolling front at 0 degrees, strike = the front stretched with its feet driven down, hit = squashed flat on the foe ----
+function jpAnchor(c,sx,sy){c.translate(0,19);c.scale(sx,sy);c.translate(0,-19);}
+function artJigglypuffStompFrame(c,n){
+  const P='#f8b4c8',PD='#e48aa6';
+  c.lineCap='round';
+  if(n===0){artJigglypuffRollFront(c,0,0,0);
+    c.strokeStyle='rgba(255,255,255,.8)';c.lineWidth=1.3;for(const dx of [-10,0,10]){c.beginPath();c.moveTo(dx,24);c.lineTo(dx,31);c.stroke();}   // pushing off
+    return;}
+  if(n===1){ov(c,-7,17.5,4.4,6.6,PD,0.08);ov(c,7,17.5,4.4,6.6,PD,-0.08);   // the feet driven down, tucked up close: the body is drawn over them
+    c.save();jpAnchor(c,0.9,1.12);artJigglypuff(c,0,-2,0.5,{dir:0,mv:0,ph:0,slap:0,nofeet:true});c.restore();   // the body without its little round feet (those were the legs)
+    c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=1.4;for(const dx of [-12,0,12]){c.beginPath();c.moveTo(dx,-26);c.lineTo(dx,-37);c.stroke();}
+    return;}
+  c.save();jpAnchor(c,1.16,0.84);artJigglypuff(c,0,3,0.5,{dir:0,mv:0,ph:0,slap:0});c.restore();   // squashed against the foe
+  c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=1.4;c.beginPath();c.ellipse(0,21,23,4.5,0,0,7);c.stroke();
+  jpStar(c,0,24,4.2,8.4,9,'#ffe45c');
+  for(const a of [0.1,0.6,2.5,3.04]){c.beginPath();c.moveTo(Math.cos(a)*14,21+Math.sin(a)*6);c.lineTo(Math.cos(a)*22,21+Math.sin(a)*9);c.stroke();}
+}
+// stomp, back (dir 1) and side (dir 3, facing right): the same three beats as the front. The wind-up is the standing pose pressed down a little (the roll's first frame is only a front view).
+function artJigglypuffStompFrameDir(c,n,dir){
+  const P='#f8b4c8',PD='#e48aa6',pose={dir:dir,mv:0,ph:0,slap:0};
+  c.lineCap='round';
+  if(n===0){c.save();jpAnchor(c,1.06,0.93);artJigglypuff(c,0,0,0.5,pose);c.restore();
+    c.strokeStyle='rgba(255,255,255,.8)';c.lineWidth=1.3;for(const dx of [-10,0,10]){c.beginPath();c.moveTo(dx,24);c.lineTo(dx,31);c.stroke();}
+    return;}
+  if(n===1){
+    if(dir===1){ov(c,-7,17.5,4.4,6.6,PD,0.08);ov(c,7,17.5,4.4,6.6,PD,-0.08);}
+    else{ov(c,-4,17.5,4.2,6.6,PD,0.08);ov(c,4,17.5,4.2,6.6,P,-0.08);}                              // the feet driven down, the body drawn over them
+    c.save();jpAnchor(c,0.9,1.12);artJigglypuff(c,0,-2,0.5,Object.assign({nofeet:true},pose));c.restore();
+    c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=1.4;for(const dx of [-12,0,12]){c.beginPath();c.moveTo(dx,-26);c.lineTo(dx,-37);c.stroke();}
+    return;}
+  c.save();jpAnchor(c,1.16,0.84);artJigglypuff(c,0,3,0.5,pose);c.restore();
+  c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=1.4;c.beginPath();c.ellipse(0,21,23,4.5,0,0,7);c.stroke();
+  jpStar(c,0,24,4.2,8.4,9,'#ffe45c');
+  for(const a of [0.1,0.6,2.5,3.04]){c.beginPath();c.moveTo(Math.cos(a)*14,21+Math.sin(a)*6);c.lineTo(Math.cos(a)*22,21+Math.sin(a)*9);c.stroke();}
+}
+// Jigglypuff stomping in the air, three beats (pose.stomp): 1 wind-up (pressed down, about to push off), 2 the strike (stretched, the feet driven down under the body), 3 squashed flat on the foe.
+function artJigglypuffStomp(c,x,y,t,pose){
+  const d=pose.dir,n=pose.stomp-1;
+  c.save();c.translate(x,y);if(d===2)c.scale(-1,1);
+  if(d===0)artJigglypuffStompFrame(c,n);else artJigglypuffStompFrameDir(c,n,d===2?3:d);
   c.restore();
 }
 function artJigglypuff(c,x,y,t,pose){
@@ -1781,6 +1877,8 @@ function artJigglypuff(c,x,y,t,pose){
     else artJigglypuffRollFront(c, 0, 0, d === 1 ? Math.PI - pose.roll : pose.roll);
     c.restore(); return;
   }
+  if ((pose.dir === 0 || pose.dir === 1) && pose.slap >= 2) { artJigglypuff45(c, x, y, pose.dir === 1, pose.slap === 2 ? 0.5 : 1); return; } // the blow coming down is turned a little (22.5), the follow-through a full 45
+  if ((pose.dir === 2 || pose.dir === 3) && pose.slap === 3) { c.save(); c.translate(x, y); if (pose.dir === 2) c.scale(-1, 1); artJigglypuff45Side(c, 0, 0); c.restore(); return; }
   const {dir,mv,ph}=pose,sw=Math.sin(ph)*mv,bob=-Math.abs(Math.sin(ph))*2*mv,br=Math.sin(t*2.2)*0.35,sl=pose.slap||0;
   const P='#f8b4c8',PD='#e48aa6',PL='#fdd5e1',EAR='#f4a0b9',EYE='#27a9b8',EYED='#0f5d6a';
   const curl=(cx,cy,s,flip=1)=>{c.lineCap='round';
@@ -1792,7 +1890,7 @@ function artJigglypuff(c,x,y,t,pose){
   if(dir===2)c.scale(-1,1);
   if(dir===0||dir===1){
     const back=dir===1;
-    ov(c,-7,15.5,5.52,3.84,PD);ov(c,7,15.5,5.52,3.84,PD);
+    if(!pose.nofeet){ov(c,-7,15.5,5.52,3.84,PD);ov(c,7,15.5,5.52,3.84,PD);}
     if(back)ov(c,0,14,3.4,3.4,P);
     poly(c,[[-14,-5],[-12.5,-15],[-5,-10.5]],P);poly(c,[[14,-5],[12.5,-15],[5,-10.5]],P);
     if(!back){poly(c,[[-12,-7],[-11.6,-12.5],[-7.5,-10]],EAR,null);poly(c,[[12,-7],[11.6,-12.5],[7.5,-10]],EAR,null);}
@@ -1815,7 +1913,7 @@ function artJigglypuff(c,x,y,t,pose){
     }
   } else {
     const a=sw*0.8;
-    ov(c,-3,15.5,5.52,3.84,PD);
+    if(!pose.nofeet)ov(c,-3,15.5,5.52,3.84,PD);
     poly(c,[[-11,-4],[-9,-13],[-2,-9]],PD);
     if(sl===1)arm(-8,1,2.62,10,3.6,6.4,P);                              // raised: sticks up from behind the ball
     ov(c,0,2,16,15.2+br*0.3,P);
@@ -1826,7 +1924,7 @@ function artJigglypuff(c,x,y,t,pose){
     ov(c,7,7,2,1.4,'#f58aa6',0,null);
     if(sl===0)ov(c,1+a,5,3.6,5.04,P,0.2);
     else if(sl===2)arm(5,9,-1.5,11.5,3.6,6.4,P);                         // straight out front
-    ov(c,3,16,5.52,3.84,P);
+    if(!pose.nofeet)ov(c,3,16,5.52,3.84,P);
     if(sl===2){jpSwoosh(c,[[4,-14],[27,-4],[26,16]]);jpStar(c,28,11,3.4,6.4,7,'#ffe45c');}
   }
   c.restore();
@@ -4659,7 +4757,9 @@ function drawPlayer(i, p) {
   lk.mv += ((running ? 1 : 0) - lk.mv) * 0.25; lk.ph += 0.2 * lk.mv;
   if (p.k === 10 && p.rlt > 0) lk.dir = faceOf(...rv(p.rlx, p.rly)); // rolling: it faces the way it rolls
   else if (p.k === 10 && (p.slt > 0 || p.slr > 0)) lk.dir = faceOf(...rv(p.slx, p.sly)); // swinging: it faces the way the blow goes // slapping: it faces the way the slap goes
-  const pose = { dir: lk.dir, slap: p.k === 10 && !p.jpa ? (p.slt > 0 ? 1 : p.slr > 0 ? 2 : 0) : 0, roll: p.k === 10 && p.rlt > 0 ? Math.PI * 2 * (1 - p.rlt / Math.max(slapCfg.rdur, 1e-6)) : -1, stomp: p.k === 10 && p.z > 0 && ((p.jpa && p.slt > 0 && p.jpn < 2) || (p.slr > 0 && p.jpp === 1)), kick: p.k === 10 && ((p.jpa && p.slt > 0 && p.jpn === 2) || (p.slr > 0 && p.jpp === 2)), mv: lk.mv, ph: lk.ph, gmax: isGmax(p), sneak: p.k === 9 && p.gnt > 0, sleep: p.k === 1 && p.slp > 0, lick: p.k === 9 && p.lkp >= 2 && p.lkp <= 4, whip: p.k === 11 && (p.tlt > 0 || (p.tlcd <= cdCfg.tail - tailCfg.charge && p.tlcd > cdCfg.tail - tailCfg.charge - TAIL_SWING)) }; // whip: its tail is out (cocked, or lashing), so the body is drawn without it
+  const pose = { dir: lk.dir, slap: p.k === 10 && !p.jpa ? (p.slt > 0 ? (1 - p.slt / Math.max(slapCfg.dur[p.jpn] || slapCfg.dur[0], 1e-6) < 0.5 ? 1 : 2) : p.slr > 0 ? 3 : 0) : 0, // raised for the first half of the swing, coming down (22.5) for the second, the follow-through (45) after it lands
+     roll: p.k === 10 && p.rlt > 0 ? Math.PI * 2 * (1 - p.rlt / Math.max(slapCfg.rdur, 1e-6)) : -1, stomp: p.k === 10 && !(p.rlt > 0) ? (p.jpa && p.slt > 0 && p.jpn < 2 ? 2 : p.slr > 0 && p.jpp === 1 ? 3 : p.jpa && p.z > 0 && !(p.slt > 0) && !(p.slr > 0) ? 1 : 0) : 0, // 1 wind-up (in the air between two presses), 2 the strike, 3 squashed on the foe
+     kick: p.k === 10 && ((p.jpa && p.slt > 0 && p.jpn === 2) || (p.slr > 0 && p.jpp === 2)), mv: lk.mv, ph: lk.ph, gmax: isGmax(p), sneak: p.k === 9 && p.gnt > 0, sleep: p.k === 1 && p.slp > 0, lick: p.k === 9 && p.lkp >= 2 && p.lkp <= 4, whip: p.k === 11 && (p.tlt > 0 || (p.tlcd <= cdCfg.tail - tailCfg.charge && p.tlcd > cdCfg.tail - tailCfg.charge - TAIL_SWING)) }; // whip: its tail is out (cocked, or lashing), so the body is drawn without it
   if (p.k === 3) { // the leaf grows for the Leaf Slash and is swung by it, upper left to lower right on the first, the other way on the next
     const sgn = p.ln % 2 === 0 ? 1 : -1, e = p.lk * p.lk * (3 - 2 * p.lk); // eased: the swing gathers speed and slows at the end
     lk.ls += ((p.lp > 0 ? leafCfg.scale : 1) - lk.ls) * 0.3;
@@ -5058,7 +5158,7 @@ function frame() {
       else if (f.t === 'leaf') drawLeafSpark(f);
       else if (f.t === 'sleep' || f.t === 'wake') { /* drawn from the player's own state (drawSleepFx) */ }
       else if (f.t === 'lick' || f.t === 'devour') { /* drawn from the player's own state (drawLick, drawDevour), not from the event */ }
-      else drawQuake(f); // 'slam'
+      else if (f.t === 'slam' || f.t === 'stomp' || f.t === 'rollkick') drawQuake(f); // 'slam' (events with no picture and no reach, such as Jigglypuff's 'bounce', must not fall in here: no radius makes the gradient throw)
     }
     ctx.restore();
     drawStormSky(dt);

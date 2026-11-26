@@ -1005,7 +1005,7 @@ type Config struct {
 	// On the ground (`ground`) it is five hand blows: right, left, right-left, right-left, then one big right hand that sends the foe flying; each swing takes `duration[n]` seconds (rooted, the fan it hits
 	// drawn on the ground) and then hits whoever is in the fan (`angle` wide, `length` long, at a height inside min_height..max_height): `damage[n]`, `knockback[n]`, stunned `stun_duration`.
 	// In the air (`air`) it stomps: the first press (after `duration[0]`) stomps a foe within `radius` below it, and that foe is driven into the ground, bounces up like a ball `foe_bounce_height[0]`
-	// high, drifting `bounce_distance[0]` away, while Jigglypuff itself bounces up to `self_bounce_height[0]`. A second press needs the first to have connected and stomps the ball again (index 1); a
+	// high, drifting `bounce_distance[0]` away, while Jigglypuff itself bounces up to `self_bounce_height[0]`, drifting `self_bounce_distance[0]` the way the blow was aimed. A second press needs the first to have connected and stomps the ball again (index 1); a
 	// third needs the second to have connected and kicks the foe away (`damage[2]`, `knockback[2]`). `slam_speed` is how fast a stomped foe is driven down. `gravity` pulls every ball-like flight.
 	// The second skill (`roll_kick`) rolls `roll_distance` the way the stick points at `roll_speed` per second, then kicks whoever is within `kick_radius` of it (plus both bodies) and stuns them `stun_duration` seconds. (It used to say: then kicks whoever is within `kick_radius` of it (plus both bodies): `damage`, and the
 	// foe flies off at 45 degrees `kick_distance` away, up to `kick_height`, while Jigglypuff itself flies up to `self_height`, following `self_distance` along.
@@ -1403,6 +1403,7 @@ func DefaultConfig() Config {
 	ar.Duration, ar.Damage, ar.Knockback = []float64{0.2, 0.2, 0.25}, []int{12, 12, 20}, []float64{0, 0, 300}
 	ar.Radius, ar.SlamSpeed = 110, 1200
 	ar.SelfBounceHeight, ar.FoeBounceHeight, ar.BounceDistance = []float64{180, 220}, []float64{90, 110}, []float64{40, 40}
+	ar.SelfBounceDistance = []float64{0, 0}
 	rk := &jp.RollKick
 	rk.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	rk.RollDistance, rk.RollSpeed, rk.StunDuration, rk.KickRadius, rk.Damage = 160, 320, 1, 70, 18
@@ -2568,14 +2569,15 @@ type jigglypuffCfg struct {
 		} `json:"ground"`
 		Air struct {
 			Reach
-			Duration         []float64 `json:"duration"`
-			Damage           []int     `json:"damage"`
-			Knockback        []float64 `json:"knockback"`
-			Radius           float64   `json:"radius"`
-			SlamSpeed        float64   `json:"slam_speed"`
-			SelfBounceHeight []float64 `json:"self_bounce_height"`
-			FoeBounceHeight  []float64 `json:"foe_bounce_height"`
-			BounceDistance   []float64 `json:"bounce_distance"`
+			Duration           []float64 `json:"duration"`
+			Damage             []int     `json:"damage"`
+			Knockback          []float64 `json:"knockback"`
+			Radius             float64   `json:"radius"`
+			SlamSpeed          float64   `json:"slam_speed"`
+			SelfBounceHeight   []float64 `json:"self_bounce_height"`
+			SelfBounceDistance []float64 `json:"self_bounce_distance"`
+			FoeBounceHeight    []float64 `json:"foe_bounce_height"`
+			BounceDistance     []float64 `json:"bounce_distance"`
 		} `json:"air"`
 	} `json:"combo"`
 	RollKick rollKickCfg `json:"roll_kick"`

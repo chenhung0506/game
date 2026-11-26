@@ -255,3 +255,32 @@ func TestJigglypuffIsPickableAndHasItsOwnBody(t *testing.T) {
 		t.Fatal("Jigglypuff should be pickable")
 	}
 }
+
+func TestAirStompBouncesJigglypuffTheConfiguredDistanceTheWayItAimed(t *testing.T) {
+	g := airJig()
+	g.cfg.Jigglypuff.Combo.Air.SelfBounceDistance = []float64{150, 0}
+	p := &g.P[0]
+	x0 := p.X
+	airSwing(g, 0)
+	if !p.JpFly || p.JpVX <= 0 || math.Abs(p.JpVY) > 1e-6 {
+		t.Fatalf("it should drift along the aim (+x): flying %v, JpVX %v, JpVY %v", p.JpFly, p.JpVX, p.JpVY)
+	}
+	for i := 0; i < int(5*tickRate) && p.JpFly; i++ {
+		g.Step(dt)
+	}
+	if p.JpFly {
+		t.Fatal("it should have landed")
+	}
+	if got := p.X - x0; math.Abs(got-150) > 20 { // the swing itself took a moment, in which the foe was already under it
+		t.Fatalf("it drifted %v, want about 150", got)
+	}
+}
+
+func TestAirStompWithNoSelfBounceDistanceBouncesStraightUp(t *testing.T) {
+	g := airJig()
+	g.cfg.Jigglypuff.Combo.Air.SelfBounceDistance = []float64{0, 0}
+	airSwing(g, 0)
+	if p := &g.P[0]; p.JpVX != 0 || p.JpVY != 0 {
+		t.Fatalf("drift %v,%v, want none", p.JpVX, p.JpVY)
+	}
+}

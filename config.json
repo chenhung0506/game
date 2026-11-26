@@ -513,28 +513,29 @@
       "air": {
         "min_height": 0,
         "max_height": 1000,
-        "duration": [0.2, 0.2, 0.25],
+        "duration": [0.5, 0.5, 0.5],
         "damage": [12, 12, 20],
         "knockback": [0, 0, 300],
         "radius": 110,
-        "slam_speed": 1200,
-        "self_bounce_height": [180, 220],
-        "foe_bounce_height": [90, 110],
+        "slam_speed": 800,
+        "self_bounce_height": [200, 250],
+        "self_bounce_distance": [100, 60],
+        "foe_bounce_height": [100, 140],
         "bounce_distance": [40, 40]
       }
     },
     "roll_kick": {
       "min_height": 0,
       "max_height": 60,
-      "roll_distance": 160,
-      "roll_speed": 320,
+      "roll_distance": 320,
+      "roll_speed": 450,
       "stun_duration": 1,
       "kick_radius": 70,
       "damage": 18,
       "kick_distance": 300,
-      "kick_height": 75,
-      "self_height": 140,
-      "self_distance": 220,
+      "kick_height": 100,
+      "self_height": 160,
+      "self_distance": 280,
       "cooldown": 6
     }
   },

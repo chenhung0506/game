@@ -202,6 +202,10 @@ func (g *Game) stomp(i, n int) (bool, []Event) {
 	}
 	if hit && n < 2 { // and it bounces higher off the foe
 		p.VZ, p.JpFly = math.Sqrt(2*jp.Gravity*math.Max(0, air.SelfBounceHeight[n]-p.Z)), true
+		if d := air.SelfBounceDistance[n]; d > 0 && p.VZ > 0 { // it drifts the way the blow was aimed, over the whole flight (up to the top and down again to the ground)
+			t := (p.VZ + math.Sqrt(p.VZ*p.VZ+2*jp.Gravity*p.Z)) / jp.Gravity
+			p.JpVX, p.JpVY = p.SlapX*d/t, p.SlapY*d/t
+		}
 	}
 	return hit, events
 }
@@ -292,7 +296,7 @@ func (c Config) validateJigglypuff() error {
 	}{
 		{"combo.ground.duration", 5, gr.Duration}, {"combo.ground.knockback", 5, gr.Knockback},
 		{"combo.air.duration", 3, ar.Duration}, {"combo.air.knockback", 3, ar.Knockback},
-		{"combo.air.self_bounce_height", 2, ar.SelfBounceHeight}, {"combo.air.foe_bounce_height", 2, ar.FoeBounceHeight}, {"combo.air.bounce_distance", 2, ar.BounceDistance},
+		{"combo.air.self_bounce_height", 2, ar.SelfBounceHeight}, {"combo.air.self_bounce_distance", 2, ar.SelfBounceDistance}, {"combo.air.foe_bounce_height", 2, ar.FoeBounceHeight}, {"combo.air.bounce_distance", 2, ar.BounceDistance},
 	}
 	for _, l := range lists {
 		if len(l.v) != l.n {
