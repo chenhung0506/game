@@ -1399,7 +1399,8 @@ func DefaultConfig() Config {
 	gr.Duration, gr.Damage, gr.Knockback = []float64{0.25, 0.25, 0.3, 0.3, 0.45}, []int{8, 8, 10, 10, 20}, []float64{10, 10, 10, 10, 260}
 	gr.StepDistance = []float64{0, 0, 0, 0, 0}
 	gr.PalmScale = 1
-	gr.Angle, gr.Length, gr.StunDuration = 110, 110, 0.5
+	gr.Angle, gr.Length = 110, 110
+	gr.StunDuration = []float64{0.5, 0.5, 0.5, 0.5, 0.5}
 	ar := &jp.Combo.Air
 	ar.Reach = Reach{MinHeight: 0, MaxHeight: 1000}
 	ar.Duration, ar.Damage, ar.Knockback = []float64{0.2, 0.2, 0.25}, []int{12, 12, 20}, []float64{0, 0, 300}
@@ -2570,7 +2571,7 @@ type jigglypuffCfg struct {
 			PalmScale    float64   `json:"palm_scale"`
 			Angle        float64   `json:"angle"`
 			Length       float64   `json:"length"`
-			StunDuration float64   `json:"stun_duration"`
+			StunDuration []float64 `json:"stun_duration"` // seconds each blow stuns the foes it hits (0 = that blow does not stun)
 		} `json:"ground"`
 		Air struct {
 			Reach

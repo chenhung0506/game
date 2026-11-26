@@ -506,12 +506,12 @@
         "max_height": 60,
         "duration": [0.25, 0.25, 0.3, 0.3, 0.45],
         "damage": [8, 8, 10, 10, 20],
-        "knockback": [10, 10, 10, 10, 260],
-        "step_distance": [60, 60, 40, 40, 100],
+        "knockback": [20, 20, 20, 20, 260],
+        "step_distance": [120, 60, 40, 40, 100],
         "palm_scale": 1,
         "angle": 110,
         "length": 110,
-        "stun_duration": 0.5
+        "stun_duration": [0, 0, 0.5, 0.5, 2]
       },
       "air": {
         "min_height": 0,

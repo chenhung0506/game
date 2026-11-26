@@ -410,3 +410,16 @@ func TestSelfGravityAlsoPullsTheFoeJigglypuffKicked(t *testing.T) {
 		t.Fatalf("the kicked foe must not depend on `gravity` (that is for stomped ones): %d vs %d ticks", again, slow)
 	}
 }
+
+func TestGroundBlowsStunOnlyWhereTheListSaysSo(t *testing.T) {
+	g := jig(80)
+	g.cfg.Jigglypuff.Combo.Ground.StunDuration = []float64{0, 0.7, 0, 0, 1.5}
+	want := []float64{0, 0.7, 0, 0, 1.5}
+	for n := 0; n < 5; n++ {
+		g.P[1].StunT = 0
+		swing(g, n)
+		if got := g.P[1].StunT; math.Abs(got-want[n]) > 0.1 {
+			t.Fatalf("blow %d: stunned %v, want %v", n+1, got, want[n])
+		}
+	}
+}

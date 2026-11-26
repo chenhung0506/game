@@ -184,7 +184,9 @@ func (g *Game) slap(i, n int) []Event {
 		if gr.Reach.hits(other) && d <= gr.Length+g.radius(j) && (d < 1e-9 || (dx*ux+dy*uy)/d >= math.Cos(gr.Angle/2*math.Pi/180)) {
 			g.hit(other, gr.Damage[n])
 			g.knockBack(p.X, p.Y, other, gr.Knockback[n], ux, uy)
-			g.stun(other, gr.StunDuration)
+			if gr.StunDuration[n] > 0 {
+				g.stun(other, gr.StunDuration[n])
+			}
 		}
 	}
 	if d := gr.StepDistance[n]; d > 0 {
@@ -329,7 +331,7 @@ func (c Config) validateJigglypuff() error {
 		n    int
 		v    []float64
 	}{
-		{"combo.ground.duration", 5, gr.Duration}, {"combo.ground.knockback", 5, gr.Knockback}, {"combo.ground.step_distance", 5, gr.StepDistance},
+		{"combo.ground.duration", 5, gr.Duration}, {"combo.ground.knockback", 5, gr.Knockback}, {"combo.ground.stun_duration", 5, gr.StunDuration}, {"combo.ground.step_distance", 5, gr.StepDistance},
 		{"combo.air.duration", 3, ar.Duration}, {"combo.air.knockback", 3, ar.Knockback},
 		{"combo.air.self_bounce_height", 2, ar.SelfBounceHeight}, {"combo.air.self_bounce_distance", 2, ar.SelfBounceDistance}, {"combo.air.foe_bounce_height", 2, ar.FoeBounceHeight}, {"combo.air.bounce_distance", 2, ar.BounceDistance},
 	}
@@ -366,8 +368,7 @@ func (c Config) validateJigglypuff() error {
 	if !(gr.Angle > 0 && gr.Angle <= 360) {
 		return fmt.Errorf("jigglypuff.combo.ground.angle must be between 0 (exclusive) and 360, got %v", gr.Angle)
 	}
-	for name, v := range map[string]float64{"combo.use_window": jp.Combo.UseWindow, "combo.cooldown": jp.Combo.Cooldown, "combo.ground.stun_duration": gr.StunDuration,
-		"roll_kick.roll_distance": rk.RollDistance, "roll_kick.stun_duration": rk.StunDuration, "roll_kick.kick_radius": rk.KickRadius, "roll_kick.kick_distance": rk.KickDistance, "roll_kick.kick_height": rk.KickHeight,
+	for name, v := range map[string]float64{"combo.use_window": jp.Combo.UseWindow, "combo.cooldown": jp.Combo.Cooldown, "roll_kick.roll_distance": rk.RollDistance, "roll_kick.stun_duration": rk.StunDuration, "roll_kick.kick_radius": rk.KickRadius, "roll_kick.kick_distance": rk.KickDistance, "roll_kick.kick_height": rk.KickHeight,
 		"roll_kick.self_height": rk.SelfHeight, "roll_kick.self_distance": rk.SelfDistance, "roll_kick.cooldown": rk.Cooldown} {
 		if !(v >= 0) || math.IsInf(v, 0) {
 			return fmt.Errorf("jigglypuff.%s must not be negative, got %v", name, v)
