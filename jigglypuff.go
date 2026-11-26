@@ -104,6 +104,10 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 			p.SlapQ = false
 			p.SlapX, p.SlapY = g.castDir(i, in)
 			p.SlapT = p.comboDuration(jp, p.SlapN)
+			if p.SlapN == 0 && !p.SlapAir && jp.Combo.Ground.LungeDistance > 0 { // the first blow: it closes in while the hand comes down
+				p.StepLeft, p.StepDX, p.StepDY = jp.Combo.Ground.LungeDistance, p.SlapX, p.SlapY
+				p.StepV = p.StepLeft / math.Max(p.SlapT, slapStepTime)
+			}
 			if p.SlapT == 0 {
 				events = append(events, g.comboStrike(i)...)
 			}
@@ -368,7 +372,7 @@ func (c Config) validateJigglypuff() error {
 	if !(gr.Angle > 0 && gr.Angle <= 360) {
 		return fmt.Errorf("jigglypuff.combo.ground.angle must be between 0 (exclusive) and 360, got %v", gr.Angle)
 	}
-	for name, v := range map[string]float64{"combo.use_window": jp.Combo.UseWindow, "combo.cooldown": jp.Combo.Cooldown, "roll_kick.roll_distance": rk.RollDistance, "roll_kick.stun_duration": rk.StunDuration, "roll_kick.kick_radius": rk.KickRadius, "roll_kick.kick_distance": rk.KickDistance, "roll_kick.kick_height": rk.KickHeight,
+	for name, v := range map[string]float64{"combo.use_window": jp.Combo.UseWindow, "combo.cooldown": jp.Combo.Cooldown, "combo.ground.lunge_distance": gr.LungeDistance, "roll_kick.roll_distance": rk.RollDistance, "roll_kick.stun_duration": rk.StunDuration, "roll_kick.kick_radius": rk.KickRadius, "roll_kick.kick_distance": rk.KickDistance, "roll_kick.kick_height": rk.KickHeight,
 		"roll_kick.self_height": rk.SelfHeight, "roll_kick.self_distance": rk.SelfDistance, "roll_kick.cooldown": rk.Cooldown} {
 		if !(v >= 0) || math.IsInf(v, 0) {
 			return fmt.Errorf("jigglypuff.%s must not be negative, got %v", name, v)

@@ -423,3 +423,28 @@ func TestGroundBlowsStunOnlyWhereTheListSaysSo(t *testing.T) {
 		}
 	}
 }
+
+func TestFirstGroundBlowClosesInBeforeItLands(t *testing.T) {
+	g := jig(400)
+	gr := &g.cfg.Jigglypuff.Combo.Ground
+	gr.LungeDistance, gr.StepDistance = 90, []float64{0, 0, 0, 0, 0}
+	x0 := g.P[0].X
+	press(g, 0, Input{Skill: true})
+	steps(g, int(gr.Duration[0]*tickRate)-2) // the blow has not landed yet
+	if g.P[0].SlapN != 0 || g.P[0].SlapT <= 0 {
+		t.Fatalf("the first blow should still be coming down: SlapN %d SlapT %v", g.P[0].SlapN, g.P[0].SlapT)
+	}
+	if moved := g.P[0].X - x0; moved < 60 {
+		t.Fatalf("it should be closing in during the first swing, moved only %v", moved)
+	}
+	steps(g, 10)
+	if moved := g.P[0].X - x0; math.Abs(moved-90) > 1 {
+		t.Fatalf("it moved %v, want 90", moved)
+	}
+	// only the first blow: the second does not lunge
+	x1 := g.P[0].X
+	swing(g, 1)
+	if g.P[0].X != x1 {
+		t.Fatalf("the second blow moved it %v", g.P[0].X-x1)
+	}
+}

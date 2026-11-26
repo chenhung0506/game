@@ -2564,14 +2564,15 @@ type jigglypuffCfg struct {
 		Cooldown  float64 `json:"cooldown"`
 		Ground    struct {
 			Reach
-			Duration     []float64 `json:"duration"`
-			Damage       []int     `json:"damage"`
-			Knockback    []float64 `json:"knockback"`
-			StepDistance []float64 `json:"step_distance"`
-			PalmScale    float64   `json:"palm_scale"`
-			Angle        float64   `json:"angle"`
-			Length       float64   `json:"length"`
-			StunDuration []float64 `json:"stun_duration"` // seconds each blow stuns the foes it hits (0 = that blow does not stun)
+			Duration      []float64 `json:"duration"`
+			Damage        []int     `json:"damage"`
+			Knockback     []float64 `json:"knockback"`
+			StepDistance  []float64 `json:"step_distance"`
+			PalmScale     float64   `json:"palm_scale"`
+			LungeDistance float64   `json:"lunge_distance"` // how far Jigglypuff moves forward during the FIRST blow of a chain, before it lands (spread over that swing; 0 = stays put)
+			Angle         float64   `json:"angle"`
+			Length        float64   `json:"length"`
+			StunDuration  []float64 `json:"stun_duration"` // seconds each blow stuns the foes it hits (0 = that blow does not stun)
 		} `json:"ground"`
 		Air struct {
 			Reach
