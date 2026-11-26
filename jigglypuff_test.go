@@ -128,8 +128,8 @@ func TestAirChainStompsTheFoeIntoABallThatBouncesThenKicksItAway(t *testing.T) {
 	if top < air.FoeBounceHeight[0]*0.9 || top > air.FoeBounceHeight[0]*1.1 {
 		t.Fatalf("the foe bounced to %v, want about %v", top, air.FoeBounceHeight[0])
 	}
-	if f.X-x < air.BounceDistance[0]*0.5 {
-		t.Fatalf("the foe drifted %v, want about %v", f.X-x, air.BounceDistance[0])
+	if f.X-x < air.FoeBounceDistance[0]*0.5 {
+		t.Fatalf("the foe drifted %v, want about %v", f.X-x, air.FoeBounceDistance[0])
 	}
 	// second stomp and the kick: bring the bodies together so the test is about the chain, not the chase
 	g.P[0].X, g.P[0].Y = f.X-30, f.Y
@@ -446,5 +446,86 @@ func TestFirstGroundBlowClosesInBeforeItLands(t *testing.T) {
 	swing(g, 1)
 	if g.P[0].X != x1 {
 		t.Fatalf("the second blow moved it %v", g.P[0].X-x1)
+	}
+}
+
+func TestRollIsAllowedBetweenTheBlowsOfAChainAndEndsIt(t *testing.T) {
+	g := jig(80)
+	swing(g, 0) // one blow done, the window is open
+	if !g.P[0].SlapChain || g.P[0].SlapN != 1 {
+		t.Fatalf("the chain should be waiting for blow 2: chain %v N %d", g.P[0].SlapChain, g.P[0].SlapN)
+	}
+	press(g, 0, Input{Roll: true, DX: 1})
+	if g.P[0].RollT <= 0 {
+		t.Fatal("the roll should start inside use_window")
+	}
+	if g.P[0].SlapChain || g.P[0].SlapCD != 0 {
+		t.Fatalf("rolling should end the chain without a cooldown: chain %v, cooldown %v", g.P[0].SlapChain, g.P[0].SlapCD)
+	}
+}
+
+func TestRollIsNotAllowedMidSwing(t *testing.T) {
+	g := jig(80)
+	press(g, 0, Input{Skill: true})
+	g.Step(dt)
+	press(g, 0, Input{Roll: true, DX: 1})
+	if g.P[0].RollT > 0 || g.P[0].SlapT <= 0 {
+		t.Fatalf("a swing in progress is rooted: RollT %v SlapT %v", g.P[0].RollT, g.P[0].SlapT)
+	}
+}
+
+func TestKickedFoeBouncesUpWhenItLandsAsHighAsTheThirdFoeBounceHeight(t *testing.T) {
+	g := airJig()
+	g.cfg.Jigglypuff.Combo.Air.FoeBounceHeight = []float64{90, 110, 120}
+	airSwing(g, 0)
+	f, p := &g.P[1], &g.P[0]
+	g.P[0].X, g.P[0].Y = f.X-30, f.Y
+	p.Z, p.VZ, f.VZ = f.Z+20, 400, 300
+	airSwing(g, 1)
+	g.P[0].X, g.P[0].Y = f.X-30, f.Y
+	p.Z, p.VZ, f.VZ = f.Z+20, 400, 300
+	airSwing(g, 2) // the kick
+	if !f.ArcOn {
+		t.Fatal("the kicked foe should be in the air")
+	}
+	landed, top := false, 0.0
+	for i := 0; i < int(6*tickRate); i++ {
+		g.Step(dt)
+		if f.Z == 0 {
+			landed = true
+		}
+		if landed && f.Z > top {
+			top = f.Z
+		}
+	}
+	if math.Abs(top-120) > 12 {
+		t.Fatalf("after landing it bounced to %v, want about 120", top)
+	}
+}
+
+func TestKickedFoeDriftsTheThirdFoeBounceDistanceAsItBounces(t *testing.T) {
+	g := airJig()
+	g.cfg.Jigglypuff.Combo.Air.FoeBounceHeight = []float64{90, 110, 120}
+	g.cfg.Jigglypuff.Combo.Air.FoeBounceDistance = []float64{40, 40, 150}
+	airSwing(g, 0)
+	f, p := &g.P[1], &g.P[0]
+	g.P[0].X, g.P[0].Y = f.X-30, f.Y
+	p.Z, p.VZ, f.VZ = f.Z+20, 400, 300
+	airSwing(g, 1)
+	g.P[0].X, g.P[0].Y = f.X-30, f.Y
+	p.Z, p.VZ, f.VZ = f.Z+20, 400, 300
+	airSwing(g, 2)
+	landedX, set := 0.0, false
+	for i := 0; i < int(6*tickRate) && f.ArcOn; i++ {
+		g.Step(dt)
+		if f.Z == 0 && !set && f.VZ > 0 { // just bounced
+			landedX, set = f.X, true
+		}
+	}
+	if !set {
+		t.Fatal("the kicked foe never bounced")
+	}
+	if got := f.X - landedX; math.Abs(got-150) > 15 {
+		t.Fatalf("it drifted %v during the bounce, want about 150", got)
 	}
 }

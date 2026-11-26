@@ -48,7 +48,7 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 	p.RollHeld = in.Roll
 
 	// the roll: along the stick (or where it faces), then the kick
-	if rollPress && p.RollT == 0 && p.RollCD == 0 && !p.SlapChain && !p.Held && p.Z == 0 && !p.JpFly {
+	if rollPress && p.RollT == 0 && p.RollCD == 0 && p.SlapT == 0 && !p.Held && p.Z == 0 && !p.JpFly { // (between the blows of a chain too: use_window does not lock the roll out)
 		rk := jp.RollKick
 		dx, dy := float64(in.DX), float64(in.DY)
 		if dx == 0 && dy == 0 {
@@ -58,6 +58,9 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 		p.RollX, p.RollY = dx/n, dy/n
 		p.RollT, p.RollCD = rk.rollTime(), rk.Cooldown
 		p.SlapQ = false
+		if p.SlapChain { // rolling out of a chain ends it, with no cooldown, so the air chain after the kick starts fresh
+			p.endChain(0)
+		}
 		if p.RollT == 0 {
 			events = append(events, g.rollKick(i)...)
 		}
@@ -227,11 +230,11 @@ func (g *Game) stomp(i, n int) (bool, []Event) {
 		g.knockBack(p.X, p.Y, f, air.Knockback[n], ux, uy)
 		if n < 2 { // driven down: it lands, then bounces up like a ball
 			f.ArcOn, f.Held, f.VZ, f.ArcVX, f.ArcVY = true, true, -air.SlamSpeed, 0, 0
-			f.ArcBounce, f.ArcDist, f.ArcDX, f.ArcDY = air.FoeBounceHeight[n], air.BounceDistance[n], ux, uy
+			f.ArcBounce, f.ArcDist, f.ArcDX, f.ArcDY = air.FoeBounceHeight[n], air.FoeBounceDistance[n], ux, uy
 			f.ArcG = 0 // a stomped foe is a ball under `gravity`
 			events = append(events, Event{T: "stomp", X: f.X, Y: f.Y, Z: f.Z, R: air.Radius, K: n})
-		} else { // kicked away: whatever bounce it had coming is gone, it just falls
-			f.ArcBounce, f.ArcVX, f.ArcVY, f.VZ = 0, 0, 0, math.Min(f.VZ, 0)
+		} else { // kicked away: it falls, and bounces up when it lands, `foe_bounce_height[2]` high, drifting `foe_bounce_distance[2]` along the kick
+			f.ArcBounce, f.ArcDist, f.ArcDX, f.ArcDY, f.ArcVX, f.ArcVY, f.VZ = air.FoeBounceHeight[2], air.FoeBounceDistance[2], ux, uy, 0, 0, math.Min(f.VZ, 0)
 			f.ArcOn, f.Held = true, true
 			f.ArcG = jp.SelfGravity // kicked away: it falls like Jigglypuff does
 			events = append(events, Event{T: "stomp", X: f.X, Y: f.Y, Z: f.Z, R: air.Radius, K: n, DX: ux, DY: uy})
@@ -337,7 +340,7 @@ func (c Config) validateJigglypuff() error {
 	}{
 		{"combo.ground.duration", 5, gr.Duration}, {"combo.ground.knockback", 5, gr.Knockback}, {"combo.ground.stun_duration", 5, gr.StunDuration}, {"combo.ground.step_distance", 5, gr.StepDistance},
 		{"combo.air.duration", 3, ar.Duration}, {"combo.air.knockback", 3, ar.Knockback},
-		{"combo.air.self_bounce_height", 2, ar.SelfBounceHeight}, {"combo.air.self_bounce_distance", 2, ar.SelfBounceDistance}, {"combo.air.foe_bounce_height", 2, ar.FoeBounceHeight}, {"combo.air.bounce_distance", 2, ar.BounceDistance},
+		{"combo.air.self_bounce_height", 2, ar.SelfBounceHeight}, {"combo.air.self_bounce_distance", 2, ar.SelfBounceDistance}, {"combo.air.foe_bounce_height", 3, ar.FoeBounceHeight}, {"combo.air.foe_bounce_distance", 3, ar.FoeBounceDistance},
 	}
 	for _, l := range lists {
 		if len(l.v) != l.n {
