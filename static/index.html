@@ -115,7 +115,7 @@ const HELP = [
   '你是真新鎮小智　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人）　L＝百萬噸拳擊（絕招，蓄能滿了才能放；天色會變暗。朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），蓄力後半段畫面會閃爍，朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
   '你是怪力　移動 WASD　空白鍵＝上鉤拳（朝按住的方向滑一步，接著朝敵人衝過去給他一記上鉤拳，打中的敵人受傷、不會被推開，而是被打飛到空中動彈不得）　J＝子彈拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝飛膝踢（直接朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　L＝極巨化（絕招，蓄能滿了才能放：變成又大又壯的極巨化怪力一段時間，血量、速度和招式的數值都換成極巨化的；這段時間空白鍵變成爆裂拳（先朝方向鍵滑一步，再定身蓄力，朝敵人揮出拳頭，拳頭周圍的空中和地面接連出現黑白爆炸，炸中的敵人被炸上天，被炸中越多次飛越高）、K 變成閃電拳：定身蓄力，朝敵人揮出巨大的拳頭，打中的同時一道巨大的閃電從天而降）',
   '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才發射；輕點就朝敵人；定身蓄力一下後，球筆直飛出去，碰到敵人、牆或被打爆就爆炸，會把範圍內的敵人往中心吸過去一陣子，並向外炸出一圈不會回頭的紫色火焰；球有血量，敵人的招式和飛行物可以提早打爆它）　L＝極巨化（絕招，蓄能滿了才能用；變成又大又厚的極巨化梗鬼一陣子：空白鍵＝舔舌（定身蓄力一下，舌頭朝敵人伸出去，碰到的敵人受傷、被擊暈、被拉回你身邊，再被你啃一口並再次擊暈；沒碰到舌頭就縮回來）　K＝吞噬（以自己為中心把範圍內的敵人拉過來，更近的範圍內的敵人還不能出招，拉人和沈默的時間各自計算）　J＝鬼火（只朝正前方扇形噴出）；鬼火、潛行與影子球在變身期間換成這三招）',
-  '你是胖丁　移動 WASD　空白鍵＝連打（可以連續按：在地上是五下巴掌，前四下一下一下打、第五下大力把人拍飛，打之前地上會先畫粉紅色的扇形；在空中是踩人：把人踩進地上像球一樣彈起來，再踩一次、第三下把人踢飛，每一下都要前一下有踩到才接得上）　J＝翻滾飛踢（朝方向鍵滾一段，滾完把身邊的人以 45 度角踢飛、暈住，你也跟著飛到空中，可以接空中的連打）',
+  '你是胖丁　移動 WASD　空白鍵＝連打（可以連續按：在地上是五下巴掌，前四下一下一下打、第五下大力把人拍飛；在空中是踩人：把人踩進地上像球一樣彈起來，再踩一次、第三下把人踢飛，每一下都要前一下有踩到才接得上）　J＝翻滾飛踢（朝方向鍵滾一段，滾完把身邊的人以 45 度角踢飛、暈住，你也跟著飛到空中，可以接空中的連打）',
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
 const ghosts = []; // dash afterimages
@@ -1951,7 +1951,6 @@ const teleCtx = tele.getContext('2d');
 function drawTelegraph() {
   for (const si of beamSlots()) drawFan(snap.p[si], disp[si]);
   for (const si of slotsOf(11)) drawTailWarning(snap.p[si], disp[si]);
-  for (const si of slotsOf(10)) drawSlapWarning(snap.p[si], disp[si]);
   for (const si of [...slotsOf(7), ...slotsOf(8)]) drawTreeWarning(snap.p[si], disp[si]);
   for (const si of slotsOf(7)) drawMegaCharge(snap.p[si], disp[si]);
   for (const si of slotsOf(0)) drawVoltCharge(si);
@@ -2694,18 +2693,6 @@ function drawTailWhip(f) {
 // The tail whip winding up: the fan it will hit is drawn on the ground, where the opponent can see what to keep out of, filling
 // with colour as the wind-up runs out; a ring runs out to the edge of it so the moment of the hit can be read, and the tail is
 // cocked back at one side of the fan.
-// Jigglypuff's Slap: the fan it will hit, on the ground, filling as the hand comes up (the same drawing as the tail's, in pink).
-function drawSlapWarning(p, d) {
-  if (!(p.slt > 0) || p.jpa) return; // (the air chain has no fan: it stomps what is under it)
-  const k = 1 - p.slt / Math.max(slapCfg.dur[p.jpn] || slapCfg.dur[0], 1e-6), half = slapCfg.angle / 2 * Math.PI / 180, base = Math.atan2(p.sly, p.slx), L = slapCfg.length;
-  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
-  ctx.save(); ctx.lineCap = 'round';
-  ctx.fillStyle = `rgba(255,110,160,${0.12 + 0.3 * k})`; ctx.strokeStyle = `rgba(255,${120 + 80 * pulse | 0},170,${0.5 + 0.4 * k})`; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.arc(d.x, d.y, L, base - half, base + half); ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = `rgba(255,235,240,${0.35 + 0.4 * k})`; ctx.lineWidth = 2; // the ring that reaches the edge as it lands
-  ctx.beginPath(); ctx.arc(d.x, d.y, L * k, base - half, base + half); ctx.stroke();
-  ctx.restore();
-}
 
 function drawTailWarning(p, d) {
   if (!(p.tlt > 0)) return;
