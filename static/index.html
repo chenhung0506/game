@@ -103,7 +103,7 @@ let VIEW = [1, 0, 0, 1, 0, 0]; // world -> canvas matrix for ctx.transform
 // Everything below that belongs to one character looks that player up with slotOf, instead of assuming a slot.
 const NAMES = ['皮卡丘', '卡比獸', '噴火龍', '菊草葉', '六尾', '木木梟', '鯉魚王', '小智', '怪力', '梗鬼', '胖丁'];
 const FORMS = [...NAMES, '紅色暴鯉龍']; // every kind a player can be in: Magikarp becomes the last one (nobody picks it)
-const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳・睡覺（絕招）', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭・大藤蔓（絕招）', '冰山滑行・冰風暴・急凍光線・冰封世界（絕招）', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球・極巨化（絕招）', '連環巴掌・翻滾飛踢・唱歌'];
+const BLURB = ['伏特攻擊・打雷・電球', '跳躍落地震・破壞死光・急凍拳・睡覺（絕招）', '飛行・噴火・地球上投', '葉刃連斬・飛葉快刀・藤鞭・大藤蔓（絕招）', '冰山滑行・冰風暴・急凍光線・冰封世界（絕招）', '空氣斬・箭雨・龍捲風', '彈跳・彈跳五次進化成暴鯉龍', '飛膝踢・拔樹・百裂拳・百萬噸拳擊（絕招）', '飛膝踢・子彈拳・岩石陣', '暗影潛行・鬼火・影子球・極巨化（絕招）', '連環巴掌・翻滾飛踢・踩踏・唱歌（絕招）'];
 const HELP = [
   '你是皮卡丘　移動 WASD　空白鍵＝伏特攻擊（全身纏繞閃電朝按住的方向衝刺，可連續使用數次，撞到敵人會使其麻痺無法移動；比地球上投和急凍拳輕，對撞時會輸）　J＝打雷（朝天空放電並在敵人頭上落雷，施放期間無法移動，陰影會追著敵人）　K＝電球（續能後自動朝敵人所在方向丟出，碰到敵人、牆或被打爆時爆炸）　L＝千萬伏特（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能放；朝四周放出一圈閃電，之後追著敵人跑、碰到會擊退，時間到全部爆炸）',
   '你是卡比獸　移動 WASD　空白鍵＝跳躍（落地壓人，附地震特效）　J＝破壞死光（朝敵人所在方向扇形掃射，蓄力與掃射時定身，之後硬直）　K＝急凍拳（蓄力時按 WASD 決定方向，朝該方向衝拳，打到的敵人被冰凍）　L＝睡覺（絕招：開場鎖住，被打、打中敵人、時間經過都會續能，滿了才能用；睡著的這段時間不能動也不能出招，但會持續回血；被暈眩、擊退、打上空中、冰凍、定身都不會中斷睡眠）',
@@ -115,7 +115,7 @@ const HELP = [
   '你是真新鎮小智　移動 WASD　空白鍵＝飛膝踢（朝按住的方向滑一步，接著朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　J＝拔樹（朝按住的方向跳一大步，落地後從地面拔起一棵大樹，高舉一會兒後朝敵人所在位置砸下，地上會先畫出樹幹加樹冠的範圍給對手看）　K＝百裂拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人）　L＝百萬噸拳擊（絕招，蓄能滿了才能放；天色會變暗。朝按住的方向先跳一步，落地後定身蓄力一下（蓄力時拳會一直追著敵人，推搖桿就改朝搖桿的方向），蓄力後半段畫面會閃爍，朝敵人的方向帶著拳頭一起往前衝出去，打中的敵人受傷、被擊暈並被打飛）',
   '你是怪力　移動 WASD　空白鍵＝上鉤拳（朝按住的方向滑一步，接著朝敵人衝過去給他一記上鉤拳，打中的敵人受傷、不會被推開，而是被打飛到空中動彈不得）　J＝子彈拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝飛膝踢（直接朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　L＝極巨化（絕招，蓄能滿了才能放：變成又大又壯的極巨化怪力一段時間，血量、速度和招式的數值都換成極巨化的；這段時間空白鍵變成爆裂拳（先朝方向鍵滑一步，再定身蓄力，朝敵人揮出拳頭，拳頭周圍的空中和地面接連出現黑白爆炸，炸中的敵人被炸上天，被炸中越多次飛越高）、K 變成閃電拳：定身蓄力，朝敵人揮出巨大的拳頭，打中的同時一道巨大的閃電從天而降）',
   '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才發射；輕點就朝敵人；定身蓄力一下後，球筆直飛出去，碰到敵人、牆或被打爆就爆炸，會把範圍內的敵人往中心吸過去一陣子，並向外炸出一圈不會回頭的紫色火焰；球有血量，敵人的招式和飛行物可以提早打爆它）　L＝極巨化（絕招，蓄能滿了才能用；變成又大又厚的極巨化梗鬼一陣子：空白鍵＝舔舌（定身蓄力一下，舌頭朝敵人伸出去，碰到的敵人受傷、被擊暈、被拉回你身邊，再被你啃一口並再次擊暈；沒碰到舌頭就縮回來）　K＝吞噬（以自己為中心把範圍內的敵人拉過來，更近的範圍內的敵人還不能出招，拉人和沈默的時間各自計算）　J＝鬼火（只朝正前方扇形噴出）；鬼火、潛行與影子球在變身期間換成這三招）',
-  '你是胖丁　移動 WASD　空白鍵＝連環巴掌（可以連續按：在地上是五下巴掌，前四下一下一下打、第五下大力把人拍飛；在空中是踩人：把人踩進地上像球一樣彈起來，再踩一次、第三下把人踢飛，每一下都要前一下有踩到才接得上）　J＝翻滾飛踢（朝方向鍵滾一段，滾完把身邊的人以 45 度角踢飛、暈住，你也跟著飛到空中，可以接空中的連打）　K＝唱歌（放出一圈音符追著對手，音符碰到對手不會傷人，會在它頭上作記號，記號夠多對手就睡著，睡著時動不了；音符會被對手的招式打掉）',
+  '你是胖丁　移動 WASD　空白鍵＝連環巴掌（可以連續按：在地上是五下巴掌，前四下一下一下打、第五下大力把人拍飛；在空中是踩人：把人踩進地上像球一樣彈起來，再踩一次、第三下把人踢飛，每一下都要前一下有踩到才接得上）　J＝翻滾飛踢（朝方向鍵滾一段，滾完把身邊的人以 45 度角踢飛、暈住，你也跟著飛到空中，可以接空中的連打）　K＝踩踏（跳起來，落地震傷身邊的人；在空中也能按：往下踩到空中的敵人，把他踩回地面、他會彈起來）　L＝唱歌（絕招，要蓄能滿：放出一圈音符追著對手，音符碰到對手不會傷人，會在它頭上作記號，記號夠多對手就睡著，睡著時動不了；音符會被對手的招式打掉）',
   '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
 const ghosts = []; // dash afterimages
@@ -498,7 +498,7 @@ function drawCards() {
 // ---- input: send only when the held-key state changes ----
 // Directions are read on screen (up is up) and turned back into world directions for the server.
 const keys = new Set();
-const touch = { sing: false, tree: false, skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false, roll: false, ult: false }; // the pad's buttons
+const touch = { stomp: false, tree: false, skill: false, thunder: false, beam: false, ball: false, punch: false, fire: false, toss: false, razor: false, vine: false, storm: false, freeze: false, arrow: false, twister: false, tail: false, comet: false, rock: false, mega: false, gfire: false, sball: false, roll: false, ult: false }; // the pad's buttons
 let stick = { x: 0, y: 0 }; // the pad's stick, each -1 / 0 / 1 on screen
 let stickAim = { x: 0, y: 0 }; // the stick's exact direction on screen, a unit vector (0, 0 = not pushed)
 let last = '';
@@ -542,7 +542,7 @@ function sendInput() {
     razor: k('j') || touch.razor, vine: touch.vine,
     storm: k('j') || touch.storm, freeze: k('k') || touch.freeze,
     arrow: k('j') || touch.arrow, twister: k('k') || touch.twister,
-    comet: (padKind === 7 ? k('k') : k('j')) || touch.comet, tree: k('j') || touch.tree, rock: k('k') || touch.rock, mega: touch.mega, gfire: k('j') || touch.gfire, roll: k('j') || touch.roll, sing: k('k') || touch.sing, sball: touch.sball, ult: k('l') || touch.ult, // the third skill, the ultimate (called Z, its key is L): a character without one ignores it
+    comet: (padKind === 7 ? k('k') : k('j')) || touch.comet, tree: k('j') || touch.tree, rock: k('k') || touch.rock, mega: touch.mega, gfire: k('j') || touch.gfire, roll: k('j') || touch.roll, stomp: k('k') || touch.stomp, sball: touch.sball, ult: k('l') || touch.ult, // the third skill, the ultimate (called Z, its key is L): a character without one ignores it
     tail: touch.tail, tx: Math.round(cast.x * 100) / 100 || 0, ty: Math.round(cast.y * 100) / 100 || 0, // the tail and the vines are cast when the button is let go (see endAim), not while it is held
   });
   if (msg !== last && ws.readyState === 1) { ws.send(msg); last = msg; }
@@ -600,7 +600,7 @@ const PAD = [
   { main: ['飛膝踢', 'skill'], small: [['拔樹', 'tree'], ['百裂拳', 'comet']], ult: ['百萬噸', 'ult'] }, // Ash: the kick is the main skill (sent as Skill, personsInput on the server sorts out what it is), the tree and the Comet Punch the small ones, the Megaton Punch the ultimate
   { main: ['上鉤拳', 'skill'], small: [['子彈拳', 'comet'], ['飛膝踢', 'rock']], ult: ['極巨化', 'ult'] }, // Machamp: Z turns it into the Gigantamax Machamp; the Uppercut is the main skill, the High Jump Kick (the page sends K as `rock`, the server turns it into the kick) a small one; the Rock Tomb is not used
   { main: ['暗影潛行', 'skill'], small: [['鬼火', 'gfire'], ['影子球', 'sball', true]], ult: ['極巨化', 'ult'] }, // Gengar: Z turns it into the Gigantamax Gengar, whose three buttons are the Lick, the Devour and the fan of fire
-  { main: ['連環巴掌', 'skill'], small: [['翻滾飛踢', 'roll'], ['唱歌', 'sing']] }, // Jigglypuff: the main button is the chain of blows (ground: five hand blows, in the air: stomps), the small one the roll kick
+  { main: ['連環巴掌', 'skill'], small: [['翻滾飛踢', 'roll'], ['踩踏', 'stomp']], ult: ['唱歌', 'ult'] }, // Jigglypuff: the main button is the chain of blows (ground: five hand blows, in the air: stomps), the small one the roll kick
   { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
 ];
 function buildPad() {
@@ -627,7 +627,7 @@ function buildPad() {
   const MAIN = 104, SMALL = 58, EDGE = 18, BOTTOM = 28;
   const place = (b, size, cx, cy) => { b.style.width = b.style.height = size + 'px'; b.style.right = (cx - size / 2) + 'px'; b.style.bottom = (cy - size / 2) + 'px'; };
   // which snapshot field holds the time left, and which cooldown is its full length
-  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['kkcd', 'akick'], tree: ['trcd', 'tree'], comet: ['cpcd', 'comet'] }, { skill: ['ucd', 'upper'], comet: ['cpcd', 'mcomet'], rock: ['kkcd', 'mkick'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['slcd', 'slap'], roll: ['rlcd', 'roll'], sing: ['sgcd', 'sing'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
+  const CD = [{ skill: ['dcd', 'dash'], thunder: ['tcd', 'thunder'], ball: ['ecd', 'ball'] }, { skill: ['jcd', 'jump'], beam: ['bcd', 'beam'], punch: ['pcd', 'punch'] }, { skill: ['fcd', 'fly'], fire: ['hcd', 'fire'], toss: ['gcd', 'toss'] }, { skill: ['lcd', 'leaf'], razor: ['rcd', 'razor'], vine: ['vcd', 'vine'] }, { skill: ['ycd', 'frost'], storm: ['wcd', 'storm'], freeze: ['zcd', 'fbeam'] }, { skill: ['mcd', 'drift'], arrow: ['acd', 'arrow'], twister: ['qcd', 'twister'] }, { skill: ['ocd', 'hop'] }, { skill: ['kkcd', 'akick'], tree: ['trcd', 'tree'], comet: ['cpcd', 'comet'] }, { skill: ['ucd', 'upper'], comet: ['cpcd', 'mcomet'], rock: ['kkcd', 'mkick'] }, { skill: ['gncd', 'gsneak'], gfire: ['gfcd', 'gfire'], sball: ['sbcd', 'sball'] }, { skill: ['slcd', 'slap'], roll: ['rlcd', 'roll'], stomp: ['jscd', 'jstomp'] }, { skill: ['wvcd', 'wave'], beam: ['bcd', 'gbeam'], tail: ['tlcd', 'tail'] }];
   const hold = (b, label, name, aimed) => {
     b.textContent = label; let id = null;
     const span = document.createElement('div'); span.className = 'cd'; b.append(span);

@@ -69,7 +69,7 @@ type Input struct {
 	Tree    bool `json:"tree"`    // Ash only, and only a person's: Tree Slam (the page's second button; personsInput turns it into Skill)
 	Kick    bool `json:"kick"`    // Ash only, and only the computer's (a person's is dropped on the way in): High Jump Kick, which is Machamp's Skill
 	Roll    bool `json:"roll"`    // Jigglypuff only: Roll Kick
-	Sing    bool `json:"sing"`    // Jigglypuff only: Sing
+	Stomp   bool `json:"stomp"`   // Jigglypuff only: Stomp (a jump that stomps a foe in the air down); its Sing is its ultimate, on Ult
 	GFire   bool `json:"gfire"`   // Gengar only: Ghost Fire
 	Ult     bool `json:"ult"`     // the third skill (Z, the ultimate): it works once the character's charge is full
 	SBall   bool `json:"sball"`   // Gengar only: Shadow Ball (aimed like the Vine Whip, see CastX)
@@ -285,13 +285,16 @@ type Player struct {
 	RollX    float64 `json:"rlx"`
 	RollY    float64 `json:"rly"`
 	RollHeld bool    `json:"-"`
-	// Sing: the cooldown, the key as of last tick; and what its notes did to this player: marks over its head (they run out MarkT seconds after the last), and how long it has left asleep.
-	SingCD   float64 `json:"sgcd"`
-	SingHeld bool    `json:"-"`
-	Marks    int     `json:"smk,omitempty"`
-	MarkT    float64 `json:"-"`
-	DozeT    float64 `json:"doz,omitempty"`
-	JpFly    bool    `json:"-"`
+	// Stomp: the cooldown, the key as of last tick; whether it is in the jump of it (and the gravity of that jump), and whether it has stomped a foe on the way down. And what Sing's notes did to this player: marks over its head (they run out MarkT seconds after the last), and how long it has left asleep.
+	StompCD   float64 `json:"jscd"`
+	StompHeld bool    `json:"-"`
+	JpJump    bool    `json:"-"`
+	JpG       float64 `json:"-"`
+	JpStomped bool    `json:"-"`
+	Marks     int     `json:"smk,omitempty"`
+	MarkT     float64 `json:"-"`
+	DozeT     float64 `json:"doz,omitempty"`
+	JpFly     bool    `json:"-"`
 	// the step forward after a ground blow: the distance still to go, along (StepDX, StepDY), at StepV per second.
 	StepLeft, StepV, StepDX, StepDY float64 `json:"-"`
 	JpVX                            float64 `json:"-"`
@@ -1225,6 +1228,12 @@ func (g *Game) Step(dt float64) []Event {
 			}
 			if p.Kind == gengar && p.SneakT > 0 {
 				v = g.sneakSpeed(p)
+			}
+			if p.Kind == jigglypuff && p.JpJump {
+				v = g.cfg.Jigglypuff.Stomp.AirSpeedSecondHalf
+				if p.VZ > 0 {
+					v = g.cfg.Jigglypuff.Stomp.AirSpeedFirstHalf
+				}
 			}
 			if p.Kind == snorlax && p.Z > 0 {
 				v = g.cfg.Snorlax.Jump.AirSpeedSecondHalf

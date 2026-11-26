@@ -1393,7 +1393,9 @@ func DefaultConfig() Config {
 	c.Jigglypuff.MaxHP, c.Jigglypuff.WalkSpeed, c.Jigglypuff.Radius = 130, 135, 22
 	jp := &c.Jigglypuff
 	jp.Gravity, jp.SelfGravity = 1500, 1500
-	jp.Sing = singCfg{Reach: Reach{MinHeight: 0, MaxHeight: 1000}, Cooldown: 8, Count: 8, RingRadius: 160, SpreadSpeed: 300, ConvergenceSpeed: 140, Radius: 16, HP: 20, Mass: 20, Duration: 8, MarksToSleep: 3, SleepDuration: 3, MarkDuration: 6, SwayWidth: 0, SwayLength: 140, Scale: 1}
+	jp.Stomp = stompCfg{Reach: Reach{MinHeight: 0, MaxHeight: 12}, Height: 120, Duration: 0.8, Cooldown: 4, SlamRadius: 110, Damage: 12, AirSpeedFirstHalf: 160, AirSpeedSecondHalf: 160, CatchRadius: 70, FoeDamage: 15, SlamSpeed: 900, FoeBounceHeight: 100, FoeBounceDistance: 60}
+	jp.Ultimate = Ultimate{Max: 100, GainTaken: 1, GainDealt: 1, GainUltDealt: 1, GainPerSecond: 1}
+	jp.Sing = singCfg{Reach: Reach{MinHeight: 0, MaxHeight: 1000}, Count: 8, RingRadius: 160, SpreadSpeed: 300, ConvergenceSpeed: 140, Radius: 16, HP: 20, Mass: 20, Duration: 8, MarksToSleep: 3, SleepDuration: 3, MarkDuration: 6, SwayWidth: 0, SwayLength: 140, Scale: 1}
 	jp.Combo.UseWindow, jp.Combo.Cooldown = 3, 4
 	gr := &jp.Combo.Ground
 	gr.Reach = Reach{MinHeight: 0, MaxHeight: 60}
@@ -1765,6 +1767,7 @@ func (c Config) validateSkills() error {
 		{"vulpix.ultimate.max", c.Vulpix.Ultimate.Max, 0},
 		{"gengar.ultimate.max", c.Gengar.Ultimate.Max, 0},
 		{"snorlax.ultimate.max", c.Snorlax.Ultimate.Max, 0},
+		{"jigglypuff.ultimate.max", c.Jigglypuff.Ultimate.Max, 0},
 		{"snorlax.sleep.sleep_duration", c.Snorlax.Sleep.SleepDuration, 0},
 		{"vulpix.glaciate.duration", c.Vulpix.Glaciate.Duration, 0},
 		{"vulpix.glaciate.radius", c.Vulpix.Glaciate.Radius, 0},
@@ -2160,6 +2163,10 @@ func (c Config) validateSkills() error {
 		{"vulpix.ultimate.gain_dealt", c.Vulpix.Ultimate.GainDealt},
 		{"vulpix.ultimate.gain_per_second", c.Vulpix.Ultimate.GainPerSecond},
 		{"vulpix.ultimate.gain_ultimate_dealt", c.Vulpix.Ultimate.GainUltDealt},
+		{"jigglypuff.ultimate.gain_taken", c.Jigglypuff.Ultimate.GainTaken},
+		{"jigglypuff.ultimate.gain_dealt", c.Jigglypuff.Ultimate.GainDealt},
+		{"jigglypuff.ultimate.gain_per_second", c.Jigglypuff.Ultimate.GainPerSecond},
+		{"jigglypuff.ultimate.gain_ultimate_dealt", c.Jigglypuff.Ultimate.GainUltDealt},
 		{"snorlax.ultimate.gain_taken", c.Snorlax.Ultimate.GainTaken},
 		{"snorlax.ultimate.gain_dealt", c.Snorlax.Ultimate.GainDealt},
 		{"snorlax.ultimate.gain_per_second", c.Snorlax.Ultimate.GainPerSecond},
@@ -2590,16 +2597,37 @@ type jigglypuffCfg struct {
 	} `json:"combo"`
 	RollKick rollKickCfg `json:"roll_kick"`
 	Sing     singCfg     `json:"sing"`
+	Stomp    stompCfg    `json:"stomp"`
+	Ultimate Ultimate    `json:"ultimate"` // the charge Sing (Z) needs
 }
 
-// singCfg is Jigglypuff's Sing (its second small skill): `count` music notes fly out round it (ring_radius at spread_speed), then each turns on the nearest foe and chases it at
+// stompCfg is Jigglypuff's Stomp (its second small skill, K): a jump that steers like Snorlax's (a parabola `height` high and `duration` seconds long, `air_speed_*` to steer by) and whose landing
+// shock hurts the foes within `slam_radius` (by min/max_height) and the projectiles it reaches, `damage` each (no earthquake). It can be used in the air too, as a fresh jump from where it is. Coming down on
+// a foe that is in the air (`catch_radius` across, and within 25 of its height) it stomps it down to the floor instead: `foe_damage`, at `slam_speed`, and the foe bounces up
+// `foe_bounce_height` high, drifting `foe_bounce_distance` away. One foe is stomped per jump.
+type stompCfg struct {
+	Reach
+	Height             float64 `json:"height"`
+	Duration           float64 `json:"duration"`
+	Cooldown           float64 `json:"cooldown"`
+	SlamRadius         float64 `json:"slam_radius"`
+	Damage             int     `json:"damage"`
+	AirSpeedFirstHalf  float64 `json:"air_speed_first_half"`
+	AirSpeedSecondHalf float64 `json:"air_speed_second_half"`
+	CatchRadius        float64 `json:"catch_radius"`
+	FoeDamage          int     `json:"foe_damage"`
+	SlamSpeed          float64 `json:"slam_speed"`
+	FoeBounceHeight    float64 `json:"foe_bounce_height"`
+	FoeBounceDistance  float64 `json:"foe_bounce_distance"`
+}
+
+// singCfg is Jigglypuff's Sing (its ultimate, Z: it needs the charge in `jigglypuff.ultimate` full and empties it): `count` music notes fly out round it (ring_radius at spread_speed), then each turns on the nearest foe and chases it at
 // convergence_speed. A note does no damage: touching a foe (radius, at a height inside min_height..max_height) spends it and puts a mark over the foe's head; every mark lasts
 // mark_duration seconds from the last one (0 = until it sleeps), and `marks_to_sleep` marks put the foe to sleep for `sleep_duration` seconds (it can neither move nor act, like a stun;
 // notes that touch a sleeping foe are spent for nothing). A note has hp and mass like a fire ball, so the foe's skills and projectiles can shoot it down; it fades after `duration` seconds
 // (0 = it chases until it is shot down). `scale` only sizes the picture.
 type singCfg struct {
 	Reach
-	Cooldown         float64 `json:"cooldown"`
 	Count            int     `json:"count"`
 	RingRadius       float64 `json:"ring_radius"`
 	SpreadSpeed      float64 `json:"spread_speed"`

@@ -500,7 +500,7 @@
     "self_gravity": 800,
     "combo": {
       "use_window": 3,
-      "cooldown": 0,
+      "cooldown": 2,
       "ground": {
         "min_height": 0,
         "max_height": 60,
@@ -545,7 +545,6 @@
     "sing": {
       "min_height": 0,
       "max_height": 1000,
-      "cooldown": 8,
       "count": 8,
       "ring_radius": 560,
       "spread_speed": 300,
@@ -560,6 +559,29 @@
       "sway_width": 100,
       "sway_length": 140,
       "scale": 1
+    },
+    "stomp": {
+      "min_height": 0,
+      "max_height": 12,
+      "height": 120,
+      "duration": 0.8,
+      "cooldown": 4,
+      "slam_radius": 110,
+      "damage": 12,
+      "air_speed_first_half": 160,
+      "air_speed_second_half": 160,
+      "catch_radius": 70,
+      "foe_damage": 15,
+      "slam_speed": 900,
+      "foe_bounce_height": 100,
+      "foe_bounce_distance": 60
+    },
+    "ultimate": {
+      "max": 100,
+      "gain_taken": 1,
+      "gain_dealt": 1,
+      "gain_ultimate_dealt": 1,
+      "gain_per_second": 1
     }
   },
   "dummy": {

@@ -64,6 +64,8 @@ func (c Config) ultimateOf(kind int) (Ultimate, bool) {
 		return c.Gengar.Ultimate, true
 	case snorlax:
 		return c.Snorlax.Ultimate, true
+	case jigglypuff:
+		return c.Jigglypuff.Ultimate, true
 	}
 	return Ultimate{}, false
 }
