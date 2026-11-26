@@ -571,7 +571,7 @@
       "air_speed_first_half": 500,
       "air_speed_second_half": 500,
       "catch_radius": 80,
-      "foe_damage": 15,
+      "foe_damage": 25,
       "foe_stun_duration": 1.5,
       "slam_speed": 900,
       "foe_bounce_height": 100,
