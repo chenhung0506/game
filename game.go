@@ -256,10 +256,20 @@ type Player struct {
 	HopLeft float64 `json:"ot"`
 	HopCD   float64 `json:"ocd"`
 	Hops    int     `json:"hn"`
-	// Gyarados: seconds of the hop left before the wave, the wave's cooldown, the tail whip's cooldown.
-	WaveT  float64 `json:"wvt"`
-	WaveCD float64 `json:"wvcd"`
-	TailCD float64 `json:"tlcd"`
+	// Gyarados: Surf (see stepGyarados). SurfT is the seconds of calling the wave left (rooted), SurfLeft the distance
+	// the wave still runs (> 0 = riding it), SurfX/SurfY the way it runs (unit vector, fixed at the press). WaveCD is
+	// its cooldown, TailCD the tail whip's.
+	SurfT    float64 `json:"sft"`
+	SurfLeft float64 `json:"sfl"`
+	SurfX    float64 `json:"sfx"`
+	SurfY    float64 `json:"sfy"`
+	WaveCD   float64 `json:"wvcd"`
+	TailCD   float64 `json:"tlcd"`
+	// A body a Surf wave has swept up: the slot of the Gyarados that carries it + 1 (0 = none; the page draws the
+	// water around it), where across the wave it rides, and the seconds to the next carry_damage.
+	SurfBy  int     `json:"sfb,omitempty"`
+	SurfOff float64 `json:"-"`
+	SurfIn  float64 `json:"-"`
 	// The tail whip's wind-up: seconds left (0 = not winding up), and the aim it was started with (unit vector), which
 	// is also where the warning fan is drawn.
 	TailT float64 `json:"tlt"`
@@ -539,7 +549,6 @@ type Game struct {
 	Quakes  []quake        // the earthquakes Snorlax's landings left, still shaking
 	Bursts  []burstCast    // the Burst Punches that have come out and are still letting off explosions
 	Wells   []pullWell     // where Shadow Balls burst and are still dragging the opponent in
-	Waves   []wave         // Gyarados's waves running out over the ground (the client draws them from an event)
 	rng     *rand.Rand     // the fire's random spread; tests replace it
 	// Ease is each player's handicap in percent (a multiple of easeStep, at most easeMax): its HP and its
 	// walking speed are cut by that much. It survives Reset. Only slots 0 and 1 have one; a teammate has none.
@@ -646,7 +655,7 @@ func (g *Game) Reset() {
 		g.P[i] = Player{Kind: g.P[i].Kind, X: x, Y: y, FX: fx, AimX: float64(fx)}
 		g.P[i].HP = g.maxHP(i) // after the swap: a Gigantamax form of the round before (GmaxT) must not set the maximum
 	}
-	g.Balls, g.Frost, g.Waves, g.Fires, g.Ghosts, g.Shadows, g.Wells, g.Icicles, g.Casts, g.Bursts, g.Quakes = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	g.Balls, g.Frost, g.Fires, g.Ghosts, g.Shadows, g.Wells, g.Icicles, g.Casts, g.Bursts, g.Quakes = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	g.UltUsed = [maxSlots]bool{} // a new round, a new match: everyone has their ultimate again (a team match gives it back only to whoever is new, see nextRound)
 	for i := range g.P {
 		if g.P[i].Kind == rowlet {
@@ -910,7 +919,8 @@ func (g *Game) Step(dt float64) []Event {
 			p.VineChargeT, p.VineT, p.VineRecT = 0, 0, 0
 			p.FrostT, p.FBeamT = 0, 0                              // Vulpix's spray and beam stop (a storm already running goes on, like Thunder)
 			p.DriftT, p.TwistT, p.TwistRecT, p.ArrowT = 0, 0, 0, 0 // Rowlet's drift and the tornado's charge stop (a tornado already let go goes on)
-			p.WaveT, p.TailT = 0, 0                                // Gyarados's hop and wind-up stop
+			p.TailT = 0                                            // Gyarados's wind-up stops
+			g.dropSurf(i)                                          // and it falls off its wave, which lets go of what it swept up
 			g.dropJigglypuff(i)                                    // Jigglypuff's swing or roll is cut short
 		}
 		// Bound by a vine or paralyzed by a Volt Tackle: no walking and no movement skill (the others still work).
@@ -1000,7 +1010,7 @@ func (g *Game) Step(dt float64) []Event {
 				}
 			}
 			punchBusy := p.PunchT > 0 || p.PunchLeft > 0 || p.PunchRecover > 0
-			if p.BeamT == 0 && p.SweepT == 0 && p.RechargeT == 0 && p.BeamCD == 0 && in.Beam && p.Z == 0 && !punchBusy && p.TailT == 0 {
+			if p.BeamT == 0 && p.SweepT == 0 && p.RechargeT == 0 && p.BeamCD == 0 && in.Beam && p.Z == 0 && !punchBusy && p.TailT == 0 && !p.surfing() {
 				dx, dy := other.X-p.X, other.Y-p.Y
 				n := math.Hypot(dx, dy)
 				if n < 1e-9 { // standing on the opponent: there is no direction, so use the facing
@@ -1301,7 +1311,7 @@ func (g *Game) Step(dt float64) []Event {
 	events = append(events, g.stepShadowBalls(dt)...)
 	g.stepWells(dt)
 	events = append(events, g.stepGlaciates(dt)...)
-	g.stepWaves(dt)
+	g.stepSurf(dt)
 	events = append(events, g.stepBalls(dt)...)
 	events = append(events, g.stepTwirl(dt)...)
 	events = append(events, g.stepBursts(dt)...)

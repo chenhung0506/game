@@ -8,17 +8,9 @@ import "math"
 // everyone, a way to be out of reach of whatever cannot hit that high. Every landing counts, and the evolve_hops-th
 // one turns it into Gyarados, which keeps the share of its HP it has left.
 //
-// Gyarados hops and sends a wave out over the ground (Skill), hits a fan in front of it with its tail and knocks
-// back and stuns whoever it catches (Tail), and fires Snorlax's Hyper Beam (Beam; see the Snorlax block in Step).
-
-// wave is one of Gyarados's waves: a disc growing from where it landed, which hurts the opponent once, when its edge
-// first reaches it.
-type wave struct {
-	Owner int
-	X, Y  float64
-	R     float64
-	Hit   [maxSlots]bool // which foes it has reached already
-}
+// Gyarados rides a wave straight on and sweeps up whoever it runs into (Skill, Surf), hits a fan in front of it with
+// its tail and knocks back and stuns whoever it catches (Tail), and fires Snorlax's Hyper Beam (Beam; see the
+// Snorlax block in Step).
 
 // evolve turns slot i's Magikarp into a Gyarados.
 func (g *Game) evolve(i int) Event {
@@ -82,8 +74,11 @@ func (g *Game) magikarpAirSpeed(p *Player) float64 {
 	return mj.AirSpeedSecondHalf
 }
 
-// stepGyarados runs the wave and the tail whip, and reports whether Gyarados is rooted this tick (in its hop: the
-// walking code stays out of it).
+// surfing reports whether Gyarados is calling up or riding its Surf wave.
+func (p *Player) surfing() bool { return p.SurfT > 0 || p.SurfLeft > 0 }
+
+// stepGyarados runs Surf and the tail whip, and reports whether Gyarados is rooted this tick (calling the wave up or
+// riding it: the wave moves it, so the walking code stays out of it).
 func (g *Game) stepGyarados(i int, in Input, dt float64) ([]Event, bool) {
 	var events []Event
 	p := &g.P[i]
@@ -97,28 +92,25 @@ func (g *Game) stepGyarados(i int, in Input, dt float64) ([]Event, bool) {
 	}
 	beamBusy := p.BeamT > 0 || p.SweepT > 0 || p.RechargeT > 0
 
-	// ---- Wave: a hop, and the landing shakes the ground ----
-	if in.Skill && p.WaveT == 0 && p.WaveCD == 0 && !beamBusy && p.TailT == 0 && p.Z == 0 {
-		p.WaveT, p.WaveCD = wv.JumpDuration, wv.Cooldown
+	// ---- Surf: call up a wave, then ride it straight on ----
+	if in.Skill && !p.surfing() && p.WaveCD == 0 && !beamBusy && p.TailT == 0 && p.Z == 0 {
+		p.WaveCD, p.SurfT, p.SurfLeft = wv.Cooldown, wv.SummonDuration, wv.Distance
+		p.SurfX, p.SurfY = g.surfDir(i, in)
+		events = append(events, Event{T: "surf", X: p.X, Y: p.Y, R: wv.Width, DX: p.SurfX, DY: p.SurfY})
 	}
-	rooted := p.WaveT > 0 // through the tick the hop ends in, free from the next
-	if p.WaveT > 0 {
-		if p.WaveT -= dt; p.WaveT < 1e-9 {
-			p.WaveT, p.Z = 0, 0
-			g.Waves = append(g.Waves, wave{Owner: i, X: p.X, Y: p.Y, R: g.radius(i)})
-			events = append(events, Event{T: "wave", X: p.X, Y: p.Y, R: wv.Radius})
-		} else {
-			s := 1 - p.WaveT/wv.JumpDuration
-			p.Z = 4 * wv.JumpHeight * s * (1 - s)
+	rooted := p.surfing() // through the tick the ride ends in, free from the next
+	if p.SurfT > 0 {
+		if p.SurfT -= dt; p.SurfT < 1e-9 {
+			p.SurfT = 0
 		}
-	} else if p.Z > 0 && !p.Held && p.Twirl == twirlNone { // a hop that was cut short (frozen, stunned) leaves it in the air
-		p.Z = 0
+	} else if p.SurfLeft > 0 {
+		events = append(events, g.surf(i, math.Min(wv.Speed*dt, p.SurfLeft))...)
 	}
 
 	// ---- Tail whip: wind up with the fan shown, then hit what is in it ----
 	// The fan goes the way the player chose (the page's tail stick, see Input.CastX) as it was when the cast came in, or at the
 	// opponent when none was chosen, so the warning is exactly what gets hit. Gyarados is rooted while it winds up, and through the tick it hits in.
-	if in.Tail && p.TailCD == 0 && p.TailT == 0 && p.WaveT == 0 && !beamBusy {
+	if in.Tail && p.TailCD == 0 && p.TailT == 0 && !p.surfing() && !beamBusy {
 		p.TailCD = tw.Cooldown // counted from the press
 		p.TailX, p.TailY = g.castDir(i, in)
 		p.TailT = tw.ChargeDuration
@@ -153,26 +145,93 @@ func (g *Game) whip(i int) []Event {
 	return []Event{{T: "tail", X: p.X, Y: p.Y, R: tw.Length, DX: ux, DY: uy}}
 }
 
-// stepWaves spreads Gyarados's waves. The edge of a wave hurts the opponent once, the first time it reaches the
-// opponent's body, if the opponent is then at a height the wave can hit; a wave that reaches it in the air passes under.
-func (g *Game) stepWaves(dt float64) {
+// surfDir is the way slot i's Surf wave runs: the way held, else at the nearest foe (else the way it faces).
+func (g *Game) surfDir(i int, in Input) (float64, float64) {
+	if in.DX != 0 || in.DY != 0 {
+		return unit(float64(in.DX), float64(in.DY))
+	}
+	return g.castDir(i, Input{})
+}
+
+// surf moves slot i's Gyarados `step` along its wave and sweeps up the foes the wave's front runs into on the way.
+// The wave is `width` across and as deep as Gyarados's body, and it is checked along the whole step, so a fast wave
+// cannot jump over anyone. The ride ends when the distance is run or the wave hits a wall (stepSurf then lets go).
+func (g *Game) surf(i int, step float64) []Event {
+	var events []Event
+	p := &g.P[i]
 	wv := g.cfg.Gyarados.Wave
-	kept := g.Waves[:0]
-	for _, w := range g.Waves {
-		w.R = math.Min(w.R+wv.Speed*dt, wv.Radius)
-		for _, j := range g.foes(w.Owner) {
-			if foe := &g.P[j]; !w.Hit[j] && math.Hypot(foe.X-w.X, foe.Y-w.Y)-g.radius(j) <= w.R {
-				w.Hit[j] = true
-				if wv.Reach.hits(foe) {
-					g.hit(foe, wv.Damage)
-				}
-			}
+	ux, uy := p.SurfX, p.SurfY
+	vx, vy := -uy, ux // across the wave
+	x0, y0 := p.X, p.Y
+	nx, ny := x0+ux*step, y0+uy*step
+	p.X, p.Y = math.Min(math.Max(nx, 0), g.court.Length), math.Min(math.Max(ny, 0), g.court.Width)
+	wall := p.X != nx || p.Y != ny
+	if p.SurfLeft -= step; p.SurfLeft < 1e-9 {
+		p.SurfLeft = 0
+	}
+	rg := g.radius(i)
+	for _, j := range g.foes(i) {
+		f := &g.P[j]
+		if f.Held || f.Twirl != twirlNone || !wv.Reach.hits(f) {
+			continue
 		}
-		if w.R < wv.Radius {
-			kept = append(kept, w)
+		rf := g.radius(j)
+		dx, dy := f.X-x0, f.Y-y0
+		along, across := dx*ux+dy*uy, dx*vx+dy*vy
+		if along < -rg-rf || along > step+rg+rf || math.Abs(across) > wv.Width/2+rf {
+			continue
+		}
+		f.Held, f.VZ, f.SurfBy, f.SurfIn = true, 0, i+1, wv.CarryInterval
+		f.SurfOff = math.Min(math.Max(across, -wv.Width/2), wv.Width/2)
+		g.hit(f, wv.Damage)
+		events = append(events, Event{T: "surfhit", X: f.X, Y: f.Y})
+	}
+	if wall {
+		p.SurfLeft = 0 // the wave breaks on the wall; stepSurf lets go of what it carries, where it is now
+	}
+	return events
+}
+
+// dropSurf ends slot i's Surf, if it is calling up or riding a wave, and lets go of everything the wave carries: each
+// body falls the way a tornado's does (stepTwirl), and takes landing_damage when it lands.
+func (g *Game) dropSurf(i int) {
+	p := &g.P[i]
+	p.SurfT, p.SurfLeft = 0, 0
+	wv := g.cfg.Gyarados.Wave
+	for v := range g.P {
+		if f := &g.P[v]; f.SurfBy == i+1 {
+			f.SurfBy, f.SurfOff, f.SurfIn = 0, 0, 0
+			// SpinDuration only marks the numbers as set (stepTwirl falls back to the tornado's on a zero one); the fall does not use it
+			f.Twirl, f.TwZ0, f.TwUlt = twirlFall, 0, false
+			f.Tw = spinParams{Reach: wv.Reach, LiftHeight: wv.LiftHeight, SpinDuration: 1, LandingDamage: wv.LandingDamage}
 		}
 	}
-	g.Waves = kept
+}
+
+// stepSurf carries the bodies Surf waves have swept up: each rides just in front of its Gyarados, where it was hit
+// across the wave, rises to lift_height as fast as a tornado's catch falls, and takes carry_damage every
+// carry_interval. A wave whose ride is over, or whose Gyarados is gone (fallen in a 2v2), lets go after placing them
+// one last time. It runs after the players have moved.
+func (g *Game) stepSurf(dt float64) {
+	wv := g.cfg.Gyarados.Wave
+	for v := range g.P {
+		f := &g.P[v]
+		if f.SurfBy == 0 {
+			continue
+		}
+		o := f.SurfBy - 1
+		p := &g.P[o]
+		d := g.radius(o) + g.radius(v)
+		f.X = math.Min(math.Max(p.X+p.SurfX*d-p.SurfY*f.SurfOff, 0), g.court.Length)
+		f.Y = math.Min(math.Max(p.Y+p.SurfY*d+p.SurfX*f.SurfOff, 0), g.court.Width)
+		f.Z = math.Min(wv.LiftHeight, f.Z+wv.LiftHeight/twirlFallTime*dt)
+		for f.SurfIn -= dt; f.SurfIn < 1e-9; f.SurfIn += wv.CarryInterval { // a loop so a tiny interval cannot lose ticks
+			g.hit(f, wv.CarryDamage)
+		}
+		if p.SurfLeft == 0 || p.HP <= 0 { // the ride is over (this tick, where it ended), or its Gyarados has fallen
+			g.dropSurf(o)
+		}
+	}
 }
 
 // castDir is the unit direction slot i's aimed skill goes: the one the player chose, else straight at the opponent

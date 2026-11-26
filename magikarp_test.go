@@ -157,8 +157,8 @@ func TestMagikarpEvolvesOnTheFifthLandingAndKeepsItsShareOfHP(t *testing.T) {
 	}
 	// from now on the main button is the wave, not the jump
 	press(g, 0, Input{Skill: true})
-	if g.P[0].HopLeft != 0 || g.P[0].WaveT == 0 {
-		t.Fatalf("HopLeft %v WaveT %v: Gyarados should hop for its wave", g.P[0].HopLeft, g.P[0].WaveT)
+	if g.P[0].HopLeft != 0 || !g.P[0].surfing() {
+		t.Fatalf("HopLeft %v surfing %v: Gyarados should call up its wave", g.P[0].HopLeft, g.P[0].surfing())
 	}
 }
 
@@ -213,91 +213,196 @@ func TestATeamSurvivorComesBackAsMagikarpWithoutMoreHPThanItCanHold(t *testing.T
 
 // ---- Gyarados: the wave ----
 
-func TestGyaradosHopsRootedAndTheLandingSendsAWaveThatHurtsTheOpponentOnce(t *testing.T) {
-	cfg := DefaultConfig()
-	wv := cfg.Gyarados.Wave
-	for _, c := range []struct {
-		name string
-		d    float64 // distance between the two, centre to centre
-		hit  bool
-	}{{"close", 150, true}, {"at the edge of the wave", wv.Radius + cfg.Snorlax.Radius - 5, true}, {"just out of reach", wv.Radius + cfg.Snorlax.Radius + 5, false}} {
-		g := gya(cfg, snorlax)
-		g.P[1].X = 300 + c.d
-		hp := g.P[1].HP
-		ev := press(g, 0, Input{Skill: true, DX: 1})
-		steps(g, 3)
-		if g.P[0].Z <= 0 || g.P[0].Z > wv.JumpHeight+1e-9 || g.P[0].X != 300 {
-			t.Fatalf("%s: mid-hop Z %v X %v: it should be in the air, rooted", c.name, g.P[0].Z, g.P[0].X)
-		}
-		for i := 0; i < int(wv.JumpDuration*tickRate)+2; i++ {
-			g.P[0].In = Input{}
-			ev = append(ev, g.Step(dt)...)
-		}
-		if count(ev, "wave") != 1 || g.P[0].Z != 0 {
-			t.Fatalf("%s: %d wave events, Z %v after the hop", c.name, count(ev, "wave"), g.P[0].Z)
-		}
-		steps(g, int(2*tickRate)) // plenty of time for the wave to cross the court
-		got := hp - g.P[1].HP
-		if (c.hit && got != wv.Damage) || (!c.hit && got != 0) {
-			t.Errorf("%s: took %d, want %d (once)", c.name, got, map[bool]int{true: wv.Damage, false: 0}[c.hit])
-		}
-		if len(g.Waves) != 0 {
-			t.Errorf("%s: %d waves left after they should have run out", c.name, len(g.Waves))
-		}
+// summonSurf presses Surf for slot 0 going the way (dx, dy) and steps through the summon, so the next tick rides.
+func summonSurf(g *Game, dx, dy int) []Event {
+	ev := press(g, 0, Input{Skill: true, DX: dx, DY: dy})
+	for g.P[0].SurfT > 0 {
+		ev = append(ev, g.Step(dt)...)
 	}
+	return ev
 }
 
-func TestTheWaveSpreadsAtItsSpeedUpToItsRadius(t *testing.T) {
+func TestSurfCallsUpAWaveRootedThenRidesItItsDistanceTheWayHeld(t *testing.T) {
 	cfg := DefaultConfig()
 	wv := cfg.Gyarados.Wave
 	g := gya(cfg, snorlax)
-	g.P[1].X, g.P[1].Y = 1800, 900 // far away
-	press(g, 0, Input{Skill: true})
-	steps(g, int(wv.JumpDuration*tickRate)+1)
-	if len(g.Waves) != 1 {
-		t.Fatalf("%d waves", len(g.Waves))
+	g.P[1].X, g.P[1].Y = 1800, 900 // out of the way
+	g.P[0].X, g.P[0].Y = 300, 500
+	ev := press(g, 0, Input{Skill: true, DX: 1})
+	if count(ev, "surf") != 1 || g.P[0].SurfT <= 0 || g.P[0].SurfX != 1 || g.P[0].SurfY != 0 {
+		t.Fatalf("%d surf events, SurfT %v, dir (%v,%v): the wave should be called up to the right", count(ev, "surf"), g.P[0].SurfT, g.P[0].SurfX, g.P[0].SurfY)
 	}
-	r0 := g.Waves[0].R
-	steps(g, 3)
-	if got := g.Waves[0].R - r0; math.Abs(got-3*wv.Speed*dt) > 1e-6 {
-		t.Fatalf("grew %v in 3 ticks, want %v", got, 3*wv.Speed*dt)
+	for g.P[0].SurfT > 0 { // rooted while the wave rises, even with a key held the other way
+		g.P[0].In = Input{DX: -1}
+		g.Step(dt)
+		if g.P[0].X != 300 {
+			t.Fatalf("X %v: it moved while calling up the wave", g.P[0].X)
+		}
 	}
-	steps(g, int(2*tickRate))
-	if len(g.Waves) != 0 {
-		t.Fatalf("the wave never ended")
+	g.P[0].In = Input{}
+	g.Step(dt)
+	if got := g.P[0].X - 300; math.Abs(got-wv.Speed*dt) > 1e-6 {
+		t.Fatalf("rode %v in a tick, want %v", got, wv.Speed*dt)
+	}
+	for n := 0; g.P[0].SurfLeft > 0; n++ {
+		g.P[0].In = Input{DY: 1} // the wave runs straight on whatever is held
+		if g.Step(dt); n > 300 {
+			t.Fatal("the ride never ended")
+		}
+	}
+	if math.Abs(g.P[0].X-(300+wv.Distance)) > 1e-6 || g.P[0].Y != 500 {
+		t.Fatalf("ended at (%v,%v), want (%v,500): exactly its distance, straight on", g.P[0].X, g.P[0].Y, 300+wv.Distance)
+	}
+	g.P[0].In = Input{DX: -1}
+	g.Step(dt)
+	if g.P[0].X >= 300+wv.Distance {
+		t.Fatal("it cannot walk after the ride")
 	}
 }
 
-func TestAWaveGoesUnderAnOpponentInTheAirAndIsSpentAnyway(t *testing.T) {
+func TestSurfGoesAtTheNearestFoeWhenNothingIsHeld(t *testing.T) {
+	g := gya(DefaultConfig(), snorlax)
+	g.P[0].X, g.P[0].Y, g.P[1].X, g.P[1].Y = 300, 300, 600, 700
+	press(g, 0, Input{Skill: true})
+	if math.Abs(g.P[0].SurfX-0.6) > 1e-9 || math.Abs(g.P[0].SurfY-0.8) > 1e-9 {
+		t.Fatalf("dir (%v,%v), want (0.6,0.8): at the foe", g.P[0].SurfX, g.P[0].SurfY)
+	}
+}
+
+func TestSurfSweepsUpAFoeInItsWidthAndCarriesItAlongThenDropsIt(t *testing.T) {
+	cfg := DefaultConfig()
+	wv := cfg.Gyarados.Wave
+	for _, c := range []struct {
+		name   string
+		across float64 // how far off the line of the wave the foe stands
+		caught bool
+	}{{"on the line", 0, true}, {"at the edge of the wave", wv.Width/2 + cfg.Snorlax.Radius - 2, true}, {"just beside it", wv.Width/2 + cfg.Snorlax.Radius + 2, false}} {
+		g := gya(cfg, snorlax)
+		g.P[0].X, g.P[0].Y = 300, 500
+		g.P[1].X, g.P[1].Y = 550, 500+c.across
+		hp := g.P[1].HP
+		ev := summonSurf(g, 1, 0)
+		for g.P[0].SurfLeft > 0 {
+			ev = append(ev, g.Step(dt)...)
+			if f := g.P[1]; f.SurfBy == 1 {
+				if !f.Held {
+					t.Fatalf("%s: a swept-up foe should be held", c.name)
+				}
+				want := g.P[0].X + g.radius(0) + g.radius(1)
+				if math.Abs(f.X-want) > 1e-6 {
+					t.Fatalf("%s: foe at X %v, want %v: just in front of Gyarados", c.name, f.X, want)
+				}
+			}
+		}
+		if !c.caught {
+			if count(ev, "surfhit") != 0 || g.P[1].HP != hp || g.P[1].Held {
+				t.Fatalf("%s: %d hits, lost %d HP: the wave should pass by", c.name, count(ev, "surfhit"), hp-g.P[1].HP)
+			}
+			continue
+		}
+		if count(ev, "surfhit") != 1 {
+			t.Fatalf("%s: %d surfhit events, want 1", c.name, count(ev, "surfhit"))
+		}
+		if f := g.P[1]; f.SurfBy != 0 || f.Twirl != twirlFall || f.Z <= 0 {
+			t.Fatalf("%s: SurfBy %d Twirl %d Z %v: at the end of the ride the foe should be let go from the air", c.name, f.SurfBy, f.Twirl, f.Z)
+		}
+		if math.Abs(g.P[1].X-(300+wv.Distance+g.radius(0)+g.radius(1))) > 1e-6 {
+			t.Fatalf("%s: let go at X %v: it should have been carried to the end", c.name, g.P[1].X)
+		}
+		carried := hp - g.P[1].HP
+		steps(g, int(twirlFallTime*tickRate)+2)
+		if g.P[1].Held || g.P[1].Z != 0 || g.P[1].Twirl != twirlNone {
+			t.Fatalf("%s: Held %v Z %v: the foe should have landed", c.name, g.P[1].Held, g.P[1].Z)
+		}
+		if got := hp - g.P[1].HP - carried; got != wv.LandingDamage {
+			t.Fatalf("%s: landing took %d, want %d", c.name, got, wv.LandingDamage)
+		}
+		if carried <= wv.Damage {
+			t.Fatalf("%s: took %d while carried, want the hit (%d) and some carry_damage", c.name, carried, wv.Damage)
+		}
+	}
+}
+
+func TestSurfCarryDamageComesEveryInterval(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Gyarados.Wave.Distance, cfg.Gyarados.Wave.Speed, cfg.Gyarados.Wave.CarryInterval = 1000, 300, 0.5
+	wv := cfg.Gyarados.Wave
+	g := gya(cfg, snorlax)
+	g.P[0].X, g.P[0].Y = 200, 500
+	g.P[1].X, g.P[1].Y = 200+g.radius(0)+g.radius(1)+1, 500
+	hp := g.P[1].HP
+	summonSurf(g, 1, 0)
+	g.Step(dt) // caught on the first ride tick
+	if g.P[1].SurfBy != 1 || hp-g.P[1].HP != wv.Damage {
+		t.Fatalf("SurfBy %d, took %d: it should be caught at once", g.P[1].SurfBy, hp-g.P[1].HP)
+	}
+	steps(g, 2*tickRate) // two seconds
+	if got, want := hp-g.P[1].HP-wv.Damage, 4*wv.CarryDamage; got != want {
+		t.Fatalf("took %d carry damage in two seconds, want %d", got, want)
+	}
+}
+
+func TestSurfEndsAtAWallAndLetsGo(t *testing.T) {
+	cfg := DefaultConfig()
+	g := gya(cfg, snorlax)
+	g.P[0].X, g.P[0].Y = g.court.Length-200, 500
+	g.P[1].X, g.P[1].Y = g.court.Length-80, 500
+	summonSurf(g, 1, 0)
+	steps(g, tickRate)
+	if g.P[0].surfing() || g.P[0].X != g.court.Length || g.P[1].SurfBy != 0 || g.P[1].Twirl != twirlFall && g.P[1].Held {
+		t.Fatalf("surfing %v X %v SurfBy %d: the wave should break on the wall and let go", g.P[0].surfing(), g.P[0].X, g.P[1].SurfBy)
+	}
+}
+
+func TestSurfIsCutShortWhenGyaradosIsStunnedAndLetsGo(t *testing.T) {
+	g := gya(DefaultConfig(), snorlax)
+	g.P[0].X, g.P[0].Y = 300, 500
+	g.P[1].X, g.P[1].Y = 400, 500
+	summonSurf(g, 1, 0)
+	for n := 0; g.P[1].SurfBy != 1; n++ {
+		if g.Step(dt); n > 30 {
+			t.Fatal("the scene needs the foe on the wave")
+		}
+	}
+	steps(g, 5) // up off the ground, so it is still falling the tick it is let go
+	g.stun(&g.P[0], 1)
+	g.Step(dt)
+	if g.P[0].surfing() || g.P[1].SurfBy != 0 || g.P[1].Twirl != twirlFall {
+		t.Fatalf("surfing %v SurfBy %d Twirl %d: a stunned Gyarados falls off its wave", g.P[0].surfing(), g.P[1].SurfBy, g.P[1].Twirl)
+	}
+}
+
+func TestSurfPassesUnderAFoeAboveItsBand(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Gyarados.Wave.Reach = Reach{MinHeight: 0, MaxHeight: 15}
 	g := gya(cfg, rowlet) // Rowlet flies at fly_high (30), above that band
-	g.P[1].X = 500
+	g.P[0].X, g.P[0].Y = 300, 500
+	g.P[1].X, g.P[1].Y = 500, 500
 	if g.P[1].Z <= cfg.Gyarados.Wave.MaxHeight {
 		t.Fatal("the scene needs a Rowlet above the band")
 	}
 	hp := g.P[1].HP
-	press(g, 0, Input{Skill: true})
-	steps(g, 3*tickRate)
-	if g.P[1].HP != hp {
+	summonSurf(g, 1, 0)
+	steps(g, 2*tickRate)
+	if g.P[1].HP != hp || g.P[1].Held {
 		t.Fatalf("Rowlet lost %d HP to a wave that runs along the ground", hp-g.P[1].HP)
 	}
 }
 
-func TestWaveHasACooldownFromTheStartOfTheHopAndNeedsTheGround(t *testing.T) {
+func TestSurfHasACooldownFromThePress(t *testing.T) {
 	cfg := DefaultConfig()
 	g := gya(cfg, snorlax)
 	g.P[1].X, g.P[1].Y = 1800, 900
-	press(g, 0, Input{Skill: true})
+	press(g, 0, Input{Skill: true, DY: 1})
 	steps(g, 3*tickRate)
 	press(g, 0, Input{Skill: true})
-	if g.P[0].WaveT != 0 {
-		t.Fatal("a second hop began during the cooldown")
+	if g.P[0].surfing() {
+		t.Fatal("a second surf began during the cooldown")
 	}
 	steps(g, int((cfg.Gyarados.Wave.Cooldown-3)*tickRate)+2)
 	press(g, 0, Input{Skill: true})
-	if g.P[0].WaveT == 0 {
-		t.Fatalf("no hop after the cooldown (WaveCD %v)", g.P[0].WaveCD)
+	if !g.P[0].surfing() {
+		t.Fatalf("no surf after the cooldown (WaveCD %v)", g.P[0].WaveCD)
 	}
 }
 
@@ -450,8 +555,8 @@ func TestGyaradosCannotWhipOrHopWhileItsBeamRuns(t *testing.T) {
 	g.P[1].X = 450
 	press(g, 0, Input{Beam: true})
 	press(g, 0, Input{Tail: true, Skill: true})
-	if g.P[0].TailCD != 0 || g.P[0].WaveT != 0 || g.P[1].StunT != 0 {
-		t.Fatalf("TailCD %v WaveT %v: it used a skill in the middle of its beam", g.P[0].TailCD, g.P[0].WaveT)
+	if g.P[0].TailCD != 0 || g.P[0].surfing() || g.P[1].StunT != 0 {
+		t.Fatalf("TailCD %v surfing %v: it used a skill in the middle of its beam", g.P[0].TailCD, g.P[0].surfing())
 	}
 }
 
@@ -461,7 +566,7 @@ func TestMagikarpAndGyaradosSnapshotKeysAndEventFields(t *testing.T) {
 	b, _ := json.Marshal(Player{})
 	var m map[string]any
 	json.Unmarshal(b, &m)
-	for _, k := range []string{"ot", "ocd", "hn", "wvt", "wvcd", "tlcd", "tlt", "tlx", "tly", "sn"} {
+	for _, k := range []string{"ot", "ocd", "hn", "sft", "sfl", "sfx", "sfy", "wvcd", "tlcd", "tlt", "tlx", "tly", "sn"} {
 		if _, ok := m[k]; !ok {
 			t.Errorf("snapshot is missing %q: %s", k, b)
 		}
@@ -489,7 +594,10 @@ func TestMagikarpAndGyaradosConfigIsLoadedAndRefusesBadValues(t *testing.T) {
 		"magikarp.jump.air_speed_second_half":  func(c *Config) { c.Magikarp.Jump.AirSpeedSecondHalf = 0 },
 		"gyarados.radius":                      func(c *Config) { c.Gyarados.Radius = 0 },
 		"gyarados.wave.speed":                  func(c *Config) { c.Gyarados.Wave.Speed = 0 },
-		"gyarados.wave.jump_duration":          func(c *Config) { c.Gyarados.Wave.JumpDuration = 0 },
+		"gyarados.wave.distance":               func(c *Config) { c.Gyarados.Wave.Distance = 0 },
+		"gyarados.wave.width":                  func(c *Config) { c.Gyarados.Wave.Width = 0 },
+		"gyarados.wave.carry_interval":         func(c *Config) { c.Gyarados.Wave.CarryInterval = 0 },
+		"gyarados.wave.landing_damage":         func(c *Config) { c.Gyarados.Wave.LandingDamage = -1 },
 		"gyarados.wave":                        func(c *Config) { c.Gyarados.Wave.MinHeight, c.Gyarados.Wave.MaxHeight = 50, 10 },
 		"gyarados.tail_whip.angle":             func(c *Config) { c.Gyarados.TailWhip.Angle = 361 },
 		"gyarados.tail_whip.length":            func(c *Config) { c.Gyarados.TailWhip.Length = 0 },
@@ -638,8 +746,8 @@ func TestNothingElseStartsInTheMiddleOfAWindUp(t *testing.T) {
 	g := windUp(DefaultConfig(), snorlax)
 	press(g, 0, Input{Tail: true})
 	press(g, 0, Input{Skill: true, Beam: true})
-	if g.P[0].WaveT != 0 || g.P[0].BeamT != 0 {
-		t.Fatalf("WaveT %v BeamT %v: a hop or a beam began in the middle of the wind-up", g.P[0].WaveT, g.P[0].BeamT)
+	if g.P[0].surfing() || g.P[0].BeamT != 0 {
+		t.Fatalf("surfing %v BeamT %v: a surf or a beam began in the middle of the wind-up", g.P[0].surfing(), g.P[0].BeamT)
 	}
 }
 

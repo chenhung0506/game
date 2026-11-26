@@ -798,7 +798,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 			"scale": cfg.Gengar.ShadowBall.BallScale, "slam": cfg.Gengar.ShadowBall.SlamRadius, "ctime": cfg.Gengar.ShadowBall.ChargeTime, "pull": cfg.Gengar.ShadowBall.PullDuration,
 			"orb": cfg.Gengar.ShadowBall.Radius, "orbhp": float64(cfg.Gengar.ShadowBall.HP),
 			"nscale": cfg.Gengar.NightShade.BallScale, "nslam": cfg.Gengar.NightShade.SlamRadius, "nflight": cfg.Gengar.NightShade.Duration, "nlob": cfg.Gengar.NightShade.Height, "sfire": cfg.Gengar.NightShade.GhostFireRadius},
-		"wave":    map[string]float64{"radius": cfg.Gyarados.Wave.Radius, "speed": cfg.Gyarados.Wave.Speed},
+		"wave":    map[string]float64{"width": cfg.Gyarados.Wave.Width, "speed": cfg.Gyarados.Wave.Speed, "distance": cfg.Gyarados.Wave.Distance, "summon": cfg.Gyarados.Wave.SummonDuration},
 		"tail":    map[string]float64{"angle": cfg.Gyarados.TailWhip.Angle, "length": cfg.Gyarados.TailWhip.Length, "stun": cfg.Gyarados.TailWhip.StunDuration, "charge": cfg.Gyarados.TailWhip.ChargeDuration},
 		"frost":   map[string]float64{"radius": cfg.Vulpix.FrostField.Radius, "scale": cfg.Vulpix.FrostField.Scale, "duration": cfg.Vulpix.FrostField.Duration, "ride": cfg.Vulpix.FrostField.SprayDuration},
 		"storm":   map[string]float64{"radius": cfg.Vulpix.IceStorm.Radius, "interval": cfg.Vulpix.IceStorm.Interval, "strikes": float64(cfg.Vulpix.IceStorm.Strikes)},

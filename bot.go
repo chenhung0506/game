@@ -21,7 +21,7 @@ const (
 )
 
 // botKinds are the characters a Bot can play so far.
-var botKinds = []int{pikachu, snorlax, chikorita, ash, machamp, charizard, vulpix, gengar, rowlet, jigglypuff}
+var botKinds = []int{pikachu, snorlax, chikorita, ash, machamp, charizard, vulpix, gengar, rowlet, jigglypuff, magikarp} // a magikarp bot goes on as the Gyarados it evolves into
 
 func botCanPlay(kind int) bool {
 	for _, k := range botKinds {
@@ -102,6 +102,8 @@ func (b *Bot) Decide(g *Game, me int) Input {
 		in = b.rowlet(c)
 	case jigglypuff:
 		in = b.jigglypuff(c)
+	case magikarp:
+		in = b.magikarp(c) // and the Gyarados it turns into
 	}
 	if (in.DX != 0 || in.DY != 0) && !in.Skill && !in.Kick && c.th.kind == thNone && c.walksIntoFlames(in) {
 		in.DX, in.DY = 0, 0 // no threat where it stands, but where it is going there is: let the flames pass
@@ -353,6 +355,18 @@ func (c *bctx) findThreat() threat {
 		if d := math.Hypot(dx, dy); d <= tw.Length+c.pr && (d < 1e-9 || (dx*f.TailX+dy*f.TailY)/d >= math.Cos((tw.Angle/2+8)*math.Pi/180)) {
 			ax, ay := unit(dx, dy) // out of reach is the way out; a jump goes over it (it hits at the ground)
 			consider(threat{thPunch, f.TailT, ax, ay})
+		}
+	}
+
+	if f.Kind == gyarados && f.surfing() && cfg.Gyarados.Wave.Reach.hits(p) {
+		// a Surf wave being called up or ridden: its lane is on the ground for everyone to see. Off it, sideways, before the front gets there.
+		wv := cfg.Gyarados.Wave
+		inLane := func(x, y float64) bool { return g.surfLane(f, x, y, c.pr+15) }
+		if inLane(p.X, p.Y) {
+			along := (p.X-f.X)*f.SurfX + (p.Y-f.Y)*f.SurfY
+			eta := math.Max(0, f.SurfT+math.Max(0, along-c.fr-c.pr)/wv.Speed-lag)
+			ax, ay, out := c.wayOutT(inLane)
+			considerBig(threat{thPunch, eta, ax, ay}, out > eta)
 		}
 	}
 

@@ -21,6 +21,8 @@ var breakKeys = map[int][]func(*Input){
 	ash:       {func(in *Input) { in.Comet = true }, func(in *Input) { in.Skill = true }, func(in *Input) { in.Kick = true }},
 	machamp:   {func(in *Input) { in.Comet = true }, func(in *Input) { in.Skill = true }, func(in *Input) { in.Kick = true }},
 	gengar:    {func(in *Input) { in.GFire = true }, func(in *Input) { in.SBall = true }, func(in *Input) { in.Skill = true }},
+	magikarp:  {func(in *Input) { in.Skill = true }}, // nothing that hurts: the jump, along the stick, goes over the band the solids block
+	gyarados:  {func(in *Input) { in.Beam = true }}, // the beam hits what it sweeps (the wave and the tail hurt only bodies)
 }
 
 // walledIn is the solid to break when every way out is shut, and whether they are.
@@ -81,7 +83,7 @@ func (b *Bot) breakOut(c *bctx, blk *Ball) Input {
 	ux, uy := unit(blk.X-c.p.X, blk.Y-c.p.Y)
 	in := Input{AimX: ux, AimY: uy, CastX: ux, CastY: uy}
 	in.DX, in.DY = dir8(ux, uy)
-	if keys := breakKeys[b.kind]; len(keys) > 0 {
+	if keys := breakKeys[c.p.Kind]; len(keys) > 0 { // the body it is in now: a Magikarp bot may be a Gyarados
 		keys[b.rng.IntN(len(keys))](&in)
 	}
 	return in

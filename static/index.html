@@ -116,7 +116,7 @@ const HELP = [
   '你是怪力　移動 WASD　空白鍵＝上鉤拳（朝按住的方向滑一步，接著朝敵人衝過去給他一記上鉤拳，打中的敵人受傷、不會被推開，而是被打飛到空中動彈不得）　J＝子彈拳（一直朝敵人衝過去，前方不斷出現一堆拳頭打人，拳頭有血量，會被其他招式打掉）　K＝飛膝踢（直接朝敵人飛身踢過去，踢中的敵人受傷、被踢飛並被打暈）　L＝極巨化（絕招，蓄能滿了才能放：變成又大又壯的極巨化怪力一段時間，血量、速度和招式的數值都換成極巨化的；這段時間空白鍵變成爆裂拳（先朝方向鍵滑一步，再定身蓄力，朝敵人揮出拳頭，拳頭周圍的空中和地面接連出現黑白爆炸，炸中的敵人被炸上天，被炸中越多次飛越高）、K 變成閃電拳：定身蓄力，朝敵人揮出巨大的拳頭，打中的同時一道巨大的閃電從天而降）',
   '你是梗鬼　移動 WASD　空白鍵＝暗影潛行（潛進地面快速移動一陣子，這時一般招式打不到你，地上會有一大片黑影標出你的位置，碰到黑影的敵人不能出招，潛行中也不能用其他招）　J＝鬼火（朝四面八方放出一圈紫色鬼火，飛出去之後會飛回你身上，你一直走它們就一直追）　K＝影子球（按住 K 或小按鈕選方向，放開才發射；輕點就朝敵人；定身蓄力一下後，球筆直飛出去，碰到敵人、牆或被打爆就爆炸，會把範圍內的敵人往中心吸過去一陣子，並向外炸出一圈不會回頭的紫色火焰；球有血量，敵人的招式和飛行物可以提早打爆它）　L＝極巨化（絕招，蓄能滿了才能用；變成又大又厚的極巨化梗鬼一陣子：空白鍵＝舔舌（定身蓄力一下，舌頭朝敵人伸出去，碰到的敵人受傷、被擊暈、被拉回你身邊，再被你啃一口並再次擊暈；沒碰到舌頭就縮回來）　K＝吞噬（以自己為中心把範圍內的敵人拉過來，更近的範圍內的敵人還不能出招，拉人和沈默的時間各自計算）　J＝鬼火（只朝正前方扇形噴出）；鬼火、潛行與影子球在變身期間換成這三招）',
   '你是胖丁　移動 WASD　空白鍵＝連環巴掌（可以連續按：在地上是五下巴掌，前四下一下一下打、第五下大力把人拍飛；在空中是踩人：把人踩進地上像球一樣彈起來，再踩一次、第三下把人踢飛，每一下都要前一下有踩到才接得上）　J＝翻滾飛踢（朝方向鍵滾一段，滾完把身邊的人以 45 度角踢飛、暈住，你也跟著飛到空中，可以接空中的連打）　K＝踩踏（跳起來，落地震傷身邊的人；在空中也能按：往下踩到空中的敵人，把他踩回地面、他會彈起來）　L＝唱歌（絕招，要蓄能滿：放出一圈音符追著對手，音符碰到對手不會傷人，會在它頭上作記號，記號夠多對手就睡著，睡著時動不了；音符會被對手的招式打掉）',
-  '你是紅色暴鯉龍　移動 WASD　空白鍵＝海浪（短暫跳起震動地面，海浪朝四面八方擴散，打到地面上的敵人）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
+  '你是紅色暴鯉龍　移動 WASD　空白鍵＝衝浪（召喚一道海浪、站在浪上朝 WASD 按住的方向衝出去（沒按就朝敵人），撞到的敵人被捲進浪裡一起帶走，浪停下來才摔到地上）　J＝破壞死光（和卡比獸一樣）　K＝擺尾（朝 WASD 按住的方向掃出一個扇形，被掃到的敵人被擊退並擊暈，暈的時候不能動也不能出招）',
 ];
 const ghosts = []; // dash afterimages
 const SLOTS = 4; // a 2v2 has four characters: the state kept for each is made for all of them
@@ -158,7 +158,7 @@ const iceTrail = []; // fading ice puffs the dash leaves behind
 let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp: 5 }, vineCfg = { len: 160, w: 24, angle: 70, duration: 0.35, charge: 0.4, recharge: 0.5 }; // Chikorita's Leaf Slash reach, from 'hi'
 let voltCfg = { radius: 16, uses: 3, window: 2, scale: 1 }; // Volt Tackle, from 'hi'
 let ultCfg = [], tvoltCfg = { jump: 0, dark: 0, fevery: 0, falpha: 0, colors: ['#ffd21e'], radius: 20, hp: 10, rrad: 220, boom: 120, time: 5, link: 9, tip: 0.6, charge: 2.4, ring: 0.6, bstart: 1.2, bcount: 6, bint: 0.2, boffs: [0], rscale: 1, bscale: 1 }; // per kind, the charge its ultimate (Z) needs (0 = it has none); Thousand Volt's, from 'hi'
-let waveCfg = { radius: 260, speed: 500 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
+let waveCfg = { width: 160, speed: 500, distance: 600, summon: 0.4 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
 let singCfg = { scale: 1, radius: 16, marks: 3, sleep: 3, ring: 160 }; // Jigglypuff's Sing, from 'hi'
 let slapCfg = { adur: [0.2, 0.2, 0.25], pscale: 1, angle: 110, length: 110, dur: [0.25], aradius: 110, rdur: 0.5 }; // Jigglypuff's Slap, from 'hi'
 let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8, width: 0 }; // Vulpix's, from 'hi'
@@ -263,7 +263,8 @@ ws.onmessage = (e) => {
       if (ev.t === 'gvcast' || ev.t === 'gvplant' || ev.t === 'gvrise' || ev.t === 'gvslam') gvBurst(ev);
       if (ev.t === 'voltburst') { shake = Math.max(shake, 5); flashT = 4 * tvoltCfg.fevery; } // an explosion: one white and black flash (the bolts of a cast go off together, still one flash)
       if (ev.t === 'iceburst') shake = 12;
-      if (ev.t === 'wave') shake = 16;
+      if (ev.t === 'surf') shake = 8;
+      if (ev.t === 'surfhit') shake = 12;
       if (ev.t === 'tree') shake = 18;
       if (ev.t === 'mega') shake = 14;
       if (ev.t === 'megahit') shake = 30;
@@ -470,7 +471,7 @@ document.getElementById('mSingle').onclick = () => send({ team: false });
 document.getElementById('mTeam').onclick = () => send({ team: true });
 document.getElementById('sz3').onclick = () => send({ size: 3 });
 document.getElementById('szAll').onclick = () => send({ size: TEAM_BIG });
-const BOT_KINDS = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10]; // the characters the computer can play (the server's botKinds)
+const BOT_KINDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // the characters the computer can play (the server's botKinds)
 for (const k of BOT_KINDS) {
   const b = document.createElement('button'); b.dataset.k = k; b.textContent = NAMES[k];
   b.onclick = () => { botOpen = false; send({ bot: k }); showPick(); };
@@ -602,7 +603,7 @@ const PAD = [
   { main: ['上鉤拳', 'skill'], small: [['子彈拳', 'comet'], ['飛膝踢', 'rock']], ult: ['極巨化', 'ult'] }, // Machamp: Z turns it into the Gigantamax Machamp; the Uppercut is the main skill, the High Jump Kick (the page sends K as `rock`, the server turns it into the kick) a small one; the Rock Tomb is not used
   { main: ['暗影潛行', 'skill'], small: [['鬼火', 'gfire'], ['影子球', 'sball', true]], ult: ['極巨化', 'ult'] }, // Gengar: Z turns it into the Gigantamax Gengar, whose three buttons are the Lick, the Devour and the fan of fire
   { main: ['連環巴掌', 'skill'], small: [['翻滾飛踢', 'roll'], ['踩踏', 'jump']], ult: ['唱歌', 'ult'] }, // Jigglypuff: the main button is the chain of blows (ground: five hand blows, in the air: stomps), the small one the roll kick
-  { main: ['海浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
+  { main: ['衝浪', 'skill'], small: [['死光', 'beam'], ['擺尾', 'tail', true]] }, // Gyarados; a third entry marks a skill that is aimed with its own button
 ];
 function buildPad() {
   document.querySelectorAll('.stick, .btn').forEach((el) => el.remove());
@@ -1953,6 +1954,8 @@ const teleCtx = tele.getContext('2d');
 function drawTelegraph() {
   for (const si of beamSlots()) drawFan(snap.p[si], disp[si]);
   for (const si of slotsOf(11)) drawTailWarning(snap.p[si], disp[si]);
+  for (const si of slotsOf(11)) drawSurf(snap.p[si], disp[si]);
+  snap.p.forEach((q, i) => { if (q.sfb && !fallen(i)) drawSurfCatch(disp[i], q); });
   for (const si of [...slotsOf(7), ...slotsOf(8)]) drawTreeWarning(snap.p[si], disp[si]);
   for (const si of slotsOf(7)) drawMegaCharge(snap.p[si], disp[si]);
   for (const si of slotsOf(0)) drawVoltCharge(si);
@@ -2616,20 +2619,66 @@ function drawIceberg(d, p) {
   });
 }
 
-// Gyarados's wave: a ring of surf running out from where it landed at the wave's speed, up to its radius.
-function drawWave(f) {
-  const r0 = 6, R = Math.min(f.r, r0 + waveCfg.speed * f.age), a = Math.max(0, 1 - Math.max(0, R - f.r * 0.6) / (f.r * 0.4 + 1e-6));
+// Gyarados's Surf. While it calls the wave up (p.sft), the path the wave will run (`distance` long, `width` across,
+// along p.sfx/p.sfy) is marked on the ground for both players and a crest rises behind Gyarados; while it rides
+// (p.sfl > 0) the wave is a band of water `width` across under and just in front of it, a foaming crest at the
+// front and a wake behind, with what is left of the path still marked.
+function drawSurf(p, d) {
+  const summon = p.sft > 0, ride = !summon && p.sfl > 0; // sfl is already the whole distance while the wave is called up
+  if (!summon && !ride) return;
+  const ux = p.sfx || 0, uy = p.sfy || 0, W = waveCfg.width, R = bodyR(p), t = performance.now() / 1000;
+  const left = summon ? waveCfg.distance : p.sfl, k = summon ? 1 - p.sft / Math.max(waveCfg.summon, 1e-6) : 1;
   ctx.save();
-  const disc = ctx.createRadialGradient(f.x, f.y, Math.max(0, R * 0.6), f.x, f.y, R);
-  disc.addColorStop(0, 'rgba(120,200,255,0)'); disc.addColorStop(1, `rgba(120,200,255,${0.28 * a})`);
-  ctx.fillStyle = disc; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
+  ctx.translate(d.x, d.y); ctx.rotate(Math.atan2(uy, ux)); // from here x runs along the wave's way, y across it
   ctx.lineCap = 'round';
-  ctx.strokeStyle = `rgba(235,250,255,${0.9 * a})`; ctx.lineWidth = 7; // the crest, with foam on it
-  ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.stroke();
-  ctx.strokeStyle = `rgba(90,170,235,${0.7 * a})`; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.arc(f.x, f.y, Math.max(0, R - 9), 0, 7); ctx.stroke();
-  ctx.fillStyle = `rgba(255,255,255,${0.85 * a})`;
-  for (let k = 0; k < 28; k++) { const ang = k * 0.2244 + seeded(k * 3.3) * 0.15, rr = R + (seeded(k * 7.1) - 0.5) * 8; ctx.beginPath(); ctx.arc(f.x + Math.cos(ang) * rr, f.y + Math.sin(ang) * rr, 2 + seeded(k) * 2.4, 0, 7); ctx.fill(); }
+  // the path still ahead: a dashed lane, in deep blue so it reads on the sand
+  ctx.fillStyle = `rgba(40,120,200,${summon ? 0.1 + 0.12 * k : 0.08})`;
+  ctx.fillRect(0, -W / 2, left + R, W);
+  ctx.setLineDash([10, 8]); ctx.strokeStyle = 'rgba(20,70,140,0.6)'; ctx.lineWidth = 2;
+  ctx.strokeRect(0, -W / 2, left + R, W); ctx.setLineDash([]);
+  // the water: from behind the body to the crest just in front of it
+  const back = -R * (summon ? 1.3 : 1.6), front = summon ? -R * (1.3 - 1.1 * k) : R * 1.15;
+  const body = ctx.createLinearGradient(back, 0, front, 0);
+  body.addColorStop(0, 'rgba(30,110,190,0)'); body.addColorStop(0.5, `rgba(40,130,210,${0.55 * k})`); body.addColorStop(1, `rgba(90,180,240,${0.85 * k})`);
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.moveTo(back, -W / 2);
+  for (let y = -W / 2; y <= W / 2 + 1e-6; y += W / 12) ctx.lineTo(front + Math.sin(y * 0.09 + t * 9) * 5 * k, y); // the crest wobbles
+  ctx.lineTo(back, W / 2); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = `rgba(15,60,120,${0.7 * k})`; ctx.lineWidth = 5; // a dark line under the foam, so the crest shows on sand
+  ctx.beginPath();
+  for (let y = -W / 2; y <= W / 2 + 1e-6; y += W / 12) { const x = front + Math.sin(y * 0.09 + t * 9) * 5 * k; y === -W / 2 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(245,252,255,${0.95 * k})`; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = `rgba(255,255,255,${0.9 * k})`; // foam along the crest
+  for (let n = 0; n < 16; n++) { const y = -W / 2 + W * seeded(n * 2.7), x = front + Math.sin(y * 0.09 + t * 9) * 5 * k + (seeded(n + t * 3 | 0) - 0.3) * 8; ctx.beginPath(); ctx.arc(x, y, 2 + 3 * seeded(n * 5.3), 0, 7); ctx.fill(); }
+  if (ride) { // the wake: white streaks trailing behind
+    ctx.strokeStyle = 'rgba(235,248,255,0.7)'; ctx.lineWidth = 2;
+    for (let n = 0; n < 7; n++) { const y = (n / 6 - 0.5) * W * 0.9, x0 = back - 10 - ((t * 400 + n * 37) % 60); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 - 30 - 20 * seeded(n), y); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+// A body a Surf wave carries: a churning ring of water round it on the ground and spray.
+function drawSurfCatch(d, q) {
+  const r = bodyR(q) * 1.25, t = performance.now() / 1000;
+  ctx.save(); ctx.lineCap = 'round';
+  ctx.fillStyle = 'rgba(40,130,210,0.35)'; ctx.beginPath(); ctx.ellipse(d.x, d.y, r, r * 0.7, 0, 0, 7); ctx.fill();
+  for (let n = 0; n < 3; n++) {
+    const a0 = t * 7 + n * 2.1;
+    ctx.strokeStyle = n === 0 ? 'rgba(15,60,120,0.7)' : 'rgba(240,250,255,0.9)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(d.x, d.y, r * (0.75 + 0.15 * n), r * (0.5 + 0.1 * n), 0, a0, a0 + 2.2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// The splash where a Surf wave sweeps someone up.
+function drawSurfSplash(f) {
+  const k = f.age / 0.5, a = Math.max(0, 1 - k), R = 18 + 50 * k;
+  ctx.save(); ctx.lineCap = 'round';
+  ctx.strokeStyle = `rgba(15,60,120,${0.6 * a})`; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.stroke();
+  ctx.strokeStyle = `rgba(240,250,255,${0.9 * a})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.stroke();
+  ctx.fillStyle = `rgba(255,255,255,${0.9 * a})`;
+  for (let n = 0; n < 14; n++) { const ang = n * 0.449 + seeded(n) * 0.3, rr = R * (0.6 + 0.6 * seeded(n * 3.1)); ctx.beginPath(); ctx.arc(f.x + Math.cos(ang) * rr, f.y + Math.sin(ang) * rr - 20 * k * seeded(n * 1.7), 2 + 2 * seeded(n * 7), 0, 7); ctx.fill(); }
   ctx.restore();
 }
 
@@ -5268,7 +5317,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'wave' ? waveCfg.radius / waveCfg.speed + 0.35 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'lickhit' ? 0.35 : f.t === 'bite' ? Math.max(0.4, ggmaxCfg.lbite + 0.25) : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : f.t === 'sing' ? 0.7 : f.t === 'jumpair' ? 0.55 : f.t === 'jslam' ? 1.0 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'surfhit' ? 0.5 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'lickhit' ? 0.35 : f.t === 'bite' ? Math.max(0.4, ggmaxCfg.lbite + 0.25) : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : f.t === 'sing' ? 0.7 : f.t === 'jumpair' ? 0.55 : f.t === 'jslam' ? 1.0 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -5279,7 +5328,7 @@ function frame() {
       else if (f.t === 'airhit') drawAirHit(f);
       else if (f.t === 'freeze') drawFreezeBurst(f);
       else if (f.t === 'iceburst') drawIceBurst(f);
-      else if (f.t === 'wave') drawWave(f);
+      else if (f.t === 'surfhit') drawSurfSplash(f);
       else if (f.t === 'tail') drawTailWhip(f);
       else if (f.t === 'tree') drawTreeSlam(f);
       else if (f.t === 'mega') drawMegaFist(f);

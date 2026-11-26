@@ -8,7 +8,7 @@ package main
 //	Chikorita  the Leaf Slash's hop         Ash       the Tree Slam's jump          Machamp   the Uppercut's slide
 //	Charizard  Fly (the Seismic Toss as the Gigantamax one, which cannot fly)
 //	Vulpix     the Frost Field's slide      Gengar    Shadow Sneak (under the ground)     Rowlet   the Tailwind's drift
-//	Jigglypuff the Roll Kick's roll
+//	Jigglypuff the Roll Kick's roll         Magikarp  the jump (over it)    Gyarados  Surf (once the wave is up)
 func (b *Bot) escapeBySkill(c *bctx) (Input, bool) {
 	th, p, g := c.th, c.p, c.g
 	if th.kind == thNone || !c.cant || th.eta > botHorizon {
@@ -78,6 +78,17 @@ func (b *Bot) escapeBySkill(c *bctx) (Input, bool) {
 	case jigglypuff:
 		if p.RollCD == 0 && p.Z == 0 && !p.JpFly && p.SlapT == 0 && p.RollT == 0 {
 			in.Roll = true // along the aim (the way out), the exact angle
+			return in, true
+		}
+	case magikarp:
+		if th.kind != thChase && p.HopLeft == 0 && p.HopCD == 0 && th.eta <= 0.6 { // up and over (a chaser waits below); the stick steers it in the air
+			in.Skill = true
+			return in, true
+		}
+	case gyarados:
+		busy := p.TailT > 0 || p.BeamT > 0 || p.SweepT > 0 || p.RechargeT > 0 || p.surfing() || p.Z > 0
+		if !busy && p.WaveCD == 0 && th.eta > g.cfg.Gyarados.Wave.SummonDuration+0.15 { // the wave rides it out along the stick, once it is up
+			in.Skill = true
 			return in, true
 		}
 	case rowlet:

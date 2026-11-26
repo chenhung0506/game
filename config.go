@@ -897,17 +897,26 @@ type Config struct {
 		MaxHP     int     `json:"max_hp"`
 		WalkSpeed float64 `json:"walk_speed"`
 		Radius    float64 `json:"radius"`
-		// Wave (the main button): Gyarados hops `jump_height` for `jump_duration` seconds, rooted, and the landing shakes
-		// the ground: a wave runs out from it in every direction at `speed` up to `radius`, hurting the opponent
-		// once (`damage`) if the front reaches it at a height inside min_height..max_height.
+		// Surf (the main button; the block is still called "wave"): Gyarados calls up a wave for `summon_duration`
+		// seconds, rooted, then rides it `distance` straight on at `speed`, the way held when it was pressed (else at
+		// the nearest foe). The wave is `width` across. A foe its front reaches, at a height inside
+		// min_height..max_height and not already held by something else, takes `damage` and is swept up like a
+		// tornado's catch: held (no moving, no skills) in front of Gyarados where it was hit across the wave, lifted
+		// to `lift_height`, hurt `carry_damage` every `carry_interval` seconds, and carried along. When the wave has
+		// run its distance, hits a wall, or Gyarados is frozen, stunned or caught, everything it carries is let go:
+		// it falls in twirlFallTime and takes `landing_damage` on landing.
 		Wave struct {
 			Reach
-			Damage       int     `json:"damage"`
-			Radius       float64 `json:"radius"`
-			Speed        float64 `json:"speed"`
-			JumpHeight   float64 `json:"jump_height"`
-			JumpDuration float64 `json:"jump_duration"`
-			Cooldown     float64 `json:"cooldown"` // counted from the start of the hop
+			Cooldown       float64 `json:"cooldown"` // counted from the press
+			SummonDuration float64 `json:"summon_duration"`
+			Speed          float64 `json:"speed"`
+			Distance       float64 `json:"distance"`
+			Width          float64 `json:"width"`
+			Damage         int     `json:"damage"`
+			LiftHeight     float64 `json:"lift_height"`
+			CarryInterval  float64 `json:"carry_interval"`
+			CarryDamage    int     `json:"carry_damage"`
+			LandingDamage  int     `json:"landing_damage"`
 		} `json:"wave"`
 		// Tail whip (K): Gyarados winds up for `charge_duration` seconds, rooted, with the fan it will hit drawn on the
 		// ground for the opponent to see (the aim is fixed when K is pressed; 0 = no wind-up, it hits at once). Then
@@ -1384,8 +1393,9 @@ func DefaultConfig() Config {
 	c.Gyarados.MaxHP, c.Gyarados.WalkSpeed, c.Gyarados.Radius = 170, 130, 36
 	c.Gyarados.HyperBeam = c.Snorlax.HyperBeam // to start from: Snorlax's, which can then be told apart
 	c.Gyarados.Wave.Reach = Reach{MinHeight: 0, MaxHeight: 60}
-	c.Gyarados.Wave.Damage, c.Gyarados.Wave.Radius, c.Gyarados.Wave.Speed = 12, 260, 500
-	c.Gyarados.Wave.JumpHeight, c.Gyarados.Wave.JumpDuration, c.Gyarados.Wave.Cooldown = 40, 0.4, 6
+	c.Gyarados.Wave.Cooldown, c.Gyarados.Wave.SummonDuration, c.Gyarados.Wave.Speed, c.Gyarados.Wave.Distance = 6, 0.4, 500, 600
+	c.Gyarados.Wave.Width, c.Gyarados.Wave.Damage, c.Gyarados.Wave.LiftHeight = 160, 8, 40
+	c.Gyarados.Wave.CarryInterval, c.Gyarados.Wave.CarryDamage, c.Gyarados.Wave.LandingDamage = 0.3, 2, 10
 	c.Gyarados.TailWhip.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	c.Gyarados.TailWhip.Angle, c.Gyarados.TailWhip.Length, c.Gyarados.TailWhip.Knockback = 90, 180, 200
 	c.Gyarados.TailWhip.StunDuration, c.Gyarados.TailWhip.Cooldown = 1.2, 6
@@ -1790,9 +1800,10 @@ func (c Config) validateSkills() error {
 		{"gyarados.max_hp", float64(c.Gyarados.MaxHP), 0},
 		{"gyarados.walk_speed", c.Gyarados.WalkSpeed, 0},
 		{"gyarados.radius", c.Gyarados.Radius, 0},
-		{"gyarados.wave.radius", c.Gyarados.Wave.Radius, 0},
 		{"gyarados.wave.speed", c.Gyarados.Wave.Speed, 0},
-		{"gyarados.wave.jump_duration", c.Gyarados.Wave.JumpDuration, 0},
+		{"gyarados.wave.distance", c.Gyarados.Wave.Distance, 0},
+		{"gyarados.wave.width", c.Gyarados.Wave.Width, 0},
+		{"gyarados.wave.carry_interval", c.Gyarados.Wave.CarryInterval, 0},
 		{"gyarados.tail_whip.length", c.Gyarados.TailWhip.Length, 0},
 		{"machamp.max_hp", float64(c.Machamp.MaxHP), 0},
 		{"ash.max_hp", float64(c.Ash.MaxHP), 0},
@@ -2063,8 +2074,11 @@ func (c Config) validateSkills() error {
 		{"magikarp.jump.highest_point_duration", c.Magikarp.Jump.HighestPointDuration},
 		{"magikarp.jump.cooldown", c.Magikarp.Jump.Cooldown},
 		{"gyarados.wave.damage", float64(c.Gyarados.Wave.Damage)},
-		{"gyarados.wave.jump_height", c.Gyarados.Wave.JumpHeight},
 		{"gyarados.wave.cooldown", c.Gyarados.Wave.Cooldown},
+		{"gyarados.wave.summon_duration", c.Gyarados.Wave.SummonDuration},
+		{"gyarados.wave.lift_height", c.Gyarados.Wave.LiftHeight},
+		{"gyarados.wave.carry_damage", float64(c.Gyarados.Wave.CarryDamage)},
+		{"gyarados.wave.landing_damage", float64(c.Gyarados.Wave.LandingDamage)},
 		{"gyarados.tail_whip.knockback", c.Gyarados.TailWhip.Knockback},
 		{"gyarados.tail_whip.stun_duration", c.Gyarados.TailWhip.StunDuration},
 		{"gyarados.tail_whip.cooldown", c.Gyarados.TailWhip.Cooldown},
