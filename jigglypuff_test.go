@@ -315,3 +315,98 @@ func TestGroundBlowStepsForwardTheConfiguredDistanceAndStopsAtTheFoe(t *testing.
 		t.Fatalf("it walked into the foe: %v apart", d)
 	}
 }
+
+func TestKickReachesAFoeFlyingAboveJigglypuff(t *testing.T) {
+	g := airJig()
+	g.cfg.Jigglypuff.Combo.Air.Radius = 120
+	air := g.cfg.Jigglypuff.Combo.Air
+	airSwing(g, 0)
+	f, p := &g.P[1], &g.P[0]
+	g.P[0].X, g.P[0].Y = f.X-30, f.Y
+	p.Z, p.VZ, f.VZ = f.Z+20, 400, 300 // both still rising, so neither lands before the second blow
+	airSwing(g, 1)
+	g.P[0].X, g.P[0].Y = f.X-30, f.Y
+	p.Z, p.VZ, f.Z, f.VZ = 20, 100, 90, 0 // the ball is above it now
+	hp := f.HP
+	airSwing(g, 2)
+	if f.HP != hp-air.Damage[2] {
+		t.Fatalf("the kick missed a foe 70 above it: HP %d, want %d", f.HP, hp-air.Damage[2])
+	}
+}
+
+func TestLandingInTheMiddleOfTheKickSwingStillKicks(t *testing.T) {
+	g := airJig()
+	airSwing(g, 0)
+	f, p := &g.P[1], &g.P[0]
+	g.P[0].X, g.P[0].Y = f.X-30, f.Y
+	p.Z, p.VZ, f.VZ = f.Z+20, 400, 300
+	airSwing(g, 1)
+	if !p.SlapChain {
+		t.Fatal("the chain should be waiting for the kick")
+	}
+	g.P[0].X, g.P[0].Y = f.X-30, f.Y
+	p.Z, p.VZ, f.Z, f.VZ = 20, -300, 20, 0
+	hp := f.HP
+	press(g, 0, Input{Skill: true})
+	steps(g, 4) // it lands while the swing is on
+	if p.Z != 0 || !p.SlapChain || p.SlapT <= 0 {
+		t.Fatalf("it should have landed with the swing still on: Z %v, chain %v, SlapT %v", p.Z, p.SlapChain, p.SlapT)
+	}
+	steps(g, int(g.cfg.Jigglypuff.Combo.Air.Duration[2]*tickRate)+2)
+	if f.HP >= hp {
+		t.Fatalf("the kick was lost: HP %d", f.HP)
+	}
+}
+
+func TestSelfGravityOnlyChangesJigglypuffsOwnFlight(t *testing.T) {
+	flight := func(selfG float64) (self, foe int) {
+		g := airJig()
+		g.cfg.Jigglypuff.SelfGravity = selfG
+		airSwing(g, 0)
+		p, f := &g.P[0], &g.P[1]
+		for i := 0; i < int(10*tickRate) && (p.JpFly || f.ArcOn); i++ {
+			g.Step(dt)
+			if p.JpFly {
+				self++
+			}
+			if f.ArcOn {
+				foe++
+			}
+		}
+		return
+	}
+	s1, f1 := flight(1500)
+	s2, f2 := flight(600)
+	if s2 <= s1+5 {
+		t.Fatalf("a lower self_gravity should keep Jigglypuff up longer: %d ticks, then %d", s1, s2)
+	}
+	if f1 != f2 {
+		t.Fatalf("the foe's ball flight must not change with self_gravity: %d ticks, then %d", f1, f2)
+	}
+}
+
+func TestSelfGravityAlsoPullsTheFoeJigglypuffKicked(t *testing.T) {
+	fall := func(selfG, g2 float64) int {
+		g := jig(120)
+		g.cfg.Jigglypuff.SelfGravity, g.cfg.Jigglypuff.Gravity = selfG, g2
+		rk := g.cfg.Jigglypuff.RollKick
+		press(g, 0, Input{Roll: true, DX: 1})
+		steps(g, int((rk.RollDistance/rk.RollSpeed+0.1)*tickRate))
+		f := &g.P[1]
+		if !f.ArcOn {
+			t.Fatal("the foe should have been kicked into the air")
+		}
+		n := 0
+		for ; f.ArcOn && n < int(10*tickRate); n++ {
+			g.Step(dt)
+		}
+		return n
+	}
+	slow, fast := fall(600, 1500), fall(1500, 1500)
+	if slow <= fast+5 {
+		t.Fatalf("a kicked foe should stay up longer under a lower self_gravity: %d ticks vs %d", slow, fast)
+	}
+	if again := fall(600, 3000); again != slow {
+		t.Fatalf("the kicked foe must not depend on `gravity` (that is for stomped ones): %d vs %d ticks", again, slow)
+	}
+}

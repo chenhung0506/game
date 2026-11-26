@@ -497,9 +497,10 @@
     "walk_speed": 165,
     "radius": 22,
     "gravity": 1500,
+    "self_gravity": 1000,
     "combo": {
-      "use_window": 3,
-      "cooldown": 1,
+      "use_window": 2.5,
+      "cooldown": 0,
       "ground": {
         "min_height": 0,
         "max_height": 60,
@@ -507,6 +508,7 @@
         "damage": [8, 8, 10, 10, 20],
         "knockback": [10, 10, 10, 10, 260],
         "step_distance": [60, 60, 40, 40, 100],
+        "palm_scale": 1,
         "angle": 110,
         "length": 110,
         "stun_duration": 0.5
@@ -514,15 +516,15 @@
       "air": {
         "min_height": 0,
         "max_height": 1000,
-        "duration": [0.5, 0.5, 0.5],
+        "duration": [0.3, 0.5, 0.5],
         "damage": [12, 12, 20],
         "knockback": [0, 0, 300],
-        "radius": 110,
-        "slam_speed": 800,
+        "radius": 120,
+        "slam_speed": 650,
         "self_bounce_height": [200, 200],
-        "self_bounce_distance": [50, 60],
+        "self_bounce_distance": [50, 80],
         "foe_bounce_height": [100, 180],
-        "bounce_distance": [40, 40]
+        "bounce_distance": [100, 120]
       }
     },
     "roll_kick": {

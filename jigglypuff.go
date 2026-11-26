@@ -205,7 +205,11 @@ func (g *Game) stomp(i, n int) (bool, []Event) {
 		f := &g.P[j]
 		dx, dy := f.X-p.X, f.Y-p.Y
 		d := math.Hypot(dx, dy)
-		if d > air.Radius+g.radius(j) || !air.Reach.hits(f) || f.Z > p.Z+10 || (f.Held && !f.ArcOn) {
+		below := f.Z <= p.Z+10 // a stomp needs the foe under it; the kick (the third blow) takes a ball flying anywhere within `radius` above or below
+		if n == 2 {
+			below = math.Abs(f.Z-p.Z) <= air.Radius
+		}
+		if d > air.Radius+g.radius(j) || !air.Reach.hits(f) || !below || (f.Held && !f.ArcOn) {
 			continue
 		}
 		ux, uy := p.SlapX, p.SlapY
@@ -218,17 +222,19 @@ func (g *Game) stomp(i, n int) (bool, []Event) {
 		if n < 2 { // driven down: it lands, then bounces up like a ball
 			f.ArcOn, f.Held, f.VZ, f.ArcVX, f.ArcVY = true, true, -air.SlamSpeed, 0, 0
 			f.ArcBounce, f.ArcDist, f.ArcDX, f.ArcDY = air.FoeBounceHeight[n], air.BounceDistance[n], ux, uy
+			f.ArcG = 0 // a stomped foe is a ball under `gravity`
 			events = append(events, Event{T: "stomp", X: f.X, Y: f.Y, Z: f.Z, R: air.Radius, K: n})
 		} else { // kicked away: whatever bounce it had coming is gone, it just falls
 			f.ArcBounce, f.ArcVX, f.ArcVY, f.VZ = 0, 0, 0, math.Min(f.VZ, 0)
 			f.ArcOn, f.Held = true, true
+			f.ArcG = jp.SelfGravity // kicked away: it falls like Jigglypuff does
 			events = append(events, Event{T: "stomp", X: f.X, Y: f.Y, Z: f.Z, R: air.Radius, K: n, DX: ux, DY: uy})
 		}
 	}
 	if hit && n < 2 { // and it bounces higher off the foe
-		p.VZ, p.JpFly = math.Sqrt(2*jp.Gravity*math.Max(0, air.SelfBounceHeight[n]-p.Z)), true
+		p.VZ, p.JpFly = math.Sqrt(2*jp.SelfGravity*math.Max(0, air.SelfBounceHeight[n]-p.Z)), true
 		if d := air.SelfBounceDistance[n]; d > 0 && p.VZ > 0 { // it drifts the way the blow was aimed, over the whole flight (up to the top and down again to the ground)
-			t := (p.VZ + math.Sqrt(p.VZ*p.VZ+2*jp.Gravity*p.Z)) / jp.Gravity
+			t := (p.VZ + math.Sqrt(p.VZ*p.VZ+2*jp.SelfGravity*p.Z)) / jp.SelfGravity
 			p.JpVX, p.JpVY = p.SlapX*d/t, p.SlapY*d/t
 		}
 	}
@@ -249,29 +255,33 @@ func (g *Game) rollKick(i int) []Event {
 		hit = true
 		g.hit(f, rk.Damage)
 		g.stun(f, rk.StunDuration)
-		v := math.Sqrt(2 * jp.Gravity * rk.KickHeight)
-		t := 2 * v / jp.Gravity
-		f.ArcOn, f.Held, f.VZ, f.ArcBounce = true, true, v, 0
+		v := math.Sqrt(2 * jp.SelfGravity * rk.KickHeight)
+		t := 2 * v / jp.SelfGravity
+		f.ArcOn, f.Held, f.VZ, f.ArcBounce, f.ArcG = true, true, v, 0, jp.SelfGravity
 		f.ArcVX, f.ArcVY = p.RollX*rk.KickDistance/t, p.RollY*rk.KickDistance/t
 	}
 	events := []Event{{T: "rollkick", X: p.X, Y: p.Y, R: rk.KickRadius, DX: p.RollX, DY: p.RollY}}
 	if hit {
 		p.SlapRecT, p.JpPose, p.SlapX, p.SlapY = 0.4, 2, p.RollX, p.RollY // for the page: the kick
-		p.VZ, p.JpFly = math.Sqrt(2*jp.Gravity*rk.SelfHeight), true
-		t := 2 * p.VZ / jp.Gravity
+		p.VZ, p.JpFly = math.Sqrt(2*jp.SelfGravity*rk.SelfHeight), true
+		t := 2 * p.VZ / jp.SelfGravity
 		p.JpVX, p.JpVY = p.RollX*rk.SelfDistance/t, p.RollY*rk.SelfDistance/t
 	}
 	return events
 }
 
-// stepArcs flies the bodies Jigglypuff threw (a stomped or kicked foe is a ball: gravity, and a bounce when it lands if one is due) and Jigglypuff's own
+// stepArcs flies the bodies Jigglypuff threw (a stomped foe is a ball under `gravity`, a kicked one under `self_gravity`, with a bounce when it lands if one is due) and Jigglypuff's own
 // flights (a ball too: it ends when it lands, and an air chain with it).
 func (g *Game) stepArcs(dt float64) []Event {
 	var events []Event
-	gr := g.cfg.Jigglypuff.Gravity
+	gr, sg := g.cfg.Jigglypuff.Gravity, g.cfg.Jigglypuff.SelfGravity
 	for i := range g.P {
 		p := &g.P[i]
 		if p.ArcOn {
+			gr := gr
+			if p.ArcG > 0 {
+				gr = p.ArcG
+			}
 			p.Held = true
 			p.Z += p.VZ*dt - 0.5*gr*dt*dt
 			p.VZ -= gr * dt
@@ -286,7 +296,7 @@ func (g *Game) stepArcs(dt float64) []Event {
 					p.ArcBounce = 0
 					events = append(events, Event{T: "bounce", X: p.X, Y: p.Y})
 				} else {
-					p.ArcOn, p.Held, p.VZ, p.ArcVX, p.ArcVY = false, false, 0, 0, 0
+					p.ArcOn, p.Held, p.VZ, p.ArcVX, p.ArcVY, p.ArcG = false, false, 0, 0, 0, 0
 				}
 			}
 		}
@@ -295,13 +305,13 @@ func (g *Game) stepArcs(dt float64) []Event {
 				p.JpFly, p.JpVX, p.JpVY = false, 0, 0
 				continue
 			}
-			p.Z += p.VZ*dt - 0.5*gr*dt*dt
-			p.VZ -= gr * dt
+			p.Z += p.VZ*dt - 0.5*sg*dt*dt
+			p.VZ -= sg * dt
 			p.X = math.Min(math.Max(p.X+p.JpVX*dt, 0), g.court.Length)
 			p.Y = math.Min(math.Max(p.Y+p.JpVY*dt, 0), g.court.Width)
 			if p.Z <= 0 {
 				p.Z, p.VZ, p.JpFly, p.JpVX, p.JpVY = 0, 0, false, 0, 0
-				if p.SlapChain && p.SlapAir {
+				if p.SlapChain && p.SlapAir && p.SlapT == 0 { // (a blow already on its way still lands: coming down in the middle of the third swing must not lose the kick)
 					p.endChain(g.cfg.Jigglypuff.Combo.Cooldown) // landing ends the air chain
 				}
 			}
@@ -347,8 +357,11 @@ func (c Config) validateJigglypuff() error {
 			}
 		}
 	}
-	if !(jp.Gravity > 0) || !(ar.SlamSpeed > 0) || !(gr.Length > 0) || !(ar.Radius > 0) || !(rk.RollSpeed > 0) {
+	if !(jp.Gravity > 0) || !(jp.SelfGravity > 0) || !(ar.SlamSpeed > 0) || !(gr.Length > 0) || !(ar.Radius > 0) || !(rk.RollSpeed > 0) {
 		return fmt.Errorf("jigglypuff: gravity, combo.air.slam_speed, combo.ground.length and combo.air.radius must be positive, roll_kick.roll_speed positive")
+	}
+	if !(gr.PalmScale >= 0 && gr.PalmScale <= 10) {
+		return fmt.Errorf("jigglypuff.combo.ground.palm_scale must be between 0 and 10, got %v", gr.PalmScale)
 	}
 	if !(gr.Angle > 0 && gr.Angle <= 360) {
 		return fmt.Errorf("jigglypuff.combo.ground.angle must be between 0 (exclusive) and 360, got %v", gr.Angle)

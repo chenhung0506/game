@@ -1392,12 +1392,13 @@ func DefaultConfig() Config {
 	c.Gyarados.TailWhip.ChargeDuration = 0.5
 	c.Jigglypuff.MaxHP, c.Jigglypuff.WalkSpeed, c.Jigglypuff.Radius = 130, 135, 22
 	jp := &c.Jigglypuff
-	jp.Gravity = 1500
+	jp.Gravity, jp.SelfGravity = 1500, 1500
 	jp.Combo.UseWindow, jp.Combo.Cooldown = 3, 4
 	gr := &jp.Combo.Ground
 	gr.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	gr.Duration, gr.Damage, gr.Knockback = []float64{0.25, 0.25, 0.3, 0.3, 0.45}, []int{8, 8, 10, 10, 20}, []float64{10, 10, 10, 10, 260}
 	gr.StepDistance = []float64{0, 0, 0, 0, 0}
+	gr.PalmScale = 1
 	gr.Angle, gr.Length, gr.StunDuration = 110, 110, 0.5
 	ar := &jp.Combo.Air
 	ar.Reach = Reach{MinHeight: 0, MaxHeight: 1000}
@@ -2552,11 +2553,12 @@ func (c *Config) brawlerOf(kind int) *BrawlerCfg {
 
 // jigglypuffCfg and rollKickCfg are Config.Jigglypuff and its roll kick (see there).
 type jigglypuffCfg struct {
-	MaxHP     int     `json:"max_hp"`
-	WalkSpeed float64 `json:"walk_speed"`
-	Radius    float64 `json:"radius"`
-	Gravity   float64 `json:"gravity"`
-	Combo     struct {
+	MaxHP       int     `json:"max_hp"`
+	WalkSpeed   float64 `json:"walk_speed"`
+	Radius      float64 `json:"radius"`
+	Gravity     float64 `json:"gravity"`      // pulls the foes it throws (a stomped or kicked foe is a ball)
+	SelfGravity float64 `json:"self_gravity"` // pulls Jigglypuff itself when it flies (after a stomp or a roll kick); lower = it hangs in the air longer and lands softer
+	Combo       struct {
 		UseWindow float64 `json:"use_window"`
 		Cooldown  float64 `json:"cooldown"`
 		Ground    struct {
@@ -2565,6 +2567,7 @@ type jigglypuffCfg struct {
 			Damage       []int     `json:"damage"`
 			Knockback    []float64 `json:"knockback"`
 			StepDistance []float64 `json:"step_distance"`
+			PalmScale    float64   `json:"palm_scale"`
 			Angle        float64   `json:"angle"`
 			Length       float64   `json:"length"`
 			StunDuration float64   `json:"stun_duration"`

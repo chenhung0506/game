@@ -290,6 +290,7 @@ type Player struct {
 	JpVX                            float64 `json:"-"`
 	JpVY                            float64 `json:"-"`
 	// A body Jigglypuff stomped or kicked is a ball while ArcOn (Held, flown by stepArcs): its drift, the height it will bounce to when it lands (0 = none) and how far it drifts then, along (ArcDX, ArcDY).
+	ArcG      float64 `json:"-"` // the gravity this ball flies under (0 = jigglypuff.gravity): a foe Jigglypuff kicked falls under its self_gravity
 	ArcOn     bool    `json:"arc"`
 	ArcVX     float64 `json:"-"`
 	ArcVY     float64 `json:"-"`
