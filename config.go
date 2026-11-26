@@ -2602,7 +2602,7 @@ type jigglypuffCfg struct {
 }
 
 // stompCfg is Jigglypuff's Stomp (its second small skill, K): a jump that steers like Snorlax's (a parabola `height` high and `duration` seconds long, `air_speed_*` to steer by) and whose landing
-// shock hurts the foes within `slam_radius` (by min/max_height) and the projectiles it reaches, `damage` each (no earthquake). It can be used in the air too, as a fresh jump from where it is. Coming down on
+// shock hurts the foes within `slam_radius` (by min/max_height) and the projectiles it reaches, `damage` each (no earthquake). Cast on the ground it is only a jump (no shock, no stomp, no damage); only a Stomp cast in the air (a fresh jump from where it is) has them. Coming down on
 // a foe that is in the air (`catch_radius` across, and within 25 of its height) it stomps it down to the floor instead: `foe_damage`, at `slam_speed`, and the foe bounces up
 // `foe_bounce_height` high, drifting `foe_bounce_distance` away. One foe is stomped per jump.
 type stompCfg struct {

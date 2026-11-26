@@ -289,6 +289,7 @@ type Player struct {
 	StompCD   float64 `json:"jscd"`
 	StompHeld bool    `json:"-"`
 	JpJump    bool    `json:"-"`
+	JpArmed   bool    `json:"-"` // the jump was cast in the air: only that one stomps and hurts
 	JpG       float64 `json:"-"`
 	JpStomped bool    `json:"-"`
 	Marks     int     `json:"smk,omitempty"`

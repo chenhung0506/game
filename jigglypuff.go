@@ -62,6 +62,7 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 		p.SlapQ = false
 		p.StompCD = hs.Cooldown // counted from the take-off
 		p.VZ, p.JpG = 4*hs.Height/hs.Duration, 8*hs.Height/(hs.Duration*hs.Duration)
+		p.JpArmed = p.Z > 0 || p.JpFly // only a Stomp cast in the air stomps (and hurts); from the ground it is only a jump
 		p.JpFly, p.JpJump, p.JpStomped, p.JpVX, p.JpVY = true, true, false, 0, 0
 	}
 
@@ -343,14 +344,17 @@ func (g *Game) stepArcs(dt float64) []Event {
 			p.VZ -= sgi * dt
 			p.X = math.Min(math.Max(p.X+p.JpVX*dt, 0), g.court.Length)
 			p.Y = math.Min(math.Max(p.Y+p.JpVY*dt, 0), g.court.Width)
-			if p.JpJump && !p.JpStomped && p.VZ < 0 {
+			if p.JpJump && p.JpArmed && !p.JpStomped && p.VZ < 0 {
 				events = append(events, g.stompInAir(i)...)
 			}
 			if p.Z <= 0 {
 				p.Z, p.VZ, p.JpFly, p.JpVX, p.JpVY = 0, 0, false, 0, 0
 				if p.JpJump {
-					p.JpJump, p.JpG = false, 0
-					events = append(events, g.stompLanding(i)...)
+					armed := p.JpArmed
+					p.JpJump, p.JpArmed, p.JpG = false, false, 0
+					if armed {
+						events = append(events, g.stompLanding(i)...)
+					}
 				}
 				if p.SlapChain && p.SlapAir && p.SlapT == 0 { // (a blow already on its way still lands: coming down in the middle of the third swing must not lose the kick)
 					p.endChain(g.cfg.Jigglypuff.Combo.Cooldown) // landing ends the air chain
@@ -468,7 +472,7 @@ func (g *Game) stompInAir(i int) []Event {
 	return nil
 }
 
-// stompLanding is the shock of a Stomp jump coming down: the foes within slam_radius (by height) and the projectiles it reaches are hurt `damage`.
+// stompLanding is the shock of a Stomp jump cast in the air coming down: the foes within slam_radius (by height) and the projectiles it reaches are hurt `damage`.
 func (g *Game) stompLanding(i int) []Event {
 	p, hs := &g.P[i], g.cfg.Jigglypuff.Stomp
 	for _, j := range g.foes(i) {

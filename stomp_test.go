@@ -12,7 +12,7 @@ func hopTo(gap float64) *Game {
 	return g
 }
 
-func TestStompOnTheGroundJumpsTheConfiguredHeightAndLandsWithAShock(t *testing.T) {
+func TestStompFromTheGroundIsOnlyAJump(t *testing.T) {
 	g := hopTo(60)
 	hs := g.cfg.Jigglypuff.Stomp
 	hp := g.P[1].HP
@@ -28,17 +28,30 @@ func TestStompOnTheGroundJumpsTheConfiguredHeightAndLandsWithAShock(t *testing.T
 	if got := float64(ticks) / tickRate; math.Abs(got-hs.Duration) > 0.15 {
 		t.Fatalf("it was up for %v s, want about %v", got, hs.Duration)
 	}
-	if g.P[1].HP != hp-hs.Damage {
-		t.Fatalf("the landing should hurt the foe beside it: HP %d, want %d", g.P[1].HP, hp-hs.Damage)
+	if g.P[1].HP != hp {
+		t.Fatalf("a jump from the ground must not hurt: HP %d, was %d", g.P[1].HP, hp)
 	}
 	if g.P[0].StompCD <= 0 {
 		t.Fatal("the cooldown should be running")
 	}
 }
 
+func TestStompCastInTheAirLandsWithAShock(t *testing.T) {
+	g := hopTo(60)
+	hs := g.cfg.Jigglypuff.Stomp
+	g.P[0].Z, g.P[0].JpFly, g.P[0].VZ = 30, true, 0
+	hp := g.P[1].HP
+	press(g, 0, Input{Stomp: true})
+	steps(g, int(3*tickRate))
+	if g.P[1].HP != hp-hs.Damage {
+		t.Fatalf("the landing of a jump cast in the air should hurt the foe beside it: HP %d, want %d", g.P[1].HP, hp-hs.Damage)
+	}
+}
+
 func TestStompShockMissesAFoeOutOfReach(t *testing.T) {
 	g := hopTo(600)
 	hp := g.P[1].HP
+	g.P[0].Z, g.P[0].JpFly = 30, true
 	press(g, 0, Input{Stomp: true})
 	steps(g, int(2*tickRate))
 	if g.P[1].HP != hp {
@@ -49,7 +62,8 @@ func TestStompShockMissesAFoeOutOfReach(t *testing.T) {
 func TestStompInTheAirDrivesAFoeInTheAirDownAndItBouncesUp(t *testing.T) {
 	g := hopTo(30)
 	hs := g.cfg.Jigglypuff.Stomp
-	g.P[1].Z = 70 // in the air, held there (a Pikachu does not fall by itself in this test)
+	g.P[1].Z = 70                     // in the air, held there (a Pikachu does not fall by itself in this test)
+	g.P[0].Z, g.P[0].JpFly = 30, true // the Stomp is cast in the air
 	hp := g.P[1].HP
 	press(g, 0, Input{Stomp: true})
 	stomped := false
@@ -78,8 +92,19 @@ func TestStompInTheAirDrivesAFoeInTheAirDownAndItBouncesUp(t *testing.T) {
 	}
 }
 
-func TestStompIsOnePerJumpAndNeedsTheFoeToBeInTheAir(t *testing.T) {
+func TestStompFromTheGroundDoesNotStompAFoeInTheAir(t *testing.T) {
+	g := hopTo(30)
+	g.P[1].Z = 70
+	press(g, 0, Input{Stomp: true})
+	steps(g, int(2*tickRate))
+	if g.P[1].ArcOn {
+		t.Fatal("a jump from the ground only jumps: it must not stomp")
+	}
+}
+
+func TestStompNeedsTheFoeToBeInTheAir(t *testing.T) {
 	g := hopTo(30) // the foe stands on the ground: nothing to stomp down
+	g.P[0].Z, g.P[0].JpFly = 30, true
 	press(g, 0, Input{Stomp: true})
 	steps(g, int(2*tickRate))
 	if g.P[1].ArcOn {

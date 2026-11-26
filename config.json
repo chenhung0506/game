@@ -500,7 +500,7 @@
     "self_gravity": 800,
     "combo": {
       "use_window": 3,
-      "cooldown": 2,
+      "cooldown": 3,
       "ground": {
         "min_height": 0,
         "max_height": 60,
@@ -568,8 +568,8 @@
       "cooldown": 4,
       "slam_radius": 110,
       "damage": 12,
-      "air_speed_first_half": 160,
-      "air_speed_second_half": 160,
+      "air_speed_first_half": 400,
+      "air_speed_second_half": 400,
       "catch_radius": 70,
       "foe_damage": 15,
       "slam_speed": 900,
