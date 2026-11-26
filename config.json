@@ -590,7 +590,7 @@
     "radius": 28
   },
   "magikarp": {
-    "max_hp": 200,
+    "max_hp": 250,
     "walk_speed": 95,
     "radius": 10,
     "evolve_hops": 3,
@@ -604,7 +604,7 @@
     }
   },
   "gyarados": {
-    "max_hp": 400,
+    "max_hp": 500,
     "walk_speed": 130,
     "radius": 75,
     "wave": {
