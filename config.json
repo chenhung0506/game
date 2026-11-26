@@ -493,19 +493,20 @@
     }
   },
   "jigglypuff": {
-    "max_hp": 130,
-    "walk_speed": 135,
+    "max_hp": 200,
+    "walk_speed": 165,
     "radius": 22,
     "gravity": 1500,
     "combo": {
       "use_window": 3,
-      "cooldown": 4,
+      "cooldown": 1,
       "ground": {
         "min_height": 0,
         "max_height": 60,
         "duration": [0.25, 0.25, 0.3, 0.3, 0.45],
         "damage": [8, 8, 10, 10, 20],
         "knockback": [10, 10, 10, 10, 260],
+        "step_distance": [30, 30, 20, 20, 50],
         "angle": 110,
         "length": 110,
         "stun_duration": 0.5
@@ -518,9 +519,9 @@
         "knockback": [0, 0, 300],
         "radius": 110,
         "slam_speed": 800,
-        "self_bounce_height": [200, 250],
-        "self_bounce_distance": [100, 60],
-        "foe_bounce_height": [100, 140],
+        "self_bounce_height": [200, 200],
+        "self_bounce_distance": [50, 60],
+        "foe_bounce_height": [100, 180],
         "bounce_distance": [40, 40]
       }
     },
@@ -536,7 +537,7 @@
       "kick_height": 100,
       "self_height": 160,
       "self_distance": 280,
-      "cooldown": 6
+      "cooldown": 2
     }
   },
   "dummy": {

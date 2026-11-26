@@ -1002,7 +1002,7 @@ type Config struct {
 		Gigantamax GengarGmaxCfg `json:"gigantamax"`
 	} `json:"gengar"`
 	// Jigglypuff: a ball of a body. Its main skill is a chain of blows used one press after the other (like Volt Tackle: `use_window` seconds from the first press to finish the chain, then `cooldown`).
-	// On the ground (`ground`) it is five hand blows: right, left, right-left, right-left, then one big right hand that sends the foe flying; each swing takes `duration[n]` seconds (rooted, the fan it hits
+	// On the ground (`ground`) it is five hand blows: right, left, right-left, right-left, then one big right hand that sends the foe flying; each swing takes `duration[n]` seconds (and after blow n Jigglypuff steps `step_distance[n]` forward along the aim, stopping at a foe's body) (rooted, the fan it hits
 	// drawn on the ground) and then hits whoever is in the fan (`angle` wide, `length` long, at a height inside min_height..max_height): `damage[n]`, `knockback[n]`, stunned `stun_duration`.
 	// In the air (`air`) it stomps: the first press (after `duration[0]`) stomps a foe within `radius` below it, and that foe is driven into the ground, bounces up like a ball `foe_bounce_height[0]`
 	// high, drifting `bounce_distance[0]` away, while Jigglypuff itself bounces up to `self_bounce_height[0]`, drifting `self_bounce_distance[0]` the way the blow was aimed. A second press needs the first to have connected and stomps the ball again (index 1); a
@@ -1397,6 +1397,7 @@ func DefaultConfig() Config {
 	gr := &jp.Combo.Ground
 	gr.Reach = Reach{MinHeight: 0, MaxHeight: 60}
 	gr.Duration, gr.Damage, gr.Knockback = []float64{0.25, 0.25, 0.3, 0.3, 0.45}, []int{8, 8, 10, 10, 20}, []float64{10, 10, 10, 10, 260}
+	gr.StepDistance = []float64{0, 0, 0, 0, 0}
 	gr.Angle, gr.Length, gr.StunDuration = 110, 110, 0.5
 	ar := &jp.Combo.Air
 	ar.Reach = Reach{MinHeight: 0, MaxHeight: 1000}
@@ -2563,6 +2564,7 @@ type jigglypuffCfg struct {
 			Duration     []float64 `json:"duration"`
 			Damage       []int     `json:"damage"`
 			Knockback    []float64 `json:"knockback"`
+			StepDistance []float64 `json:"step_distance"`
 			Angle        float64   `json:"angle"`
 			Length       float64   `json:"length"`
 			StunDuration float64   `json:"stun_duration"`

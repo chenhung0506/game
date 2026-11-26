@@ -1868,6 +1868,7 @@ function artJigglypuffStomp(c,x,y,t,pose){
   c.restore();
 }
 function artJigglypuff(c,x,y,t,pose){
+  if (pose.mir) { c.save(); c.translate(x, y); c.scale(-1, 1); artJigglypuff(c, 0, 0, t, Object.assign({}, pose, { mir: false })); c.restore(); return; } // the other hand: the whole figure mirrored
   if (pose.stomp) return artJigglypuffStomp(c, x, y, t, pose);
   if (pose.kick || pose.roll >= 0) { // the roll (pose.roll = how far the ball has turned, radians) and the kick: side views face right and are mirrored for left
     const d = pose.dir, side = d === 2 || d === 3;
@@ -4757,8 +4758,20 @@ function drawPlayer(i, p) {
   lk.mv += ((running ? 1 : 0) - lk.mv) * 0.25; lk.ph += 0.2 * lk.mv;
   if (p.k === 10 && p.rlt > 0) lk.dir = faceOf(...rv(p.rlx, p.rly)); // rolling: it faces the way it rolls
   else if (p.k === 10 && (p.slt > 0 || p.slr > 0)) lk.dir = faceOf(...rv(p.slx, p.sly)); // swinging: it faces the way the blow goes // slapping: it faces the way the slap goes
-  const pose = { dir: lk.dir, slap: p.k === 10 && !p.jpa ? (p.slt > 0 ? (1 - p.slt / Math.max(slapCfg.dur[p.jpn] || slapCfg.dur[0], 1e-6) < 0.5 ? 1 : 2) : p.slr > 0 ? 3 : 0) : 0, // raised for the first half of the swing, coming down (22.5) for the second, the follow-through (45) after it lands
-     roll: p.k === 10 && p.rlt > 0 ? Math.PI * 2 * (1 - p.rlt / Math.max(slapCfg.rdur, 1e-6)) : -1, stomp: p.k === 10 && !(p.rlt > 0) ? (p.jpa && p.slt > 0 && p.jpn < 2 ? 2 : p.slr > 0 && p.jpp === 1 ? 3 : p.jpa && p.z > 0 && !(p.slt > 0) && !(p.slr > 0) ? 1 : 0) : 0, // 1 wind-up (in the air between two presses), 2 the strike, 3 squashed on the foe
+  // the ground chain: blow 1 right hand, 2 left, 3 and 4 a quick right then left (two raises and two blows in one swing), 5 the big right hand; the art is drawn for the left hand seen from the front (the right seen from the back), so it is mirrored for the other
+  const gs = { slap: 0, mir: false };
+  if (p.k === 10 && !p.jpa && (p.slt > 0 || (p.slr > 0 && (p.jpp === 0 || p.jpp === 3)))) {
+    let right = true, ph = 3;
+    if (p.slt > 0) {
+      const kk = 1 - p.slt / Math.max(slapCfg.dur[p.jpn] || slapCfg.dur[0], 1e-6), dbl = p.jpn === 2 || p.jpn === 3;
+      right = p.jpn === 0 || p.jpn === 4 || (dbl && kk < 0.5);
+      ph = (dbl ? (kk * 2) % 1 : kk) < 0.5 ? 1 : 2; // raised first, then coming down (22.5)
+    } else right = p.jpp !== 3; // the follow-through (45) of the blow that just landed
+    gs.slap = ph;
+    gs.mir = lk.dir === 0 ? right : lk.dir === 1 ? !right : false;
+  }
+  const pose = { dir: lk.dir, slap: gs.slap, mir: gs.mir,
+    roll: p.k === 10 && p.rlt > 0 ? Math.PI * 2 * (1 - p.rlt / Math.max(slapCfg.rdur, 1e-6)) : -1, stomp: p.k === 10 && !(p.rlt > 0) ? (p.jpa && p.slt > 0 && p.jpn < 2 ? 2 : p.slr > 0 && p.jpp === 1 ? 3 : p.jpa && p.z > 0 && !(p.slt > 0) && !(p.slr > 0) ? 1 : 0) : 0, // 1 wind-up (in the air between two presses), 2 the strike, 3 squashed on the foe
      kick: p.k === 10 && ((p.jpa && p.slt > 0 && p.jpn === 2) || (p.slr > 0 && p.jpp === 2)), mv: lk.mv, ph: lk.ph, gmax: isGmax(p), sneak: p.k === 9 && p.gnt > 0, sleep: p.k === 1 && p.slp > 0, lick: p.k === 9 && p.lkp >= 2 && p.lkp <= 4, whip: p.k === 11 && (p.tlt > 0 || (p.tlcd <= cdCfg.tail - tailCfg.charge && p.tlcd > cdCfg.tail - tailCfg.charge - TAIL_SWING)) }; // whip: its tail is out (cocked, or lashing), so the body is drawn without it
   if (p.k === 3) { // the leaf grows for the Leaf Slash and is swung by it, upper left to lower right on the first, the other way on the next
     const sgn = p.ln % 2 === 0 ? 1 : -1, e = p.lk * p.lk * (3 - 2 * p.lk); // eased: the swing gathers speed and slows at the end

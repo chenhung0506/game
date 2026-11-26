@@ -17,6 +17,9 @@ import (
 // A foe that is stomped or kicked is a ball: Held, and flown by stepArcs (gravity, a bounce when it lands if it has one coming).
 
 // rollTime is how long the roll takes: its distance at its speed.
+// slapStepTime is how long the step forward after a ground blow takes.
+const slapStepTime = 0.12
+
 func (rk rollKickCfg) rollTime() float64 {
 	if rk.RollSpeed <= 0 {
 		return 0
@@ -70,6 +73,22 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 		}
 	}
 
+	// the step forward after a blow: a short slide along the aim that stops at a foe's body
+	if p.StepLeft > 0 {
+		step := math.Min(p.StepLeft, p.StepV*dt)
+		nx, ny := math.Min(math.Max(p.X+p.StepDX*step, 0), g.court.Length), math.Min(math.Max(p.Y+p.StepDY*step, 0), g.court.Width)
+		blocked := false
+		for _, j := range g.foes(i) {
+			if f := &g.P[j]; math.Hypot(f.X-nx, f.Y-ny) < g.radius(i)+g.radius(j) && f.Z <= p.Z+10 {
+				blocked = true
+			}
+		}
+		if blocked {
+			p.StepLeft = 0
+		} else {
+			p.X, p.Y, p.StepLeft = nx, ny, p.StepLeft-step
+		}
+	}
 	// the chain: a swing in progress lands, or the next press starts one
 	if p.SlapT > 0 {
 		if p.SlapT -= dt; p.SlapT < 1e-9 {
@@ -121,7 +140,7 @@ func (g *Game) dropJigglypuff(i int) {
 	if p.SlapChain {
 		p.endChain(g.cfg.Jigglypuff.Combo.Cooldown)
 	}
-	p.SlapT, p.SlapQ, p.RollT = 0, false, 0
+	p.SlapT, p.SlapQ, p.RollT, p.StepLeft = 0, false, 0, 0
 }
 
 // comboStrike is the swing landing: the ground fan, or the air stomp.
@@ -153,7 +172,10 @@ func (g *Game) comboStrike(i int) []Event {
 func (g *Game) slap(i, n int) []Event {
 	p := &g.P[i]
 	gr := g.cfg.Jigglypuff.Combo.Ground
-	p.SlapRecT, p.JpPose = 0.2, 0 // for the page: the hand is down
+	p.SlapRecT, p.JpPose = 0.2, 0 // for the page: the hand is down (0: the right hand did it)
+	if n == 1 || n == 2 || n == 3 {
+		p.JpPose = 3 // the left hand did (the last of the quick right-left pair, for blows 3 and 4)
+	}
 	ux, uy := p.SlapX, p.SlapY
 	for _, j := range g.foes(i) {
 		other := &g.P[j]
@@ -164,6 +186,9 @@ func (g *Game) slap(i, n int) []Event {
 			g.knockBack(p.X, p.Y, other, gr.Knockback[n], ux, uy)
 			g.stun(other, gr.StunDuration)
 		}
+	}
+	if d := gr.StepDistance[n]; d > 0 {
+		p.StepLeft, p.StepV, p.StepDX, p.StepDY = d, d/slapStepTime, ux, uy
 	}
 	return []Event{{T: "slap", X: p.X, Y: p.Y, R: gr.Length, DX: ux, DY: uy, K: n}}
 }
@@ -294,7 +319,7 @@ func (c Config) validateJigglypuff() error {
 		n    int
 		v    []float64
 	}{
-		{"combo.ground.duration", 5, gr.Duration}, {"combo.ground.knockback", 5, gr.Knockback},
+		{"combo.ground.duration", 5, gr.Duration}, {"combo.ground.knockback", 5, gr.Knockback}, {"combo.ground.step_distance", 5, gr.StepDistance},
 		{"combo.air.duration", 3, ar.Duration}, {"combo.air.knockback", 3, ar.Knockback},
 		{"combo.air.self_bounce_height", 2, ar.SelfBounceHeight}, {"combo.air.self_bounce_distance", 2, ar.SelfBounceDistance}, {"combo.air.foe_bounce_height", 2, ar.FoeBounceHeight}, {"combo.air.bounce_distance", 2, ar.BounceDistance},
 	}

@@ -284,3 +284,34 @@ func TestAirStompWithNoSelfBounceDistanceBouncesStraightUp(t *testing.T) {
 		t.Fatalf("drift %v,%v, want none", p.JpVX, p.JpVY)
 	}
 }
+
+func TestGroundBlowsTellThePageWhichHandDidIt(t *testing.T) {
+	g := jig(80)
+	want := []int{0, 3, 3, 3, 0} // right, left, then the right-left pairs end on the left, and the big blow is the right
+	for n := 0; n < 5; n++ {
+		g.P[1].StunT = 0
+		swing(g, n)
+		if g.P[0].JpPose != want[n] {
+			t.Fatalf("blow %d: JpPose %d, want %d", n+1, g.P[0].JpPose, want[n])
+		}
+	}
+}
+
+func TestGroundBlowStepsForwardTheConfiguredDistanceAndStopsAtTheFoe(t *testing.T) {
+	g := jig(300)
+	g.cfg.Jigglypuff.Combo.Ground.StepDistance = []float64{80, 0, 0, 0, 0}
+	x0 := g.P[0].X
+	swing(g, 0)
+	steps(g, int(0.3*tickRate))
+	if got := g.P[0].X - x0; math.Abs(got-80) > 1 {
+		t.Fatalf("it stepped %v, want 80", got)
+	}
+	// with the foe right in front it cannot step into its body
+	g = jig(70)
+	g.cfg.Jigglypuff.Combo.Ground.StepDistance = []float64{200, 0, 0, 0, 0}
+	swing(g, 0)
+	steps(g, int(0.3*tickRate))
+	if d := math.Hypot(g.P[1].X-g.P[0].X, g.P[1].Y-g.P[0].Y); d < g.radius(0)+g.radius(1)-1e-6 {
+		t.Fatalf("it walked into the foe: %v apart", d)
+	}
+}

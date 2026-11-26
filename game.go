@@ -272,7 +272,7 @@ type Player struct {
 	SlapX     float64 `json:"slx"`
 	SlapY     float64 `json:"sly"`
 	SlapN     int     `json:"jpn"`
-	JpPose    int     `json:"jpp"` // for the page, while SlapRecT runs: what it just did (1 a stomp, 2 a kick)
+	JpPose    int     `json:"jpp"` // for the page, while SlapRecT runs: what it just did (0 a blow of the right hand, 1 a stomp, 2 a kick, 3 a blow of the left hand)
 	SlapChain bool    `json:"-"`
 	SlapAir   bool    `json:"jpa"`
 	SlapWin   float64 `json:"-"`
@@ -285,8 +285,10 @@ type Player struct {
 	RollY    float64 `json:"rly"`
 	RollHeld bool    `json:"-"`
 	JpFly    bool    `json:"-"`
-	JpVX     float64 `json:"-"`
-	JpVY     float64 `json:"-"`
+	// the step forward after a ground blow: the distance still to go, along (StepDX, StepDY), at StepV per second.
+	StepLeft, StepV, StepDX, StepDY float64 `json:"-"`
+	JpVX                            float64 `json:"-"`
+	JpVY                            float64 `json:"-"`
 	// A body Jigglypuff stomped or kicked is a ball while ArcOn (Held, flown by stepArcs): its drift, the height it will bounce to when it lands (0 = none) and how far it drifts then, along (ArcDX, ArcDY).
 	ArcOn     bool    `json:"arc"`
 	ArcVX     float64 `json:"-"`
