@@ -509,10 +509,10 @@
         "knockback": [40, 40, 30, 30, 260],
         "step_distance": [60, 60, 40, 40, 100],
         "palm_scale": 1,
-        "lunge_distance": 120,
+        "lunge_distance": 100,
         "angle": 110,
         "length": 110,
-        "stun_duration": [0, 0, 0.5, 0.5, 2]
+        "stun_duration": [0, 0, 0.3, 0.3, 2]
       },
       "air": {
         "min_height": 0,
