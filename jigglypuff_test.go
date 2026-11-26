@@ -529,3 +529,16 @@ func TestKickedFoeDriftsTheThirdFoeBounceDistanceAsItBounces(t *testing.T) {
 		t.Fatalf("it drifted %v during the bounce, want about 150", got)
 	}
 }
+
+func TestRollFollowsTheSticksExactAngle(t *testing.T) {
+	g := jig(900)
+	press(g, 0, Input{Roll: true, DX: 1, DY: 0, AimX: math.Cos(22.5 * math.Pi / 180), AimY: math.Sin(22.5 * math.Pi / 180)})
+	if got := math.Atan2(g.P[0].RollY, g.P[0].RollX) * 180 / math.Pi; math.Abs(got-22.5) > 0.1 {
+		t.Fatalf("it rolls at %v degrees, want 22.5", got)
+	}
+	g2 := jig(900)
+	press(g2, 0, Input{Roll: true, DX: 1}) // no stick: the 8-way key
+	if g2.P[0].RollX != 1 || g2.P[0].RollY != 0 {
+		t.Fatalf("keys only: rolls (%v, %v), want (1, 0)", g2.P[0].RollX, g2.P[0].RollY)
+	}
+}

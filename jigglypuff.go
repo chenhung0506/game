@@ -51,6 +51,9 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 	if rollPress && p.RollT == 0 && p.RollCD == 0 && p.SlapT == 0 && !p.Held && p.Z == 0 && !p.JpFly { // (between the blows of a chain too: use_window does not lock the roll out)
 		rk := jp.RollKick
 		dx, dy := float64(in.DX), float64(in.DY)
+		if n := math.Hypot(in.AimX, in.AimY); n > 1e-9 && !math.IsInf(n, 0) { // the stick's exact angle (any angle), the 8-way keys when there is none
+			dx, dy = in.AimX/n, in.AimY/n
+		}
 		if dx == 0 && dy == 0 {
 			dx, dy = float64(p.FX), float64(p.FY)
 		}

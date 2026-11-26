@@ -531,10 +531,10 @@
     "roll_kick": {
       "min_height": 0,
       "max_height": 60,
-      "roll_distance": 320,
-      "roll_speed": 450,
+      "roll_distance": 270,
+      "roll_speed": 550,
       "stun_duration": 1,
-      "kick_radius": 70,
+      "kick_radius": 90,
       "damage": 18,
       "kick_distance": 300,
       "kick_height": 100,
