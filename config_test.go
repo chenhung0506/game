@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -323,5 +324,25 @@ func TestMegatonPunchCrackFadeCannotOutlastTheCracks(t *testing.T) {
 	cfg.Ash.MegatonPunch.CrackFade = -1
 	if cfg.validate() == nil {
 		t.Fatal("a negative crack_fade should be refused")
+	}
+}
+
+func TestAirScaleIsCheckedAndSentToThePage(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.AirScale != 0 {
+		t.Fatalf("the default must leave sizes alone, got %v", cfg.AirScale)
+	}
+	for _, bad := range []float64{-0.1, 5.1} {
+		cfg.AirScale = bad
+		if cfg.validate() == nil {
+			t.Fatalf("air_scale %v should be refused", bad)
+		}
+	}
+	cfg.AirScale = 0.5
+	if err := cfg.validate(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(hiMessage(cfg, "web", cfg.Court.Web.size(), 0)), `"air":0.5`) {
+		t.Fatal("hi should carry air_scale")
 	}
 }

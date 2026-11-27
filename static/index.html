@@ -126,6 +126,8 @@ const TAIL = 0.2; // seconds
 let gengarCfg = { shadow: 90, depth: -10, sneak: 2.5, fire: 22, ring: 260, scale: 1, slam: 110, ctime: 0.8, pull: 1, orb: 30, orbhp: 30, nscale: 1, nslam: 110, nflight: 0.9, nlob: 150, sfire: 20 }; // Gengar's, from 'hi'
 let kickText = { ash: { slide: '閃身步', kick: '浪子踢球' }, machamp: { slide: '閃身步', kick: '飛膝踢' } }; // the names shown for the two parts of the High Jump Kick, from 'hi'
 let upText = { slide: '閃身步', punch: '上鉤拳' }, upWarn = 0; // the names shown for the two parts of Machamp's Uppercut, from 'hi'
+let airScale = 0; // how much bigger a character looks per 100 up in the air (hi.air, from air_scale)
+const airFactor = (z) => 1 + airScale * Math.max(0, z) / 100;
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
 let gvCfg = { warn: 1, hw: 50, wo: 100, wi: 100, hr: 40, len: 320, w: 80, tw: 20, rs: 0.8, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
 let megaCfg = { crack: 2.6, cfade: 0.8, fevery: 0, charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
@@ -219,7 +221,7 @@ const beamSlots = () => (snap ? [...snap.p.keys()].filter((i) => hasBeam(snap.p[
 const slotsOf = (k) => (snap ? [...snap.p.keys()].filter((i) => snap.p[i].k === k) : []); // the slots playing that character (both may play the same one)
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.t === 'hi') { hideRooms(); you = m.you; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; slapCfg = m.slap; singCfg = m.sing; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; kickText = m.kicktext; gmaxCfg = m.gmax; cgmaxCfg = m.cgmax; ggmaxCfg = m.ggmax; sleepCfg = m.sleep; upText = m.uptext; upWarn = m.upwarn; gengarCfg = m.gengar; fistCfgs = m.fist; gFistCfg = m.gfist; lpCfg = m.glp; bpCfg = m.gbp; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; glaCfg = m.glaciate; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
+  if (m.t === 'hi') { hideRooms(); you = m.you; airScale = m.air || 0; beamCfg = m.beam; gbeamCfg = m.gbeam; thunderCfg = m.thunder; cdCfg = m.cooldown; ballCfg = m.ball; punchCfg = m.punch; fireCfg = m.fire; tossCfg = m.toss; flyCfg = m.fly; voltCfg = m.volt; leafCfg = m.leaf; razorCfg = m.razor; vineCfg = m.vine; frostCfg = m.frost; stormCfg = m.storm; fbeamCfg = m.fbeam; arrowCfg = m.arrow; slashCfg = m.slash; tornadoCfg = m.tornado; waveCfg = m.wave; tailCfg = m.tail; slapCfg = m.slap; singCfg = m.sing; treeCfgs = m.tree; megaCfg = m.mega; kickWarn = m.kickwarn; kickText = m.kicktext; gmaxCfg = m.gmax; cgmaxCfg = m.cgmax; ggmaxCfg = m.ggmax; sleepCfg = m.sleep; upText = m.uptext; upWarn = m.upwarn; gengarCfg = m.gengar; fistCfgs = m.fist; gFistCfg = m.gfist; lpCfg = m.glp; bpCfg = m.gbp; stoneCfgs = m.stone; ultCfg = m.ult; tvoltCfg = m.tvolt; bbCfg = m.bbird; glaCfg = m.glaciate; gvCfg = m.gvine; evolveHops = m.evolve; maxHp = m.maxhp; radius = m.radius; arena = m.arena; cam = m.cam; setView(); buildCards(); }
   else if (m.t === 'lobby') {
     if (PLAY === 'dummy' && !!m.full !== fullWant) send({ fullcharge: fullWant }); // the practice room starts without it: say what the box says
     if (m.on || (m.picks[0] >= 0 && m.picks[1] >= 0 && m.here[0] && m.here[1])) return; // a match is on: a refused pick changes nothing
@@ -1935,7 +1937,7 @@ function artJigglypuff(c,x,y,t,pose){
 }
 
 function drawBody(kind, X, Y, alpha, lift = 0, flap = 0, pose = IDLE, spin = 0, tumble = 0) {
-  const bs = (pose.gmax ? gmaxOf(kind).radius : radius[kind]) / (pose.gmax && kind === 9 ? GENGAR_GMAX_REF : REF[kind]);
+  const bs = (pose.gmax ? gmaxOf(kind).radius : radius[kind]) / (pose.gmax && kind === 9 ? GENGAR_GMAX_REF : REF[kind]) * airFactor(lift); // the higher it is, the bigger it looks
   ctx.save(); ctx.translate(X, Y); ctx.rotate(-ROT); // upright whatever the view
   ctx.scale(bs, bs);
   ctx.globalAlpha = alpha;
@@ -5184,7 +5186,7 @@ function drawPlayer(i, p) {
   if (p.pz > 0) drawParalyzed(d, p);
   // Everything below is upright, with the origin on the ground under the player; the body is at -d.z.
   const top = -d.z;
-  const hudTop = top - (p.k === 8 && look[i].dir >= 2 ? (isGmax(p) ? 30 : 10) * bs : 0); // Machamp's fists are over its head in side view, so its bars and labels sit higher then
+  const hudTop = top - (airFactor(d.z) - 1) * 20 * bs - (p.k === 8 && look[i].dir >= 2 ? (isGmax(p) ? 30 : 10) * bs : 0); // Machamp's fists are over its head in side view, so its bars and labels sit higher then
   upright(d.x, d.y, () => {
     if (hasBeam(p.k) && p.bt > 0) { // glowing orb with radiating lines, growing as the charge fills
       const k = 1 - p.bt / beamCfgOf(p.k).charge, [ax, ay] = rv(p.bx, p.by), ox = ax * 26 * bs, oy = top - 4 * bs + ay * 26 * bs, r = 4 + 12 * k;

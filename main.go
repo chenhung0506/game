@@ -761,6 +761,7 @@ func hiMessage(cfg Config, mode string, court CourtSize, idx int) []byte {
 	cc := cfg.courtConfigFor(mode)
 	hi, _ := json.Marshal(map[string]any{
 		"t": "hi", "you": idx, "arena": map[string]float64{"w": court.Length, "h": court.Width}, // the x and y extents
+		"air": cfg.AirScale,
 		"cam": map[string]float64{"minw": cc.MinLength, "minh": cc.MinWidth, "maxw": cc.MaxLength, "maxh": cc.MaxWidth, "zin": cc.ZoomInDistance, "zout": cc.ZoomOutDistance, "zspeed": cc.ZoomSpeed, "margin": cc.SeaMargin, "gz": b2f(cc.GigantamaxZoomOut)}, // the camera window and its zoom
 		// per kind: pikachu, snorlax, charizard, chikorita, vulpix, rowlet, magikarp, ash, machamp, gengar, jigglypuff and the gyarados magikarp becomes
 		"radius":   []float64{cfg.Pikachu.Radius, cfg.Snorlax.Radius, cfg.Charizard.Radius, cfg.Chikorita.Radius, cfg.Vulpix.Radius, cfg.Rowlet.Radius, cfg.Magikarp.Radius, cfg.Ash.Radius, cfg.Machamp.Radius, cfg.Gengar.Radius, cfg.Jigglypuff.Radius, cfg.Gyarados.Radius, cfg.Dummy.Radius},

@@ -427,6 +427,8 @@ type GengarGmaxCfg struct {
 
 // Config holds the tuning values. Distances are in game units and times are in seconds.
 type Config struct {
+	// AirScale makes a character look bigger the higher it is above the ground: its picture is drawn (1 + air_scale x height / 100) times as big. 0 = no change. Only the picture; the body (radius) is not changed.
+	AirScale float64 `json:"air_scale"`
 	// Length runs between the two players (left-right on the web page, up-down on a phone), width
 	// across. A room takes the court of the view its first player opened it in.
 	Court struct {
@@ -1590,6 +1592,9 @@ func (b BurstPunchCfg) validate() error {
 
 // validate checks the whole config: the numbers of every character, and then the Gigantamax Machamp's own (its three skills are checked just like Machamp's).
 func (c Config) validate() error {
+	if !(c.AirScale >= 0 && c.AirScale <= 5) {
+		return fmt.Errorf("air_scale must be between 0 and 5, got %v", c.AirScale)
+	}
 	if err := c.validateSkills(); err != nil {
 		return err
 	}

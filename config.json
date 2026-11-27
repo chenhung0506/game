@@ -1,4 +1,5 @@
 {
+  "air_scale": 0.3,
   "court": {
     "mobile": { "min_width": 600, "min_length": 1000, "max_width": 800, "max_length": 1200, "zoom_in_distance": 400, "zoom_out_distance": 400, "zoom_speed": 0.5, "sea_margin": 120, "gigantamax_zoom_out": true },
     "web": { "min_width": 900, "min_length": 1600, "max_width": 1200, "max_length": 2000, "zoom_in_distance": 700, "zoom_out_distance": 1100, "zoom_speed": 0.5, "sea_margin": 300, "gigantamax_zoom_out": true }
