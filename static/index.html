@@ -5152,6 +5152,12 @@ function drawPlayer(i, p) {
     ctx.fillStyle = `rgba(0,0,0,${0.35 - 0.2 * lift})`;
     const fy = (p.k === 2 && p.gmt > 0 ? 38 : p.k === 10 ? 18 : 14) * bs; // the Gigantamax Charizard's feet are lower
     if (!(p.k === 9 && p.gmt > 0)) { ctx.beginPath(); ctx.ellipse(0, fy, 18 * bs * (1 - 0.4 * lift), 7 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.fill(); } // the Gigantamax Gengar stands in a shadow of its own
+    if (d.z > 6) { // in the air: a thin dashed line from the shadow up to the body, so the shadow can be told from whose body it belongs to (white for me, green for a teammate, red for a foe)
+      const col = i === you ? '255,255,255' : sideOf(i) === sideOf(you) ? '150,240,175' : '255,130,115', a = Math.min(1, (d.z - 6) / 30);
+      ctx.save(); ctx.lineCap = 'round'; ctx.setLineDash([4, 5]);
+      for (const [c, w] of [[`rgba(40,25,10,${0.3 * a})`, 3.2], [`rgba(${col},${0.9 * a})`, 1.6]]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(0, fy - d.z + 2 * bs); ctx.stroke(); } // (a dark line under the bright one, so it shows on the sand)
+      ctx.restore();
+    }
     if (snap.p.length > 2) { // a 2v2: a ring in the colour of the side, green for mine and red for theirs
       ctx.strokeStyle = sideOf(i) === sideOf(you) ? '#5fe08a' : '#ff6b6b'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(0, fy, 24 * bs * (1 - 0.4 * lift), 10 * bs * (1 - 0.4 * lift), 0, 0, 7); ctx.stroke();
