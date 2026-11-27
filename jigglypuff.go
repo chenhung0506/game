@@ -48,8 +48,23 @@ func (g *Game) stepJigglypuff(i int, in Input, dt float64) ([]Event, bool) {
 	p.RollHeld = in.Roll
 
 	// Sing, the ultimate: with the charge full the notes go out (between the blows of a chain too, but not in the middle of a swing or a roll)
+	// A charge_time first: Jigglypuff stands gathering (UltT; a stun, a freeze or a catch ends it, see Step, and the charge is lost).
+	if p.UltT > 0 {
+		if p.UltT -= dt; p.UltT < 1e-9 {
+			p.UltT = 0
+			events = append(events, g.sing(i)...)
+		}
+		return events, true // (Step lets no skill start while UltT is on; the tick the notes go out is still rooted)
+	}
 	if u := jp.Ultimate; in.Ult && p.Charge >= u.Max && p.SlapT == 0 && p.RollT == 0 && !p.Held {
 		p.Charge = 0
+		if ct := jp.Sing.ChargeTime; ct > 0 {
+			p.UltT, p.SlapQ, p.StepLeft = ct, false, 0
+			if p.SlapChain { // gathering ends a chain it was cast between the blows of, with no cooldown (like the roll)
+				p.endChain(0)
+			}
+			return events, true
+		}
 		events = append(events, g.sing(i)...)
 	}
 	// Jump (K): a jump, from the ground or from the air; coming down on a foe in the air stomps it to the floor
@@ -428,7 +443,7 @@ func (c Config) validateJigglypuff() error {
 	if sg.SwayWidth > 0 && !(sg.SwayLength > 0) {
 		return fmt.Errorf("jigglypuff.sing.sway_length must be above 0 while sway_width is")
 	}
-	for name, v := range map[string]float64{"sing.ring_radius": sg.RingRadius, "sing.mass": sg.Mass, "sing.duration": sg.Duration, "sing.mark_duration": sg.MarkDuration, "sing.sway_width": sg.SwayWidth, "sing.sway_length": sg.SwayLength} {
+	for name, v := range map[string]float64{"sing.charge_time": sg.ChargeTime, "sing.ring_radius": sg.RingRadius, "sing.mass": sg.Mass, "sing.duration": sg.Duration, "sing.mark_duration": sg.MarkDuration, "sing.sway_width": sg.SwayWidth, "sing.sway_length": sg.SwayLength} {
 		if !(v >= 0) || math.IsInf(v, 0) {
 			return fmt.Errorf("jigglypuff.%s must not be negative, got %v", name, v)
 		}

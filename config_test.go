@@ -310,3 +310,18 @@ func TestGiantVinesWarningIsOnByDefaultAndTheSwitchReachesThePage(t *testing.T) 
 		}
 	}
 }
+
+func TestMegatonPunchCrackFadeCannotOutlastTheCracks(t *testing.T) {
+	cfg := DefaultConfig()
+	if err := cfg.validate(); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Ash.MegatonPunch.CrackDuration, cfg.Ash.MegatonPunch.CrackFade = 1, 2
+	if cfg.validate() == nil {
+		t.Fatal("a crack_fade longer than crack_duration should be refused")
+	}
+	cfg.Ash.MegatonPunch.CrackFade = -1
+	if cfg.validate() == nil {
+		t.Fatal("a negative crack_fade should be refused")
+	}
+}

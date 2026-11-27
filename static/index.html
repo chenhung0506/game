@@ -128,7 +128,7 @@ let kickText = { ash: { slide: '閃身步', kick: '浪子踢球' }, machamp: { s
 let upText = { slide: '閃身步', punch: '上鉤拳' }, upWarn = 0; // the names shown for the two parts of Machamp's Uppercut, from 'hi'
 let kickWarn = { ash: 0, machamp: 0 }; // show the name of the High Jump Kick's moves over whoever does them, from 'hi'
 let gvCfg = { warn: 1, hw: 50, wo: 100, wi: 100, hr: 40, len: 320, w: 80, tw: 20, rs: 0.8, scale: 1, charge: 0.5, swing: 0.2, linger: 0.7, ring: 200 }; // Chikorita's Giant Vines, from 'hi'
-let megaCfg = { fevery: 0, charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
+let megaCfg = { crack: 2.6, cfade: 0.8, fevery: 0, charge: 1, ring: 0.5, bstart: 0.5, bcount: 1, bint: 0, boffs: [0], dist: 420, radius: 45, rscale: 1, bscale: 1, fscale: 1, iscale: 1, fwscale: 1, fwdur: 0.3, htscale: 1, htdur: 0.6, warn: 1, text: 1, fstart: 24, fend: 420 }; // Ash's Megaton Punch, from 'hi'
 let bpCfg = { charge: 0.8, dist: 450, radius: 250, height: 300, erad: 70, warn: 1, fscale: 1, escale: 1, count: 24, dur: 1.2, c1: 'rgba(8,8,13,0.55)', c2: '#fafafa' }; // the Gigantamax Machamp's Burst Punch, from 'hi'
 let lpCfg = { charge: 1.2, dist: 700, radius: 120, warn: 1, fscale: 1, lscale: 1, lrad: 250 }; // the Gigantamax Machamp's Lightning Punch, from 'hi'
 let gFistCfg = { radius: 26, hp: 20, life: 0.2 }; // the Gigantamax Machamp's fists, from 'hi'
@@ -159,7 +159,7 @@ let leafCfg = { radius: 90, scale: 2.5 }, razorCfg = { radius: 10, scale: 1, hp:
 let voltCfg = { radius: 16, uses: 3, window: 2, scale: 1 }; // Volt Tackle, from 'hi'
 let ultCfg = [], tvoltCfg = { jump: 0, dark: 0, fevery: 0, falpha: 0, colors: ['#ffd21e'], radius: 20, hp: 10, rrad: 220, boom: 120, time: 5, link: 9, tip: 0.6, charge: 2.4, ring: 0.6, bstart: 1.2, bcount: 6, bint: 0.2, boffs: [0], rscale: 1, bscale: 1 }; // per kind, the charge its ultimate (Z) needs (0 = it has none); Thousand Volt's, from 'hi'
 let waveCfg = { width: 160, speed: 500, distance: 600, summon: 0.4 }, tailCfg = { angle: 90, length: 180, stun: 1.2, charge: 0.5 }, evolveHops = 5; // Gyarados's, from 'hi'
-let singCfg = { scale: 1, radius: 16, marks: 3, sleep: 3, ring: 160 }; // Jigglypuff's Sing, from 'hi'
+let singCfg = { charge: 0, scale: 1, radius: 16, marks: 3, sleep: 3, ring: 160 }; // Jigglypuff's Sing, from 'hi'
 let slapCfg = { adur: [0.2, 0.2, 0.25], pscale: 1, angle: 110, length: 110, dur: [0.25], aradius: 110, rdur: 0.5 }; // Jigglypuff's Slap, from 'hi'
 let frostCfg = { radius: 40, scale: 1, duration: 6, ride: 2 }, stormCfg = { radius: 80, interval: 0.7, strikes: 6 }, fbeamCfg = { len: 450, control: 3, pillar: 24, hp: 25, life: 8, width: 0 }; // Vulpix's, from 'hi'
 let slashCfg = { radius: 8, scale: 0.5, hp: 1 }; // Rowlet's air slash, from 'hi'
@@ -266,8 +266,8 @@ ws.onmessage = (e) => {
       if (ev.t === 'surf') shake = 8;
       if (ev.t === 'surfhit') shake = 12;
       if (ev.t === 'tree') shake = 18;
-      if (ev.t === 'mega') shake = 14;
-      if (ev.t === 'megahit') shake = 30;
+      if (ev.t === 'mega') { shake = 14; addMegaCracks(ev); }
+      if (ev.t === 'megahit') { shake = 30; addHitCracks(ev); }
       if (ev.t === 'kickhit') shake = 24;
       if (ev.t === 'uphit') shake = 20;
       if (ev.t === 'gmax') shake = 30;
@@ -1952,6 +1952,7 @@ function drawBody(kind, X, Y, alpha, lift = 0, flap = 0, pose = IDLE, spin = 0, 
 const tele = document.createElement('canvas'); tele.width = arena.w; tele.height = arena.h;
 const teleCtx = tele.getContext('2d');
 function drawTelegraph() {
+  drawCracks(); // the ground cracked by a Megaton Punch, under everything else on it
   for (const si of beamSlots()) drawFan(snap.p[si], disp[si]);
   for (const si of slotsOf(11)) drawTailWarning(snap.p[si], disp[si]);
   for (const si of slotsOf(11)) drawSurf(snap.p[si], disp[si]);
@@ -1962,6 +1963,7 @@ function drawTelegraph() {
   for (const si of slotsOf(5)) drawBirdCharge(si);
   for (const si of slotsOf(4)) drawGlaciateCharge(si);
   for (const si of slotsOf(1)) drawSleepCharge(si);
+  for (const si of slotsOf(10)) drawSingCharge(si);
   if (aiming && AIMED[snap.p[you].k] === aiming.name && !(snap.p[you].k === 9 && snap.p[you].gmt > 0)) drawAimFan(snap.p[you], disp[you]); // the Gigantamax Gengar's K is the Devour, a plain press
 }
 // The fan of an aimed skill the player is choosing, drawn for them only (the opponent's page never gets it; it is not sent) until the cast, when the
@@ -2764,7 +2766,8 @@ function drawSlapPalm(p, d) {
   const flick = Math.floor(performance.now() / 45) % 2 === 0;
   ctx.save();
   ctx.lineCap = 'round'; ctx.strokeStyle = `rgba(255,255,255,${0.55 * fade})`; ctx.lineWidth = R * 0.5; // the streak the hand leaves
-  ctx.beginPath(); ctx.arc(d.x, d.y, slapCfg.length * 0.72, at(Math.max(0, s - 0.35)), at(s), !right); ctx.stroke();
+  const ah = at(s), trail = ah + (right ? 1 : -1) * Math.PI / 3; // 60 degrees behind the hand, against the way it sweeps (the right hand sweeps toward smaller angles)
+  ctx.beginPath(); ctx.arc(d.x, d.y, slapCfg.length * 0.72, trail, ah, right); ctx.stroke();
   for (let n = 4; n >= 0; n--) { // afterimages, then the palm itself
     const t = s - n * 0.08, head = n === 0, black = flick !== (n % 2 === 1), a = at(t), r = slapCfg.length * 0.72;
     ctx.save(); ctx.translate(d.x + Math.cos(a) * r, d.y + Math.sin(a) * r); ctx.rotate(a);
@@ -3384,6 +3387,179 @@ function discLightning(R, black, bolts) {
   }
   ctx.restore();
 }
+// Ash's Megaton Punch tears up the ground he was carried over (the 'mega' event: from (x, y) along (dx, dy) for l, at least a short way when he could not move):
+// a trench sunk deep down the middle, slabs of dirt tipped up along both lips of it, cracks running off to the sides, stones thrown about, and a crater
+// ringed with upturned slabs where he stopped. It tears open along the way in a moment (the slabs pop up as it passes), stays, and fades. Only the picture.
+const CRACK_OPEN = 0.15, TRENCH_W = 34, SLAB_H = 28, SLAB_IN = 8; // SLAB_H: how far every tipped-up slab reaches out from the hollow; SLAB_IN: how far the whole slab is moved in over the hollow
+let cracks = [];
+function addMegaCracks(ev) {
+  const ux = ev.dx || 0, uy = ev.dy || 0;
+  if (!(Math.hypot(ux, uy) > 0)) return;
+  const L = Math.max(ev.l || 0, 40), nx = -uy, ny = ux, base = Math.atan2(uy, ux);
+  let seed = (Math.abs(Math.round(ev.x * 13.7 + ev.y * 7.3)) % 2147483646) + 1;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const at = (a, side) => [ev.x + ux * a + nx * side, ev.y + uy * a + ny * side];
+  // the trench: its two lips, wider in the middle, ragged, and a jagged line down its deepest part
+  const N = Math.max(4, Math.round(L / 14)), left = [], right = [], mid = [];
+  for (let q = 0; q <= N; q++) {
+    const u = q / N, w = TRENCH_W * (0.9 + 0.1 * Math.sin(Math.PI * u)); // the same width all the way (only a slight swell in the middle)
+    left.push({ p: at(L * u, -w * (0.95 + rnd() * 0.1)), u }); right.push({ p: at(L * u, w * (0.95 + rnd() * 0.1)), u });
+    mid.push(at(L * u, (rnd() - 0.5) * w * 0.35));
+  }
+  // the slabs: chunks of crust along each lip, tipped up and outward (inner edge on the lip, outer edge pushed out)
+  const slabs = [];
+  for (const [lip, side] of [[left, -1], [right, 1]]) {
+    for (let q = 0; q < N; q += 2) { // each slab spans two steps of the lip: broad chunks, not posts
+      if (rnd() < 0.12) continue; // a gap here and there
+      const [x0, y0] = lip[q].p, [x1, y1] = lip[Math.min(q + 2, N)].p, mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+      const ox = -nx * side * SLAB_IN, oy = -ny * side * SLAB_IN;
+      slabs.push({ u: lip[q].u, pts: [[x0 + ox, y0 + oy], [x1 + ox, y1 + oy]], tip: [mx + ox + nx * side * SLAB_H, my + oy + ny * side * SLAB_H], tone: rnd() });
+    }
+  }
+  // where he stopped: a crater ringed with slabs
+  const [ex, ey] = at(L, 0), CR = TRENCH_W * 1.3, crater = [];
+  for (let q = 0; q < 12; q++) { const t = q / 12 * Math.PI * 2, r = CR * (0.85 + rnd() * 0.3); crater.push([ex + Math.cos(t) * r, ey + Math.sin(t) * r]); }
+  for (let q = 0; q < 12; q++) {
+    if (rnd() < 0.15) continue;
+    const [x0, y0] = crater[q], [x1, y1] = crater[(q + 1) % 12], t = (q + 0.5) / 12 * Math.PI * 2;
+    const ox = -Math.cos(t) * SLAB_IN, oy = -Math.sin(t) * SLAB_IN;
+    slabs.push({ u: 1, pts: [[x0 + ox, y0 + oy], [x1 + ox, y1 + oy]], tip: [(x0 + x1) / 2 + ox + Math.cos(t) * SLAB_H, (y0 + y1) / 2 + oy + Math.sin(t) * SLAB_H], tone: rnd() });
+  }
+  // cracks running off the lips and the crater, out into the flat ground
+  const lines = [];
+  const branch = (x, y, ang, len, w, from) => {
+    const pts = [[x, y]], n = 3;
+    for (let q = 1; q <= n; q++) { ang += (rnd() - 0.5) * 0.7; const [px, py] = pts[q - 1]; pts.push([px + Math.cos(ang) * len / n, py + Math.sin(ang) * len / n]); }
+    lines.push({ pts, w, from });
+  };
+  for (const [lip, side] of [[left, -1], [right, 1]]) for (let q = 1; q < N; q++) if (rnd() < 0.45) branch(lip[q].p[0] + nx * side * 12, lip[q].p[1] + ny * side * 12, base + side * (Math.PI / 2 + (rnd() - 0.5) * 1.1), 25 + rnd() * 40, 2.5, lip[q].u);
+  for (let q = 0; q < 9; q++) { const t = base + q / 9 * Math.PI * 2 + rnd() * 0.4; branch(ex + Math.cos(t) * (CR + 14), ey + Math.sin(t) * (CR + 14), t, 30 + rnd() * 45, 3, 1); }
+  // stones thrown out to the sides
+  const stones = [];
+  for (let q = 0; q < Math.round(L / 18) + 8; q++) {
+    const atEnd = q < 8, u = atEnd ? 1 : rnd(), side = rnd() < 0.5 ? -1 : 1, out = TRENCH_W + 20 + rnd() * 45, t = rnd() * Math.PI * 2;
+    const [sx, sy] = atEnd ? [ex + Math.cos(t) * (CR + 25 + rnd() * 40), ey + Math.sin(t) * (CR + 25 + rnd() * 40)] : at(L * u, side * out);
+    stones.push({ x: sx, y: sy, r: 2.5 + rnd() * 4.5, rot: rnd() * 6, u });
+  }
+  cracks.push({ left, right, mid, slabs, lines, stones, crater, ex, ey, t0: performance.now() / 1000 });
+}
+// Where the punch lands: the ground behind the foe (the way the punch was going) splits open in a fan: a sunken wedge, cracks running out through it,
+// dirt tipped up along its outer rim and stones thrown about. Same pieces as the trench (see drawCracks), so it tears open and fades with it.
+const HIT_FAN = 100, HIT_R = 230; // the fan's opening in degrees and how far it reaches past the foe
+function addHitCracks(ev) {
+  const ux = ev.dx || 0, uy = ev.dy || 0;
+  if (!(Math.hypot(ux, uy) > 0)) return;
+  const base = Math.atan2(uy, ux), half = HIT_FAN / 2 * Math.PI / 180;
+  // it starts right at the end of the trench the dash tore (the very end of that trench (the middle of the crater), same moment), and opens out through the foe and on behind it
+  const now = performance.now() / 1000, dash = cracks.filter((c) => c.left.length && now - c.t0 < 0.3).pop();
+  const cx = dash ? dash.ex : ev.x, cy = dash ? dash.ey : ev.y;
+  const HR = Math.max(HIT_R * 0.6, Math.hypot(ev.x - cx, ev.y - cy) + HIT_R * 0.5); // how far the fan reaches: to the foe and half of HIT_R beyond
+  let seed = (Math.abs(Math.round(cx * 11.3 + cy * 5.9)) % 2147483646) + 1;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const M = 14, rim = [], slabs = [], lines = [], stones = [];
+  for (let q = 0; q <= M; q++) { // the rim of the fan, ragged
+    const a = base - half + 2 * half * q / M, r = HR * (0.82 + rnd() * 0.3) * (0.8 + 0.2 * Math.cos((q / M - 0.5) * Math.PI));
+    rim.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, a]);
+  }
+  for (let q = 0; q < M; q += 1) { // dirt tipped up along the rim
+    if (rnd() < 0.12) continue;
+    const [x0, y0, a0] = rim[q], [x1, y1, a1] = rim[q + 1], a = (a0 + a1) / 2, g = 0.5 + 0.5 * (q / M);
+    const ox = -Math.cos(a) * SLAB_IN, oy = -Math.sin(a) * SLAB_IN;
+    slabs.push({ u: 0.25 + 0.6 * g, pts: [[x0 + ox, y0 + oy], [x1 + ox, y1 + oy]], tip: [(x0 + x1) / 2 + ox + Math.cos(a) * SLAB_H, (y0 + y1) / 2 + oy + Math.sin(a) * SLAB_H], tone: rnd() });
+  }
+  const radial = (a, from, to, w, n = 4) => { // a jagged crack along angle a, from radius `from` to `to`
+    const pts = [];
+    for (let q = 0; q <= n; q++) { const r = from + (to - from) * q / n, o = q ? (rnd() - 0.5) * 18 : 0; pts.push([cx + Math.cos(a) * r - Math.sin(a) * o, cy + Math.sin(a) * r + Math.cos(a) * o]); }
+    lines.push({ pts, w, from: 0 });
+    return pts;
+  };
+  for (let q = 0; q < 9; q++) { // cracks fanning out through it (the ones near the middle are the longest) and a fork off each
+    const a = base - half * 0.95 + 2 * half * 0.95 * (q / 8) + (rnd() - 0.5) * 0.12, reach = HR * (0.8 + 0.35 * Math.cos((q / 8 - 0.5) * Math.PI) * rnd() + 0.2);
+    const pts = radial(a, 14, reach, q % 2 ? 2.5 : 3.5);
+    const [fx, fy] = pts[2], fa = a + (rnd() < 0.5 ? -1 : 1) * (0.4 + rnd() * 0.4), fl = 30 + rnd() * 40;
+    lines.push({ pts: [[fx, fy], [fx + Math.cos(fa) * fl / 2, fy + Math.sin(fa) * fl / 2 + (rnd() - 0.5) * 8], [fx + Math.cos(fa) * fl, fy + Math.sin(fa) * fl]], w: 1.8, from: 0 });
+  }
+  for (let q = 0; q < 14; q++) { // stones thrown out ahead
+    const a = base + (rnd() - 0.5) * half * 2.3, r = 40 + rnd() * (HR + 50);
+    stones.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, r: 2.5 + rnd() * 4.5, rot: rnd() * 6, u: 0 });
+  }
+  cracks.push({ left: [], right: [], mid: [], crater: [], ex: cx, ey: cy, slabs, lines, stones, fan: { cx, cy, rim }, t0: performance.now() / 1000 });
+}
+function drawCracks() {
+  const now = performance.now() / 1000;
+  const LIFE = megaCfg.crack, FADE = Math.max(megaCfg.cfade, 1e-6); // how long the torn ground stays and how much of the end of that it fades in (hi.mega, from ash.megaton_punch)
+  cracks = cracks.filter((c) => now - c.t0 < LIFE);
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const poly = (pts) => { ctx.beginPath(); pts.forEach(([x, y], q) => (q ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); };
+  for (const c of cracks) {
+    const age = now - c.t0, open = Math.min(1, age / CRACK_OPEN), a = Math.min(1, (LIFE - age) / FADE);
+    const pop = (u) => { const s = (open - u) * CRACK_OPEN / 0.12; return s <= 0 ? 0 : s >= 1 ? 1 : 1 + 0.25 * Math.sin(Math.PI * s); }; // a slab springs up a little past its tilt, then settles
+    ctx.globalAlpha = a;
+    // the trench, as far as it has torn: a wide dark hollow, a deeper middle, the blackest line at the bottom
+    const n = Math.max(1, Math.ceil((c.left.length - 1) * open));
+    const L = c.left.slice(0, n + 1).map((v) => v.p), R = c.right.slice(0, n + 1).map((v) => v.p);
+    const lerp = (P, Q, k) => P.map(([x, y], q) => [x + (Q[q][0] - x) * k, y + (Q[q][1] - y) * k]);
+    const M = c.mid.slice(0, n + 1);
+    poly([...L, ...R.slice().reverse()]); ctx.fillStyle = '#7a5129'; ctx.fill(); ctx.strokeStyle = '#4a2e12'; ctx.lineWidth = 2.5; ctx.stroke();
+    poly([...lerp(L, M, 0.35), ...lerp(R, M, 0.35).reverse()]); ctx.fillStyle = '#4b2f14'; ctx.fill();
+    poly([...lerp(L, M, 0.68), ...lerp(R, M, 0.68).reverse()]); ctx.fillStyle = '#26170a'; ctx.fill();
+    ctx.strokeStyle = '#0d0803'; ctx.lineWidth = 3; ctx.beginPath(); M.forEach(([x, y], q) => (q ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+    // the crater where he stopped
+    if (open >= 1) {
+      const k = Math.min(1, (age - CRACK_OPEN) / 0.1);
+      const C = c.crater.map(([x, y]) => [c.ex + (x - c.ex) * k, c.ey + (y - c.ey) * k]);
+      poly(C); ctx.fillStyle = '#6e4924'; ctx.fill(); ctx.strokeStyle = '#4a2e12'; ctx.lineWidth = 2.5; ctx.stroke();
+      poly(C.map(([x, y]) => [c.ex + (x - c.ex) * 0.62, c.ey + (y - c.ey) * 0.62])); ctx.fillStyle = '#3a2410'; ctx.fill();
+      poly(C.map(([x, y]) => [c.ex + (x - c.ex) * 0.3, c.ey + (y - c.ey) * 0.3])); ctx.fillStyle = '#160d05'; ctx.fill();
+    }
+    if (c.fan) { // the sunken fan, opening out from where the foe stood
+      const { cx, cy, rim } = c.fan, e = 1 - Math.pow(1 - open, 2);
+      const F = (k) => [[cx, cy], ...rim.map(([x, y]) => [cx + (x - cx) * e * k, cy + (y - cy) * e * k])];
+      poly(F(1)); ctx.fillStyle = '#7a5129'; ctx.fill(); ctx.strokeStyle = '#4a2e12'; ctx.lineWidth = 2.5; ctx.stroke();
+      poly(F(0.72)); ctx.fillStyle = '#4b2f14'; ctx.fill();
+      poly(F(0.42)); ctx.fillStyle = '#26170a'; ctx.fill();
+      poly(F(0.18)); ctx.fillStyle = '#0d0803'; ctx.fill();
+    }
+    // the cracks off to the sides
+    for (const ln of c.lines) {
+      if (ln.from > open + 1e-6) continue;
+      const k = ln.from >= 1 ? Math.min(1, (age - CRACK_OPEN) / 0.08 + 0.3) : Math.min(1, (open - ln.from) / Math.max(1 - ln.from, 1e-6) * 1.5);
+      const m = Math.max(1, Math.ceil((ln.pts.length - 1) * k));
+      for (const [col, extra, dy] of [['rgba(255,244,215,0.55)', 1.5, 1.5], ['rgba(90,58,28,0.9)', 0, 0], ['rgba(30,18,8,1)', -ln.w * 0.55, 0]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = Math.max(0.8, ln.w + extra); ctx.beginPath();
+        for (let q = 0; q <= m; q++) { const [x, y] = ln.pts[q]; q ? ctx.lineTo(x, y + dy) : ctx.moveTo(x, y + dy); }
+        ctx.stroke();
+      }
+    }
+    // the slabs, tipped up: the shadow each throws, the broken face of dirt toward the hole, then the sunlit crust on top
+    for (const sl of c.slabs) {
+      const k = pop(sl.u);
+      if (k <= 0) continue;
+      const [[x0, y0], [x1, y1]] = sl.pts, mx = (x0 + x1) / 2, my = (y0 + y1) / 2, up = 4 * k; // the tip stands up off the ground, so it is drawn higher up the screen
+      const tx = mx + (sl.tip[0] - mx) * k, ty = my + (sl.tip[1] - my) * k - up;
+      poly([[x0, y0 + 2], [x1, y1 + 2], [tx + 3, ty + 4 + up]]); ctx.fillStyle = 'rgba(70,45,20,0.45)'; ctx.fill(); // shadow
+      poly([[x0, y0], [x1, y1], [x1, y1 + 5], [x0, y0 + 5]]); ctx.fillStyle = '#5a3818'; ctx.fill(); // the broken edge, dirt showing
+      // a raised mound: dark where it rises out of the hollow, lighter brown toward the tip that catches the light, and a ridge down the middle with one side lit and the other in shade
+      const gr = ctx.createLinearGradient(mx, my, tx, ty), v = (sl.tone - 0.5) * 14;
+      gr.addColorStop(0, '#2e1c0c'); gr.addColorStop(0.45, `rgb(${98 + v | 0},${64 + v * 0.7 | 0},${32 + v * 0.4 | 0})`); gr.addColorStop(1, `rgb(${150 + v | 0},${106 + v * 0.7 | 0},${62 + v * 0.4 | 0})`);
+      poly([[x0, y0], [x1, y1], [tx, ty]]); ctx.fillStyle = gr; ctx.fill();
+      poly([[mx, my], [x1, y1], [tx, ty]]); ctx.fillStyle = 'rgba(25,14,6,0.38)'; ctx.fill(); // the shaded half, away from the light
+      ctx.strokeStyle = 'rgba(190,140,85,0.55)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke(); // the ridge catching the light
+      ctx.strokeStyle = 'rgba(60,36,16,0.8)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(tx, ty); ctx.lineTo(x1, y1); ctx.stroke();
+    }
+    // the stones thrown out
+    for (const st of c.stones) {
+      if (st.u > open + 1e-6 || (st.u >= 1 && age < CRACK_OPEN)) continue;
+      ctx.save(); ctx.translate(st.x, st.y); ctx.rotate(st.rot);
+      ctx.fillStyle = 'rgba(70,45,20,0.4)'; ctx.beginPath(); ctx.ellipse(1.5, st.r * 0.7, st.r, st.r * 0.45, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#9b7a52'; ctx.strokeStyle = '#4e3418'; ctx.lineWidth = 1.5; poly([[-st.r, 0], [-st.r * 0.4, -st.r * 0.9], [st.r * 0.6, -st.r * 0.7], [st.r, 0.1 * st.r], [st.r * 0.3, st.r * 0.6], [-st.r * 0.6, st.r * 0.5]]); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,240,205,0.7)'; ctx.beginPath(); ctx.arc(-st.r * 0.25, -st.r * 0.45, st.r * 0.25, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
 // While Ash gathers. The ground shows the line the fist will fly along (it does not follow). The first part (`ring_duration`) is Thunder's warning: rings close
 // in on the hand; the bolts of the config strike it whenever they are due. The second part (`ball_duration`): the whole hand becomes a flickering
 // black and white disc that swells, with lightning crackling inside it.
@@ -3476,7 +3652,6 @@ function drawMegaFist(f) {
   if (fade <= 0) return;
   const at = (t) => megaCfg.fstart + (megaCfg.fend - megaCfg.fstart) * t; // from where the config says it starts to where it ends (behind Ash if negative)
   ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(ang);
-  ctx.fillStyle = `rgba(255,255,255,${0.35 * fade})`; ctx.fillRect(Math.min(megaCfg.fstart, at(u)), -megaCfg.radius * 0.7, Math.abs(at(u) - megaCfg.fstart), megaCfg.radius * 1.4); // the streak it left
   for (let n = 5; n >= 0; n--) { // afterimages, then the fist
     const t = Math.max(0, u - n * 0.09), head = n === 0, black = megaBlack(45) !== (n % 2 === 1);
     ctx.save(); ctx.translate(at(t), 0); ctx.globalAlpha = (head ? 1 : 0.5 - n * 0.07) * fade;
@@ -4592,6 +4767,13 @@ function drawSleepCharge(i) {
   const p = snap.p[i], d = disp[i];
   if (!(p.uct > 0)) return;
   chargeRings(d.x, d.y, sleepCfg.ring > 0 ? 1 - p.uct / sleepCfg.ring : 1, 0.8, RING_SLEEP);
+}
+// Jigglypuff gathering Sing (p.uct > 0, `sing.charge_time`): pink rings close in on it.
+const RING_PINK = ['190,60,120', '255,160,205', '230,100,160'];
+function drawSingCharge(i) {
+  const p = snap.p[i], d = disp[i];
+  if (!(p.uct > 0)) return;
+  chargeRings(d.x, d.y, singCfg.charge > 0 ? 1 - p.uct / singCfg.charge : 1, 0.8, RING_PINK);
 }
 function drawGlaciateCharge(i) {
   const p = snap.p[i], d = disp[i];

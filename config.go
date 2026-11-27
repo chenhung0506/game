@@ -1110,6 +1110,8 @@ type BrawlerCfg struct {
 		ShowText           bool      `json:"show_text"`
 		FistStart          float64   `json:"fist_start"`
 		FistEnd            float64   `json:"fist_end"`
+		CrackDuration      float64   `json:"crack_duration"` // how long the torn-up ground the punch leaves stays on screen, in seconds, fading out over the end of it (picture only; 0 = none)
+		CrackFade          float64   `json:"crack_fade"`     // the last this many seconds of crack_duration it fades out in (0 = it vanishes at once; at most crack_duration)
 		RingScale          float64   `json:"ring_scale"`
 		BallScale          float64   `json:"ball_scale"`
 		FistScale          float64   `json:"fist_scale"`
@@ -1440,6 +1442,7 @@ func DefaultConfig() Config {
 	mp.LungeDistance, mp.ShowWarning, mp.ShowText = 120, true, true
 	mp.JumpDistance, mp.JumpDuration, mp.JumpHeight = 200, 0.4, 50
 	mp.FistStart, mp.FistEnd = 24, mp.Distance
+	mp.CrackDuration, mp.CrackFade = 2.6, 0.8
 	c.Dummy.MaxHP, c.Dummy.Radius = 100000, 28
 	cp := &c.Ash.CometPunch
 	cp.Reach = Reach{MinHeight: 0, MaxHeight: 60}
@@ -2104,6 +2107,8 @@ func (c Config) validateSkills() error {
 		{"ash.megaton_punch.stun_duration", c.Ash.MegatonPunch.StunDuration},
 		{"ash.megaton_punch.knockback", c.Ash.MegatonPunch.Knockback},
 		{"ash.megaton_punch.lunge_distance", c.Ash.MegatonPunch.LungeDistance},
+		{"ash.megaton_punch.crack_duration", c.Ash.MegatonPunch.CrackDuration},
+		{"ash.megaton_punch.crack_fade", c.Ash.MegatonPunch.CrackFade},
 		{"machamp.uppercut.slide_distance", c.Machamp.Uppercut.SlideDistance},
 		{"machamp.gigantamax.lightning_punch.charge_duration", c.Machamp.Gigantamax.LightningPunch.ChargeDuration},
 		{"machamp.gigantamax.lightning_punch.damage", float64(c.Machamp.Gigantamax.LightningPunch.Damage)},
@@ -2305,6 +2310,9 @@ func (c Config) validateSkills() error {
 	}
 	if n := c.Ash.MegatonPunch.BoltCount; n < 0 || n > 20 {
 		return fmt.Errorf("ash.megaton_punch.bolt_count must be 0..20, got %d", n)
+	}
+	if mp := c.Ash.MegatonPunch; mp.CrackFade > mp.CrackDuration {
+		return fmt.Errorf("ash.megaton_punch.crack_fade (%v) must not be longer than crack_duration (%v)", mp.CrackFade, mp.CrackDuration)
 	}
 	for name, r := range map[string]Reach{
 		"machamp.high_jump_kick":             c.Machamp.HighJumpKick.Reach,
@@ -2643,6 +2651,7 @@ type jumpCfg struct {
 // (0 = it chases until it is shot down). `scale` only sizes the picture.
 type singCfg struct {
 	Reach
+	ChargeTime       float64 `json:"charge_time"` // seconds Jigglypuff stands gathering (rooted, UltT) before the notes go out; a stun, a freeze or a catch ends it and the charge is lost (0 = they go out at once)
 	Count            int     `json:"count"`
 	RingRadius       float64 `json:"ring_radius"`
 	SpreadSpeed      float64 `json:"spread_speed"`

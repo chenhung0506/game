@@ -186,3 +186,50 @@ func TestANotesSwayStillReachesTheFoe(t *testing.T) {
 		t.Fatal("swaying notes never touched the foe")
 	}
 }
+
+func TestSingGathersForChargeTimeRootedBeforeTheNotesGoOut(t *testing.T) {
+	g := jig(400)
+	g.cfg.Jigglypuff.Sing.ChargeTime = 0.5
+	singNow(g)
+	if notesOf(g) != 0 || g.P[0].Charge != 0 || g.P[0].UltT <= 0 {
+		t.Fatalf("the press should empty the charge and start the gathering, no notes yet: notes %d, charge %v, uct %v", notesOf(g), g.P[0].Charge, g.P[0].UltT)
+	}
+	x0 := g.P[0].X
+	steps := 0
+	for notesOf(g) == 0 && steps < 100 {
+		g.P[0].In = Input{DX: 1, Skill: steps%2 == 0} // walking and slapping while it gathers: neither happens
+		g.Step(dt)
+		steps++
+		if notesOf(g) == 0 && (g.P[0].X != x0 || g.P[0].SlapT > 0) {
+			t.Fatalf("it moved or swung while gathering: x %v -> %v, slap %v", x0, g.P[0].X, g.P[0].SlapT)
+		}
+	}
+	if got := float64(steps) * dt; got < 0.5-dt || got > 0.5+2*dt {
+		t.Fatalf("the notes went out after %v s, want about 0.5", got)
+	}
+	if notesOf(g) != g.cfg.Jigglypuff.Sing.Count {
+		t.Fatalf("%d notes, want %d", notesOf(g), g.cfg.Jigglypuff.Sing.Count)
+	}
+}
+
+func TestAStunWhileSingGathersEndsItAndTheChargeIsLost(t *testing.T) {
+	g := jig(400)
+	g.cfg.Jigglypuff.Sing.ChargeTime = 0.5
+	singNow(g)
+	g.stun(&g.P[0], 0.2)
+	for n := 0; n < 60; n++ {
+		g.P[0].In = Input{}
+		g.Step(dt)
+	}
+	if notesOf(g) != 0 || g.P[0].UltT != 0 || g.P[0].Charge >= g.cfg.Jigglypuff.Ultimate.Max {
+		t.Fatalf("a stun should end the gathering with no notes and no charge back: notes %d, uct %v, charge %v", notesOf(g), g.P[0].UltT, g.P[0].Charge)
+	}
+}
+
+func TestSingChargeTimeMustNotBeNegative(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Jigglypuff.Sing.ChargeTime = -1
+	if cfg.validate() == nil {
+		t.Fatal("a negative charge_time should be refused")
+	}
+}
