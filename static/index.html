@@ -1078,7 +1078,10 @@ function artMachampSide(c, t, pose, gmax) {
     const o = near ? 0 : -5, sh = [near ? 1 : -1, -8], g = gmax ? 4 : 0, el = [-12 + o + s * 0.4, -26 - g], hand = [10 + o * 0.6 + s * 0.3, -32 - g - s * 0.4]; // the upper arms are raised over the head // upper arm: shoulder, bent elbow, fist up in a guard
     const sh2 = [near ? 2 : -2, 1], el2 = [-9 + o * 0.6 - s * 0.4, 14.6], hand2 = [15 + o - s * 0.3, 11 + s * 0.4]; // the elbow of the lower arm hooks back, like the upper one's // lower arm: held out in front of the belt
     for (const [a, b, h, w, r] of [[sh, el, hand, gmax ? 8.6 : 6.9, gmax ? 9.5 : 6], [sh2, el2, hand2, gmax ? 8.4 : 6.8, gmax ? 9 : 5.6]]) {
-      limb(a, b, w, col); limb(b, h, w * 0.92, col); fist(h[0] + 1, h[1], r, near ? BD : '#3b3150');
+      limb(b, h, w * 0.74, near ? (gmax ? '#3d3355' : '#7a8ca8') : (gmax ? '#2a2038' : '#53637d')); // the forearm is slimmer and a little darker, at the back
+      ov(c, b[0] + (h[0] - b[0]) * 0.8, b[1] + (h[1] - b[1]) * 0.8, w * 0.6, w * 0.6, BD, 0, null); ov(c, b[0], b[1], w * 0.8, w * 0.8, col); // the cuff at the wrist, and the elbow
+      limb(a, b, w, col); // the upper arm on top, over the elbow and the start of the forearm
+      fist(h[0] + 1, h[1], r, near ? BD : '#3b3150');
     }
   };
   leg(-1, gmax ? '#3a3050' : '#6f81a0'); // the far leg, darker
@@ -1135,16 +1138,32 @@ function artMachamp(c, x, y, t, pose, gmax = false) {
   c.lineJoin = 'round'; // the black pants: a rounded triangle, wide at the waist and pointing down (an outline pass, then the fill)
 //for (const [col, w] of [[OUTLINE, 5.8], [BLK, 5]]) { c.fillStyle = col; c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(-6.5, 15); c.lineTo(6.5, 15); c.lineTo(0, 21.5); c.closePath(); c.fill(); c.stroke(); }
   for (const [col, w] of [[OUTLINE, 5.8], [BLK, 5]]) { c.fillStyle = col; c.strokeStyle = col; c.lineWidth = w; const pw = gmax ? 4.2 : 6.5, pt = gmax ? 21 + LD * 0.4 : 21; c.beginPath(); c.moveTo(-pw, 15 + LD * 0.6); c.lineTo(pw, 15 + LD * 0.6); c.lineTo(0, pt); c.closePath(); c.fill(); c.stroke(); } // (the Gigantamax one is a small triangle: a big one would be a black patch on a body that size)
-  for (const m of [-1, 1]) { // the lower arms hang, the upper ones are raised with fists up
-    const swing = sw * m * 3;
-    if (!gmax) {
-      ov(c, m * 20.2, 5.1 + swing, 5.5, 11, B, m * 0.6 + Math.PI / 2); ov(c, m * 21.6, -12.8 - swing, 5.8, 11, B, -m * 0.9 + Math.PI / 2);
-      ov(c, m * 26.4, 14.4 + swing, 6, 5.5, BD); ov(c, m * 30, -19.6 - swing, 6.5, 6, BD);
-      continue;
-    }
-    // The Gigantamax arms are thicker, each ending in a huge gauntlet of cracked lava rock for a fist; the lower pair is held out away from the chest.
-    ov(c, m * 22.5, 6 + swing, 7.4, 14.8, B, m * 0.75 + Math.PI / 2); ov(c, m * 22.6, -17 - swing, 7.8, 14.8, B, -m * 0.9 + Math.PI / 2);
-    for (const [hx, hy, r] of [[m * 30.5, 16.5 + swing, 9.5], [m * 32, -26 - swing, 10.5]]) {
+  const limb = (p, q, w, col) => { const dx = q[0] - p[0], dy = q[1] - p[1]; ov(c, (p[0] + q[0]) / 2, (p[1] + q[1]) / 2, Math.hypot(dx, dy) / 2 + w * 0.6, w, col, Math.atan2(dy, dx)); };
+  const FORE = gmax ? '#3d3355' : '#7a8ca8'; // the forearm is a little darker than the upper arm, so the two read as two pieces
+  for (const m of [-1, 1]) { // each arm is a thick upper arm from the shoulder to an elbow, and a slimmer forearm with a cuff at the wrist, ending in the fist; the lower pair hangs, the upper pair is raised
+    const swing = sw * m * 3, g = gmax ? 1 : 0;
+    const arms = back ? [ // [shoulder, elbow, hand, upper-arm width]
+      [[m * 15, 1], [m * (21.5 + g * 1.5), 6.5 + g + swing * 0.5], [m * (26.4 + g * 4.1), 14.4 + g * 2.1 + swing], gmax ? 8 : 6.2],
+      [[m * 14, -9 - g], [m * (24.5 + g * 2.5), -8 - g * 4 - swing * 0.5], [m * (30 + g * 2), -19.6 - g * 6.4 - swing], gmax ? 8.4 : 6.4],
+    ] : [ // from the front: the upper arms are thrown up with the elbows out and the hands up beside the head, the lower ones are bent with the elbows out and the fists in at the belt
+      [[m * 15, -1], [m * (24.5 + g * 3), 8 + g * 2 + swing * 0.4], [m * (16 + g * 3), 17 + g * 3 + swing], gmax ? 8 : 6.2],
+      [[m * 14, -7 - g], [m * (28 + g * 3), -13 - g * 4 - swing * 0.4], [m * (25 + g * 3), -27 - g * 7 - swing], gmax ? 8.4 : 6.4],
+    ];
+    arms.forEach(([sh, el, hd, w], k) => {
+      const fore = back ? 0.76 : k ? 1.15 : 0.98; // from the front the forearm is as thick as the upper arm, and the raised pair's a little thicker
+
+      const cx = el[0] + (hd[0] - el[0]) * 0.8, cy = el[1] + (hd[1] - el[1]) * 0.8;
+      if (!back) { // from the front the forearm is on top: it covers the elbow and the end of the upper arm
+        limb(sh, el, w, B); ov(c, el[0], el[1], w * 0.82, w * 0.82, B); limb(el, hd, w * fore, FORE); ov(c, cx, cy, w * 0.62, w * 0.62, BD, 0, null);
+      } else {
+        limb(el, hd, w * fore, FORE); // from behind the forearm is at the back
+        ov(c, cx, cy, w * 0.62, w * 0.62, BD, 0, null); // the cuff at the wrist
+        ov(c, el[0], el[1], w * 0.82, w * 0.82, B); // the elbow: a round joint
+        limb(sh, el, w, B); // the upper arm, on top: it covers the elbow and the start of the forearm
+      }
+    });
+    if (!gmax) { for (const [, , hd] of arms) ov(c, hd[0], hd[1], 6 + (hd === arms[1][2] ? 0.5 : 0), 5.5 + (hd === arms[1][2] ? 0.5 : 0), BD); continue; }
+    for (const [, , [hx, hy]] of arms) { const r = hy < 0 ? 10.5 : 9.5; // the gauntlets of cracked lava rock
       ov(c, hx, hy, r, r * 0.9, LAVA); c.strokeStyle = CRACK; c.lineWidth = 1.1; c.beginPath();
       c.moveTo(hx - r * 0.6, hy - r * 0.2); c.lineTo(hx - r * 0.1, hy + r * 0.1); c.lineTo(hx + r * 0.2, hy - r * 0.5); c.moveTo(hx - r * 0.1, hy + r * 0.1); c.lineTo(hx + r * 0.1, hy + r * 0.7); c.moveTo(hx + r * 0.2, hy - r * 0.5); c.lineTo(hx + r * 0.65, hy - r * 0.35); c.stroke();
       ov(c, hx + (m > 0 ? 1 : -1) * r * 0.2, hy + r * 0.7, r * 0.8, r * 0.28, '#d9731a', 0, null); // the knuckles
