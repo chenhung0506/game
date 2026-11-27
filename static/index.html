@@ -1279,42 +1279,98 @@ function bezTail(c, p, w0, w1, col) {
 function artCharizardFront(c, x, y, t, flap) {
   const beat = flap ? Math.sin(t * 26) * 0.5 : Math.sin(t * 9) * 0.14;
   const ang = beat + Math.sin(t * 61) * 0.035; // the tremor
-  c.save();
+  const O = '#f28a30', OD = '#cf5d1f', OL = '#fbb36a', CR = '#f8e2a4', CRD = '#dfb768', TE = '#34a8b6', TED = '#17606b', RIM = '#e8762a', HORN = '#b64a1c', CLAW = '#f6efd8', EYE = '#1f86b8';
+  c.save(); c.translate(x, y);
   c.lineJoin = 'round'; c.lineCap = 'round';
-  // tail curling up behind, with a flickering flame on the tip
-  bezTail(c, [x + 7, y + 15, x + 22, y + 23, x + 33, y + 11, x + 29, y - 3], 13, 5.5, '#d9622a'); // thick at the body, thinner to the flame
-  const fk = 1 + 0.22 * Math.sin(t * 31) + 0.12 * Math.sin(t * 47), tx = x + 29, ty = y - 5;
-  c.fillStyle = '#ff7a1a'; c.beginPath(); c.moveTo(tx - 5, ty + 2); c.quadraticCurveTo(tx - 6, ty - 8 * fk, tx + 1, ty - 17 * fk); c.quadraticCurveTo(tx + 7, ty - 8 * fk, tx + 5, ty + 2); c.closePath(); c.fill();
-  c.fillStyle = '#ffd84a'; c.beginPath(); c.moveTo(tx - 2.5, ty + 1); c.quadraticCurveTo(tx - 3, ty - 5 * fk, tx + 1, ty - 10 * fk); c.quadraticCurveTo(tx + 4, ty - 5 * fk, tx + 2.5, ty + 1); c.closePath(); c.fill();
-  // wings, behind the body: a bone along the front edge, a teal membrane with a scalloped back edge, narrow at the body and wide at the tip
+  // the wings, behind the body: the arm bone goes up and out to a claw at the tip, the teal membrane hangs from it down to a scalloped edge, and an orange rim runs round the top and the outer edge
   for (const sd of [-1, 1]) {
-    c.save(); c.translate(x + sd * 8, y - 9); c.scale(sd, 1); c.rotate(-0.75 - ang);
-    c.fillStyle = '#2e9aa8'; c.strokeStyle = '#17606b'; c.lineWidth = 1.4;
-    c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.lineTo(52, 27); c.lineTo(46, 18); c.lineTo(39, 30); c.lineTo(33, 18); c.lineTo(26, 24); c.lineTo(19, 12); c.lineTo(12, 15); c.lineTo(6, 8); c.lineTo(0, 7); c.closePath(); c.fill(); c.stroke();
-    for (const [w, col] of [[2.8, '#17606b'], [1.5, '#ee7a2a']]) { // the finger bones are orange too, out to the far edge of the wing
-      c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(54, -8); c.lineTo(52, 27); c.moveTo(54, -8); c.lineTo(39, 30); c.moveTo(54, -8); c.lineTo(26, 24); c.moveTo(54, -8); c.lineTo(12, 15); c.stroke();
+    c.save(); c.translate(sd * 7, -9); c.scale(sd, 1); c.rotate(-0.05 - ang);
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(18, -17); c.lineTo(41, -35); c.quadraticCurveTo(64, -28, 77, 11); c.lineTo(51, 6); c.lineTo(38, 17); c.lineTo(29, 7); c.lineTo(23, 18); c.lineTo(15, 9); c.lineTo(9, 14); c.lineTo(0, 7); c.closePath();
+    c.fillStyle = TE; c.fill(); c.strokeStyle = TED; c.lineWidth = 1.2; c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.13)'; c.beginPath(); c.moveTo(4, -2); c.lineTo(20, -15); c.lineTo(39, -30); c.lineTo(46, -8); c.lineTo(22, 2); c.closePath(); c.fill(); // the lit part near the arm
+    c.strokeStyle = TED; c.lineWidth = 1.1; c.beginPath(); for (const [fx, fy] of [[51, 6], [30, 7], [15, 9]]) { c.moveTo(41, -35); c.lineTo(fx, fy); } c.stroke(); // the finger bones
+    for (const [w, col] of [[5, OUTLINE], [3.6, RIM]]) { // the rim: the arm and then the outer edge
+      c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(0, 0); c.lineTo(18, -17); c.lineTo(41, -35); c.quadraticCurveTo(64, -28, 77, 11); c.stroke();
     }
-    c.strokeStyle = '#e8762a'; c.lineWidth = 3.2; c.beginPath(); c.moveTo(0, 0); c.lineTo(54, -8); c.stroke(); // the leading bone
-    el(c, 55.5, -8.5, 2.6, 2.6, '#f6d58a'); // the claw at the wing's tip
+    ov(c, 42, -36.5, 2.4, 2.4, CLAW);
     c.restore();
   }
-  // feet, body, belly, arms
-  el(c, x - 8, y + 21, 6.5, 4.5, '#d9622a'); el(c, x + 8, y + 21, 6.5, 4.5, '#d9622a');
-  el(c, x, y + 5, 15, 18, '#f08030');
-  el(c, x, y + 9, 9, 13, '#f6d58a');
-  c.strokeStyle = '#e0b866'; c.lineWidth = 1;
-  for (let r = 0; r < 4; r++) { c.beginPath(); c.moveTo(x - 7, y + 3 + r * 5); c.quadraticCurveTo(x, y + 5 + r * 5, x + 7, y + 3 + r * 5); c.stroke(); }
-  el(c, x - 16.5, y + 3, 4.5, 8, '#f08030', 0.25); el(c, x + 16.5, y + 3, 4.5, 8, '#f08030', -0.25);
-  // head: horns swept back, snout, eyes
-  c.fillStyle = '#c4501f';
-  c.beginPath(); c.moveTo(x - 6, y - 22); c.lineTo(x - 13, y - 33); c.lineTo(x - 2, y - 25); c.closePath(); c.fill();
-  c.beginPath(); c.moveTo(x + 6, y - 22); c.lineTo(x + 13, y - 33); c.lineTo(x + 2, y - 25); c.closePath(); c.fill();
-  el(c, x, y - 16, 11.5, 10, '#f08030');
-  c.strokeStyle = '#8a3a14'; c.lineWidth = 1; c.beginPath(); // a tiny pair of nostril slits and a small mouth, instead of a flat pink muzzle
-  c.moveTo(x - 1.9, y - 13.4); c.lineTo(x - 1.5, y - 12.2); c.moveTo(x + 1.9, y - 13.4); c.lineTo(x + 1.5, y - 12.2);
-  c.moveTo(x - 4, y - 8.6); c.quadraticCurveTo(x, y - 6.8, x + 4, y - 8.6); c.stroke();
-  el(c, x - 5.2, y - 19, 2.7, 3.1, '#fff'); el(c, x + 5.2, y - 19, 2.7, 3.1, '#fff');
-  el(c, x - 5.2, y - 18.4, 1.4, 2, '#1b5e8c'); el(c, x + 5.2, y - 18.4, 1.4, 2, '#1b5e8c');
+  // the tail curls up and out to the side, over the wing,, with the flame on its tip
+  bezTail(c, [6, 16, 22, 24, 34, 12, 30, -3], 12.6, 5.6, OUTLINE); bezTail(c, [6, 16, 22, 24, 34, 12, 30, -3], 10.6, 4.2, O); bezTail(c, [6, 16, 22, 24, 34, 12, 30, -3], 2.6, 1.2, OL);
+  const fk = 1 + 0.22 * Math.sin(t * 31) + 0.12 * Math.sin(t * 47), tx = 30, ty = -4;
+  c.fillStyle = '#ff7a1a'; c.beginPath(); c.moveTo(tx - 5, ty + 2); c.quadraticCurveTo(tx - 6, ty - 8 * fk, tx + 1, ty - 17 * fk); c.quadraticCurveTo(tx + 7, ty - 8 * fk, tx + 5, ty + 2); c.closePath(); c.fill();
+  c.fillStyle = '#ffd84a'; c.beginPath(); c.moveTo(tx - 2.5, ty + 1); c.quadraticCurveTo(tx - 3, ty - 5 * fk, tx + 1, ty - 10 * fk); c.quadraticCurveTo(tx + 4, ty - 5 * fk, tx + 2.5, ty + 1); c.closePath(); c.fill();
+  // legs and feet
+  for (const s of [-1, 1]) {
+    ov(c, s * 10.2, 16.5, 6.6, 8, O); ov(c, s * 11, 23.5, 6.8, 3.8, OD);
+    for (const k of [-3, 0, 3]) poly(c, [[s * 11 + k - 1.1, 25.5], [s * 11 + k + 1.1, 25.5], [s * 11 + k + k * 0.1, 28.4]], CLAW, 'rgba(90,60,20,.5)');
+  }
+  // the body: a slim egg, with the cream belly running up the chest and the throat
+  ov(c, 0, 14, 17.6, 8.5, O); // the hips, round near the legs
+  // neck, chest and belly in one: the sides run from under the head in one smooth curve out to the hips, and the cream down the front is one piece too, from the throat to the flat bottom of the belly
+  const chest = () => { c.beginPath(); c.moveTo(-5.4, -17); c.lineTo(5.4, -17); c.bezierCurveTo(5.4, -7, 16.5, -3, 15.5, 14); c.lineTo(-15.5, 14); c.bezierCurveTo(-16.5, -3, -5.4, -7, -5.4, -17); c.closePath(); };
+  c.fillStyle = O; c.strokeStyle = OUTLINE; c.lineWidth = 0.8; chest(); c.fill();
+  c.beginPath(); c.moveTo(-5.4, -17); c.bezierCurveTo(-5.4, -7, -16.5, -3, -15.5, 14); c.moveTo(5.4, -17); c.bezierCurveTo(5.4, -7, 16.5, -3, 15.5, 14); c.stroke();
+  ov(c, 0, 14, 12, 7.4, O, 0, null); // over the seam between the chest and the hips
+  c.save(); chest(); c.moveTo(17.6, 14); c.ellipse(0, 14, 17.6, 8.5, 0, 0, 7); c.clip();
+  c.fillStyle = CR; c.beginPath(); c.moveTo(-3.4, -17); c.lineTo(3.4, -17); c.bezierCurveTo(3.4, -6, 8, -3, 8, 8); c.bezierCurveTo(8, 17, 5.2, 22, 5.2, 30); c.lineTo(-5.2, 30); c.bezierCurveTo(-5.2, 22, -8, 17, -8, 8); c.bezierCurveTo(-8, -3, -3.4, -6, -3.4, -17); c.closePath(); c.fill(); c.restore();
+  // the arms: an upper arm out to the elbow, a forearm back in, and a paw with its claws, held up in front of the chest
+  for (const s of [-1, 1]) {
+    const sx = s * 9, sy = -3, ex = s * 13.9, ey = 2.3, hx = s * 11.3, hy = 7.5;
+    ov(c, (sx + ex) / 2, (sy + ey) / 2, 6.6, 3.8, O, Math.atan2(ey - sy, ex - sx)); ov(c, (ex + hx) / 2, (ey + hy) / 2, 6.8, 3.6, O, Math.atan2(hy - ey, hx - ex));
+    ov(c, ex, ey, 4.1, 4.1, O, 0, null); ov(c, hx, hy, 4.2, 3.6, O); // the elbow, and the paw
+    for (const k of [-2.2, 0, 2.2]) poly(c, [[hx + k - 1, hy + 2.8], [hx + k + 1, hy + 2.8], [hx + k * 1.2, hy + 6.2]], CLAW, 'rgba(90,60,20,.5)');
+  }
+  // the head: a horn up the middle and a pair of fins out to the sides, a short snout, small blue eyes under slanted brows
+  for (const s of [-1, 1]) poly(c, [[s * 4, -29], [s * 9.5, -41], [s * 8, -26]], HORN); // the two horns, close in towards the middle
+  ov(c, 0, -24, 9, 8.2, O);
+  ov(c, 0, -20.4, 5.6, 4.2, OL, 0, null);
+  c.strokeStyle = '#8a3a14'; c.lineWidth = 0.9; c.beginPath(); c.moveTo(-1.7, -21.6); c.lineTo(-1.4, -20.6); c.moveTo(1.7, -21.6); c.lineTo(1.4, -20.6); c.moveTo(-3.6, -18.2); c.quadraticCurveTo(0, -16.6, 3.6, -18.2); c.stroke();
+  for (const s of [-1, 1]) {
+    ov(c, s * 4.4, -26, 2.5, 2.7, '#fff', 0, null); ov(c, s * 4.3, -25.7, 1.5, 2, EYE, 0, null); ov(c, s * 4.3, -25.5, 0.7, 1.2, '#0e2430', 0, null); ov(c, s * 4.8, -26.4, 0.5, 0.5, '#fff', 0, null);
+    c.strokeStyle = '#7a3012'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(s * 7.8, -29.4); c.lineTo(s * 2.4, -27.9); c.stroke();
+  }
+  c.restore();
+}
+
+// Charizard seen from behind, in the same build as the front one (artCharizardFront): a slim body that swells at the waist, the hips, the horns close together. From behind the
+// wings are in front of the back and show their orange outside, the tail curls up in front of the hips, and a ridge runs down the back.
+function artCharizardBack(c, x, y, t, flap, pose = IDLE) {
+  const beat = flap ? Math.sin(t * 26) * 0.5 : Math.sin(t * 9) * 0.14, ang = beat + Math.sin(t * 61) * 0.035, sw = Math.sin(pose.ph) * pose.mv;
+  const O = '#f28a30', OD = '#cf5d1f', OL = '#fbb36a', OUT = '#d96a22', RIM = '#f08a3a', EDGE = '#8f3c14', HORN = '#b64a1c', CLAW = '#f6efd8';
+  c.save(); c.translate(x, y); c.lineJoin = 'round'; c.lineCap = 'round';
+  for (const s of [-1, 1]) { // legs and feet; the one that steps lifts
+    const lift = Math.max(0, s * sw) * 3;
+    ov(c, s * 10.2, 16.5 - lift * 0.5, 6.6, 8, O); ov(c, s * 11, 23.5 - lift, 6.8, 3.8, OD);
+  }
+  ov(c, 0, 14, 17.6, 8.5, O); // the hips
+  const chest = () => { c.beginPath(); c.moveTo(-5.4, -17); c.lineTo(5.4, -17); c.bezierCurveTo(5.4, -7, 16.5, -3, 15.5, 14); c.lineTo(-15.5, 14); c.bezierCurveTo(-16.5, -3, -5.4, -7, -5.4, -17); c.closePath(); };
+  c.fillStyle = O; c.strokeStyle = OUTLINE; c.lineWidth = 0.8; chest(); c.fill();
+  c.beginPath(); c.moveTo(-5.4, -17); c.bezierCurveTo(-5.4, -7, -16.5, -3, -15.5, 14); c.moveTo(5.4, -17); c.bezierCurveTo(5.4, -7, 16.5, -3, 15.5, 14); c.stroke();
+  ov(c, 0, 14, 12, 7.4, O, 0, null); // over the seam between the back and the hips
+  for (let r = 0; r < 5; r++) poly(c, [[-3, -9 + r * 6], [0, -13 + r * 6], [3, -9 + r * 6]], OD, null); // the ridge down the back
+  for (const s of [-1, 1]) { ov(c, s * 14.5, 3, 4, 8, O, s * 0.2); ov(c, s * 14, 12, 3.4, 3, O); } // the arms hang at the sides
+  // the wings, over the back: orange outside, with the bones and the rim as in the front
+  for (const sd of [-1, 1]) {
+    c.save(); c.translate(sd * 7, -9); c.scale(sd, 1); c.rotate(-0.05 - ang);
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(18, -17); c.lineTo(41, -35); c.quadraticCurveTo(64, -28, 77, 11); c.lineTo(51, 6); c.lineTo(38, 17); c.lineTo(30, 7); c.lineTo(23, 18); c.lineTo(15, 9); c.lineTo(9, 14); c.lineTo(0, 7); c.closePath();
+    c.fillStyle = OUT; c.fill(); c.strokeStyle = EDGE; c.lineWidth = 1.2; c.stroke();
+    c.fillStyle = 'rgba(90,30,0,.16)'; c.beginPath(); c.moveTo(4, -2); c.lineTo(20, -15); c.lineTo(39, -30); c.lineTo(46, -8); c.lineTo(22, 2); c.closePath(); c.fill();
+    c.strokeStyle = EDGE; c.lineWidth = 1.1; c.beginPath(); for (const [fx, fy] of [[51, 6], [30, 7], [15, 9]]) { c.moveTo(41, -35); c.lineTo(fx, fy); } c.stroke();
+    for (const [w, col] of [[5, OUTLINE], [3.6, RIM]]) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(0, 0); c.lineTo(18, -17); c.lineTo(41, -35); c.quadraticCurveTo(64, -28, 77, 11); c.stroke(); }
+    ov(c, 42, -36.5, 2.4, 2.4, CLAW);
+    c.restore();
+  }
+  // the tail, curling up in front of the hips, with the flame on its tip
+  const tp = [3, 15, 22, 24, 33, 11, 29, -3];
+  bezTail(c, tp, 12.6, 5.6, OUTLINE); bezTail(c, tp, 10.6, 4.2, O); bezTail(c, tp, 2.6, 1.2, OL);
+  const fk = 1 + 0.22 * Math.sin(t * 31) + 0.12 * Math.sin(t * 47), tx = 29, ty = -4;
+  c.fillStyle = '#ff7a1a'; c.beginPath(); c.moveTo(tx - 5, ty + 2); c.quadraticCurveTo(tx - 6, ty - 8 * fk, tx + 1, ty - 17 * fk); c.quadraticCurveTo(tx + 7, ty - 8 * fk, tx + 5, ty + 2); c.closePath(); c.fill();
+  c.fillStyle = '#ffd84a'; c.beginPath(); c.moveTo(tx - 2.5, ty + 1); c.quadraticCurveTo(tx - 3, ty - 5 * fk, tx + 1, ty - 10 * fk); c.quadraticCurveTo(tx + 4, ty - 5 * fk, tx + 2.5, ty + 1); c.closePath(); c.fill();
+  // the back of the head: the two horns close together, a crest down it
+  for (const s of [-1, 1]) poly(c, [[s * 4, -29], [s * 9.5, -41], [s * 8, -26]], HORN);
+  ov(c, 0, -24, 9, 8.2, O);
+  ov(c, 0, -25, 5, 5.5, OD, 0, null); for (let r = 0; r < 3; r++) poly(c, [[-2.2, -27 + r * 3.4], [0, -29.6 + r * 3.4], [2.2, -27 + r * 3.4]], HORN, null);
   c.restore();
 }
 
@@ -1594,6 +1650,7 @@ function artCharizard(c, x, y, t, flap, pose = IDLE) {
   const ang = beat + Math.sin(t * 61) * 0.035; // the tremor
   const O = '#f28a30', OD = '#cf5d1f', OL = '#fbb36a', CR = '#f8e2a4', CRD = '#dfb768', TE = '#34a8b6', TEF = '#237f8b', TED = '#17606b', HORN = '#b64a1c', CLAW = '#f6efd8', EYE = '#1f86b8';
   if (dir === 0) return artCharizardFront(c, x, y + bob, t, flap); // the front is the first drawing, which reads better than a detailed one
+  if (dir === 1) return artCharizardBack(c, x, y + bob, t, flap, pose); // the back is its own drawing, in the build of the front one
   const sway = Math.sin(t * 3) * 2;
   const claw = (cx, cy, a, l = 3.4) => poly(c, [[cx - 1.2, cy], [cx + 1.2, cy], [cx + Math.sin(a) * l, cy + Math.cos(a) * l]], CLAW, 'rgba(90,60,20,.5)');
   const flame = (fx, fy, s = 1) => { // a flickering flame whose tip is at (fx, fy - height)
