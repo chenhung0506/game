@@ -254,6 +254,7 @@ ws.onmessage = (e) => {
       fx.push({ ...ev, age: 0 });
       if (ev.t === 'slam') shake = 16;
       if (ev.t === 'jslam') shake = Math.max(shake, 26);
+      if (ev.t === 'jstomp') shake = Math.max(shake, 12);
       if (ev.t === 'gslam') shake = 12;
       if (ev.t === 'glaslam') shake = Math.max(shake, 4);
       if (ev.t === 'thunder') { shake = 10; flashT = 4 * tvoltCfg.fevery; } // a strike lands: one white and black flash
@@ -899,36 +900,55 @@ function artChikorita(c, x, y, t, pose) {
   const G = '#9bd467', GD = '#74b04c', CR = '#e8f3b8', BUD = '#f3d85c', RED = '#d23a3a';
   const sway = Math.sin(t * 2.2) * 0.07 + Math.sin(t * 11) * 0.1 * mv; // the leaf: lazy at rest, whipping when it runs
   const up = (v) => Math.max(0, v);
-  const eye = (ex, ey, r) => { ov(c, ex, ey, r, r * 1.25, RED, 0, null); ov(c, ex, ey + 0.4, r * 0.45, r * 0.8, '#222', 0, null); ov(c, ex + r * 0.3, ey - r * 0.5, r * 0.3, r * 0.3, '#fff', 0, null); };
+  const TALL = 1.15, flat = (fx, fy, fn) => { c.save(); c.translate(fx, fy); c.scale(1, 1 / TALL); c.translate(-fx, -fy); fn(); c.restore(); }; // the body is stretched by TALL; the face and the buds are drawn undone, round again
+  const eye = (ex, ey, r) => flat(ex, ey, () => { // a white eye with a big red eyeball in it: the lower part of the ball is pink, a dark pupil, a big and a small highlight
+    ov(c, ex, ey, r * 1.12, r * 1.3, '#fffdf5', 0, null);
+    c.save(); c.beginPath(); c.ellipse(ex, ey, r * 1.12, r * 1.3, 0, 0, 7); c.clip(); // the eyeball is cut by the eyelids
+    ov(c, ex, ey + r * 0.05, r * 0.8, r * 1.2, RED, 0, null);
+    ov(c, ex, ey + r * 0.78, r * 0.7, r * 0.45, '#f4a0a0', 0, null);
+    ov(c, ex, ey - r * 0.05, r * 0.4, r * 0.66, '#5a1018', 0, null);
+    c.restore();
+    ov(c, ex - r * 0.28, ey - r * 0.5, r * 0.3, r * 0.34, '#fff', 0, null); ov(c, ex + r * 0.22, ey + r * 0.35, r * 0.14, r * 0.14, '#fff', 0, null);
+  });
   c.save(); c.translate(x, y + bob + 2 * mv);
   if (dir === 2) c.scale(-1, 1);
+  c.translate(0, 19); c.scale(1, TALL); c.translate(0, -19); // the whole of it taller, standing on the same feet
   if (dir === 0 || dir === 1) {
     const back = dir === 1, st = 1 + 0.08 * mv; // coming at you it is a little longer
-    ov(c, -8, 16, 3.8, 3.2, GD); ov(c, 8, 16, 3.8, 3.2, GD);
+    ov(c, -4, 16, 3.5, 3.2, GD); ov(c, 4, 16, 3.5, 3.2, GD);
     ov(c, 0, 8, 12.5, 9 * st, G);
-    if (!back) ov(c, 0, 10, 7.5, 6, CR, 0, null);
-    else ov(c, 0, 17, 2.6, 2, GD, 0, null); // the small tail
-    ov(c, -7, 15 - up(sw) * 3, 3.7, 4.2, G); ov(c, 7, 15 - up(-sw) * 3, 3.7, 4.2, G);
-    ov(c, 0, -5, 13, 11, G);
-    if (!back) {
-      eye(-5.2, -5, 2.4); eye(5.2, -5, 2.4);
-      ov(c, -1.4, -0.5, 0.5, 0.5, '#2a4a20', 0, null); ov(c, 1.4, -0.5, 0.5, 0.5, '#2a4a20', 0, null);
-      c.strokeStyle = '#2a4a20'; c.lineWidth = 0.9; c.beginPath(); c.arc(0, 0.6, 2.8, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
+    ov(c, 0, -6, 11, 9.7, G);
+    c.fillStyle = G; c.strokeStyle = OUTLINE; c.lineWidth = 0.8; c.beginPath(); c.moveTo(-11, -5); c.lineTo(11, -5); c.bezierCurveTo(11, 2, 12.5, 3, 12.5, 8); c.lineTo(-12.5, 8); c.bezierCurveTo(-12.5, 3, -11, 2, -11, -5); c.closePath(); c.fill(); // the cheeks run straight down to the body, no waist
+    c.beginPath(); c.moveTo(-11, -5); c.bezierCurveTo(-11, 2, -12.5, 3, -12.5, 8); c.moveTo(11, -5); c.bezierCurveTo(11, 2, 12.5, 3, 12.5, 8); c.stroke();
+    for (const [sx, lift] of [[-1, up(sw)], [1, up(-sw)]]) { // a near leg: a hip that swells out of the body, then the leg, joined so there is no corner
+      const ly = 15 - lift * 3;
+      ov(c, sx * 8, 11.5, 5.2, 5.5, G); ov(c, sx * 8.5, ly, 3.4, 4.2, G); ov(c, sx * 8.3, (11.5 + ly) / 2 + 0.5, 3.6, 3.4, G, 0, null);
     }
-    for (const k of [-1.5, -0.5, 0.5, 1.5]) ov(c, k * 4.6, 5.6 - (1.5 - Math.abs(k)) * 0.7, 1.9, 1.9, BUD); // the ring of four buds
-    chLeaf(c, 0, -13, sway + lf.a, back, 12 + sway * 70 + lf.bend, lf.s);
+    ov(c, 0, 8, 12.5, 9 * st, G, 0, null); // over the seams between the legs, the cheeks and the body: no line there
+    if (!back) ov(c, 0, 10, 6.2, 6, CR, 0, null);
+    else ov(c, 0, 17, 2.6, 2, GD, 0, null); // the small tail
+    if (!back) {
+      eye(-5.1, -6.5, 3.2); eye(5.1, -6.5, 3.2);
+            flat(0, -0.9, () => { c.strokeStyle = '#2a4a20'; c.lineWidth = 0.9; c.lineCap = 'round'; c.beginPath(); c.arc(-1.4, -1.3, 1.4, 0.02 * Math.PI, 0.9 * Math.PI); c.stroke(); c.beginPath(); c.arc(1.4, -1.3, 1.4, 0.1 * Math.PI, 0.98 * Math.PI); c.stroke(); }); // a small cat mouth, two little arcs meeting in the middle
+    }
+    for (const k of [-1.5, -0.5, 0.5, 1.5]) { const by = 2.4 + (1.5 - Math.abs(k)) * 1.1; flat(k * 5, by, () => ov(c, k * 5, by, 1.9, 1.9, BUD)); } // the ring of four buds, evenly spread on an arc that curves up at the ends (a smile)
+    chLeaf(c, 0, -13.7, sway + lf.a, back, 12 + sway * 70 + lf.bend, lf.s);
   } else { // side view, facing right
     const a = sw * 0.85;
-    pikaLimb(c, 7, 12, 6, -a, 3, GD); pikaLimb(c, -9, 12, 6, a, 3, GD); // the far legs
+    pikaLimb(c, 11, 12, 6, -a, 3, GD); pikaLimb(c, -4, 12, 6, a, 3, GD); // the far legs
     ov(c, -17, 6, 3.2, 2.2, GD, 0.5); // tail
-    ov(c, -2, 7, 14.5 + 1.5 * mv, 8, G, -0.04 * mv); ov(c, 1, 10, 9, 4, CR, 0, null);
-    chLeaf(c, 7, -9, -0.15 + sway + (dir === 2 ? -lf.a : lf.a), false, -14 + sway * 70 + (dir === 2 ? -lf.bend : lf.bend), lf.s); // bends back over its head; a left-facing one is drawn mirrored
-    ov(c, 10, -1 + 1.5 * mv, 10.5, 9.5, G);
-    ov(c, 18, 1 + 1.5 * mv, 3.4, 2.7, G);
-    eye(13.8, -3 + 1.5 * mv, 2.2); ov(c, 20, 0.2 + 1.5 * mv, 0.6, 0.6, '#2a4a20', 0, null);
-    c.strokeStyle = '#2a4a20'; c.lineWidth = 0.9; c.beginPath(); c.arc(16.5, 2 + 1.5 * mv, 2.3, 0.1 * Math.PI, 0.7 * Math.PI); c.stroke();
-    for (let k = 0; k < 2; k++) ov(c, 3 + k * 4.4, 6.5 + 1.5 * mv - k * 0.4, 1.9, 1.9, BUD); // two of the four show from the side
-    pikaLimb(c, 7, 12, 6, a, 3.2, G); pikaLimb(c, -9, 12, 6, -a, 3.2, G); // the near legs
+    ov(c, -2, 8, 13.5 + 1.5 * mv, 8.5, G, -0.04 * mv);
+    chLeaf(c, 7, -9.8, -0.15 + sway + (dir === 2 ? -lf.a : lf.a), false, -14 + sway * 70 + (dir === 2 ? -lf.bend : lf.bend), lf.s); // bends back over its head; a left-facing one is drawn mirrored
+    ov(c, 10, -2 + 1.5 * mv, 10, 8.8, G);
+    c.fillStyle = G; c.strokeStyle = OUTLINE; c.lineWidth = 0.8; c.beginPath(); c.moveTo(-0.5, -1 + 1.5 * mv); c.lineTo(19.6, 1 + 1.5 * mv); c.bezierCurveTo(19.6, 5, 11.5, 4, 11.5, 8); c.lineTo(-15, 8); c.closePath(); c.fill(); // the cheek runs straight down to the body
+    c.beginPath(); c.moveTo(19.6, 1 + 1.5 * mv); c.bezierCurveTo(19.6, 5, 11.5, 4, 11.5, 8); c.stroke();
+    pikaLimb(c, 11, 12, 6, a, 3.2, G); pikaLimb(c, -4, 12, 6, -a, 3.2, G); // the near legs
+    ov(c, -2, 8, 13.5 + 1.5 * mv, 8.5, G, -0.04 * mv, null); // over the seams between the legs, the cheek and the body: no line there
+    ov(c, 1, 10, 9, 4, CR, 0, null);
+    ov(c, 18, -2.5 + 1.5 * mv, 3.4, 2.7, G);
+    eye(13.4, -4.5 + 1.5 * mv, 3.1); 
+    flat(16.5, 0.5 + 1.5 * mv, () => { c.strokeStyle = '#2a4a20'; c.lineWidth = 0.9; c.beginPath(); c.lineCap = 'round'; c.arc(16.5, 0.5 + 1.5 * mv, 2.3, 0.1 * Math.PI, 0.7 * Math.PI); c.stroke(); c.beginPath(); c.moveTo(17.3, 2.6 + 1.5 * mv); c.lineTo(18.4, 2 + 1.5 * mv); c.stroke(); });
+    for (let k = 0; k < 2; k++) flat(1 + k * 7, 4.5 + 1.5 * mv, () => ov(c, 1 + k * 7, 4.5 + 1.5 * mv, 1.9, 1.9, BUD)); // two of the four show from the side
   }
   c.restore();
 }
@@ -2869,6 +2889,32 @@ function drawJumpAir(f) {
   }
   for (let n = 0; n < 8; n++) { const a = n * Math.PI / 4 + jr(f.x, n) * 0.5, rr = 12 + 56 * k; fxStar(Math.cos(a) * rr, Math.sin(a) * rr * 0.45 + 8 * k, 2, 5.5 * (1 - k * 0.5), 4, a + k * 5, JFX_COLORS[n % 4]); }
   ctx.restore();
+}
+// the moment Jigglypuff's foot lands on a foe in the air (`foe_damage`): the foe is struck where it floats, so it is a short, hard hit seen from the side: a white flash, the
+// foot's streaks slamming down onto it, a flat cyan-and-pink burst, a squashed shock ring and lines thrown down and out (the floor burst, in oranges, comes later when it lands)
+function drawJumpHit(f) {
+  const D = 0.5, k = Math.min(f.age / D, 1), ease = 1 - Math.pow(1 - k, 3), R = 50, seed = f.x * 0.53 + f.y, lu = toWorld(0, -(f.z || 0));
+  upright(f.x + lu.x, f.y + lu.y, () => {
+    if (k < 0.3) { const a = 1 - k / 0.3, r = R * (1.2 + k * 5), g = ctx.createRadialGradient(0, 0, 0, 0, 0, r); g.addColorStop(0, `rgba(255,255,255,${0.95 * a})`); g.addColorStop(0.5, `rgba(150,235,255,${0.55 * a})`); g.addColorStop(1, 'rgba(120,200,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill(); }
+    if (k < 0.4) { // the foot coming down on it: three thick streaks from above, quickly gone
+      const a = 1 - k / 0.4; ctx.lineCap = 'round';
+      for (const dx of [-16, 0, 16]) for (const [w, col] of [[11 * a + 2, `rgba(255,120,170,${0.8 * a})`], [5 * a + 1, `rgba(255,255,255,${a})`]]) { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(dx * 1.6, -R * 3.2 * (1 - k * 1.6)); ctx.lineTo(dx * 0.3, -4); ctx.stroke(); }
+    }
+    ctx.globalAlpha = Math.min(1, (1 - k) * 2.4);
+    ctx.lineCap = 'round';
+    for (let n = 0; n < 16; n++) { // thrown down and out, mostly downward
+      const a = Math.PI / 2 + (jr(seed, n) - 0.5) * 2.6, r0 = R * (0.35 + 0.8 * ease), r1 = r0 + R * (0.5 + 0.9 * jr(seed, n + 30)) * (1 - k * 0.4);
+      ctx.lineWidth = 2 + 4 * (1 - k) * jr(seed, n + 60); ctx.strokeStyle = n % 3 ? '#ffffff' : '#7fe6ff';
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0 * 1.2); ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1 * 1.2); ctx.stroke();
+    }
+    ctx.save(); ctx.scale(1, 0.75); // the burst is a little squashed: it is a blow, not a blast
+    fxStar(0, 0, R * (0.55 + 0.5 * ease), R * (1.05 + 0.7 * ease), 10, k * 0.5, '#7fe6ff', 'rgba(20,90,140,.9)');
+    fxStar(0, 0, R * (0.35 + 0.35 * ease), R * (0.75 + 0.5 * ease), 10, -k * 0.8, '#ff8fc0', 'rgba(140,30,80,.9)');
+    fxStar(0, 0, R * (0.18 + 0.2 * ease), R * (0.45 + 0.3 * ease), 8, k, '#ffffff', 'rgba(120,200,255,.9)');
+    ctx.restore();
+    for (const [mul, col, w] of [[1.7, 'rgba(255,120,170,.85)', 6], [1.15, 'rgba(255,255,255,.95)', 4]]) { ctx.strokeStyle = col; ctx.lineWidth = w * (1 - k * 0.6); ctx.beginPath(); ctx.ellipse(0, 0, R * mul * ease, R * mul * ease * 0.4, 0, 0, 7); ctx.stroke(); } // squashed shock rings
+    ctx.globalAlpha = 1;
+  });
 }
 // the burst where the stomped foe hits the floor: a white-hot flash, a huge spiky burst with speed lines, a streak coming down from above, thick shock rings and sparks
 function drawJumpStomp(f) {
@@ -5507,7 +5553,7 @@ function frame() {
     drawVines();
     drawFBeams();
     drawVolt();
-    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'surfhit' ? 0.5 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'lickhit' ? 0.35 : f.t === 'bite' ? Math.max(0.4, ggmaxCfg.lbite + 0.25) : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : f.t === 'sing' ? 0.7 : f.t === 'jumpair' ? 0.55 : f.t === 'jslam' ? 1.0 : 0.35));
+    fx = fx.filter((f) => (f.age += 1 / 60) < (f.t === 'slam' ? QUAKE_LIFE : f.t === 'explode' || f.t === 'voltburst' || f.t === 'ult' || f.t === 'bbboom' ? 0.5 : f.t === 'infboom' ? 0.7 : f.t === 'infpop' ? 0.45 : f.t === 'freeze' || f.t === 'iceburst' ? 0.6 : f.t === 'surfhit' ? 0.5 : f.t === 'tail' ? TAIL_SWING + 0.15 : f.t === 'tree' || f.t === 'gslam' ? 0.6 : f.t === 'lickhit' ? 0.35 : f.t === 'bite' ? Math.max(0.4, ggmaxCfg.lbite + 0.25) : f.t === 'mega' ? Math.max(0.5, megaCfg.fwdur) : f.t === 'megahit' ? Math.max(0.65, megaCfg.htdur) : f.t === 'kickhit' || f.t === 'uphit' ? 0.6 : f.t === 'gmax' || f.t === 'gmaxend' ? 0.9 : f.t === 'quake' ? (f.l || 3) + 0.5 : f.t === 'bpunch' ? 0.7 + (f.l || 0) : f.t === 'bpboom' ? 0.45 : f.t === 'lpunch' ? 0.45 : f.t === 'lpbolt' ? 0.8 : f.t === 'gwell' ? gengarCfg.pull : f.t === 'glacast' ? glaCfg.dur + glaCfg.fall + 0.3 : f.t === 'glaslam' ? 0.45 : f.t === 'bbwell' ? bbCfg.pull : f.t === 'evolve' ? 0.9 : f.t === 'gvplant' ? 0.7 : f.t === 'gvrise' || f.t === 'gvslam' ? 0.5 : f.t === 'storm' ? 0.4 : f.t === 'sing' ? 0.7 : f.t === 'jumpair' ? 0.55 : f.t === 'jslam' ? 1.0 : f.t === 'jstomp' ? 0.5 : 0.35));
     for (const f of fx) {
       if (f.t === 'thunder') drawBolt(f);
       else if (f.t === 'skybolt') drawSkyBolt(f);
@@ -5547,7 +5593,7 @@ function frame() {
       else if (f.t === 'leaf') drawLeafSpark(f);
       else if (f.t === 'sing') drawSingRing(f);
       else if (f.t === 'jumpair') drawJumpAir(f);
-      else if (f.t === 'jstomp') { /* the moment of the stomp itself has no picture: the burst is for when the foe hits the floor (jslam) */ }
+      else if (f.t === 'jstomp') drawJumpHit(f); // the foot landing on a foe in the air (the bigger burst is for when it hits the floor, jslam)
       else if (f.t === 'jslam') drawJumpStomp({ ...f, z: 0 }); // the big yellow burst, where the stomped foe hits the floor
       else if (f.t === 'mark') drawMarkSpark(f);
       else if (f.t === 'doze') { /* drawn from the player's own state (drawDoze) */ }
