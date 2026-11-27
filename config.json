@@ -556,8 +556,8 @@
       "mass": 20,
       "duration": 8,
       "marks_to_sleep": 3,
-      "sleep_duration": 7,
-      "mark_duration": 6,
+      "sleep_duration": 5,
+      "mark_duration": 10,
       "sway_width": 100,
       "sway_length": 140,
       "scale": 1
@@ -595,7 +595,7 @@
     "max_hp": 250,
     "walk_speed": 95,
     "radius": 10,
-    "evolve_hops": 1,
+    "evolve_hops": 3,
     "jump": {
       "height": 160,
       "duration": 0.9,
@@ -612,12 +612,12 @@
     "wave": {
       "min_height": 0,
       "max_height": 60,
-      "cooldown": 4,
-      "summon_duration": 0.4,
+      "cooldown": 4.5,
+      "summon_duration": 0.5,
       "speed": 700,
       "distance": 800,
       "width": 180,
-      "damage": 15,
+      "damage": 10,
       "lift_height": 40,
       "carry_interval": 0.3,
       "carry_damage": 3,
@@ -630,23 +630,23 @@
       "angle": 110,
       "length": 300,
       "knockback": 200,
-      "stun_duration": 1.5,
+      "stun_duration": 1,
       "cooldown": 5
     },
     "hyper_beam": {
       "min_height": 0,
       "max_height": 40,
-      "charge_duration": 0.3,
+      "charge_duration": 0.5,
       "sweep_angle": 38,
       "sweep_duration": 1.2,
-      "recharge_duration": 1,
-      "cooldown": 5,
-      "damage": 10,
+      "recharge_duration": 1.5,
+      "cooldown": 8,
+      "damage": 5,
       "knockback": 80,
       "hit_interval": 0.05,
       "mass": 130,
       "length": 650,
-      "width": 70
+      "width": 80
     }
   },
   "ash": {
